@@ -1,11 +1,13 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import Client from '@/models/Client';
 
-export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
+export const dynamic = 'force-dynamic';
+
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         await dbConnect();
-        const { id } = await context.params;
+        const { id } = await params;
         const client = await Client.findById(id);
         if (!client) {
             return NextResponse.json({ error: 'Client not found' }, { status: 404 });
@@ -16,10 +18,10 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     }
 }
 
-export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         await dbConnect();
-        const { id } = await context.params;
+        const { id } = await params;
         const body = await request.json();
         const client = await Client.findByIdAndUpdate(id, body, { new: true });
         if (!client) {
@@ -31,10 +33,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     }
 }
 
-export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         await dbConnect();
-        const { id } = await context.params;
+        const { id } = await params;
         const client = await Client.findByIdAndDelete(id);
         if (!client) {
             return NextResponse.json({ error: 'Client not found' }, { status: 404 });
