@@ -10,7 +10,7 @@ import { Recipe } from '@/models/Recipe';
 
 export async function GET(
     request: Request,
-    { params }: { params: Promise<{ id: string }> }
+    context: { params: Promise<{ id: string }> }
 ) {
     try {
         await dbConnect();
@@ -18,7 +18,7 @@ export async function GET(
         void User; // Ensure User model is registered
         void Recipe; // Ensure Recipe model is registered
 
-        const { id } = await params;
+        const { id } = await context.params;
 
         const order = await Manufacturing.findById(id)
             .populate('sku', 'name image category')
@@ -89,11 +89,11 @@ export async function GET(
 
 export async function PATCH(
     request: Request,
-    { params }: { params: Promise<{ id: string }> }
+    context: { params: Promise<{ id: string }> }
 ) {
     try {
         await dbConnect();
-        const { id } = await params;
+        const { id } = await context.params;
         const body = await request.json();
 
         const order = await Manufacturing.findByIdAndUpdate(id, body, { new: true })
@@ -159,11 +159,11 @@ export async function PATCH(
 
 export async function DELETE(
     request: Request,
-    { params }: { params: Promise<{ id: string }> }
+    context: { params: Promise<{ id: string }> }
 ) {
     try {
         await dbConnect();
-        const { id } = await params;
+        const { id } = await context.params;
 
         const deleted = await Manufacturing.findByIdAndDelete(id);
         if (!deleted) {

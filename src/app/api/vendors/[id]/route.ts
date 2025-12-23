@@ -4,11 +4,11 @@ import Vendor from '@/models/Vendor';
 
 export async function GET(
     request: Request,
-    { params }: { params: Promise<{ id: string }> }
+    context: { params: Promise<{ id: string }> }
 ) {
     try {
         await dbConnect();
-        const { id } = await params;
+        const { id } = await context.params;
         const vendor = await Vendor.findById(id).lean();
         if (!vendor) return NextResponse.json({ error: 'Vendor not found' }, { status: 404 });
         return NextResponse.json(vendor);
@@ -19,11 +19,11 @@ export async function GET(
 
 export async function PATCH(
     request: Request,
-    { params }: { params: Promise<{ id: string }> }
+    context: { params: Promise<{ id: string }> }
 ) {
     try {
         await dbConnect();
-        const { id } = await params;
+        const { id } = await context.params;
         const body = await request.json();
         const updated = await Vendor.findByIdAndUpdate(id, body, { new: true });
         if (!updated) return NextResponse.json({ error: 'Vendor not found' }, { status: 404 });
@@ -35,11 +35,11 @@ export async function PATCH(
 
 export async function DELETE(
     request: Request,
-    { params }: { params: Promise<{ id: string }> }
+    context: { params: Promise<{ id: string }> }
 ) {
     try {
         await dbConnect();
-        const { id } = await params;
+        const { id } = await context.params;
         const deleted = await Vendor.findByIdAndDelete(id);
         if (!deleted) return NextResponse.json({ error: 'Vendor not found' }, { status: 404 });
         return NextResponse.json({ message: 'Vendor deleted' });

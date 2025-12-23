@@ -6,14 +6,14 @@ import Vendor from '@/models/Vendor';
 
 export async function GET(
     request: Request,
-    { params }: { params: Promise<{ id: string }> }
+    context: { params: Promise<{ id: string }> }
 ) {
     try {
         await dbConnect();
         void Sku; // Ensure Sku model is registered
         void Vendor; // Ensure Vendor model is registered
 
-        const { id } = await params;
+        const { id } = await context.params;
 
         const order = await PurchaseOrder.findById(id)
             .populate('vendor', 'name')
@@ -34,11 +34,11 @@ export async function GET(
 
 export async function PATCH(
     request: Request,
-    { params }: { params: Promise<{ id: string }> }
+    context: { params: Promise<{ id: string }> }
 ) {
     try {
         await dbConnect();
-        const { id } = await params;
+        const { id } = await context.params;
         const body = await request.json();
 
         // Check if we need to generate lot numbers
@@ -93,11 +93,11 @@ export async function PATCH(
 
 export async function DELETE(
     request: Request,
-    { params }: { params: Promise<{ id: string }> }
+    context: { params: Promise<{ id: string }> }
 ) {
     try {
         await dbConnect();
-        const { id } = await params;
+        const { id } = await context.params;
 
         const deleted = await PurchaseOrder.findByIdAndDelete(id);
         if (!deleted) {

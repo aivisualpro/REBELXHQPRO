@@ -4,11 +4,11 @@ import Sku from '@/models/Sku';
 
 export async function GET(
     request: Request,
-    { params }: { params: Promise<{ id: string }> }
+    context: { params: Promise<{ id: string }> }
 ) {
     try {
         await dbConnect();
-        const { id } = await params;
+        const { id } = await context.params;
         const sku = await Sku.findById(id);
 
         if (!sku) {
@@ -23,11 +23,11 @@ export async function GET(
 
 export async function PATCH(
     request: Request,
-    { params }: { params: Promise<{ id: string }> }
+    context: { params: Promise<{ id: string }> }
 ) {
     try {
         await dbConnect();
-        const { id } = await params;
+        const { id } = await context.params;
         const body = await request.json();
 
         // Prevent updating _id if passed, though usually mongoose ignores it or errors if diff
@@ -49,11 +49,11 @@ export async function PATCH(
 
 export async function DELETE(
     request: Request,
-    { params }: { params: Promise<{ id: string }> }
+    context: { params: Promise<{ id: string }> }
 ) {
     try {
         await dbConnect();
-        const { id } = await params;
+        const { id } = await context.params;
         const deletedSku = await Sku.findByIdAndDelete(id);
 
         if (!deletedSku) {

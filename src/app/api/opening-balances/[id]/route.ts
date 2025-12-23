@@ -5,11 +5,11 @@ import Sku from '@/models/Sku';
 
 export async function GET(
     request: Request,
-    { params }: { params: Promise<{ id: string }> }
+    context: { params: Promise<{ id: string }> }
 ) {
     try {
         await dbConnect();
-        const { id } = await params;
+        const { id } = await context.params;
 
         const item = await OpeningBalance.findById(id).populate('sku').lean();
 
@@ -25,11 +25,11 @@ export async function GET(
 
 export async function PATCH(
     request: Request,
-    { params }: { params: Promise<{ id: string }> }
+    context: { params: Promise<{ id: string }> }
 ) {
     try {
         await dbConnect();
-        const { id } = await params;
+        const { id } = await context.params;
         const body = await request.json();
 
         const updatedItem = await OpeningBalance.findByIdAndUpdate(
@@ -50,11 +50,11 @@ export async function PATCH(
 
 export async function DELETE(
     request: Request,
-    { params }: { params: Promise<{ id: string }> }
+    context: { params: Promise<{ id: string }> }
 ) {
     try {
         await dbConnect();
-        const { id } = await params;
+        const { id } = await context.params;
 
         const deletedItem = await OpeningBalance.findByIdAndDelete(id);
 
