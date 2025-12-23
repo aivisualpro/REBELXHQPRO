@@ -10,9 +10,9 @@ export const metadata: Metadata = {
   title: "RebelX Headquarters | Unified ERP",
   description: "Advanced ERP system for RebelX operations, CRM, and warehouse management.",
   icons: {
-    icon: "https://res.cloudinary.com/dwkq4s4rg/image/upload/v1766349101/rebelx-headquarters/assets/rebelx_favicon_new.png",
-    shortcut: "https://res.cloudinary.com/dwkq4s4rg/image/upload/v1766349101/rebelx-headquarters/assets/rebelx_favicon_new.png",
-    apple: "https://res.cloudinary.com/dwkq4s4rg/image/upload/v1766349101/rebelx-headquarters/assets/rebelx_favicon_new.png",
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
   }
 };
 
