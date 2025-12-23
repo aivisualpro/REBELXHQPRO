@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import { Recipe } from '@/models/Recipe';
 import Sku from '@/models/Sku';
@@ -6,10 +6,10 @@ import User from '@/models/User';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
-    const { id } = await context.params;
+export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
     try {
         await dbConnect();
+        const { id } = await context.params;
         void Sku;
         void User;
 
@@ -30,10 +30,10 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     }
 }
 
-export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
-    const { id } = await context.params;
+export async function PUT(request: NextRequest, context: { params: Promise<{ id: string }> }) {
     try {
         await dbConnect();
+        const { id } = await context.params;
         const body = await request.json();
         const updatedRecipe = await Recipe.findByIdAndUpdate(id, body, { new: true })
             .populate('sku', 'name')
@@ -50,10 +50,10 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     }
 }
 
-export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
-    const { id } = await context.params;
+export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
     try {
         await dbConnect();
+        const { id } = await context.params;
         const deletedRecipe = await Recipe.findByIdAndDelete(id);
 
         if (!deletedRecipe) {

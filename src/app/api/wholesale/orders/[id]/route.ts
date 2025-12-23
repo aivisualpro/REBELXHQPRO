@@ -9,14 +9,14 @@ import Client from '@/models/Client';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
     try {
         await dbConnect();
         // Ensure models are registered
         void Sku;
         void Client;
 
-        const { id } = await params; // Await params in Next.js 15+
+        const { id } = await context.params; // Await params in Next.js 15+
 
         const order = await SaleOrder.findById(id)
             .populate('clientId', 'name')
@@ -77,10 +77,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
     try {
         await dbConnect();
-        const { id } = await params;
+        const { id } = await context.params;
         const body = await request.json();
 
         // If line items are being updated, ensure totals are correct
@@ -109,10 +109,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
     try {
         await dbConnect();
-        const { id } = await params;
+        const { id } = await context.params;
 
         const deletedOrder = await SaleOrder.findByIdAndDelete(id);
 

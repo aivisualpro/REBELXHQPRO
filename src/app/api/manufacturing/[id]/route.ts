@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import Manufacturing from '@/models/Manufacturing';
 
@@ -8,8 +8,10 @@ import PurchaseOrder from '@/models/PurchaseOrder';
 import User from '@/models/User';
 import { Recipe } from '@/models/Recipe';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(
-    request: Request,
+    request: NextRequest,
     context: { params: Promise<{ id: string }> }
 ) {
     try {
@@ -88,7 +90,7 @@ export async function GET(
 }
 
 export async function PATCH(
-    request: Request,
+    request: NextRequest,
     context: { params: Promise<{ id: string }> }
 ) {
     try {
@@ -158,7 +160,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-    request: Request,
+    request: NextRequest,
     context: { params: Promise<{ id: string }> }
 ) {
     try {

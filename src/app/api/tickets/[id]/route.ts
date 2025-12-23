@@ -4,10 +4,10 @@ import Ticket from '@/models/Ticket';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
     try {
         await dbConnect();
-        const { id } = await params;
+        const { id } = await context.params;
         const ticket = await Ticket.findById(id);
         if (!ticket) {
             return NextResponse.json({ error: 'Ticket not found' }, { status: 404 });
@@ -18,10 +18,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function PUT(request: NextRequest, context: { params: Promise<{ id: string }> }) {
     try {
         await dbConnect();
-        const { id } = await params;
+        const { id } = await context.params;
         const body = await request.json();
         const updatedTicket = await Ticket.findByIdAndUpdate(
             id,
@@ -37,10 +37,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
     try {
         await dbConnect();
-        const { id } = await params;
+        const { id } = await context.params;
         const deletedTicket = await Ticket.findByIdAndDelete(id);
         if (!deletedTicket) {
             return NextResponse.json({ error: 'Ticket not found' }, { status: 404 });
