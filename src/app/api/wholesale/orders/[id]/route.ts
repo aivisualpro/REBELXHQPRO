@@ -7,14 +7,14 @@ import OpeningBalance from '@/models/OpeningBalance';
 import PurchaseOrder from '@/models/PurchaseOrder'; // Check if this path is correct, previously used
 import Client from '@/models/Client';
 
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
     try {
         await dbConnect();
         // Ensure models are registered
         void Sku;
         void Client;
 
-        const { id } = await params; // Await params in Next.js 15+
+        const { id } = await context.params; // Await params in Next.js 15+
 
         const order = await SaleOrder.findById(id)
             .populate('clientId', 'name')
@@ -75,10 +75,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     }
 }
 
-export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
     try {
         await dbConnect();
-        const { id } = await params;
+        const { id } = await context.params;
         const body = await request.json();
 
         // If line items are being updated, ensure totals are correct
@@ -107,10 +107,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 }
 
-export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
     try {
         await dbConnect();
-        const { id } = await params;
+        const { id } = await context.params;
 
         const deletedOrder = await SaleOrder.findByIdAndDelete(id);
 

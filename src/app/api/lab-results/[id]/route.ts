@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import LabResult from '@/models/LabResult';
 
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
     try {
         await dbConnect();
-        const { id } = await params;
+        const { id } = await context.params;
         const labResult = await LabResult.findById(id);
         if (!labResult) {
             return NextResponse.json({ error: 'Lab result not found' }, { status: 404 });
@@ -16,10 +16,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     }
 }
 
-export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
     try {
         await dbConnect();
-        const { id } = await params;
+        const { id } = await context.params;
         const body = await request.json();
         const updatedResult = await LabResult.findByIdAndUpdate(
             id,
@@ -35,10 +35,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     }
 }
 
-export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
     try {
         await dbConnect();
-        const { id } = await params;
+        const { id } = await context.params;
         const deletedResult = await LabResult.findByIdAndDelete(id);
         if (!deletedResult) {
             return NextResponse.json({ error: 'Lab result not found' }, { status: 404 });

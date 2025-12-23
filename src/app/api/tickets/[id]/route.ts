@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import Ticket from '@/models/Ticket';
 
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
     try {
         await dbConnect();
-        const { id } = await params;
+        const { id } = await context.params;
         const ticket = await Ticket.findById(id);
         if (!ticket) {
             return NextResponse.json({ error: 'Ticket not found' }, { status: 404 });
@@ -16,10 +16,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     }
 }
 
-export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
     try {
         await dbConnect();
-        const { id } = await params;
+        const { id } = await context.params;
         const body = await request.json();
         const updatedTicket = await Ticket.findByIdAndUpdate(
             id,
@@ -35,10 +35,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     }
 }
 
-export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
     try {
         await dbConnect();
-        const { id } = await params;
+        const { id } = await context.params;
         const deletedTicket = await Ticket.findByIdAndDelete(id);
         if (!deletedTicket) {
             return NextResponse.json({ error: 'Ticket not found' }, { status: 404 });
