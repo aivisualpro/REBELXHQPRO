@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import Sku from '@/models/Sku';
 import OpeningBalance from '@/models/OpeningBalance';
@@ -14,8 +14,8 @@ import { getGlobalStartDate } from '@/lib/global-settings';
 export const dynamic = 'force-dynamic';
 
 export async function GET(
-    request: Request,
-    props: { params: Promise<{ id: string }> }
+    request: NextRequest,
+    context: { params: Promise<{ id: string }> }
 ) {
     try {
         await dbConnect();
@@ -25,8 +25,7 @@ export async function GET(
         void AuditAdjustment;
 
         // Await params object for Next.js 15+ compatibility
-        const params = await props.params;
-        const { id } = params;
+        const { id } = await context.params;
 
         const sku = await Sku.findById(id).lean();
         if (!sku) {

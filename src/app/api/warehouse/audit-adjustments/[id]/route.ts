@@ -1,14 +1,16 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import AuditAdjustment from '@/models/AuditAdjustment';
 
+export const dynamic = 'force-dynamic';
+
 export async function PUT(
-    request: Request,
-    { params }: { params: Promise<{ id: string }> }
+    request: NextRequest,
+    context: { params: Promise<{ id: string }> }
 ) {
     try {
         await dbConnect();
-        const { id } = await params;
+        const { id } = await context.params;
         const body = await request.json();
         const { lotNumber, qty, reason } = body;
 
@@ -36,12 +38,12 @@ export async function PUT(
 }
 
 export async function DELETE(
-    request: Request,
-    { params }: { params: Promise<{ id: string }> }
+    request: NextRequest,
+    context: { params: Promise<{ id: string }> }
 ) {
     try {
         await dbConnect();
-        const { id } = await params;
+        const { id } = await context.params;
 
         const deleted = await AuditAdjustment.findByIdAndDelete(id);
 
