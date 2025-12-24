@@ -3,6 +3,8 @@ import dbConnect from '@/lib/mongoose';
 import SaleOrder from '@/models/SaleOrder';
 import Sku from '@/models/Sku';
 
+export const dynamic = 'force-dynamic';
+
 const parseNumber = (val: any) => {
     if (typeof val === 'number') return val;
     if (!val) return 0;

@@ -35,6 +35,12 @@ interface Sku {
   kitApplied: boolean;
   isLotApplied: boolean;
   variances?: any[];
+  currentStock?: number;
+  avgCost?: number;
+  revenue?: number;
+  cogs?: number;
+  cogm?: number;
+  grossProfit?: number;
 }
 
 export default function SkusPage() {
@@ -62,6 +68,7 @@ export default function SkusPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingSku, setEditingSku] = useState<Sku | null>(null);
+  const [globalSettings, setGlobalSettings] = useState<any>(null);
 
   const initialFormState = {
     sku: '',
@@ -123,6 +130,14 @@ export default function SkusPage() {
   useEffect(() => {
     fetchSkus();
   }, [fetchSkus]);
+
+  // Fetch Global Settings
+  useEffect(() => {
+    fetch('/api/settings')
+      .then(res => res.json())
+      .then(data => setGlobalSettings(data))
+      .catch(() => {});
+  }, []);
 
   const handleSort = (column: string) => {
     if (sortBy === column) {
@@ -324,82 +339,79 @@ export default function SkusPage() {
         <table className="w-full border-collapse text-left">
           <thead className="sticky top-0 bg-slate-50 z-10 border-b border-slate-100">
             <tr>
-              <th className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest w-12">Img</th>
+              <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest w-10">Img</th>
               {[
                 { key: 'name', label: 'Name' },
                 { key: 'category', label: 'Category' },
                 { key: 'subCategory', label: 'Sub Cat' },
                 { key: 'materialType', label: 'Material' },
-                { key: 'uom', label: 'UOM' },
-                { key: 'salePrice', label: 'Price' },
-                { key: 'orderUpto', label: 'Ord Upto' },
+                { key: 'salePrice', label: 'Sale Price' },
+                { key: 'avgCost', label: 'Cost (Avg)' },
+                { key: 'currentStock', label: 'Avb Qty' },
                 { key: 'reOrderPoint', label: 'Re-Ord' },
+                { key: 'orderUpto', label: 'Order Up to' },
+                { key: 'revenue', label: 'Revenue' },
+                { key: 'cogs', label: 'COGS' },
+                { key: 'cogm', label: 'COGM' },
+                { key: 'grossProfit', label: 'Gross Profit' },
               ].map(col => (
                 <th
                   key={col.key}
                   onClick={() => handleSort(col.key)}
-                  className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors border-r border-slate-100 last:border-0"
+                  className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors border-r border-slate-100 last:border-0 whitespace-nowrap"
                 >
-                  <div className="flex items-center space-x-1.5">
+                  <div className="flex items-center space-x-1">
                     <span>{col.label}</span>
-                    <ArrowUpDown className={cn("w-2.5 h-2.5", sortBy === col.key ? "text-black" : "text-slate-200")} />
+                    <ArrowUpDown className={cn("w-2 h-2", sortBy === col.key ? "text-black" : "text-slate-200")} />
                   </div>
                 </th>
               ))}
-              <th className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center border-l border-slate-100">Variances</th>
-              <th className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
-              <tr><td colSpan={12} className="px-4 py-12 text-center text-xs text-slate-400">Loading SKUs...</td></tr>
+              <tr><td colSpan={14} className="px-2 py-12 text-center text-[10px] text-slate-400">Loading SKUs...</td></tr>
             ) : error ? (
-              <tr><td colSpan={12} className="px-4 py-12 text-center text-red-500 text-xs font-bold">{error}</td></tr>
+              <tr><td colSpan={14} className="px-2 py-12 text-center text-red-500 text-[10px] font-bold">{error}</td></tr>
             ) : skus.length === 0 ? (
-              <tr><td colSpan={12} className="px-4 py-12 text-center text-xs text-slate-400 uppercase font-bold tracking-tighter opacity-50">No SKUs found</td></tr>
+              <tr><td colSpan={14} className="px-2 py-12 text-center text-[10px] text-slate-400 uppercase font-bold tracking-tighter opacity-50">No SKUs found</td></tr>
             ) : skus.map(sku => (
-              <tr key={sku._id} className="hover:bg-slate-50 transition-colors group">
-                <td className="px-4 py-1.5">
-                  <div className="w-8 h-8 rounded bg-slate-100 overflow-hidden relative">
+              <tr 
+                key={sku._id} 
+                className="hover:bg-slate-50 transition-colors group cursor-pointer"
+                onClick={() => router.push(`/warehouse/skus/${sku._id}`)}
+              >
+                <td className="px-2 py-0.5">
+                  <div className="w-6 h-6 rounded bg-slate-100 overflow-hidden relative">
                     <img 
-                        src={sku.image || '/sku-placeholder.png'} 
+                        src={sku.image || globalSettings?.missingSkuImage || '/sku-placeholder.png'} 
                         alt="" 
                         className="w-full h-full object-cover"
                         onError={(e) => {
-                            (e.target as HTMLImageElement).src = '/sku-placeholder.png';
+                            const target = e.target as HTMLImageElement;
+                            const fallback = globalSettings?.missingSkuImage || '/sku-placeholder.png';
+                            if (target.src !== fallback && target.src.indexOf('sku-placeholder.png') === -1) {
+                                target.src = fallback;
+                            }
                         }} 
                     />
                   </div>
                 </td>
-                <td className="px-4 py-1.5 text-[11px] text-slate-600 font-medium hover:text-blue-600 transition-colors cursor-pointer" onClick={() => window.location.href = `/warehouse/skus/${sku._id}`}>
+                <td className="px-2 py-0.5 text-[9px] text-slate-600 font-medium hover:text-blue-600 transition-colors truncate max-w-[120px]">
                   {sku.name}
                 </td>
-                <td className="px-4 py-1.5 text-[10px] uppercase font-bold text-slate-500">{sku.category}</td>
-                <td className="px-4 py-1.5 text-[10px] uppercase font-bold text-slate-500">{sku.subCategory}</td>
-                <td className="px-4 py-1.5 text-[10px] uppercase font-bold text-slate-500">{sku.materialType}</td>
-                <td className="px-4 py-1.5 text-[10px] uppercase font-bold text-slate-500">{sku.uom}</td>
-                <td className="px-4 py-1.5 text-[11px] text-slate-600">${sku.salePrice}</td>
-                <td className="px-4 py-1.5 text-[11px] text-slate-500">{sku.orderUpto}</td>
-                <td className="px-4 py-1.5 text-[11px] text-slate-500">{sku.reOrderPoint}</td>
-                <td className="px-4 py-1.5 text-center text-[11px] font-bold text-slate-600 border-l border-slate-50">
-                  {sku.variances?.length || 0}
-                </td>
-                <td className="px-4 py-1.5 text-right">
-                  <div className="flex items-center justify-end space-x-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => openModal(sku)}
-                      className="p-1 text-slate-400 hover:text-black hover:bg-slate-200 transition-colors"
-                    >
-                      <Edit2 className="w-3 h-3" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(sku._id)}
-                      className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                </td>
+                <td className="px-2 py-0.5 text-[8px] uppercase font-bold text-slate-500">{sku.category}</td>
+                <td className="px-2 py-0.5 text-[8px] uppercase font-bold text-slate-500">{sku.subCategory}</td>
+                <td className="px-2 py-0.5 text-[8px] uppercase font-bold text-slate-500">{sku.materialType}</td>
+                <td className="px-2 py-0.5 text-[9px] text-slate-600 font-mono">${(sku.salePrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td className="px-2 py-0.5 text-[9px] text-slate-600 font-mono">${(sku.avgCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
+                <td className="px-2 py-0.5 text-[9px] font-bold text-slate-700">{Math.round(sku.currentStock || 0)}</td>
+                <td className="px-2 py-0.5 text-[9px] text-slate-500">{sku.reOrderPoint}</td>
+                <td className="px-2 py-0.5 text-[9px] text-slate-500">{sku.orderUpto}</td>
+                <td className="px-2 py-0.5 text-[9px] text-emerald-600 font-mono">${(sku.revenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td className="px-2 py-0.5 text-[9px] text-slate-500 font-mono">${(sku.cogs || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td className="px-2 py-0.5 text-[9px] text-slate-500 font-mono">${(sku.cogm || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td className="px-2 py-0.5 text-[9px] font-bold text-black font-mono">${(sku.grossProfit || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
               </tr>
             ))}
           </tbody>

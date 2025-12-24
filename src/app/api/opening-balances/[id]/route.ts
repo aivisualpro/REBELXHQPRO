@@ -44,6 +44,12 @@ export async function PATCH(
             return NextResponse.json({ error: 'Item not found' }, { status: 404 });
         }
 
+        // Propagate cost change if applicable
+        if (updatedItem.lotNumber && updatedItem.cost !== undefined) {
+            const { propagateCostChange } = await import('@/lib/cost-propagation');
+            await propagateCostChange(updatedItem.sku, updatedItem.lotNumber, updatedItem.cost);
+        }
+
         return NextResponse.json(updatedItem);
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });

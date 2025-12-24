@@ -45,37 +45,22 @@ export const MegaMenu = () => {
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: 10 }}
-                                transition={{ duration: 0.2 }}
-                                className="absolute top-full left-1/2 -translate-x-1/2 w-[600px] pt-4 z-50"
+                                transition={{ duration: 0.15 }}
+                                className="absolute top-full left-0 pt-2 z-50"
                             >
-                                <div className="bg-white rounded-xl shadow-2xl border border-border p-6 mega-menu-gradient grid grid-cols-2 gap-4">
-                                    <div className="col-span-1 border-r border-border pr-6">
-                                        <div className="flex items-center space-x-3 mb-4">
-                                            <div className="p-2 bg-slate-50 rounded-lg text-accent">
-                                                <menu.icon className="w-5 h-5" />
-                                            </div>
-                                            <h3 className="font-semibold text-lg">{menu.title}</h3>
-                                        </div>
-                                        <p className="text-sm text-muted leading-relaxed">
-                                            Access all {menu.title} workflows, data, and management tools from here.
-                                        </p>
-                                    </div>
-                                    <div className="col-span-1 space-y-1">
-                                        {menu.items.map((item) => (
-                                            <Link
-                                                key={item.href}
-                                                href={item.href}
-                                                className="flex items-center space-x-3 p-3 rounded-lg hover:bg-slate-50 transition-colors group"
-                                            >
-                                                <div className="p-1.5 bg-transparent group-hover:bg-white rounded-md transition-colors">
-                                                    <item.icon className="w-4 h-4 text-muted group-hover:text-accent" />
-                                                </div>
-                                                <span className="text-sm font-medium text-muted group-hover:text-primary">
-                                                    {item.title}
-                                                </span>
-                                            </Link>
-                                        ))}
-                                    </div>
+                                <div className="bg-white rounded-lg shadow-xl border border-slate-200 py-2 min-w-[200px]">
+                                    {menu.items.map((item) => (
+                                        <Link
+                                            key={item.href}
+                                            href={item.href}
+                                            className="flex items-center space-x-3 px-4 py-2.5 hover:bg-slate-50 transition-colors group"
+                                        >
+                                            <item.icon className="w-4 h-4 text-slate-400 group-hover:text-slate-700" />
+                                            <span className="text-sm font-medium text-slate-600 group-hover:text-slate-900">
+                                                {item.title}
+                                            </span>
+                                        </Link>
+                                    ))}
                                 </div>
                             </motion.div>
                         )}

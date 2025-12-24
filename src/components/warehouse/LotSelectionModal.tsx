@@ -10,12 +10,13 @@ interface Lot {
     balance: number;
     source?: string;
     date?: string;
+    cost?: number;
 }
 
 interface LotSelectionModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSelect: (lotNumber: string) => void;
+    onSelect: (lotNumber: string, cost?: number) => void;
     skuId: string;
     currentLotNumber?: string;
     title?: string;
@@ -63,8 +64,133 @@ export function LotSelectionModal({
 
     if (!isOpen) return null;
 
-    const filteredLots = lots.filter(lot => 
-        lot.lotNumber.toLowerCase().includes(searchQuery.toLowerCase())
+    // Sort lots from oldest to newest by date
+    const sortedLots = [...lots].sort((a, b) => {
+        const dateA = a.date ? new Date(a.date).getTime() : 0;
+        const dateB = b.date ? new Date(b.date).getTime() : 0;
+        return dateA - dateB; // oldest first
+    });
+
+    // Filter: Include if searching OR balance > 0 OR matches currentLotNumber
+    // User requested: "show the lot # which is already applied no matter if that lot # value is 0"
+    const filteredLots = sortedLots.filter(lot => {
+         const matchesSearch = lot.lotNumber.toLowerCase().includes(searchQuery.toLowerCase());
+         const isCurrent = lot.lotNumber === currentLotNumber;
+         const hasBalance = lot.balance > 0;
+
+         // If searching, show all matches. If not searching, show positive balance OR current.
+         if (searchQuery) return matchesSearch;
+         return hasBalance || isCurrent;
+    });
+
+    // Separate selected lot from others (to show first after None)
+    const selectedLot = filteredLots.find(lot => lot.lotNumber === currentLotNumber);
+    const otherLots = filteredLots.filter(lot => lot.lotNumber !== currentLotNumber);
+
+    // Format date as mm/dd/yyyy
+    const formatDate = (dateStr: string) => {
+        const date = new Date(dateStr);
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${month}/${day}/${year}`;
+    };
+
+    // The first lot in the sorted list (oldest) is the suggested lot
+    const suggestedLotNumber = otherLots.length > 0 ? otherLots[0].lotNumber : null;
+
+    // Render a lot item
+    const renderLotItem = (lot: Lot, idx: number, isSelected: boolean, isSuggested: boolean = false) => (
+        <button
+            key={lot.lotNumber}
+            onClick={() => onSelect(lot.lotNumber, lot.cost)}
+            className={cn(
+                "w-full flex items-center justify-between px-6 py-3 transition-colors text-left group hover:bg-slate-50",
+                isSelected ? "bg-blue-50/50" : "",
+                isSuggested && !isSelected ? "bg-amber-50/50" : ""
+            )}
+        >
+            <div className="flex items-center gap-3">
+                <div className={cn(
+                    "w-8 h-8 flex items-center justify-center text-xs font-bold transition-colors border",
+                    isSelected 
+                        ? "bg-blue-500 text-white border-blue-500"
+                        : isSuggested 
+                            ? "bg-amber-500 text-white border-amber-500" 
+                            : "bg-white text-slate-500 border-slate-200 group-hover:border-slate-300"
+                )}>
+                    {isSelected ? <Check className="w-4 h-4" /> : isSuggested ? '★' : `#${idx + 1}`}
+                </div>
+                <div>
+                    <div className="flex items-center gap-2">
+                        <p className={cn(
+                            "text-sm font-bold transition-colors",
+                            isSelected ? "text-blue-700" : isSuggested ? "text-amber-700" : "text-slate-900"
+                        )}>
+                            {lot.lotNumber}
+                        </p>
+                        {isSelected && (
+                            <span className="px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider bg-blue-100 text-blue-700 border border-blue-200">
+                                Selected
+                            </span>
+                        )}
+                        {isSuggested && !isSelected && (
+                            <span className="px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider bg-amber-100 text-amber-700 border border-amber-200">
+                                Suggested
+                            </span>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                        <span className={cn(
+                            "text-[10px] uppercase font-bold tracking-wider",
+                            isSelected ? "text-blue-500" : isSuggested ? "text-amber-500" : "text-slate-500"
+                        )}>
+                            {lot.source || 'Unknown'}
+                        </span>
+                        {lot.date && (
+                            <>
+                                <span className="text-[10px] text-slate-300">•</span>
+                                <span className={cn(
+                                    "text-[10px] font-medium",
+                                    isSelected ? "text-blue-400" : isSuggested ? "text-amber-400" : "text-slate-400"
+                                )}>
+                                    {formatDate(lot.date)}
+                                </span>
+                            </>
+                        )}
+                        {lot.cost !== undefined && (
+                            <>
+                                <span className="text-[10px] text-slate-300">•</span>
+                                <span className={cn(
+                                    "text-[10px] font-mono font-medium",
+                                    isSelected ? "text-blue-500" : isSuggested ? "text-amber-500" : "text-green-600"
+                                )}>
+                                    ${lot.cost.toFixed(2)}
+                                </span>
+                            </>
+                        )}
+                    </div>
+                </div>
+            </div>
+            <div className="text-right">
+                <span className={cn(
+                    "block px-2.5 py-1 text-xs font-bold border transition-colors mb-1",
+                    isSelected 
+                        ? "bg-blue-100 text-blue-700 border-blue-200"
+                        : isSuggested
+                            ? "bg-amber-100 text-amber-700 border-amber-200" 
+                            : "bg-emerald-50 text-emerald-600 border-emerald-100"
+                )}>
+                    {lot.balance.toLocaleString()}
+                </span>
+                <span className={cn(
+                    "text-[9px] uppercase font-bold tracking-widest",
+                    isSelected ? "text-blue-300" : isSuggested ? "text-amber-300" : "text-slate-300"
+                )}>
+                    Available
+                </span>
+            </div>
+        </button>
     );
 
     return (
@@ -111,7 +237,7 @@ export function LotSelectionModal({
                         <div>
                             {/* Option to clear/select no lot */}
                             <button
-                                onClick={() => onSelect('')}
+                                onClick={() => onSelect('', 0)}
                                 className={cn(
                                     "w-full flex items-center justify-between px-6 py-3 transition-colors text-left group border-b border-slate-50",
                                     !currentLotNumber 
@@ -133,12 +259,19 @@ export function LotSelectionModal({
                                             "text-sm font-bold transition-colors",
                                             !currentLotNumber ? "text-blue-700" : "text-slate-600"
                                         )}>
-                                            No Lot / Clear Selection
+                                            (N/A)
                                         </p>
-                                        <p className="text-[10px] text-slate-400">Set lot number to empty</p>
+                                        <p className="text-[10px] text-slate-400">Clear selection</p>
                                     </div>
                                 </div>
                             </button>
+
+                            {/* Show currently selected lot first (if any) */}
+                            {selectedLot && (
+                                <div className="border-b border-slate-100">
+                                    {renderLotItem(selectedLot, 0, true)}
+                                </div>
+                            )}
 
                             {filteredLots.length === 0 ? (
                                 <div className="text-center py-12">
@@ -151,73 +284,7 @@ export function LotSelectionModal({
                                 </div>
                             ) : (
                                 <div className="divide-y divide-slate-50">
-                                    {filteredLots.map((lot, idx) => {
-                                        const isSelected = currentLotNumber === lot.lotNumber;
-                                        return (
-                                            <button
-                                                key={idx}
-                                                onClick={() => onSelect(lot.lotNumber)}
-                                                className={cn(
-                                                    "w-full flex items-center justify-between px-6 py-3 transition-colors text-left group hover:bg-slate-50",
-                                                    isSelected ? "bg-blue-50/50" : ""
-                                                )}
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <div className={cn(
-                                                        "w-8 h-8 flex items-center justify-center text-xs font-bold transition-colors border",
-                                                        isSelected 
-                                                            ? "bg-blue-500 text-white border-blue-500" 
-                                                            : "bg-white text-slate-500 border-slate-200 group-hover:border-slate-300"
-                                                    )}>
-                                                        {isSelected ? <Check className="w-4 h-4" /> : `#${idx + 1}`}
-                                                    </div>
-                                                    <div>
-                                                        <p className={cn(
-                                                            "text-sm font-bold transition-colors",
-                                                            isSelected ? "text-blue-700" : "text-slate-900"
-                                                        )}>
-                                                            {lot.lotNumber}
-                                                        </p>
-                                                        <div className="flex items-center gap-2 mt-0.5">
-                                                            <span className={cn(
-                                                                "text-[10px] uppercase font-bold tracking-wider",
-                                                                isSelected ? "text-blue-500" : "text-slate-500"
-                                                            )}>
-                                                                {lot.source || 'Unknown'}
-                                                            </span>
-                                                            {lot.date && (
-                                                                <>
-                                                                    <span className="text-[10px] text-slate-300">•</span>
-                                                                    <span className={cn(
-                                                                        "text-[10px] font-medium",
-                                                                        isSelected ? "text-blue-400" : "text-slate-400"
-                                                                    )}>
-                                                                        {new Date(lot.date).toLocaleDateString()}
-                                                                    </span>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className="text-right">
-                                                    <span className={cn(
-                                                        "block px-2.5 py-1 text-xs font-bold border transition-colors mb-1",
-                                                        isSelected 
-                                                            ? "bg-blue-100 text-blue-700 border-blue-200" 
-                                                            : "bg-emerald-50 text-emerald-600 border-emerald-100"
-                                                    )}>
-                                                        {lot.balance.toLocaleString()}
-                                                    </span>
-                                                    <span className={cn(
-                                                        "text-[9px] uppercase font-bold tracking-widest",
-                                                        isSelected ? "text-blue-300" : "text-slate-300"
-                                                    )}>
-                                                        Available
-                                                    </span>
-                                                </div>
-                                            </button>
-                                        );
-                                    })}
+                                    {otherLots.map((lot, idx) => renderLotItem(lot, idx + (selectedLot ? 1 : 0), false, lot.lotNumber === suggestedLotNumber))}
                                 </div>
                             )}
                         </div>

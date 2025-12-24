@@ -23,20 +23,12 @@ export const MENU_ITEMS = [
         ]
     },
     {
-        title: 'Wholesale',
+        title: 'Sales',
         icon: Truck,
         items: [
-            { title: 'Orders', href: '/wholesale/orders', icon: ShoppingCart },
-            { title: 'Payments', href: '/wholesale/payments', icon: CreditCard },
-        ]
-    },
-    {
-        title: 'Retail',
-        icon: Store,
-        items: [
-            { title: 'Web Orders', href: '/retail/web-orders', icon: Globe },
-            { title: 'Web Products', href: '/retail/web-products', icon: Package },
-            { title: 'Web Subscriptions', href: '/retail/web-subscriptions', icon: Clock },
+            { title: 'Wholesale Orders', href: '/sales/wholesale-orders', icon: ShoppingCart },
+            { title: 'Web Orders', href: '/sales/web-orders', icon: Globe },
+            { title: 'Subscriptions', href: '/sales/subscriptions', icon: Clock },
         ]
     },
     {
@@ -45,6 +37,7 @@ export const MENU_ITEMS = [
         items: [
             { title: 'SKUs', href: '/warehouse/skus', icon: Database },
             { title: 'Manufacturing', href: '/warehouse/manufacturing', icon: Factory },
+            { title: 'Web Products', href: '/warehouse/web-products', icon: Package },
             { title: 'Opening Balances', href: '/warehouse/opening-balances', icon: Scale },
             { title: 'Audit Adjustments', href: '/warehouse/audit-adjustments', icon: ClipboardCheck },
             { title: 'Purchase Orders', href: '/warehouse/purchase-orders', icon: ShoppingCart },

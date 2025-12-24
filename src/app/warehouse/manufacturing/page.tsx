@@ -10,7 +10,8 @@ import {
   Calendar,
   User,
   Factory,
-  Trash2
+  Trash2,
+  Pencil
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { cn } from '@/lib/utils';
@@ -326,49 +327,49 @@ export default function ManufacturingPage() {
           <thead className="sticky top-0 bg-slate-50 z-10 border-b border-slate-100">
             <tr>
               {[
-                { key: 'label', label: 'Label' },
+                { key: 'label', label: 'WO#' },
                 { key: 'sku', label: 'SKU' },
                 { key: 'status', label: 'Status' },
                 { key: 'qty', label: 'Qty' },
                 { key: 'uom', label: 'UOM' },
                 { key: 'priority', label: 'Priority' },
                 { key: 'scheduledStart', label: 'Start Date' },
-                { key: 'createdAt', label: 'Created At' },
+                { key: 'createdAt', label: 'Created' },
                 { key: 'createdBy', label: 'Created By' },
               ].map(col => (
                 <th
                   key={col.key}
                   onClick={() => handleSort(col.key)}
-                  className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors border-r border-slate-100 last:border-0"
+                  className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors border-r border-slate-100 last:border-0"
                 >
-                  <div className="flex items-center space-x-1.5">
+                  <div className="flex items-center space-x-1">
                     <span>{col.label}</span>
-                    <ArrowUpDown className={cn("w-2.5 h-2.5", sortBy === col.key ? "text-black" : "text-slate-200")} />
+                    <ArrowUpDown className={cn("w-2 h-2", sortBy === col.key ? "text-black" : "text-slate-200")} />
                   </div>
                 </th>
               ))}
-              <th className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center border-l border-slate-100">Line Items</th>
-              <th className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right">Actions</th>
+              <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest text-center border-l border-slate-100">Items</th>
+              <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
-              <tr><td colSpan={11} className="px-4 py-12 text-center text-xs text-slate-400">Loading Orders...</td></tr>
+              <tr><td colSpan={11} className="px-2 py-4 text-center text-[10px] text-slate-400">Loading Orders...</td></tr>
             ) : error ? (
-              <tr><td colSpan={11} className="px-4 py-12 text-center text-red-500 text-xs font-bold">{error}</td></tr>
+              <tr><td colSpan={11} className="px-2 py-4 text-center text-red-500 text-[10px] font-bold">{error}</td></tr>
             ) : orders.length === 0 ? (
-              <tr><td colSpan={11} className="px-4 py-12 text-center text-xs text-slate-400 uppercase font-bold tracking-tighter opacity-50">No Orders found</td></tr>
+              <tr><td colSpan={11} className="px-2 py-4 text-center text-[10px] text-slate-400 uppercase font-bold tracking-tighter opacity-50">No Orders found</td></tr>
             ) : orders.map(order => (
               <tr
                 key={order._id}
                 className="hover:bg-slate-50 transition-colors group cursor-pointer"
                 onClick={() => router.push(`/warehouse/manufacturing/${order._id}`)}
               >
-                <td className="px-4 py-2 text-[11px] font-bold text-slate-900 tracking-tight">{order.label || '-'}</td>
-                <td className="px-4 py-2 text-[11px] text-slate-600 font-medium">{typeof order.sku === 'object' ? order.sku?.name : order.sku}</td>
-                <td className="px-4 py-2">
+                <td className="px-2 py-1.5 text-[10px] font-bold text-slate-900 tracking-tight font-mono">{order.label || '-'}</td>
+                <td className="px-2 py-1.5 text-[10px] text-slate-600 font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px]">{typeof order.sku === 'object' ? order.sku?.name : order.sku}</td>
+                <td className="px-2 py-1.5">
                   <span className={cn(
-                    "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
+                    "px-1.5 py-0.5 rounded-[2px] text-[8px] font-bold uppercase",
                     order.status === 'Completed' ? "bg-green-100 text-green-700" :
                       order.status === 'In Progress' ? "bg-blue-100 text-blue-700" :
                         "bg-slate-100 text-slate-600"
@@ -376,19 +377,26 @@ export default function ManufacturingPage() {
                     {order.status}
                   </span>
                 </td>
-                <td className="px-4 py-2 text-[11px] text-slate-600">{order.qty}</td>
-                <td className="px-4 py-2 text-[10px] uppercase font-bold text-slate-500">{order.uom}</td>
-                <td className="px-4 py-2 text-[10px] uppercase font-bold text-slate-500">{order.priority}</td>
-                <td className="px-4 py-2 text-[11px] text-slate-500">{order.scheduledStart ? new Date(order.scheduledStart).toLocaleDateString() : '-'}</td>
-                <td className="px-4 py-2 text-[11px] text-slate-500">{new Date(order.createdAt).toLocaleDateString()}</td>
-                <td className="px-4 py-2 text-[11px] text-slate-600">
+                <td className="px-2 py-1.5 text-[10px] text-slate-600 font-mono">{order.qty}</td>
+                <td className="px-2 py-1.5 text-[8px] uppercase font-bold text-slate-500">{order.uom}</td>
+                <td className="px-2 py-1.5 text-[8px] uppercase font-bold text-slate-500">{order.priority}</td>
+                <td className="px-2 py-1.5 text-[10px] text-slate-500 font-mono">{order.scheduledStart ? new Date(order.scheduledStart).toLocaleDateString() : '-'}</td>
+                <td className="px-2 py-1.5 text-[10px] text-slate-500 font-mono">{new Date(order.createdAt).toLocaleDateString()}</td>
+                <td className="px-2 py-1.5 text-[10px] text-slate-600">
                   {order.createdBy ? `${order.createdBy.firstName} ${order.createdBy.lastName}` : '-'}
                 </td>
-                <td className="px-4 py-2 text-center text-[11px] font-bold text-slate-600 border-l border-slate-50">
+                <td className="px-2 py-1.5 text-center text-[10px] font-bold text-slate-600 border-l border-slate-50">
                   {order.lineItems?.length || 0}
                 </td>
-                <td className="px-4 py-2 text-right">
-                  {/* Actions placeholder */}
+                <td className="px-2 py-1.5 text-right">
+                  <div className="flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button className="p-1 hover:bg-slate-200 rounded text-slate-400 hover:text-blue-600">
+                      <Pencil className="w-3 h-3" />
+                    </button>
+                    <button className="p-1 hover:bg-slate-200 rounded text-slate-400 hover:text-red-600">
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

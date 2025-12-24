@@ -15,9 +15,11 @@ import {
   X,
   Pencil,
   AlertCircle,
-  Truck,
   Printer,
-  Package
+  Package,
+  RefreshCw,
+  Loader2,
+  List // Adding List icon
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { cn } from '@/lib/utils';
@@ -25,6 +27,7 @@ import toast from 'react-hot-toast';
 import { MultiSelectFilter } from '@/components/ui/filters/MultiSelectFilter';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Pagination } from '@/components/ui/Pagination';
+import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal'; // Import Lot Modal
 
 interface LineItem {
   _id?: string;
@@ -34,6 +37,7 @@ interface LineItem {
   uom: string;
   price: number;
   total: number;
+  cost?: number;
   createdAt: string;
 }
 
@@ -44,6 +48,7 @@ interface ItemForm {
     price: number;
     uom: string;
     lotNumber: string;
+    cost: number;
 }
 
 interface SaleOrder {
@@ -85,6 +90,31 @@ const UOM_OPTIONS = [
   { label: 'Gal', value: 'Gal' }
 ];
 
+const PAYMENT_METHODS = [
+    { label: 'Cash', value: 'Cash' },
+    { label: 'Credit Card', value: 'Credit Card' },
+    { label: 'Check By Mail', value: 'Check By Mail' },
+    { label: 'ACH', value: 'ACH' },
+    { label: 'Nothing Due', value: 'Nothing Due' },
+    { label: 'CC#', value: 'CC#' },
+    { label: 'Mobile Check Deposit', value: 'Mobile Check Deposit' },
+    { label: 'Auth Payment Link', value: 'Auth Payment Link' },
+    { label: 'COD Check', value: 'COD Check' },
+    { label: 'COD', value: 'COD' },
+    { label: 'Consignment', value: 'Consignment' },
+    { label: 'Net Terms', value: 'Net Terms' }
+];
+
+const SHIPPING_METHODS = [
+    { label: 'FedEx', value: 'FedEx' },
+    { label: 'UPS', value: 'UPS' },
+    { label: 'USPS', value: 'USPS' },
+    { label: 'DHL', value: 'DHL' },
+    { label: 'Pickup', value: 'Pickup' },
+    { label: 'LTL Freight', value: 'LTL Freight' },
+    { label: 'Courier', value: 'Courier' }
+];
+
 export default function SaleOrdersPage() {
   const router = useRouter();
   const [orders, setOrders] = useState<SaleOrder[]>([]);
@@ -118,7 +148,24 @@ export default function SaleOrdersPage() {
   const [allUsers, setAllUsers] = useState<{ _id: string; firstName: string; lastName: string }[]>([]);
   const [allSkus, setAllSkus] = useState<{ _id: string; name: string; salePrice?: number }[]>([]);
   
-  const [newOrder, setNewOrder] = useState({
+  const [newOrder, setNewOrder] = useState<{
+    label: string;
+    clientId: string;
+    salesRep: string;
+    paymentMethod: string;
+    orderStatus: string;
+    shippedDate: string;
+    shippingMethod: string;
+    trackingNumber: string;
+    shippingCost: number | string;
+    discount: number | string;
+    tax: number | string;
+    category: string;
+    shippingAddress: string;
+    city: string;
+    state: string;
+    lockPrice: boolean;
+  }>({
     label: '',
     clientId: '',
     salesRep: '',
@@ -127,9 +174,9 @@ export default function SaleOrdersPage() {
     shippedDate: '',
     shippingMethod: '',
     trackingNumber: '',
-    shippingCost: 0,
-    discount: 0,
-    tax: 0,
+    shippingCost: '',
+    discount: '',
+    tax: '',
     category: '',
     shippingAddress: '',
     city: '',
@@ -137,6 +184,17 @@ export default function SaleOrdersPage() {
     lockPrice: false
   });
   const [newLineItems, setNewLineItems] = useState<ItemForm[]>([]);
+  const [isRefreshingCosts, setIsRefreshingCosts] = useState(false);
+  const [refreshProgress, setRefreshProgress] = useState('');
+  
+  // Bulk Sync State
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState('');
+
+  // Lot Selection Modal State
+  const [isLotModalOpen, setIsLotModalOpen] = useState(false);
+  const [editingLotItemId, setEditingLotItemId] = useState<string | null>(null);
+  const [editingSkuId, setEditingSkuId] = useState<string | null>(null);
 
   // Delete Confirmation State
   const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; orderId: string | null }>({
@@ -169,11 +227,14 @@ export default function SaleOrdersPage() {
           setClientOptions(clients_list.map((c: any) => ({ label: c.name, value: c._id })));
         }
 
-        // Skus
+        // Skus (Filtered by Category: Finished Goods)
         const sRes = await fetch('/api/skus?limit=1000');
         if (sRes.ok) {
           const data = await sRes.json();
-          setAllSkus(data.skus || []);
+          const filteredSkus = (data.skus || []).filter((s: any) => 
+            s.category && s.category.toLowerCase() === 'finished goods'
+          );
+          setAllSkus(filteredSkus);
         }
 
         // Users (Sales Reps)
@@ -193,16 +254,33 @@ export default function SaleOrdersPage() {
 
   // Generate Label
   useEffect(() => {
+    // Only generate if modal is open and we are CREATING (not editing)
     if (isCreateModalOpen && !editingOrderId) {
-      const generateLabel = async () => {
+      const generateNextLabel = async () => {
         try {
-            // Simple generic label generation
-            setNewOrder(prev => ({ ...prev, label: `SO-${Date.now().toString().slice(-6)}` }));
+            // Fetch the latest created order to determine next sequence
+            const res = await fetch('/api/wholesale/orders?limit=1&sortBy=createdAt&sortOrder=desc');
+            if (res.ok) {
+                const data = await res.json();
+                if (data.orders && data.orders.length > 0) {
+                    const lastLabel = data.orders[0].label;
+                    // Extract number from label (e.g., SO-53001 -> 53001, or 53001 -> 53001)
+                    const match = lastLabel.match(/(\d+)/);
+                    if (match) {
+                        const nextNum = parseInt(match[0]) + 1;
+                        setNewOrder(prev => ({ ...prev, label: String(nextNum) }));
+                        return;
+                    }
+                }
+            }
+            // Fallback if no orders exist or parse fails
+            setNewOrder(prev => ({ ...prev, label: '53002' }));
         } catch (e) {
-          setNewOrder(prev => ({ ...prev, label: `SO-${Date.now()}` }));
+            console.error("Failed to generate label", e);
+            setNewOrder(prev => ({ ...prev, label: '53002' }));
         }
       };
-      generateLabel();
+      generateNextLabel();
     }
   }, [isCreateModalOpen, editingOrderId]);
 
@@ -371,12 +449,12 @@ export default function SaleOrdersPage() {
       salesRep: typeof order.salesRep === 'object' && order.salesRep ? order.salesRep._id : String(order.salesRep || ''),
       paymentMethod: order.paymentMethod || '',
       orderStatus: order.orderStatus,
-      shippedDate: order.shippedDate || '', // Date handling might need tweak
+      shippedDate: order.shippedDate || '', 
       shippingMethod: (order as any).shippingMethod || '',
       trackingNumber: (order as any).trackingNumber || '',
-      shippingCost: (order as any).shippingCost || 0,
-      discount: (order as any).discount || 0,
-      tax: (order as any).tax || 0,
+      shippingCost: (order as any).shippingCost || '',
+      discount: (order as any).discount || '',
+      tax: (order as any).tax || '',
       category: (order as any).category || '',
       shippingAddress: (order as any).shippingAddress || '',
       city: (order as any).city || '',
@@ -389,6 +467,7 @@ export default function SaleOrdersPage() {
       sku: typeof item.sku === 'object' && item.sku ? item.sku._id : String(item.sku),
       qtyShipped: item.qtyShipped,
       price: item.price,
+      cost: (item as any).cost || 0,
       uom: item.uom || 'Each',
       lotNumber: item.lotNumber || ''
     }));
@@ -408,9 +487,9 @@ export default function SaleOrdersPage() {
         shippedDate: '',
         shippingMethod: '',
         trackingNumber: '',
-        shippingCost: 0,
-        discount: 0,
-        tax: 0,
+        shippingCost: '',
+        discount: '',
+        tax: '',
         category: '',
         shippingAddress: '',
         city: '',
@@ -430,12 +509,16 @@ export default function SaleOrdersPage() {
 
     const payload = {
       ...newOrder,
+      shippingCost: Number(newOrder.shippingCost) || 0,
+      discount: Number(newOrder.discount) || 0,
+      tax: Number(newOrder.tax) || 0,
       lineItems: newLineItems.map(item => ({
         sku: item.sku,
         qtyShipped: item.qtyShipped,
         price: item.price,
         uom: item.uom,
         lotNumber: item.lotNumber,
+        cost: item.cost, 
         total: (item.qtyShipped || 0) * (item.price || 0)
       }))
     };
@@ -468,29 +551,163 @@ export default function SaleOrdersPage() {
   };
 
   const addLineItem = () => {
-    setNewLineItems([...newLineItems, { id: Math.random().toString(), sku: '', qtyShipped: 1, price: 0, uom: 'Each', lotNumber: '' }]);
+    setNewLineItems([...newLineItems, { id: Math.random().toString(), sku: '', qtyShipped: 1, price: 0, cost: 0, uom: 'Each', lotNumber: '' }]);
   };
 
   const removeLineItem = (id: string) => {
     setNewLineItems(newLineItems.filter(i => i.id !== id));
   };
 
-  const updateLineItem = (id: string, field: keyof ItemForm, value: any) => {
-    setNewLineItems(newLineItems.map(item => {
+  const updateLineItem = async (id: string, field: keyof ItemForm, value: any) => {
+    setNewLineItems(prev => prev.map(item => {
       if (item.id === id) {
-        let updated = { ...item, [field]: value };
-        
-        // Auto-fill price if SKU changes
-        if (field === 'sku') {
-            const skuObj = allSkus.find(s => s._id === value);
-            if (skuObj && skuObj.salePrice) {
-                updated.price = skuObj.salePrice;
-            }
-        }
-        return updated;
+        return { ...item, [field]: value };
       }
       return item;
     }));
+
+    // Async updates for Side Effects (Price & Lot Auto-Suggest)
+    if (field === 'sku') {
+        const skuObj = allSkus.find(s => s._id === value);
+        let newPrice = 0;
+        let newLot = '';
+        let newCost = 0;
+
+        if (skuObj && skuObj.salePrice) {
+            newPrice = skuObj.salePrice;
+        }
+
+        // Auto-Suggest Lot (FIFO)
+        try {
+            const res = await fetch(`/api/warehouse/skus/${value}/lots`);
+            if (res.ok) {
+                const data = await res.json();
+                const lots = data.lots || [];
+                // Sort Oldest First
+                const sorted = lots.sort((a: any, b: any) => {
+                     const dateA = a.date ? new Date(a.date).getTime() : 0;
+                     const dateB = b.date ? new Date(b.date).getTime() : 0;
+                     return dateA - dateB;
+                });
+                const suggested = sorted.find((l: any) => l.balance > 0);
+                if (suggested) {
+                    newLot = suggested.lotNumber;
+                    newCost = suggested.cost || 0;
+                }
+            }
+        } catch (e) {
+            console.error("Failed to auto-suggest lot", e);
+        }
+
+        setNewLineItems(prev => prev.map(item => {
+            if (item.id === id) {
+                return { 
+                    ...item, 
+                    price: newPrice || item.price,
+                    lotNumber: newLot,
+                    cost: newCost
+                };
+            }
+            return item;
+        }));
+    }
+  };
+
+  const handleRefreshCosts = async () => {
+    if (newLineItems.length === 0) return;
+    
+    setIsRefreshingCosts(true);
+    setRefreshProgress('Preparing...');
+    
+    // We will update items one by one or in parallel? One by one to show progress clearly as requested.
+    const total = newLineItems.length;
+    const updatedItems = [...newLineItems];
+    let changedCount = 0;
+
+    for (let i = 0; i < total; i++) {
+        const item = updatedItems[i];
+        if (item.sku && item.lotNumber) {
+            setRefreshProgress(`Fetching Lot ${item.lotNumber}... ${Math.round(((i + 1) / total) * 100)}%`);
+            try {
+                const res = await fetch(`/api/warehouse/skus/${item.sku}/lots`);
+
+                if (res.ok) {
+                    const data = await res.json();
+                    const matchedLot = data.lots?.find((l: any) => l.lotNumber === item.lotNumber);
+
+                    if (matchedLot && matchedLot.cost !== undefined) {
+                         // On the Create Page, we currently map 'price' to the input. 
+                         // If the user wants to set the Price to the Lot's Cost (e.g. for reference or cost-plus), we do this:
+                         updatedItems[i] = { ...item, price: matchedLot.cost };
+                         changedCount++;
+                    }
+                }
+            } catch (error) {
+                console.error("Failed to fetch cost for item", i, error);
+            }
+        }
+    }
+
+    setNewLineItems(updatedItems);
+    setRefreshProgress(`Updated ${changedCount} items`);
+    
+    setTimeout(() => {
+        setIsRefreshingCosts(false);
+        setRefreshProgress('');
+    }, 2000);
+  };
+
+  const handleSyncCosts = async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    setSyncStatus('Starting...');
+
+    try {
+        // Get Total Count
+        const countRes = await fetch('/api/wholesale/orders?limit=1');
+        const countData = await countRes.json();
+        const total = countData.total || 0; 
+        
+        let skip = 0;
+        const batchSize = 500; // Larger batch for speed (500 * 10 cost updates)
+        let hasMore = total > 0;
+
+        while (hasMore) {
+            const perc = total > 0 ? Math.min(Math.round((skip / total) * 100), 99) : 0;
+            setSyncStatus(`Syncing... ${perc}%`);
+
+            const res = await fetch('/api/wholesale/orders/sync-costs', {
+                method: 'POST',
+                body: JSON.stringify({ skip, limit: batchSize }),
+                headers: {'Content-Type': 'application/json'}
+            });
+            
+            if (!res.ok) throw new Error("Sync failed");
+            const data = await res.json();
+             
+             // If processed 0, we are done
+            if (data.processed === 0) {
+                 hasMore = false;
+            }
+
+            skip += batchSize;
+            if (data.processed < batchSize) {
+                hasMore = false;
+            }
+        }
+        
+        setSyncStatus('Done!');
+        toast.success("Cost Sync Complete");
+        fetchOrders(); // Refresh current view
+        
+        setTimeout(() => setSyncStatus(''), 3000);
+
+    } catch (e) {
+        toast.error("Sync process failed");
+        setSyncStatus('Error');
+    } finally {
+        setIsSyncing(false);
+    }
   };
 
   const formatDate = (dateStr: string) => {
@@ -513,15 +730,51 @@ export default function SaleOrdersPage() {
     return order.lineItems?.reduce((sum, item) => sum + ((item.qtyShipped || 0) * (item.price || 0)), 0) || 0;
   };
 
+  const calculateCost = (order: SaleOrder) => {
+    return order.lineItems?.reduce((sum, item) => sum + ((item.qtyShipped || 0) * (item.cost || 0)), 0) || 0;
+  };
+
   const formatCurrency = (val: number) => {
     return '$' + val.toFixed(2);
+  };
+  
+  const handleClientChange = (clientId: string) => {
+      const client: any = allClients.find((c: any) => c._id === clientId);
+      if (client) {
+          // Use 'addresses' array from Client Schema (default to first one)
+          const mainAddress = client.addresses && client.addresses.length > 0 
+              ? client.addresses[0] 
+              : { street: '', city: '', state: '' };
+          
+          setNewOrder(prev => ({
+              ...prev,
+              clientId,
+              shippingAddress: mainAddress.street || prev.shippingAddress,
+              city: mainAddress.city || prev.city,
+              state: mainAddress.state || prev.state
+          }));
+      } else {
+           setNewOrder(prev => ({ ...prev, clientId }));
+      }
+  };
+
+  const handleLotSelect = (lotNumber: string, cost?: number) => {
+      if (!editingLotItemId) return;
+      setNewLineItems(prev => prev.map(item => {
+          if (item.id === editingLotItemId) {
+              return { ...item, lotNumber, cost: cost || 0 };
+          }
+          return item;
+      }));
+      setIsLotModalOpen(false);
+      setEditingLotItemId(null);
   };
 
   return (
     <div className="flex flex-col h-[calc(100vh-48px)] bg-white relative">
       <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100 bg-slate-50/50">
         <div className="flex items-center space-x-4">
-          <h1 className="text-sm font-bold text-slate-900 uppercase tracking-tighter">Sale Orders</h1>
+          <h1 className="text-sm font-bold text-slate-900 uppercase tracking-tighter">Wholesale Orders</h1>
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
             <input
@@ -605,14 +858,14 @@ export default function SaleOrdersPage() {
           <div className="flex items-center space-x-2">
             <button
                 onClick={() => importOrdersRef.current?.click()}
-                className="h-[30px] w-[30px] bg-white border border-slate-200 text-slate-600 hover:text-black hover:bg-slate-50 transition-colors shadow-sm flex items-center justify-center rounded-sm"
+                className="h-[30px] w-[30px] bg-white border border-slate-200 text-slate-600 hover:text-black hover:bg-slate-50 transition-colors shadow-sm flex items-center justify-center rounded-none"
                 title="Import Orders"
             >
                 <Upload className="w-4 h-4" />
             </button>
             <button
                 onClick={() => importLineItemsRef.current?.click()}
-                className="h-[30px] w-[30px] bg-white border border-slate-200 text-slate-600 hover:text-black hover:bg-slate-50 transition-colors shadow-sm flex items-center justify-center rounded-sm"
+                className="h-[30px] w-[30px] bg-white border border-slate-200 text-slate-600 hover:text-black hover:bg-slate-50 transition-colors shadow-sm flex items-center justify-center rounded-none"
                 title="Import Line Items"
             >
                 <Upload className="w-4 h-4" />
@@ -621,12 +874,29 @@ export default function SaleOrdersPage() {
 
           <button
             onClick={openCreateModal}
-            className="h-[30px] w-[30px] bg-black text-white hover:bg-slate-800 transition-colors shadow-sm flex items-center justify-center rounded-sm"
+            className="h-[30px] w-[30px] bg-black text-white hover:bg-slate-800 transition-colors shadow-sm flex items-center justify-center rounded-none"
             title="New Order"
           >
             <Plus className="w-4 h-4" />
           </button>
+          
+           <div className="flex items-center space-x-2">
+            <button
+                onClick={handleSyncCosts}
+                disabled={isSyncing}
+                className={cn("h-[30px] w-[30px] bg-white border border-slate-200 text-slate-600 hover:text-blue-600 hover:bg-slate-50 transition-colors shadow-sm flex items-center justify-center rounded-none", isSyncing && "animate-spin text-blue-600")}
+                title="Sync Costs"
+            >
+                <RefreshCw className="w-4 h-4" />
+            </button>
+            {syncStatus && (
+                <span className="text-[10px] font-bold text-blue-600 whitespace-nowrap animate-pulse">
+                    {syncStatus}
+                </span>
+            )}
+           </div>
         </div>
+
       </div>
 
       <div className="flex-1 overflow-auto">
@@ -635,99 +905,94 @@ export default function SaleOrdersPage() {
             <tr>
               {[
                 { key: 'label', label: 'Order #' },
+                { key: 'createdAt', label: 'Date' },
                 { key: 'clientId', label: 'Client' },
                 { key: 'salesRep', label: 'Sales Rep' },
+                { key: 'paymentMethod', label: 'Payment Method' },
                 { key: 'orderStatus', label: 'Status' },
-                { key: 'createdAt', label: 'Date' },
-                { key: 'paymentMethod', label: 'Payment' },
-                { key: 'totalAmount', label: 'Subtotal' },
+                { key: 'subtotal', label: 'Subtotal' },
                 { key: 'shippingCost', label: 'Shipping' },
                 { key: 'discount', label: 'Discount' },
-                { key: 'grandTotal', label: 'Grand Total' },
+                { key: 'grandTotal', label: 'Grandtotal' },
+                { key: 'cost', label: 'Cost' },
+                { key: 'margin', label: 'Margin' },
               ].map(col => (
                 <th
                   key={col.key}
                   onClick={() => handleSort(col.key)}
-                  className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors border-r border-slate-100 last:border-0"
+                  className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors border-r border-slate-100 last:border-0"
                 >
-                  <div className="flex items-center space-x-1.5">
+                  <div className="flex items-center space-x-1">
                     <span>{col.label}</span>
-                    <ArrowUpDown className={cn("w-2.5 h-2.5", sortBy === col.key ? "text-black" : "text-slate-200")} />
+                    <ArrowUpDown className={cn("w-2 h-2", sortBy === col.key ? "text-black" : "text-slate-200")} />
                   </div>
                 </th>
               ))}
-              <th className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center border-l border-slate-100">Items</th>
-              <th className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right border-l border-slate-100">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
-              <tr><td colSpan={9} className="px-4 py-12 text-center text-xs text-slate-400">Loading Orders...</td></tr>
+              <tr><td colSpan={12} className="px-4 py-12 text-center text-xs text-slate-400">Loading Orders...</td></tr>
             ) : error ? (
-              <tr><td colSpan={9} className="px-4 py-12 text-center text-red-500 text-xs font-bold">{error}</td></tr>
+              <tr><td colSpan={12} className="px-4 py-12 text-center text-red-500 text-xs font-bold">{error}</td></tr>
             ) : orders.length === 0 ? (
-              <tr><td colSpan={9} className="px-4 py-12 text-center text-xs text-slate-400 uppercase font-bold tracking-tighter opacity-50">No Orders found</td></tr>
-            ) : orders.map(order => (
-              <tr
-                key={order._id}
-                className="hover:bg-slate-50 transition-colors group cursor-pointer"
-                onClick={() => router.push(`/wholesale/orders/${order._id}`)}
-              >
-                <td className="px-4 py-2 text-[11px] font-bold text-slate-900 tracking-tight">{order.label || '-'}</td>
-                <td className="px-4 py-2 text-[11px] text-slate-600 font-medium">{renderClient(order)}</td>
-                <td className="px-4 py-2 text-[11px] text-slate-500">
-                    {typeof order.salesRep === 'object' && order.salesRep !== null 
-                        ? `${order.salesRep.firstName} ${order.salesRep.lastName}` 
-                        : (order.salesRep || '-')}
-                </td>
-                <td className="px-4 py-2">
-                  <span className={cn(
-                    "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
-                    order.orderStatus === 'Shipped' ? "bg-green-100 text-green-700" :
-                    order.orderStatus === 'Completed' ? "bg-blue-100 text-blue-700" :
-                    order.orderStatus === 'Processing' ? "bg-orange-100 text-orange-700" :
-                    "bg-slate-100 text-slate-600"
-                  )}>
-                    {order.orderStatus}
-                  </span>
-                </td>
-                <td className="px-4 py-2 text-[11px] text-slate-500">{formatDate(order.createdAt)}</td>
-                <td className="px-4 py-2 text-[11px] text-slate-500">{order.paymentMethod || '-'}</td>
-                <td className="px-4 py-2 text-[11px] font-bold text-slate-900">
-                  {formatCurrency(calculateTotal(order))}
-                </td>
-                <td className="px-4 py-2 text-[11px] text-slate-500">
-                    {formatCurrency(order.shippingCost || 0)}
-                </td>
-                <td className="px-4 py-2 text-[11px] text-slate-500">
-                    {formatCurrency(order.discount || 0)}
-                </td>
-                <td className="px-4 py-2 text-[11px] font-black text-slate-900 bg-slate-50">
-                    {formatCurrency(calculateTotal(order) + (order.shippingCost || 0) - (order.discount || 0))}
-                </td>
-                <td className="px-4 py-2 text-center text-[11px] font-bold text-slate-600 border-l border-slate-50">
-                  {order.lineItems?.length || 0}
-                </td>
-                <td className="px-4 py-2 text-right border-l border-slate-50">
-                  <div className="flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={(e) => handleEditClick(e, order)}
-                      className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
-                      title="Edit Order"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={(e) => handleDeleteClick(e, order._id)}
-                      className="p-1 text-slate-400 hover:text-red-600 transition-colors"
-                      title="Delete Order"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+              <tr><td colSpan={12} className="px-4 py-12 text-center text-xs text-slate-400 uppercase font-bold tracking-tighter opacity-50">No Orders found</td></tr>
+            ) : orders.map(order => {
+                const subtotal = calculateTotal(order);
+                const shipping = order.shippingCost || 0;
+                const discount = order.discount || 0;
+                const tax = order.tax || 0;
+                const grandTotal = subtotal + shipping + tax - discount;
+                const cost = calculateCost(order);
+                const margin = grandTotal - cost;
+
+                return (
+                  <tr
+                    key={order._id}
+                    className="hover:bg-slate-50 transition-colors group cursor-pointer"
+                    onClick={() => router.push(`/sales/wholesale-orders/${order._id}`)}
+                  >
+                    <td className="px-2 py-1.5 text-[10px] font-bold text-slate-900 tracking-tight font-mono whitespace-nowrap overflow-hidden text-ellipsis max-w-[100px] border-r border-slate-50">{order.label || '-'}</td>
+                    <td className="px-2 py-1.5 text-[10px] text-slate-500 font-mono border-r border-slate-50">{formatDate(order.createdAt)}</td>
+                    <td className="px-2 py-1.5 text-[10px] text-slate-600 font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px] border-r border-slate-50">{renderClient(order)}</td>
+                    <td className="px-2 py-1.5 text-[10px] text-slate-500 whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px] border-r border-slate-50">
+                        {typeof order.salesRep === 'object' && order.salesRep !== null 
+                            ? `${order.salesRep.firstName} ${order.salesRep.lastName}` 
+                            : (order.salesRep || '-')}
+                    </td>
+                    <td className="px-2 py-1.5 text-[10px] text-slate-500 border-r border-slate-50">{order.paymentMethod || '-'}</td>
+                    <td className="px-2 py-1.5 border-r border-slate-50">
+                      <span className={cn(
+                        "px-1.5 py-0.5 rounded-none text-[8px] font-bold uppercase",
+                        order.orderStatus === 'Shipped' ? "bg-green-100 text-green-700" :
+                        order.orderStatus === 'Completed' ? "bg-blue-100 text-blue-700" :
+                        order.orderStatus === 'Processing' ? "bg-orange-100 text-orange-700" :
+                        "bg-slate-100 text-slate-600"
+                      )}>
+                        {order.orderStatus}
+                      </span>
+                    </td>
+                    <td className="px-2 py-1.5 text-[10px] font-bold text-slate-900 font-mono text-right border-r border-slate-50">
+                      {formatCurrency(subtotal)}
+                    </td>
+                    <td className="px-2 py-1.5 text-[10px] text-slate-500 font-mono text-right border-r border-slate-50">
+                        {formatCurrency(shipping)}
+                    </td>
+                    <td className="px-2 py-1.5 text-[10px] text-slate-500 font-mono text-right border-r border-slate-50">
+                        {formatCurrency(discount)}
+                    </td>
+                    <td className="px-2 py-1.5 text-[10px] font-black text-slate-900 bg-slate-50 font-mono text-right border-r border-slate-50">
+                        {formatCurrency(grandTotal)}
+                    </td>
+                    <td className="px-2 py-1.5 text-[10px] text-slate-600 font-mono text-right border-r border-slate-50">
+                        {formatCurrency(cost)}
+                    </td>
+                    <td className={cn("px-2 py-1.5 text-[10px] font-bold font-mono text-right", margin < 0 ? "text-red-500" : "text-green-600")}>
+                        {formatCurrency(margin)}
+                    </td>
+                  </tr>
+                );
+            })}
           </tbody>
         </table>
       </div>
@@ -744,7 +1009,7 @@ export default function SaleOrdersPage() {
       {/* Create / Edit Order Modal */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-4xl overflow-hidden animate-in fade-in zoom-in duration-200 border border-slate-200 flex flex-col max-h-[90vh]">
+          <div className="bg-white rounded-none shadow-2xl w-full max-w-4xl overflow-hidden animate-in fade-in zoom-in duration-200 border border-slate-200 flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50 shrink-0">
               <h2 className="text-sm font-bold uppercase text-slate-900">{editingOrderId ? 'Edit Sale Order' : 'Create Sale Order'}</h2>
               <button
@@ -762,15 +1027,15 @@ export default function SaleOrdersPage() {
                     {/* Basic Info */}
                     <div>
                         <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100">Order Details</h4>
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                             <div className="space-y-1.5">
                                 <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Order Name/ID <span className="text-red-500">*</span></label>
                                 <input
                                 type="text"
                                 required
+                                readOnly
                                 value={newOrder.label}
-                                onChange={e => setNewOrder({ ...newOrder, label: e.target.value })}
-                                className="w-full px-3 py-2 border border-slate-200 rounded text-sm bg-slate-50 focus:outline-none"
+                                className="w-full px-3 py-2 border border-slate-200 rounded text-sm bg-slate-100 text-slate-500 focus:outline-none cursor-not-allowed"
                                 />
                             </div>
                             <div className="space-y-1.5">
@@ -778,7 +1043,7 @@ export default function SaleOrdersPage() {
                                 <SearchableSelect
                                 options={allClients.map(c => ({ value: c._id, label: c.name }))}
                                 value={newOrder.clientId}
-                                onChange={(val) => setNewOrder({ ...newOrder, clientId: val })}
+                                onChange={handleClientChange}
                                 placeholder="Select Client..."
                                 required
                                 className="w-full"
@@ -786,43 +1051,23 @@ export default function SaleOrdersPage() {
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Sales Rep</label>
-                                <input
-                                type="text"
-                                value={newOrder.salesRep}
-                                onChange={e => setNewOrder({ ...newOrder, salesRep: e.target.value })}
-                                className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-black/10"
+                                <SearchableSelect
+                                    options={allUsers.map(u => ({ label: `${u.firstName} ${u.lastName}`, value: u._id }))}
+                                    value={newOrder.salesRep}
+                                    onChange={(val) => setNewOrder({ ...newOrder, salesRep: val })}
+                                    placeholder="Select Rep..."
+                                    className="w-full"
                                 />
                             </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Status</label>
-                                <select
-                                value={newOrder.orderStatus}
-                                onChange={e => setNewOrder({ ...newOrder, orderStatus: e.target.value })}
-                                className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-black/10 bg-white"
-                                >
-                                <option value="Pending">Pending</option>
-                                <option value="Processing">Processing</option>
-                                <option value="Shipped">Shipped</option>
-                                <option value="Completed">Completed</option>
-                                <option value="Cancelled">Cancelled</option>
-                                </select>
-                            </div>
+                            {/* Status is hidden and defaults to Pending */}
                             <div className="space-y-1.5">
                                 <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Payment Method</label>
-                                <input
-                                type="text"
-                                value={newOrder.paymentMethod}
-                                onChange={e => setNewOrder({ ...newOrder, paymentMethod: e.target.value })}
-                                className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-black/10"
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Category</label>
-                                <input
-                                type="text"
-                                value={newOrder.category}
-                                onChange={e => setNewOrder({ ...newOrder, category: e.target.value })}
-                                className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-black/10"
+                                <SearchableSelect
+                                    options={PAYMENT_METHODS}
+                                    value={newOrder.paymentMethod}
+                                    onChange={(val) => setNewOrder({ ...newOrder, paymentMethod: val })}
+                                    placeholder="Select Method..."
+                                    className="w-full"
                                 />
                             </div>
                         </div>
@@ -834,11 +1079,13 @@ export default function SaleOrdersPage() {
                         <div className="grid grid-cols-3 gap-4">
                              <div className="space-y-1.5">
                                 <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Shipping Method</label>
-                                <input
-                                type="text"
-                                value={newOrder.shippingMethod}
-                                onChange={e => setNewOrder({ ...newOrder, shippingMethod: e.target.value })}
-                                className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-black/10"
+                                <SearchableSelect
+                                    options={SHIPPING_METHODS}
+                                    value={newOrder.shippingMethod}
+                                    onChange={(val) => setNewOrder({ ...newOrder, shippingMethod: val })}
+                                    creatable
+                                    placeholder="Select Method..."
+                                    className="w-full"
                                 />
                             </div>
                             <div className="space-y-1.5">
@@ -905,8 +1152,10 @@ export default function SaleOrdersPage() {
                                     min="0"
                                     step="0.01"
                                     value={newOrder.shippingCost}
-                                    onChange={e => setNewOrder({ ...newOrder, shippingCost: parseFloat(e.target.value) || 0 })}
+                                    onWheel={(e) => e.currentTarget.blur()}
+                                    onChange={e => setNewOrder({ ...newOrder, shippingCost: e.target.value })}
                                     className="w-full pl-5 pr-2 py-2 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-black/10"
+                                    placeholder="0.00"
                                     />
                                 </div>
                             </div>
@@ -918,9 +1167,11 @@ export default function SaleOrdersPage() {
                                     type="number"
                                     min="0"
                                     step="0.01"
-                                    value={(newOrder as any).discount || 0}
-                                    onChange={e => setNewOrder({ ...newOrder, discount: parseFloat(e.target.value) || 0 } as any)}
+                                    value={newOrder.discount}
+                                    onWheel={(e) => e.currentTarget.blur()}
+                                    onChange={e => setNewOrder({ ...newOrder, discount: e.target.value })}
                                     className="w-full pl-5 pr-2 py-2 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-black/10"
+                                    placeholder="0.00"
                                     />
                                 </div>
                             </div>
@@ -933,21 +1184,26 @@ export default function SaleOrdersPage() {
                                     min="0"
                                     step="0.01"
                                     value={newOrder.tax}
-                                    onChange={e => setNewOrder({ ...newOrder, tax: parseFloat(e.target.value) || 0 })}
+                                    onWheel={(e) => e.currentTarget.blur()}
+                                    onChange={e => setNewOrder({ ...newOrder, tax: e.target.value })}
                                     className="w-full pl-5 pr-2 py-2 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-black/10"
+                                    placeholder="0.00"
                                     />
                                 </div>
                             </div>
                             <div className="space-y-1.5 pb-2">
-                                <label className="flex items-center space-x-2 cursor-pointer">
-                                    <input 
-                                        type="checkbox"
-                                        checked={newOrder.lockPrice}
-                                        onChange={e => setNewOrder({...newOrder, lockPrice: e.target.checked})}
-                                        className="form-checkbox h-4 w-4 text-black rounded border-slate-300"
-                                    />
-                                    <span className="text-xs font-medium text-slate-700">Lock Price</span>
-                                </label>
+                                <div className="flex items-center space-x-3">
+                                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">Lock Price</span>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            className="sr-only peer"
+                                            checked={newOrder.lockPrice}
+                                            onChange={e => setNewOrder({...newOrder, lockPrice: e.target.checked})}
+                                        />
+                                        <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-black/20 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-black"></div>
+                                    </label>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -956,94 +1212,143 @@ export default function SaleOrdersPage() {
                 <div className="border-t border-slate-100 pt-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Line Items</h3>
-                    <button
-                      type="button"
-                      onClick={addLineItem}
-                      className="flex items-center space-x-1 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[10px] font-bold uppercase transition-colors"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Add Item</span>
-                    </button>
+                    <div className="flex items-center space-x-2">
+                        <button
+                        type="button"
+                        onClick={addLineItem}
+                        className="flex items-center space-x-1 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-none text-[10px] font-bold uppercase transition-colors"
+                        >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add Item</span>
+                        </button>
+                    </div>
                   </div>
 
                   {newLineItems.length === 0 ? (
-                    <div className="text-center py-8 bg-slate-50 rounded border border-dashed border-slate-200 text-slate-400 text-xs">
-                      No items added. Click "Add Item" to start.
+                    <div className="flex flex-col items-center justify-center py-12 bg-slate-50 rounded-none border border-dashed border-slate-200 text-slate-400">
+                      <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm mb-3">
+                        <Package className="w-6 h-6 text-slate-300" />
+                      </div>
+                      <p className="text-xs font-medium">No items added yet</p>
+                      <button
+                        type="button"
+                        onClick={addLineItem}
+                        className="mt-3 text-xs font-bold text-blue-600 hover:underline"
+                      >
+                        Add your first item
+                      </button>
                     </div>
                   ) : (
-                    <div className="space-y-2">
-                      <div className="grid grid-cols-12 gap-2 text-[10px] uppercase font-bold text-slate-400 px-2">
-                        <div className="col-span-4">product / sku</div>
-                        <div className="col-span-2">UOM</div>
-                        <div className="col-span-2">Qty</div>
-                        <div className="col-span-3">Unit Price</div>
-                        <div className="col-span-1"></div>
-                      </div>
-                      {newLineItems.map((item, index) => (
-                        <div key={item.id} className="grid grid-cols-12 gap-2 items-start bg-slate-50/50 p-2 rounded border border-slate-100">
-                          <div className="col-span-4">
-                            <SearchableSelect
-                              options={allSkus
-                                .filter(s => !newLineItems.some(i => i.id !== item.id && i.sku === s._id))
-                                .map(s => ({ value: s._id, label: s.name }))
-                              }
-                              value={item.sku}
-                              onChange={(val) => updateLineItem(item.id, 'sku', val)}
-                              placeholder="Select SKU..."
-                              className="w-full"
-                            />
-                            {item.lotNumber !== undefined && (
-                                <input 
-                                    type="text" 
-                                    placeholder="Lot #"
-                                    className="mt-1 w-full px-2 py-1 text-xs border border-slate-200 rounded bg-white"
-                                    value={item.lotNumber}
-                                    onChange={(e) => updateLineItem(item.id, 'lotNumber', e.target.value)}
-                                />
-                            )}
-                          </div>
-                          <div className="col-span-2">
-                            <SearchableSelect
-                              options={UOM_OPTIONS}
-                              value={item.uom}
-                              onChange={(val) => updateLineItem(item.id, 'uom', val)}
-                              placeholder="UOM"
-                              creatable
-                            />
-                          </div>
-                          <div className="col-span-2">
-                            <input
-                              type="number"
-                              min="1"
-                              value={item.qtyShipped}
-                              onChange={(e) => updateLineItem(item.id, 'qtyShipped', parseInt(e.target.value) || 0)}
-                              className="w-full px-2 py-2 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-black/10"
-                            />
-                          </div>
-                          <div className="col-span-3">
-                            <div className="relative">
-                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={item.price}
-                                onChange={(e) => updateLineItem(item.id, 'price', parseFloat(e.target.value) || 0)}
-                                className="w-full pl-5 pr-2 py-2 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-black/10"
-                              />
-                            </div>
-                          </div>
-                          <div className="col-span-1 flex justify-end">
-                            <button
-                              type="button"
-                              onClick={() => removeLineItem(item.id)}
-                              className="p-2 text-slate-400 hover:text-red-500 transition-colors"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+                    <div className="border border-slate-200 rounded-none">
+                      <table className="w-full text-left border-collapse border-b border-slate-200">
+                        <thead className="bg-slate-50 text-slate-500">
+                           <tr>
+                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[35%] border-r border-slate-200">Item / SKU</th>
+                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[15%] border-r border-slate-200">Lot #</th>
+                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[10%] border-r border-slate-200">UOM</th>
+                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[10%] border-r border-slate-200">Qty</th>
+                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[15%] border-r border-slate-200">Price</th>
+                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[10%] text-right border-r border-slate-200">Total</th>
+                              <th className="px-2 py-2 w-[5%] bg-white"></th>
+                           </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200 bg-white">
+                          {newLineItems.map((item, index) => (
+                            <tr key={item.id} className="group">
+                                <td className="p-0 border-r border-slate-200">
+                                    <div className="w-full h-full">
+                                        <SearchableSelect
+                                            options={allSkus
+                                                .filter(s => !newLineItems.some(i => i.id !== item.id && i.sku === s._id))
+                                                .map(s => ({ value: s._id, label: s.name }))
+                                            }
+                                            value={item.sku}
+                                            onChange={(val) => updateLineItem(item.id, 'sku', val)}
+                                            placeholder="Select SKU"
+                                            className="w-full rounded-none border-none text-sm focus:ring-0"
+                                        />
+                                    </div>
+                                </td>
+                                <td className="p-0 border-r border-slate-200">
+                                    <div 
+                                        className="w-full h-[32px] px-2 flex items-center cursor-pointer hover:bg-slate-50 transition-colors"
+                                        onClick={() => {
+                                            if (!item.sku) {
+                                                toast.error("Select SKU first");
+                                                return;
+                                            }
+                                            setEditingLotItemId(item.id);
+                                            setEditingSkuId(item.sku);
+                                            setIsLotModalOpen(true);
+                                        }}
+                                    >
+                                        <span className={cn("text-xs truncate block w-full", !item.lotNumber ? "text-slate-400 italic" : "text-slate-700 font-mono")}>
+                                            {item.lotNumber || "Select"}
+                                        </span>
+                                    </div>
+                                </td>
+                                <td className="p-0 border-r border-slate-200">
+                                     <SearchableSelect
+                                        options={UOM_OPTIONS}
+                                        value={item.uom}
+                                        onChange={(val) => updateLineItem(item.id, 'uom', val)}
+                                        placeholder="UOM"
+                                        creatable
+                                        className="w-full rounded-none border-none focus:ring-0"
+                                    />
+                                </td>
+                                <td className="p-0 border-r border-slate-200">
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      value={item.qtyShipped}
+                                      onWheel={(e) => e.currentTarget.blur()}
+                                      onChange={(e) => updateLineItem(item.id, 'qtyShipped', parseInt(e.target.value) || 0)}
+                                      className="w-full h-[32px] px-2 text-sm focus:outline-none focus:bg-blue-50/50 transition-colors font-mono rounded-none"
+                                    />
+                                </td>
+                                <td className="p-0 border-r border-slate-200">
+                                    <div className="relative h-full w-full">
+                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          step="0.01"
+                                          value={item.price}
+                                          onWheel={(e) => e.currentTarget.blur()}
+                                          onChange={(e) => updateLineItem(item.id, 'price', parseFloat(e.target.value) || 0)}
+                                          className="w-full h-[32px] pl-5 pr-2 text-sm focus:outline-none focus:bg-blue-50/50 transition-colors font-mono text-right rounded-none"
+                                        />
+                                    </div>
+                                </td>
+                                <td className="px-2 py-0 align-middle text-right border-r border-slate-200 bg-slate-50/30">
+                                    <span className="text-xs font-bold text-slate-700 font-mono">
+                                        {formatCurrency((item.qtyShipped || 0) * (item.price || 0))}
+                                    </span>
+                                </td>
+                                <td className="p-0 text-center align-middle">
+                                    <button
+                                      type="button"
+                                      onClick={() => removeLineItem(item.id)}
+                                      className="w-full h-[32px] flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                      title="Remove Item"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-slate-50">
+                            <tr>
+                                <td colSpan={5} className="px-2 py-2 text-[10px] font-bold text-slate-500 uppercase text-right tracking-wider border-r border-slate-200">Subtotal</td>
+                                <td className="px-2 py-2 text-xs font-black text-slate-900 font-mono text-right border-r border-slate-200">
+                                    {formatCurrency(newLineItems.reduce((sum, item) => sum + ((item.qtyShipped || 0) * (item.price || 0)), 0))}
+                                </td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                      </table>
                     </div>
                   )}
                 </div>
@@ -1062,6 +1367,19 @@ export default function SaleOrdersPage() {
           </div>
         </div>
       )}
+
+      {/* Lot Selection Modal */}
+      <LotSelectionModal
+        isOpen={isLotModalOpen}
+        onClose={() => {
+            setIsLotModalOpen(false);
+            setEditingLotItemId(null);
+            setEditingSkuId(null);
+        }}
+        onSelect={handleLotSelect}
+        skuId={editingSkuId || ''}
+        currentLotNumber={newLineItems.find(i => i.id === editingLotItemId)?.lotNumber || ''}
+      />
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm.isOpen && (

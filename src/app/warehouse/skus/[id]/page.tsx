@@ -51,7 +51,15 @@ interface Transaction {
     docId: string;
     varianceId?: string;
     link: string;
-    cost?: number; // Added cost
+    cost?: number;
+    salePrice?: number; // Added Sale Price
+}
+
+interface Financials {
+    totalRevenue: number;
+    costOfSales: number;
+    grossProfit: number;
+    chartData: { date: string; revenue: number; qty: number }[];
 }
 
 export default function SkuDetailsPage() {
@@ -61,6 +69,7 @@ export default function SkuDetailsPage() {
 
     const [sku, setSku] = useState<Sku | null>(null);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [financials, setFinancials] = useState<Financials | null>(null);
     const [loading, setLoading] = useState(true);
     const [fallbackImage, setFallbackImage] = useState('/sku-placeholder.png');
 
@@ -76,7 +85,7 @@ export default function SkuDetailsPage() {
         showWebOrders: true,
         showAuditAdjustments: true
     });
-    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc'); // Default to Newest First
     const [selectedVarianceId, setSelectedVarianceId] = useState<string | null>(null);
     const [selectedLot, setSelectedLot] = useState<string>('All');
 
@@ -94,6 +103,7 @@ export default function SkuDetailsPage() {
                 const data = await res.json();
                 setSku(data.sku);
                 setTransactions(data.transactions || []);
+                setFinancials(data.financials || null);
                 if (data.settings?.missingSkuImage) {
                     setFallbackImage(data.settings.missingSkuImage);
                 }
@@ -230,7 +240,7 @@ export default function SkuDetailsPage() {
         );
     }
 
-    const currentStock = transactions.length > 0 ? transactions[transactions.length - 1].balance : 0; // Last item has latest balance due to chronological sort
+    const currentStock = transactions.length > 0 ? transactions[0].balance : 0; // First item has latest balance due to API returning Newest First
 
     return (
         <div className="flex flex-col h-screen bg-slate-50 overflow-hidden">
@@ -380,6 +390,77 @@ export default function SkuDetailsPage() {
                             </div>
                         </div>
 
+                        {/* Financials Card */}
+                        {financials && (
+                            <div className="bg-white shadow-sm border border-slate-200 p-6">
+                                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">Financials</h3>
+                                <div className="space-y-4">
+                                    <div className="flex justify-between items-baseline">
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Revenue</span>
+                                        <span className="text-sm font-bold text-slate-900">${financials.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                    </div>
+                                    <div className="flex justify-between items-baseline">
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Cost of Sales</span>
+                                        <span className="text-sm font-medium text-slate-600">${financials.costOfSales.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                    </div>
+                                    <div className="flex justify-between items-baseline pt-2 border-t border-slate-100">
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Gross Profit</span>
+                                        <span className={cn(
+                                            "text-sm font-bold",
+                                            financials.grossProfit >= 0 ? "text-emerald-600" : "text-red-600"
+                                        )}>
+                                            ${financials.grossProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
+
+                                    {/* Turnover Chart */}
+                                    {/* Turnover Chart */}
+                                    <div className="mt-8">
+                                        <h4 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-4">Last 12 Months Turnover</h4>
+                                        <div className="flex items-end space-x-2 pt-6">
+                                            {financials.chartData.map((d, i) => {
+                                                const maxRev = Math.max(...financials.chartData.map(c => c.revenue), 100); 
+                                                const heightPct = (d.revenue / maxRev) * 100;
+                                                const [y, m] = d.date.split('-');
+                                                const monthLabel = new Date(parseInt(y), parseInt(m) - 1, 2).toLocaleString('default', { month: 'short' });
+
+                                                return (
+                                                    <div key={i} className="flex-1 flex flex-col group relative">
+                                                        {/* Bar Container */}
+                                                        <div className="h-32 flex flex-col justify-end w-full border-b border-slate-100 pb-px">
+                                                            <div 
+                                                                className="bg-slate-800 rounded-t hover:bg-black transition-all w-full min-w-[12px] relative"
+                                                                style={{ height: `${Math.max(heightPct, 2)}%` }}
+                                                            >
+                                                                {/* Permanent Labels */}
+                                                                {d.revenue > 0 && (
+                                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 flex flex-col items-center pointer-events-none w-max z-10">
+                                                                        <span className="text-[9px] font-bold text-slate-900 leading-none">${Math.round(d.revenue).toLocaleString()}</span>
+                                                                        <span className="text-[8px] text-slate-500 font-medium leading-tight mt-0.5">{d.qty || 0}u</span>
+                                                                    </div>
+                                                                )}
+                                                                
+                                                                {/* Tooltip */}
+                                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-8 hidden group-hover:block z-20 bg-black text-white text-[9px] px-2 py-1.5 rounded whitespace-nowrap shadow-lg">
+                                                                    <div className="font-bold">{monthLabel} {y}</div>
+                                                                    <div>Revenue: ${d.revenue.toLocaleString()}</div>
+                                                                    <div>Qty: {d.qty || 0} units</div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        {/* X-Axis Label */}
+                                                        <div className="text-[8px] text-center mt-2 text-slate-400 font-bold uppercase tracking-wider">
+                                                            {monthLabel}
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Filters Card (Moved Here) */}
                         <div className="bg-white shadow-sm border border-slate-200 p-6">
                             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">Ledger Filters</h3>
@@ -507,23 +588,24 @@ export default function SkuDetailsPage() {
 
                             <div className="overflow-x-auto flex-1">
                                 <table className="w-full text-left border-collapse">
-                                    <thead className="bg-slate-50 sticky top-0 z-10">
+                                    <thead className="bg-slate-50 sticky top-0 z-10 border-b border-slate-100">
                                         <tr>
                                             <th 
-                                                className="px-4 py-2 text-[9px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group"
+                                                className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors group border-r border-slate-100"
                                                 onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
                                             >
                                                 <div className="flex items-center space-x-1">
                                                     <span>Date</span>
-                                                    <ArrowUpDown className={cn("w-3 h-3 text-slate-300 group-hover:text-slate-500", sortOrder === 'asc' ? "text-black" : "")} />
+                                                    <ArrowUpDown className={cn("w-2 h-2 text-slate-300 group-hover:text-slate-500", sortOrder === 'asc' ? "text-black" : "")} />
                                                 </div>
                                             </th>
-                                            <th className="px-4 py-2 text-[9px] font-bold text-slate-500 uppercase tracking-wider">Type</th>
-                                            <th className="px-4 py-2 text-[9px] font-bold text-slate-500 uppercase tracking-wider">Reference</th>
-                                            <th className="px-4 py-2 text-[9px] font-bold text-slate-500 uppercase tracking-wider">Lot #</th>
-                                            <th className="px-4 py-2 text-[9px] font-bold text-slate-500 uppercase tracking-wider text-right">Cost</th>
-                                            <th className="px-4 py-2 text-[9px] font-bold text-slate-500 uppercase tracking-wider text-right">In / Out</th>
-                                            <th className="px-4 py-2 text-[9px] font-bold text-slate-500 uppercase tracking-wider text-right">Balance</th>
+                                            <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100">Type</th>
+                                            <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100">Reference</th>
+                                            <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100">Lot #</th>
+                                            <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest text-right border-r border-slate-100">In / Out</th>
+                                            <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest text-right border-r border-slate-100">Balance</th>
+                                            <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest text-right border-r border-slate-100">Cost</th>
+                                            <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest text-right">Sale Price</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -533,41 +615,44 @@ export default function SkuDetailsPage() {
                                                 className="hover:bg-slate-50 transition-colors group cursor-pointer"
                                                 onClick={() => router.push(tx.link)}
                                             >
-                                                <td className="px-4 py-1 text-[10px] text-slate-500 font-mono">
+                                                <td className="px-2 py-1 text-[10px] text-slate-500 font-mono">
                                                     {new Date(tx.date).toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' })}
                                                 </td>
-                                                <td className="px-4 py-1 text-[10px] font-medium text-slate-700">
-                                                    <div className="flex items-center space-x-2">
+                                                <td className="px-2 py-1 text-[10px] font-medium text-slate-700">
+                                                    <div className="flex items-center space-x-1.5">
                                                         {getTypeIcon(tx.type)}
-                                                        <span>{tx.type}</span>
+                                                        <span className="text-[9px] uppercase font-bold text-slate-500">{tx.type}</span>
                                                     </div>
                                                 </td>
-                                                <td className="px-4 py-1 text-[10px] text-slate-600 whitespace-normal break-words max-w-[150px]">
+                                                <td className="px-2 py-1 text-[10px] text-slate-600 whitespace-normal break-words max-w-[150px]">
                                                     {tx.reference}
                                                 </td>
-                                                <td className="px-4 py-1 text-[10px] text-slate-600">
+                                                <td className="px-2 py-1 text-[10px] text-slate-600 font-mono">
                                                     {tx.lotNumber || '-'}
                                                 </td>
-                                                <td className="px-4 py-1 text-right text-[10px] text-slate-600 font-mono">
-                                                    {tx.cost !== undefined ? `$${tx.cost.toFixed(2)}` : '-'}
-                                                </td>
-                                                <td className="px-4 py-1 text-right">
+                                                <td className="px-2 py-1 text-right">
                                                     <span className={cn(
-                                                        "text-[9px] font-bold px-1.5 py-0.5",
+                                                        "text-[9px] font-mono font-bold px-1 py-0.5 rounded-[2px]",
                                                         tx.quantity > 0 ? "text-emerald-700 bg-emerald-50" : "text-rose-700 bg-rose-50"
                                                     )}>
                                                         {tx.quantity > 0 ? '+' : ''}{tx.quantity} {tx.uom}
                                                     </span>
                                                 </td>
-                                                <td className="px-4 py-1 text-right text-[10px] font-bold text-slate-900">
+                                                <td className="px-2 py-1 text-right text-[10px] font-bold text-slate-900 font-mono">
                                                     {tx.balance.toLocaleString()}
+                                                </td>
+                                                <td className="px-2 py-1 text-right text-[10px] text-slate-600 font-mono">
+                                                    {tx.cost ? `$${tx.cost.toFixed(2)}` : '-'}
+                                                </td>
+                                                <td className="px-2 py-1 text-right text-[10px] text-slate-600 font-mono">
+                                                    {tx.salePrice ? `$${tx.salePrice.toFixed(2)}` : '-'}
                                                 </td>
                                             </tr>
                                         ))}
                                         {displayTransactions.length === 0 && (
                                             <tr>
-                                                <td colSpan={6} className="px-6 py-12 text-center text-slate-400 text-sm">
-                                                    No transactions found for the selected filters.
+                                                <td colSpan={8} className="px-4 py-8 text-center text-slate-400 text-[10px] uppercase font-bold tracking-widest opacity-50">
+                                                    No transactions found
                                                 </td>
                                             </tr>
                                         )}

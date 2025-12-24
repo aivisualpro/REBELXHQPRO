@@ -450,7 +450,7 @@ export default function DashboardPage() {
                         value={loading ? '...' : stats?.kpis?.webOrders?.toLocaleString()}
                         change="+8%"
                         positive
-                        onClick={() => router.push('/retail/web-orders')}
+                        onClick={() => router.push('/sales/web-orders')}
                     />
                     <KpiTile
                         icon={Package}

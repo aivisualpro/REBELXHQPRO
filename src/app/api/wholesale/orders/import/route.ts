@@ -3,10 +3,15 @@ import dbConnect from '@/lib/mongoose';
 import SaleOrder from '@/models/SaleOrder';
 import Client from '@/models/Client';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: Request) {
+    console.log('[import-orders] API called');
     try {
         await dbConnect();
-        const { data } = await request.json();
+        const body = await request.json();
+        console.log('[import-orders] Body keys:', Object.keys(body));
+        const { data } = body;
 
         if (!data || !Array.isArray(data)) {
             return NextResponse.json({ error: 'Invalid data format' }, { status: 400 });

@@ -87,6 +87,19 @@ export async function PATCH(
 
         const updated = await PurchaseOrder.findByIdAndUpdate(id, body, { new: true });
 
+        // Propagate cost changes
+        if (updated && updated.lineItems) {
+            const { propagateCostChange } = await import('@/lib/cost-propagation');
+            for (const item of updated.lineItems) {
+                if (item.sku && item.lotNumber) {
+                    // Use cost or price as cost basis
+                    const c = item.cost !== undefined ? item.cost : (item.price || 0);
+                    const skuId = (item.sku && typeof item.sku === 'object' && '_id' in item.sku) ? item.sku._id : item.sku;
+                    await propagateCostChange(skuId, item.lotNumber, c);
+                }
+            }
+        }
+
         return NextResponse.json(updated);
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });

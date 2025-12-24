@@ -594,7 +594,7 @@ export default function ManufacturingDetailPage() {
                             </div>
                             <div className="flex justify-between items-center group pt-1">
                                 <span className="text-sm text-slate-500 group-hover:text-slate-900 transition-colors italic">Cost per Unit</span>
-                                <span className="text-sm font-mono font-medium text-slate-600 italic">${costs.perUnit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</span>
+                                <span className="text-sm font-mono font-medium text-slate-600 italic">${costs.perUnit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
                             </div>
                             <div className="pt-3 mt-3 border-t border-slate-200 flex justify-between items-center">
                                 <span className="text-sm font-bold text-slate-900 uppercase tracking-wider">Total Cost</span>
@@ -723,15 +723,13 @@ export default function ManufacturingDetailPage() {
                                             {col.label}
                                         </th>
                                     ))}
-                                    <th className="px-3 py-1.5 text-[8px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap text-right w-[80px]">
-                                        Actions
-                                    </th>
+                                    {/* Actions Column Removed */}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {(!order.lineItems || order.lineItems.length === 0) ? (
                                     <tr>
-                                        <td colSpan={14} className="px-3 py-6 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">No line items</td>
+                                        <td colSpan={13} className="px-3 py-6 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">No line items</td>
                                     </tr>
                                 ) : order.lineItems.map(item => {
                                     const bomQty = (item.recipeQty || 0) * (order.qty || 0);
@@ -806,70 +804,7 @@ export default function ManufacturingDetailPage() {
                                             <td className="px-3 py-1 text-[10px] font-mono text-slate-700 bg-slate-50/10 whitespace-nowrap">
                                                 {item.cost !== undefined ? `$${item.cost.toFixed(2)}` : '-'}
                                             </td>
-                                            <td className="px-3 py-1 text-right">
-                                                <div className="flex items-center justify-end space-x-1">
-                                                    <button 
-                                                        onClick={() => {
-                                                            setEditingItem(item as any);
-                                                            setIsEditModalOpen(true);
-                                                        }}
-                                                        className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
-                                                        title="Edit Item"
-                                                    >
-                                                        <Pencil className="w-3 h-3" />
-                                                    </button>
-                                                    <button 
-                                                        onClick={async () => {
-                                                            const copiedItem = {
-                                                                ...item,
-                                                                _id: '',
-                                                                lotNumber: '',
-                                                                createdAt: new Date().toISOString()
-                                                            };
-                                                            const updatedItems = [...(order.lineItems || []), copiedItem];
-                                                            const res = await fetch(`/api/manufacturing/${order._id}`, {
-                                                                 method: 'PATCH',
-                                                                 headers: { 'Content-Type': 'application/json' },
-                                                                 body: JSON.stringify({ lineItems: updatedItems })
-                                                            });
-                                                            if (res.ok) {
-                                                                const data = await res.json();
-                                                                setOrder(data);
-                                                                toast.success('Item copied');
-                                                            } else {
-                                                                toast.error('Failed to copy item');
-                                                            }
-                                                        }}
-                                                        className="p-1 text-slate-400 hover:text-green-600 transition-colors"
-                                                        title="Copy Item"
-                                                    >
-                                                        <Copy className="w-3 h-3" />
-                                                    </button>
-                                                    <button 
-                                                        onClick={() => {
-                                                            if (window.confirm('Are you sure you want to delete this item?')) {
-                                                                const updatedItems = order.lineItems?.filter(i => i._id !== item._id) || [];
-                                                                fetch(`/api/manufacturing/${order._id}`, {
-                                                                    method: 'PATCH',
-                                                                    headers: { 'Content-Type': 'application/json' },
-                                                                    body: JSON.stringify({ lineItems: updatedItems })
-                                                                }).then(res => {
-                                                                    if (res.ok) {
-                                                                        res.json().then(data => {
-                                                                            setOrder(data);
-                                                                            toast.success('Item removed');
-                                                                        });
-                                                                    }
-                                                                });
-                                                            }
-                                                        }}
-                                                        className="p-1 text-slate-400 hover:text-red-600 transition-colors"
-                                                        title="Delete Item"
-                                                    >
-                                                        <Trash2 className="w-3 h-3" />
-                                                    </button>
-                                                </div>
-                                            </td>
+                                            {/* Actions Cell Removed */}
                                         </tr>
                                     );
                                 })}

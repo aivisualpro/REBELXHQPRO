@@ -540,16 +540,16 @@ export default function PurchaseOrdersPage() {
                 <th
                   key={col.key}
                   onClick={() => handleSort(col.key)}
-                  className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors border-r border-slate-100 last:border-0"
+                  className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors border-r border-slate-100 last:border-0"
                 >
-                  <div className="flex items-center space-x-1.5">
+                  <div className="flex items-center space-x-1">
                     <span>{col.label}</span>
-                    <ArrowUpDown className={cn("w-2.5 h-2.5", sortBy === col.key ? "text-black" : "text-slate-200")} />
+                    <ArrowUpDown className={cn("w-2 h-2", sortBy === col.key ? "text-black" : "text-slate-200")} />
                   </div>
                 </th>
               ))}
-              <th className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center border-l border-slate-100">Line Items</th>
-              <th className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center border-l border-slate-100">Actions</th>
+              <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest text-center border-l border-slate-100">Items</th>
+              <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">

@@ -11,7 +11,9 @@ import {
   Phone,
   MapPin,
   CreditCard,
-  Plus
+  Plus,
+  Pencil,
+  Trash2
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { cn } from '@/lib/utils';
@@ -244,36 +246,36 @@ export default function VendorsPage() {
                 <th
                   key={col.key}
                   onClick={() => handleSort(col.key)}
-                  className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors border-r border-slate-100 last:border-0"
+                  className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors border-r border-slate-100 last:border-0"
                 >
-                  <div className="flex items-center space-x-1.5">
+                  <div className="flex items-center space-x-1">
                     <span>{col.label}</span>
-                    <ArrowUpDown className={cn("w-2.5 h-2.5", sortBy === col.key ? "text-black" : "text-slate-200")} />
+                    <ArrowUpDown className={cn("w-2 h-2", sortBy === col.key ? "text-black" : "text-slate-200")} />
                   </div>
                 </th>
               ))}
-              <th className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right">Actions</th>
+              <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
-              <tr><td colSpan={9} className="px-4 py-12 text-center text-xs text-slate-400">Loading Vendors...</td></tr>
+              <tr><td colSpan={9} className="px-2 py-4 text-center text-[10px] text-slate-400">Loading Vendors...</td></tr>
             ) : error ? (
-              <tr><td colSpan={9} className="px-4 py-12 text-center text-red-500 text-xs font-bold">{error}</td></tr>
+              <tr><td colSpan={9} className="px-2 py-4 text-center text-red-500 text-[10px] font-bold">{error}</td></tr>
             ) : vendors.length === 0 ? (
-              <tr><td colSpan={9} className="px-4 py-12 text-center text-xs text-slate-400 uppercase font-bold tracking-tighter opacity-50">No Vendors found</td></tr>
+              <tr><td colSpan={9} className="px-2 py-4 text-center text-[10px] text-slate-400 uppercase font-bold tracking-tighter opacity-50">No Vendors found</td></tr>
             ) : vendors.map(vendor => (
               <tr key={vendor._id} className="hover:bg-slate-50 transition-colors group">
-                <td className="px-4 py-2 text-[11px] font-bold text-slate-900 tracking-tight">{vendor.name}</td>
-                <td className="px-4 py-2 text-[11px] text-slate-600 truncate max-w-[200px]" title={vendor.address}>{vendor.address || '-'}</td>
-                <td className="px-4 py-2 text-[11px] text-slate-600">{vendor.phone || '-'}</td>
-                <td className="px-4 py-2 text-[11px] text-slate-600"><a href={`mailto:${vendor.email}`} className="hover:underline">{vendor.email || '-'}</a></td>
-                <td className="px-4 py-2 text-[11px] text-slate-600 font-medium">{vendor.contactName || '-'}</td>
-                <td className="px-4 py-2 text-[10px] text-slate-500 uppercase">{vendor.paymentTerms || '-'}</td>
-                <td className="px-4 py-2 text-[11px] text-slate-600">{vendor.carrierPreference || '-'}</td>
-                <td className="px-4 py-2">
+                <td className="px-2 py-1.5 text-[10px] font-bold text-slate-900 tracking-tight">{vendor.name}</td>
+                <td className="px-2 py-1.5 text-[10px] text-slate-600 truncate max-w-[200px]" title={vendor.address}>{vendor.address || '-'}</td>
+                <td className="px-2 py-1.5 text-[10px] text-slate-600 font-mono tracking-tighter">{vendor.phone || '-'}</td>
+                <td className="px-2 py-1.5 text-[10px] text-slate-600 truncate max-w-[150px]"><a href={`mailto:${vendor.email}`} className="hover:underline">{vendor.email || '-'}</a></td>
+                <td className="px-2 py-1.5 text-[10px] text-slate-600 font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[100px]">{vendor.contactName || '-'}</td>
+                <td className="px-2 py-1.5 text-[8px] text-slate-500 uppercase font-bold">{vendor.paymentTerms || '-'}</td>
+                <td className="px-2 py-1.5 text-[10px] text-slate-600 truncate max-w-[100px]">{vendor.carrierPreference || '-'}</td>
+                <td className="px-2 py-1.5">
                   <span className={cn(
-                    "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
+                    "px-1.5 py-0.5 rounded-[2px] text-[8px] font-bold uppercase",
                     vendor.status === 'Active' ? "bg-green-100 text-green-700" :
                       vendor.status === 'Inactive' ? "bg-red-100 text-red-700" :
                         "bg-slate-100 text-slate-600"
@@ -281,8 +283,15 @@ export default function VendorsPage() {
                     {vendor.status || 'Active'}
                   </span>
                 </td>
-                <td className="px-4 py-2 text-right">
-                  {/* Actions placeholder */}
+                <td className="px-2 py-1.5 text-right">
+                  <div className="flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button className="p-1 hover:bg-slate-200 rounded text-slate-400 hover:text-blue-600">
+                      <Pencil className="w-3 h-3" />
+                    </button>
+                    <button className="p-1 hover:bg-slate-200 rounded text-slate-400 hover:text-red-600">
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

@@ -1,3 +1,4 @@
+import { Currency } from 'lucide-react';
 import mongoose from 'mongoose';
 
 const SaleOrderSchema = new mongoose.Schema({
@@ -27,10 +28,20 @@ const SaleOrderSchema = new mongoose.Schema({
         lotNumber: String,
         qtyShipped: Number,
         uom: String,
+        cost: Number, // Cost from lot source (manufacturing/PO)
         price: Number,
         total: Number, // qty x price
         createdAt: { type: Date, default: Date.now }
+    }],
+
+    payments: [{
+        _id: { type: String, default: () => new mongoose.Types.ObjectId().toString() },
+        orderNumber: String, // Ref to order
+        paymentAmount: Number,
+        createdAt: { type: Date, default: Date.now },
+        createdBy: { type: String, ref: 'RXHQUsers' }
     }]
 });
 
+// Force schema refresh
 export default mongoose.models.SaleOrder || mongoose.model('SaleOrder', SaleOrderSchema);

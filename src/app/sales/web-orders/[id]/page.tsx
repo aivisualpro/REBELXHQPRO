@@ -321,7 +321,7 @@ export default function WebOrderDetailPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
             <div className="flex items-center space-x-4">
                 <button 
-                    onClick={() => router.push('/retail/web-orders')} 
+                    onClick={() => router.push('/sales/web-orders')} 
                     className="p-2 bg-white border border-slate-200 hover:bg-slate-50 transition-colors text-slate-500 hover:text-slate-900"
                 >
                     <ArrowLeft className="w-4 h-4" />

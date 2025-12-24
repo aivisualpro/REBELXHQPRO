@@ -30,6 +30,9 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
         // Enrich line items with cost based on Lot Number
         if (order.lineItems && Array.isArray(order.lineItems)) {
             const enrichedLineItems = await Promise.all(order.lineItems.map(async (item: any) => {
+                // Prioritize saved cost
+                if (item.cost && item.cost > 0) return item;
+
                 let cost = 0;
                 const skuId = item.sku?._id || item.sku; // handle populated or unpopulated
                 const lotNumber = item.lotNumber;
