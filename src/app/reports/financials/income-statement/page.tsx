@@ -67,7 +67,7 @@ export default function IncomeStatementPage() {
 
     const formatCurrency = (val: number) => {
         if (!val) return '$0.00';
-        return '$' + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return '$' + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 });
     };
 
     const formatCompact = (val: number) => {

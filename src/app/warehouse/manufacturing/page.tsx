@@ -10,8 +10,10 @@ import {
   Calendar,
   User,
   Factory,
-  Trash2,
-  Pencil
+  Plus,
+  MoreVertical,
+  Pencil,
+  Trash2
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { cn } from '@/lib/utils';
@@ -35,7 +37,7 @@ interface LineItem {
 interface ManufacturingOrder {
   _id: string;
   label?: string;
-  sku: { _id: string; name: string } | string; // Can be populated object or string ID
+  sku: { _id: string; name: string } | string;
   recipesId: string;
   uom: string;
   qty: number;
@@ -48,6 +50,11 @@ interface ManufacturingOrder {
   finishedBy?: { firstName: string, lastName: string };
   createdAt: string;
   lineItems?: LineItem[];
+  // Cost fields
+  materialCost?: number;
+  packagingCost?: number;
+  laborCost?: number;
+  totalCost?: number;
 }
 
 export default function ManufacturingPage() {
@@ -70,12 +77,29 @@ export default function ManufacturingPage() {
 
   // Filter Options (Populated dynamically from fetched data for simplicity in this iteration)
   const [skuOptions, setSkuOptions] = useState<{ label: string, value: string }[]>([]);
+  const [skuList, setSkuList] = useState<any[]>([]);
   const [creatorOptions, setCreatorOptions] = useState<{ label: string, value: string }[]>([]);
 
   const woInputRef = useRef<HTMLInputElement>(null);
   const liInputRef = useRef<HTMLInputElement>(null);
   const laborInputRef = useRef<HTMLInputElement>(null);
   const notesInputRef = useRef<HTMLInputElement>(null);
+
+
+  // Action Menu State
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpenMenuId(null);
+      }
+    };
+    if (openMenuId) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [openMenuId]);
 
   // Debounce search
   useEffect(() => {
@@ -129,6 +153,7 @@ export default function ManufacturingPage() {
       .then(res => res.json())
       .then(data => {
         if (data.skus) {
+          setSkuList(data.skus);
           setSkuOptions(data.skus.map((s: any) => ({ label: s.name, value: s._id })));
         }
       })
@@ -201,12 +226,20 @@ export default function ManufacturingPage() {
     e.target.value = '';
   };
 
+
   return (
     <div className="flex flex-col h-[calc(100vh-48px)] bg-white">
       {/* Action Bar */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100 bg-slate-50/50">
         <div className="flex items-center space-x-4">
           <h1 className="text-sm font-bold text-slate-900 uppercase tracking-tighter">Manufacturing</h1>
+          <button
+            onClick={() => router.push('/warehouse/manufacturing/new')}
+            className="h-[28px] px-3 bg-black text-white text-[10px] font-bold uppercase tracking-wider hover:bg-slate-800 transition-colors flex items-center gap-1.5 rounded-none"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Add</span>
+          </button>
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
             <input
@@ -277,32 +310,29 @@ export default function ManufacturingPage() {
             onChange={(e) => handleImport(e, '/api/manufacturing/import-labor', 'Labor')}
           />
 
-          <button
-            onClick={() => woInputRef.current?.click()}
-            className="p-2 text-slate-600 hover:text-black hover:bg-slate-200 transition-colors rounded-sm flex items-center space-x-1"
-            title="Import Manufacturing Orders"
-          >
-            <Upload className="w-4 h-4" />
-            <span className="text-[10px] font-bold uppercase">Import WO</span>
-          </button>
-
-          <button
-            onClick={() => liInputRef.current?.click()}
-            className="p-2 text-slate-600 hover:text-black hover:bg-slate-200 transition-colors rounded-sm flex items-center space-x-1"
-            title="Import Line Items"
-          >
-            <Upload className="w-4 h-4" />
-            <span className="text-[10px] font-bold uppercase">Import Line Items</span>
-          </button>
-
-          <button
-            onClick={() => laborInputRef.current?.click()}
-            className="p-2 text-slate-600 hover:text-black hover:bg-slate-200 transition-colors rounded-sm flex items-center space-x-1"
-            title="Import Labor"
-          >
-            <Upload className="w-4 h-4" />
-            <span className="text-[10px] font-bold uppercase">Import Labor</span>
-          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => woInputRef.current?.click()}
+              className="h-[30px] w-[30px] bg-white border border-slate-200 text-slate-600 hover:text-black hover:bg-slate-50 transition-colors shadow-sm flex items-center justify-center rounded-none"
+              title="Import Manufacturing Orders"
+            >
+              <Upload className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => liInputRef.current?.click()}
+              className="h-[30px] w-[30px] bg-white border border-slate-200 text-slate-600 hover:text-black hover:bg-slate-50 transition-colors shadow-sm flex items-center justify-center rounded-none"
+              title="Import Line Items"
+            >
+              <Upload className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => laborInputRef.current?.click()}
+              className="h-[30px] w-[30px] bg-white border border-slate-200 text-slate-600 hover:text-black hover:bg-slate-50 transition-colors shadow-sm flex items-center justify-center rounded-none"
+              title="Import Labor"
+            >
+              <Upload className="w-4 h-4" />
+            </button>
+          </div>
 
           <input
             type="file"
@@ -313,12 +343,12 @@ export default function ManufacturingPage() {
           />
           <button
             onClick={() => notesInputRef.current?.click()}
-            className="p-2 text-slate-600 hover:text-black hover:bg-slate-200 transition-colors rounded-sm flex items-center space-x-1"
+            className="h-[30px] w-[30px] bg-white border border-slate-200 text-slate-600 hover:text-black hover:bg-slate-50 transition-colors shadow-sm flex items-center justify-center rounded-none"
             title="Import Notes"
           >
             <Upload className="w-4 h-4" />
-            <span className="text-[10px] font-bold uppercase">Import Notes</span>
           </button>
+
         </div>
       </div>
 
@@ -328,14 +358,18 @@ export default function ManufacturingPage() {
             <tr>
               {[
                 { key: 'label', label: 'WO#' },
+                { key: 'createdAt', label: 'Date' },
                 { key: 'sku', label: 'SKU' },
-                { key: 'status', label: 'Status' },
-                { key: 'qty', label: 'Qty' },
-                { key: 'uom', label: 'UOM' },
+                { key: 'qty', label: 'Qty Mfg.' },
                 { key: 'priority', label: 'Priority' },
-                { key: 'scheduledStart', label: 'Start Date' },
-                { key: 'createdAt', label: 'Created' },
+                { key: 'status', label: 'Status' },
                 { key: 'createdBy', label: 'Created By' },
+                { key: 'materialCost', label: 'Mat. Cost' },
+                { key: 'packagingCost', label: 'Pack. Cost' },
+                { key: 'laborCost', label: 'Labor Cost' },
+                { key: 'totalCost', label: 'Total Cost' },
+                { key: 'unitCost', label: 'Unit Cost' },
+                { key: 'actions', label: '' },
               ].map(col => (
                 <th
                   key={col.key}
@@ -348,25 +382,50 @@ export default function ManufacturingPage() {
                   </div>
                 </th>
               ))}
-              <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest text-center border-l border-slate-100">Items</th>
-              <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
-              <tr><td colSpan={11} className="px-2 py-4 text-center text-[10px] text-slate-400">Loading Orders...</td></tr>
+              <tr><td colSpan={13} className="px-2 py-4 text-center text-[10px] text-slate-400">Loading Orders...</td></tr>
             ) : error ? (
-              <tr><td colSpan={11} className="px-2 py-4 text-center text-red-500 text-[10px] font-bold">{error}</td></tr>
+              <tr><td colSpan={13} className="px-2 py-4 text-center text-red-500 text-[10px] font-bold">{error}</td></tr>
             ) : orders.length === 0 ? (
-              <tr><td colSpan={11} className="px-2 py-4 text-center text-[10px] text-slate-400 uppercase font-bold tracking-tighter opacity-50">No Orders found</td></tr>
-            ) : orders.map(order => (
+              <tr><td colSpan={13} className="px-2 py-4 text-center text-[10px] text-slate-400 uppercase font-bold tracking-tighter opacity-50">No Orders found</td></tr>
+            ) : orders.map(order => {
+              const unitCost = order.qty && order.qty > 0 ? (order.totalCost || 0) / order.qty : 0;
+              return (
               <tr
                 key={order._id}
                 className="hover:bg-slate-50 transition-colors group cursor-pointer"
                 onClick={() => router.push(`/warehouse/manufacturing/${order._id}`)}
               >
                 <td className="px-2 py-1.5 text-[10px] font-bold text-slate-900 tracking-tight font-mono">{order.label || '-'}</td>
-                <td className="px-2 py-1.5 text-[10px] text-slate-600 font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px]">{typeof order.sku === 'object' ? order.sku?.name : order.sku}</td>
+                <td className="px-2 py-1.5 text-[10px] text-slate-500 font-mono">{new Date(order.createdAt).toLocaleDateString()}</td>
+                <td className="px-2 py-1.5 text-[10px] text-slate-600 font-medium whitespace-nowrap">
+                   <div className="flex items-center space-x-1.5">
+                      {(() => {
+                        const skuId = typeof order.sku === 'object' ? order.sku?._id : order.sku;
+                        const skuData = (typeof order.sku === 'object' && (order.sku as any).tier) ? order.sku : skuList.find(s => s._id === skuId);
+                        const tier = skuData?.tier;
+                        if (!tier) return null;
+                        return (
+                          <span className={cn(
+                            "flex-shrink-0 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-black text-white",
+                            tier === 1 ? "bg-emerald-500" :
+                            tier === 2 ? "bg-blue-500" :
+                            "bg-orange-500"
+                          )} title={`Tier ${tier}`}>
+                            {tier}
+                          </span>
+                        );
+                      })()}
+                      <span className="max-w-[150px] overflow-hidden text-ellipsis">
+                        {typeof order.sku === 'object' ? order.sku?.name : (skuList.find(s => s._id === order.sku)?.name || order.sku)}
+                      </span>
+                   </div>
+                </td>
+                <td className="px-2 py-1.5 text-[10px] text-slate-600 font-mono">{order.qty}</td>
+                <td className="px-2 py-1.5 text-[8px] uppercase font-bold text-slate-500">{order.priority}</td>
                 <td className="px-2 py-1.5">
                   <span className={cn(
                     "px-1.5 py-0.5 rounded-[2px] text-[8px] font-bold uppercase",
@@ -377,29 +436,62 @@ export default function ManufacturingPage() {
                     {order.status}
                   </span>
                 </td>
-                <td className="px-2 py-1.5 text-[10px] text-slate-600 font-mono">{order.qty}</td>
-                <td className="px-2 py-1.5 text-[8px] uppercase font-bold text-slate-500">{order.uom}</td>
-                <td className="px-2 py-1.5 text-[8px] uppercase font-bold text-slate-500">{order.priority}</td>
-                <td className="px-2 py-1.5 text-[10px] text-slate-500 font-mono">{order.scheduledStart ? new Date(order.scheduledStart).toLocaleDateString() : '-'}</td>
-                <td className="px-2 py-1.5 text-[10px] text-slate-500 font-mono">{new Date(order.createdAt).toLocaleDateString()}</td>
                 <td className="px-2 py-1.5 text-[10px] text-slate-600">
                   {order.createdBy ? `${order.createdBy.firstName} ${order.createdBy.lastName}` : '-'}
                 </td>
-                <td className="px-2 py-1.5 text-center text-[10px] font-bold text-slate-600 border-l border-slate-50">
-                  {order.lineItems?.length || 0}
-                </td>
-                <td className="px-2 py-1.5 text-right">
-                  <div className="flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button className="p-1 hover:bg-slate-200 rounded text-slate-400 hover:text-blue-600">
-                      <Pencil className="w-3 h-3" />
+                <td className="px-2 py-1.5 text-[10px] text-slate-600 font-mono">${(order.materialCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
+                <td className="px-2 py-1.5 text-[10px] text-slate-600 font-mono">${(order.packagingCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
+                <td className="px-2 py-1.5 text-[10px] text-slate-600 font-mono">${(order.laborCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
+                <td className="px-2 py-1.5 text-[10px] text-slate-700 font-mono font-bold">${(order.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
+                <td className="px-2 py-1.5 text-[10px] text-emerald-600 font-mono font-bold">${unitCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
+                <td className="px-2 py-1.5 relative" onClick={(e) => e.stopPropagation()}>
+                  <div className="relative" ref={openMenuId === order._id ? menuRef : null}>
+                    <button
+                      onClick={() => setOpenMenuId(openMenuId === order._id ? null : order._id)}
+                      className="p-1 hover:bg-slate-100 rounded transition-colors"
+                    >
+                      <MoreVertical className="w-4 h-4 text-slate-400" />
                     </button>
-                    <button className="p-1 hover:bg-slate-200 rounded text-slate-400 hover:text-red-600">
-                      <Trash2 className="w-3 h-3" />
-                    </button>
+                    {openMenuId === order._id && (
+                      <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 shadow-lg z-50 min-w-[120px] py-1">
+                        <button
+                          onClick={() => {
+                            setOpenMenuId(null);
+                            router.push(`/warehouse/manufacturing/${order._id}`);
+                          }}
+                          className="w-full px-3 py-1.5 text-left text-[10px] font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                        >
+                          <Pencil className="w-3 h-3" />
+                          Edit
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (!confirm('Are you sure you want to delete this order?')) return;
+                            setOpenMenuId(null);
+                            try {
+                              const res = await fetch(`/api/manufacturing/${order._id}`, { method: 'DELETE' });
+                              if (res.ok) {
+                                toast.success('Order deleted');
+                                fetchOrders();
+                              } else {
+                                toast.error('Failed to delete order');
+                              }
+                            } catch (e) {
+                              toast.error('Error deleting order');
+                            }
+                          }}
+                          className="w-full px-3 py-1.5 text-left text-[10px] font-medium text-red-600 hover:bg-red-50 flex items-center gap-2"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          Delete
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </td>
               </tr>
-            ))}
+            );
+            })}
           </tbody>
         </table>
       </div>

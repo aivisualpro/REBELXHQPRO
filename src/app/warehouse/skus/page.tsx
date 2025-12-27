@@ -41,6 +41,7 @@ interface Sku {
   cogs?: number;
   cogm?: number;
   grossProfit?: number;
+  tier?: number;
 }
 
 export default function SkusPage() {
@@ -397,21 +398,33 @@ export default function SkusPage() {
                     />
                   </div>
                 </td>
-                <td className="px-2 py-0.5 text-[9px] text-slate-600 font-medium hover:text-blue-600 transition-colors truncate max-w-[120px]">
-                  {sku.name}
+                <td className="px-2 py-0.5 text-[9px] text-slate-600 font-medium hover:text-blue-600 transition-colors truncate max-w-[150px]">
+                  <div className="flex items-center space-x-1.5">
+                    {sku.tier ? (
+                      <span className={cn(
+                        "flex-shrink-0 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-black text-white shadow-sm",
+                        sku.tier === 1 ? "bg-emerald-500" :
+                        sku.tier === 2 ? "bg-blue-500" :
+                        "bg-orange-500"
+                      )} title={`Tier ${sku.tier}`}>
+                        {sku.tier}
+                      </span>
+                    ) : null}
+                    <span className="truncate">{sku.name}</span>
+                  </div>
                 </td>
                 <td className="px-2 py-0.5 text-[8px] uppercase font-bold text-slate-500">{sku.category}</td>
                 <td className="px-2 py-0.5 text-[8px] uppercase font-bold text-slate-500">{sku.subCategory}</td>
                 <td className="px-2 py-0.5 text-[8px] uppercase font-bold text-slate-500">{sku.materialType}</td>
-                <td className="px-2 py-0.5 text-[9px] text-slate-600 font-mono">${(sku.salePrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td className="px-2 py-0.5 text-[9px] text-slate-600 font-mono">${(sku.salePrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
                 <td className="px-2 py-0.5 text-[9px] text-slate-600 font-mono">${(sku.avgCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
                 <td className="px-2 py-0.5 text-[9px] font-bold text-slate-700">{Math.round(sku.currentStock || 0)}</td>
                 <td className="px-2 py-0.5 text-[9px] text-slate-500">{sku.reOrderPoint}</td>
                 <td className="px-2 py-0.5 text-[9px] text-slate-500">{sku.orderUpto}</td>
-                <td className="px-2 py-0.5 text-[9px] text-emerald-600 font-mono">${(sku.revenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td className="px-2 py-0.5 text-[9px] text-slate-500 font-mono">${(sku.cogs || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td className="px-2 py-0.5 text-[9px] text-slate-500 font-mono">${(sku.cogm || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td className="px-2 py-0.5 text-[9px] font-bold text-black font-mono">${(sku.grossProfit || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td className="px-2 py-0.5 text-[9px] text-emerald-600 font-mono">${(sku.revenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
+                <td className="px-2 py-0.5 text-[9px] text-slate-500 font-mono">${(sku.cogs || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
+                <td className="px-2 py-0.5 text-[9px] text-slate-500 font-mono">${(sku.cogm || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
+                <td className="px-2 py-0.5 text-[9px] font-bold text-black font-mono">${(sku.grossProfit || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
               </tr>
             ))}
           </tbody>

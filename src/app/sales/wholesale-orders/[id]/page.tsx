@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import Link from 'next/link';
 import { ArrowLeft, Package, Calendar, CreditCard, Truck, Plus, X, Trash2, Pencil, User, MapPin, DollarSign, List, RefreshCw } from 'lucide-react';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
 import { cn } from '@/lib/utils';
@@ -150,10 +151,15 @@ export default function SaleOrderDetailPage() {
       return new Date(dateStr).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
   };
 
-  const formatCurrency = (val?: number) => {
-      if (val === undefined || val === null) return '-';
-      return '$' + val.toFixed(2);
-  };
+    const formatCurrency = (val?: number) => {
+        if (val === undefined || val === null) return '-';
+        return '$' + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 });
+    };
+
+    const formatCost = (val?: number) => {
+        if (val === undefined || val === null) return '-';
+        return '$' + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 });
+    };
 
   const renderClient = (val: any) => {
       if (typeof val === 'object' && val !== null) return val.name;
@@ -669,7 +675,16 @@ export default function SaleOrderDetailPage() {
                                                 </td>
                                                 <td className="px-3 py-1.5 text-[10px] text-slate-500 group">
                                                     <div className="flex items-center gap-1">
-                                                        <span>{item.lotNumber || '-'}</span>
+                                                        {item.lotNumber ? (
+                                                            <Link 
+                                                                href={`/warehouse/skus/${skuId}?lot=${encodeURIComponent(item.lotNumber)}`}
+                                                                className="text-slate-700 font-mono hover:text-blue-600 hover:underline transition-colors"
+                                                            >
+                                                                {item.lotNumber}
+                                                            </Link>
+                                                        ) : (
+                                                            <span>-</span>
+                                                        )}
                                                         <button 
                                                             onClick={() => handleEditLot(item._id, skuId)}
                                                             className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-500 transition-all p-0.5"
@@ -681,7 +696,7 @@ export default function SaleOrderDetailPage() {
                                                 </td>
                                                 <td className="px-3 py-1.5 text-[9px] uppercase text-slate-400">{item.uom || '-'}</td>
                                                 <td className="px-3 py-1.5 text-[10px] text-slate-500 font-mono">{item.qtyShipped}</td>
-                                                <td className="px-3 py-1.5 text-[10px] text-orange-600 font-mono">{formatCurrency(item.cost)}</td>
+                                                <td className="px-3 py-1.5 text-[10px] text-orange-600 font-mono whitespace-nowrap">{formatCost(item.cost)}</td>
                                                 <td className="px-3 py-1.5 text-[10px] text-slate-500 font-mono">{formatCurrency(item.price)}</td>
                                                 <td className="px-3 py-1.5 text-[10px] text-slate-700 font-mono bg-slate-50/30">{formatCurrency(lineTotal)}</td>
                                                 <td className="px-3 py-1.5">

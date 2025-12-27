@@ -669,12 +669,19 @@ export default function SaleOrdersPage() {
         const total = countData.total || 0; 
         
         let skip = 0;
-        const batchSize = 500; // Larger batch for speed (500 * 10 cost updates)
+        const batchSize = 500;
         let hasMore = total > 0;
+
+        // Cumulative stats
+        let totalProcessed = 0;
+        let totalLineItems = 0;
+        let totalMatched = 0;
+        let totalUpdated = 0;
+        let sources = { openingBalance: 0, purchaseOrder: 0, manufacturing: 0, auditAdjustment: 0 };
 
         while (hasMore) {
             const perc = total > 0 ? Math.min(Math.round((skip / total) * 100), 99) : 0;
-            setSyncStatus(`Syncing... ${perc}%`);
+            setSyncStatus(`${perc}% | Orders: ${totalProcessed}/${total} | Items: ${totalLineItems} | Matched: ${totalMatched} | Updated: ${totalUpdated}`);
 
             const res = await fetch('/api/wholesale/orders/sync-costs', {
                 method: 'POST',
@@ -685,7 +692,24 @@ export default function SaleOrdersPage() {
             if (!res.ok) throw new Error("Sync failed");
             const data = await res.json();
              
-             // If processed 0, we are done
+            // Accumulate stats
+            totalProcessed += data.processed || 0;
+            totalUpdated += data.updated || 0;
+            if (data.stats) {
+                totalLineItems += data.stats.totalLineItems || 0;
+                totalMatched += data.stats.matchedItems || 0;
+                if (data.stats.sources) {
+                    sources.openingBalance += data.stats.sources.openingBalance || 0;
+                    sources.purchaseOrder += data.stats.sources.purchaseOrder || 0;
+                    sources.manufacturing += data.stats.sources.manufacturing || 0;
+                    sources.auditAdjustment += data.stats.sources.auditAdjustment || 0;
+                }
+            }
+
+            // Update status with latest stats
+            setSyncStatus(`${Math.min(Math.round((totalProcessed / total) * 100), 99)}% | Orders: ${totalProcessed}/${total} | Items: ${totalLineItems} | Matched: ${totalMatched} | Updated: ${totalUpdated}`);
+
+            // If processed 0, we are done
             if (data.processed === 0) {
                  hasMore = false;
             }
@@ -696,11 +720,11 @@ export default function SaleOrdersPage() {
             }
         }
         
-        setSyncStatus('Done!');
-        toast.success("Cost Sync Complete");
+        setSyncStatus(`✓ Complete! Orders: ${totalProcessed} | Items: ${totalLineItems} | Matched: ${totalMatched} | Updated: ${totalUpdated} | OB:${sources.openingBalance} PO:${sources.purchaseOrder} MFG:${sources.manufacturing} ADJ:${sources.auditAdjustment}`);
+        toast.success(`Cost Sync Complete! Updated ${totalUpdated} items.`);
         fetchOrders(); // Refresh current view
         
-        setTimeout(() => setSyncStatus(''), 3000);
+        setTimeout(() => setSyncStatus(''), 8000);
 
     } catch (e) {
         toast.error("Sync process failed");
@@ -735,7 +759,7 @@ export default function SaleOrdersPage() {
   };
 
   const formatCurrency = (val: number) => {
-    return '$' + val.toFixed(2);
+    return '$' + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 });
   };
   
   const handleClientChange = (clientId: string) => {
@@ -890,7 +914,10 @@ export default function SaleOrdersPage() {
                 <RefreshCw className="w-4 h-4" />
             </button>
             {syncStatus && (
-                <span className="text-[10px] font-bold text-blue-600 whitespace-nowrap animate-pulse">
+                <span className={cn(
+                    "text-[10px] font-bold text-blue-600 max-w-[600px]",
+                    syncStatus.startsWith('✓') ? "text-emerald-600" : "animate-pulse"
+                )}>
                     {syncStatus}
                 </span>
             )}

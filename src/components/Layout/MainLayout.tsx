@@ -9,9 +9,9 @@ export const MainLayout = ({ children }: { children: React.ReactNode }) => {
     const isLoginPage = pathname === '/login';
 
     return (
-        <div className="min-h-screen flex flex-col">
+        <div className="h-screen w-full flex flex-col overflow-hidden">
             {!isLoginPage && <Header />}
-            <main className="flex-1 w-full">
+            <main className="flex-1 w-full min-h-0 overflow-hidden bg-slate-50">
                 {children}
             </main>
         </div>

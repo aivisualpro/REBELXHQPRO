@@ -20,6 +20,7 @@ interface LotSelectionModalProps {
     skuId: string;
     currentLotNumber?: string;
     title?: string;
+    requiredQty?: number; // Required quantity for suggestion logic
 }
 
 export function LotSelectionModal({
@@ -28,7 +29,8 @@ export function LotSelectionModal({
     onSelect,
     skuId,
     currentLotNumber,
-    title = "Select Lot Number"
+    title = "Select Lot Number",
+    requiredQty = 0
 }: LotSelectionModalProps) {
     const [lots, setLots] = useState<Lot[]>([]);
     const [loading, setLoading] = useState(false);
@@ -96,8 +98,28 @@ export function LotSelectionModal({
         return `${month}/${day}/${year}`;
     };
 
-    // The first lot in the sorted list (oldest) is the suggested lot
-    const suggestedLotNumber = otherLots.length > 0 ? otherLots[0].lotNumber : null;
+    // Suggested lot logic:
+    // 1. First, find lots with balance >= requiredQty (if requiredQty specified)
+    // 2. Among those, pick the oldest (FIFO)
+    // 3. If no lots have sufficient qty, fall back to oldest lot with any balance
+    const getSuggestedLot = () => {
+        if (otherLots.length === 0) return null;
+        
+        if (requiredQty > 0) {
+            // Find lots with sufficient quantity
+            const sufficientLots = otherLots.filter(lot => lot.balance >= requiredQty);
+            if (sufficientLots.length > 0) {
+                // Return the oldest lot with sufficient qty (already sorted by date)
+                return sufficientLots[0].lotNumber;
+            }
+        }
+        
+        // Fall back to oldest lot with any positive balance
+        const positiveLots = otherLots.filter(lot => lot.balance > 0);
+        return positiveLots.length > 0 ? positiveLots[0].lotNumber : otherLots[0].lotNumber;
+    };
+    
+    const suggestedLotNumber = getSuggestedLot();
 
     // Render a lot item
     const renderLotItem = (lot: Lot, idx: number, isSelected: boolean, isSuggested: boolean = false) => (
@@ -165,7 +187,7 @@ export function LotSelectionModal({
                                     "text-[10px] font-mono font-medium",
                                     isSelected ? "text-blue-500" : isSuggested ? "text-amber-500" : "text-green-600"
                                 )}>
-                                    ${lot.cost.toFixed(2)}
+                                    ${lot.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
                                 </span>
                             </>
                         )}

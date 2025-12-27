@@ -18,6 +18,10 @@ const auditAdjustmentSchema = new Schema({
         type: String,
         default: ''
     },
+    cost: {
+        type: Number,
+        default: 0
+    },
     createdBy: {
         type: Schema.Types.Mixed, // Allow ObjectId or String Name
         ref: 'RXHQUsers', 

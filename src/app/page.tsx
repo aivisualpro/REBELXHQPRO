@@ -166,7 +166,7 @@ export default function DashboardPage() {
         if (!val) return '$0';
         if (val >= 1000000) return '$' + (val / 1000000).toFixed(2) + 'm';
         if (val >= 1000) return '$' + (val / 1000).toFixed(0) + 'k';
-        return '$' + val.toLocaleString();
+        return '$' + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 });
     };
 
     const getGreeting = () => {

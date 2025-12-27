@@ -422,7 +422,7 @@ export default function PurchaseOrdersPage() {
   };
 
   const formatCurrency = (val: number) => {
-    return '$' + val.toFixed(2);
+    return '$' + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 });
   };
 
   return (

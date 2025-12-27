@@ -1,48 +1,47 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Search,
-  Upload,
   ArrowUpDown,
-  ShoppingCart,
-  Trash2,
-  X,
-  Pencil
+  Globe,
+  Loader2,
+  Calendar,
+  ShoppingBag,
+  Package,
+  CreditCard,
+  Truck,
+  User
 } from 'lucide-react';
-import Papa from 'papaparse';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { MultiSelectFilter } from '@/components/ui/filters/MultiSelectFilter';
-import { Package, Globe, Calendar, Filter } from 'lucide-react';
 import { Pagination } from '@/components/ui/Pagination';
 
-// ... (keep interface definitions)
-interface LineItem {
-  _id?: string;
-  sku: { _id: string; name: string } | string;
-  lotNumber?: string;
-  varianceId?: string;
-  qty: number;
-  total: number;
-  website?: string;
-}
-
 interface WebOrder {
-  _id: string; // The Order Number
-  category: string;
+  _id: string;
+  webId: number;
+  number: string;
   status: string;
-  orderAmount: number;
-  tax: number;
-  firstName: string;
-  lastName: string;
-  city: string;
-  state: string;
-  postcode: string;
-  email: string;
-  createdAt: string;
-  lineItems: LineItem[];
+  currency: string;
+  dateCreated: string;
+  total: number;
+  totalTax: number;
+  shippingTotal: number;
+  discountTotal: number;
+  billing: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    city: string;
+    state: string;
+    country: string;
+  };
+  paymentMethodTitle: string;
+  website: string;
+  lineItems: any[];
 }
 
 export default function WebOrdersPage() {
@@ -54,33 +53,32 @@ export default function WebOrdersPage() {
   const [totalOrders, setTotalOrders] = useState(0);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [sortBy, setSortBy] = useState('createdAt');
+  const [sortBy, setSortBy] = useState('dateCreated');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
-  // Filters
-  const [selectedSkus, setSelectedSkus] = useState<string[]>([]);
   const [selectedWebsites, setSelectedWebsites] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState({ from: '', to: '' });
-  const [allSkus, setAllSkus] = useState<{ _id: string; name: string }[]>([]);
-  const [allWebsites, setAllWebsites] = useState<string[]>([]);
 
-  const importOrdersRef = useRef<HTMLInputElement>(null);
-  const importLineItemsRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    // Fetch SKUs for filter
-    fetch('/api/skus?limit=1000&ignoreDate=true')
-        .then(res => res.json())
-        .then(data => setAllSkus(data.skus || []))
-        .catch(err => console.error("Failed to load SKUs", err));
-
-    // Fetch Websites for filter (unique values)
-    fetch('/api/retail/web-orders/websites')
-        .then(res => res.json())
-        .then(data => setAllWebsites(data.websites || []))
-        .catch(err => console.error("Failed to load websites", err));
-  }, []);
+  const [syncStatus, setSyncStatus] = useState({
+    isSyncing: false,
+    currentStep: '',
+    progress: 0,
+    total: 0,
+    logs: [] as string[],
+    currentOrderNumber: '',
+    currentOrderDate: '',
+    currentOrderTotal: 0,
+    currentOrderCustomer: '',
+    currentSite: '',
+    fetchingPhase: false,
+    fetchingPage: 0,
+    fetchingFound: 0,
+    fetchingSite: '',
+    isFullSync: false,
+    stats: { added: 0, updated: 0, skipped: 0 },
+    debug: { logsCount: 0, lastLog: null as string | null }
+  });
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -90,11 +88,7 @@ export default function WebOrdersPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  useEffect(() => {
-    fetchOrders();
-  }, [page, debouncedSearch, sortBy, sortOrder, selectedSkus, selectedWebsites, selectedStatuses, dateRange]);
-
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
@@ -103,7 +97,6 @@ export default function WebOrdersPage() {
         search: debouncedSearch,
         sortBy,
         sortOrder,
-        sku: selectedSkus.join(','),
         website: selectedWebsites.join(','),
         status: selectedStatuses.join(','),
         fromDate: dateRange.from,
@@ -118,262 +111,385 @@ export default function WebOrdersPage() {
         setTotalPages(data.totalPages || 1);
         setTotalOrders(data.total || 0);
       } else {
-        toast.error("Failed to load web orders");
+        toast.error('Failed to load orders');
       }
     } catch (e) {
-      toast.error("Error loading web orders");
+      toast.error('Error loading orders');
     } finally {
       setLoading(false);
     }
+  }, [page, debouncedSearch, sortBy, sortOrder, selectedWebsites, selectedStatuses, dateRange]);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
+
+  const handleSync = async (fullSync = false) => {
+    try {
+      const url = fullSync 
+        ? '/api/retail/web-orders/sync?full=true' 
+        : '/api/retail/web-orders/sync';
+      const res = await fetch(url, { method: 'POST' });
+      if (res.ok) {
+        toast.success(fullSync ? 'Full sync started' : 'Incremental sync started');
+        pollSyncProgress();
+      } else {
+        const err = await res.json();
+        toast.error('Failed: ' + err.error);
+      }
+    } catch (e) {
+      toast.error('Sync error');
+    }
   };
 
-  // No need for separate useEffect now, cleaned up in previous chunk
+  const pollSyncProgress = useCallback(async () => {
+    const timer = setInterval(async () => {
+      try {
+        const res = await fetch('/api/retail/web-orders/sync');
+        const data = await res.json();
+        setSyncStatus(data);
 
-
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>, endpoint: string, label: string) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    e.target.value = '';
-
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (results) => {
-        const totalRows = results.data.length;
-        if (totalRows === 0) {
-          toast.error('No data found');
-          return;
-        }
-
-        const toastId = toast.loading(`Importing ${label} (0%)...`);
-        let processed = 0;
-        let successCount = 0;
-        let errors: string[] = [];
-
-        const CHUNK_SIZE = 500;
-        const chunks = [];
-        for (let i = 0; i < totalRows; i += CHUNK_SIZE) {
-          chunks.push(results.data.slice(i, i + CHUNK_SIZE));
-        }
-
-        try {
-          for (let i = 0; i < chunks.length; i++) {
-            const chunk = chunks[i];
-            const res = await fetch(endpoint, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ data: chunk })
-            });
-
-            if (res.ok) {
-              const data = await res.json();
-              successCount += (data.count || 0);
-              if (data.errors) errors.push(...data.errors);
-            } else {
-              const err = await res.json();
-              errors.push(`Chunk ${i}: ${err.error || 'Unknown error'}`);
-            }
-
-            processed += chunk.length;
-            const percent = Math.round((processed / totalRows) * 100);
-            toast.loading(`Importing ${label}... ${percent}%`, { id: toastId });
-          }
-
-          if (errors.length > 0) {
-             toast.error(`Finished with ${errors.length} errors. Success: ${successCount}`, { id: toastId, duration: 5000 });
-             console.error(errors);
+        if (!data.isSyncing && (data.currentStep === 'Complete' || data.currentStep === 'Failed')) {
+          clearInterval(timer);
+          if (data.currentStep === 'Complete') {
+            toast.success('Orders synced!');
+            fetchOrders();
           } else {
-             toast.success(`Imported ${successCount} ${label}!`, { id: toastId });
+            toast.error('Sync failed');
           }
-          fetchOrders();
-        } catch (e) {
-             toast.error('Import failed', { id: toastId });
         }
+      } catch (e) {
+        console.error('Polling error:', e);
+      }
+    }, 1000);
+  }, [fetchOrders]);
+
+  useEffect(() => {
+    fetch('/api/retail/web-orders/sync').then(res => res.json()).then(data => {
+      if (data.isSyncing) {
+        setSyncStatus(data);
+        pollSyncProgress();
       }
     });
+  }, [pollSyncProgress]);
+
+  const handleSort = (col: string) => {
+    if (sortBy === col) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(col);
+      setSortOrder('desc');
+    }
   };
 
-  const renderSku = (val: any) => {
-      if (typeof val === 'object' && val?.name) return val.name;
-      return val || '-';
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+      case 'processing': return 'bg-blue-100 text-blue-700 border-blue-200';
+      case 'on-hold': return 'bg-amber-100 text-amber-700 border-amber-200';
+      case 'pending': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+      case 'cancelled': case 'refunded': case 'failed': return 'bg-rose-100 text-rose-700 border-rose-200';
+      default: return 'bg-slate-100 text-slate-600 border-slate-200';
+    }
   };
 
-  const formatCurrency = (val: number) => '$' + (val || 0).toFixed(2);
+  const getWebsiteColor = (website: string) => {
+    if (website?.includes('KING')) return 'bg-amber-500';
+    if (website?.includes('GRASS')) return 'bg-emerald-500';
+    if (website?.includes('GRHK')) return 'bg-blue-500';
+    if (website?.includes('REBEL')) return 'bg-purple-500';
+    return 'bg-slate-500';
+  };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-48px)] bg-white relative">
+    <div className="flex flex-col h-[calc(100vh-48px)] bg-white">
+      {syncStatus.isSyncing && (
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2 flex items-center justify-between text-white animate-in slide-in-from-top duration-300 shadow-lg">
+          <div className="flex items-center space-x-4 flex-1 min-w-0">
+            <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+            
+            {/* Fetching Phase Display */}
+            {syncStatus.fetchingPhase ? (
+              <>
+                <div className="bg-amber-500/80 px-2.5 py-0.5 rounded-full shrink-0">
+                  <span className="text-[10px] font-black uppercase tracking-wider">Fetching</span>
+                </div>
+                <div className="h-4 w-px bg-blue-400/50 shrink-0" />
+                <div className="flex items-center space-x-3 min-w-0">
+                  <span className="px-2 py-0.5 bg-white/20 rounded text-[10px] font-black uppercase tracking-wider shrink-0">
+                    {syncStatus.fetchingSite}
+                  </span>
+                  <span className="text-[10px] font-bold shrink-0">
+                    Page {syncStatus.fetchingPage}
+                  </span>
+                  <div className="h-4 w-px bg-blue-400/50 shrink-0" />
+                  <span className="text-[11px] font-black font-mono bg-emerald-500/80 px-2 py-0.5 rounded shrink-0">
+                    {syncStatus.fetchingFound} orders found
+                  </span>
+                </div>
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="flex space-x-1">
+                    <div className="w-1.5 h-1.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <div className="w-1.5 h-1.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <div className="w-1.5 h-1.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Syncing Phase - Progress percentage */}
+                <div className="bg-blue-500/50 px-2 py-0.5 rounded-full shrink-0">
+                  <span className="text-[11px] font-black font-mono">
+                    {syncStatus.total > 0 ? `${Math.round((syncStatus.progress / syncStatus.total) * 100)}%` : '0%'}
+                  </span>
+                </div>
+                
+                {/* Current order details */}
+                {syncStatus.currentOrderNumber ? (
+                  <>
+                    <div className="h-4 w-px bg-blue-400/50 shrink-0" />
+                    <div className="flex items-center space-x-3 min-w-0">
+                      <span className="text-[10px] font-black uppercase tracking-wider shrink-0">Order #{syncStatus.currentOrderNumber}</span>
+                      <span className="text-[9px] text-blue-200 font-medium truncate max-w-[100px]">{syncStatus.currentOrderCustomer}</span>
+                      <span className="text-[9px] text-blue-300 font-mono shrink-0">
+                        {syncStatus.currentOrderDate ? new Date(syncStatus.currentOrderDate).toLocaleDateString() : ''}
+                      </span>
+                      <span className="text-[10px] font-black font-mono bg-white/20 px-1.5 py-0.5 rounded shrink-0">
+                        ${syncStatus.currentOrderTotal?.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="h-4 w-px bg-blue-400/50 shrink-0" />
+                    <span className="px-2 py-0.5 bg-blue-500/40 rounded text-[8px] font-black uppercase tracking-widest shrink-0">
+                      {syncStatus.currentSite}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-[10px] font-bold text-blue-100 truncate">
+                    {syncStatus.currentStep || syncStatus.debug?.lastLog || 'Initializing...'}
+                  </span>
+                )}
+                
+                {/* Progress bar */}
+                {syncStatus.total > 0 && (
+                  <div className="flex-1 max-w-[200px] bg-blue-400/30 h-1.5 rounded-full overflow-hidden">
+                    <div 
+                      className="bg-white h-full transition-all duration-300 rounded-full" 
+                      style={{ width: `${(syncStatus.progress / syncStatus.total) * 100}%` }}
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          
+          {/* Counter */}
+          <div className="text-[10px] font-mono font-bold bg-blue-500/30 px-2 py-1 rounded shrink-0">
+            {syncStatus.fetchingPhase 
+              ? `Scanning ${syncStatus.fetchingSite}...`
+              : `${syncStatus.progress} / ${syncStatus.total}`
+            }
+          </div>
+        </div>
+      )}
+
+      {/* Action Bar */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100 bg-slate-50/50">
         <div className="flex items-center space-x-4">
-          <h1 className="text-sm font-bold text-slate-900 uppercase tracking-tighter">Web Orders</h1>
-            <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                <input
-                type="text"
-                placeholder="Search Order#, Name, Email..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-8 pr-3 py-1.5 w-64 bg-white border border-slate-200 text-[11px] focus:outline-none focus:ring-1 focus:ring-black/5 transition-all placeholder:text-slate-400 rounded-sm"
-                />
-            </div>
+          <h1 className="text-sm font-bold text-slate-900 uppercase tracking-tighter flex items-center space-x-2">
+            <ShoppingBag className="w-4 h-4" />
+            <span>Web Orders</span>
+          </h1>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search Order#, Customer, Email..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8 pr-3 py-1.5 w-72 bg-white border border-slate-200 text-[11px] focus:outline-none focus:ring-1 focus:ring-black/5 transition-all placeholder:text-slate-400"
+            />
+          </div>
         </div>
 
         <div className="flex items-center space-x-2">
-           {/* Filters */}
-           <MultiSelectFilter
-                label="SKU"
-                icon={Package}
-                options={allSkus.map(s => ({ label: s.name, value: s._id }))}
-                selectedValues={selectedSkus}
-                onChange={setSelectedSkus}
-                className="h-[30px]"
-            />
-            
-            <MultiSelectFilter
-                label="Website"
-                icon={Globe}
-                options={allWebsites.map(w => ({ label: w, value: w }))}
-                selectedValues={selectedWebsites}
-                onChange={setSelectedWebsites}
-                className="h-[30px]"
-            />
-
-            <MultiSelectFilter
-                label="Status"
-                icon={Filter}
-                options={[
-                  { label: 'Completed', value: 'completed' },
-                  { label: 'Processing', value: 'processing' },
-                  { label: 'Pending', value: 'pending' },
-                  { label: 'On Hold', value: 'on-hold' },
-                  { label: 'Cancelled', value: 'cancelled' },
-                  { label: 'Refunded', value: 'refunded' },
-                  { label: 'Failed', value: 'failed' }
-                ]}
-                selectedValues={selectedStatuses}
-                onChange={setSelectedStatuses}
-                className="h-[30px]"
-            />
-
-            <div className="flex items-center space-x-1 border border-slate-200 bg-white px-3 h-[30px] rounded-sm">
-                <Calendar className="w-3 h-3 text-slate-400" />
-                <input
-                    type="date"
-                    className="text-[10px] outline-none max-w-[80px] bg-transparent"
-                    value={dateRange.from}
-                    onChange={e => setDateRange({ ...dateRange, from: e.target.value })}
-                />
-                <span className="text-slate-300">-</span>
-                <input
-                    type="date"
-                    className="text-[10px] outline-none max-w-[80px] bg-transparent"
-                    value={dateRange.to}
-                    onChange={e => setDateRange({ ...dateRange, to: e.target.value })}
-                />
-            </div>
-
-            <div className="w-px h-6 bg-slate-200 mx-2" />
-
-           <input
-            type="file"
-            accept=".csv"
-            className="hidden"
-            ref={importOrdersRef}
-            onChange={(e) => handleImport(e, '/api/retail/web-orders/import-orders', 'Orders')}
+          <MultiSelectFilter
+            label="Website"
+            icon={Globe}
+            options={[
+              { label: 'KINGKKRATOM', value: 'KINGKKRATOM' },
+              { label: 'GRASSROOTSHARVEST', value: 'GRASSROOTSHARVEST' },
+              { label: 'GRHKTATOM', value: 'GRHKTATOM' },
+              { label: 'REBELXBRANDS', value: 'REBELXBRANDS' }
+            ]}
+            selectedValues={selectedWebsites}
+            onChange={setSelectedWebsites}
           />
-          <input
-            type="file"
-            accept=".csv"
-            className="hidden"
-            ref={importLineItemsRef}
-            onChange={(e) => handleImport(e, '/api/retail/web-orders/import-lineitems', 'Line Items')}
+
+          <MultiSelectFilter
+            label="Status"
+            icon={Package}
+            options={[
+              { label: 'Completed', value: 'completed' },
+              { label: 'Processing', value: 'processing' },
+              { label: 'Pending', value: 'pending' },
+              { label: 'On Hold', value: 'on-hold' },
+              { label: 'Cancelled', value: 'cancelled' },
+              { label: 'Refunded', value: 'refunded' },
+              { label: 'Failed', value: 'failed' }
+            ]}
+            selectedValues={selectedStatuses}
+            onChange={setSelectedStatuses}
           />
+
+          <div className="flex items-center space-x-1 border border-slate-200 bg-white px-3 h-[30px] rounded-sm">
+            <Calendar className="w-3 h-3 text-slate-400" />
+            <input
+              type="date"
+              className="text-[10px] outline-none max-w-[90px] bg-transparent"
+              value={dateRange.from}
+              onChange={e => setDateRange({ ...dateRange, from: e.target.value })}
+            />
+            <span className="text-slate-300">-</span>
+            <input
+              type="date"
+              className="text-[10px] outline-none max-w-[90px] bg-transparent"
+              value={dateRange.to}
+              onChange={e => setDateRange({ ...dateRange, to: e.target.value })}
+            />
+          </div>
+
+          <div className="w-px h-6 bg-slate-200 mx-2" />
 
           <button
-              onClick={() => importOrdersRef.current?.click()}
-              className="h-[30px] w-[30px] bg-white border border-slate-200 text-slate-600 hover:text-black hover:bg-slate-50 transition-colors shadow-sm flex items-center justify-center rounded-sm"
-              title="Import Orders"
+            onClick={() => handleSync(false)}
+            disabled={syncStatus.isSyncing}
+            className="px-3 py-1.5 bg-black text-white hover:bg-slate-800 transition-colors shadow-sm flex items-center space-x-2 rounded-sm disabled:opacity-50"
+            title="Incremental Sync - Only changed orders"
           >
-              <Upload className="w-4 h-4" />
+            {syncStatus.isSyncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
+            <span className="text-[10px] font-bold uppercase tracking-wider">Sync</span>
           </button>
-           <button
-              onClick={() => importLineItemsRef.current?.click()}
-              className="h-[30px] w-[30px] bg-white border border-slate-200 text-slate-600 hover:text-black hover:bg-slate-50 transition-colors shadow-sm flex items-center justify-center rounded-sm"
-              title="Import Line Items"
+          
+          <button
+            onClick={() => handleSync(true)}
+            disabled={syncStatus.isSyncing}
+            className="px-3 py-1.5 bg-amber-500 text-white hover:bg-amber-600 transition-colors shadow-sm flex items-center space-x-2 rounded-sm disabled:opacity-50"
+            title="Full Sync - All orders from scratch"
           >
-              <Upload className="w-4 h-4" />
+            <Globe className="w-3.5 h-3.5" />
+            <span className="text-[10px] font-bold uppercase tracking-wider">Full</span>
           </button>
         </div>
       </div>
 
+      {/* Table */}
       <div className="flex-1 overflow-auto">
-         <table className="w-full border-collapse text-left">
-           <thead className="sticky top-0 bg-slate-50 z-10 border-b border-slate-100">
-             <tr>
-               {[
-                 { key: '_id', label: 'Order #' },
-                 { key: 'firstName', label: 'Customer' },
-                 { key: 'email', label: 'Email' },
-                 { key: 'status', label: 'Status' },
-                 { key: 'createdAt', label: 'Date' },
-                 { key: 'city', label: 'Location' },
-                 { key: 'orderAmount', label: 'Total' },
-               ].map(col => (
-                 <th key={col.key} className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100 last:border-0 cursor-pointer" onClick={() => setSortBy(col.key)}>
-                   <div className="flex items-center space-x-1">
-                     <span>{col.label}</span>
-                     <ArrowUpDown className={cn("w-2 h-2", sortBy === col.key ? "text-black" : "text-slate-200")} />
-                   </div>
-                 </th>
-               ))}
-               <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest text-center">Items</th>
-               <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest text-right">Actions</th>
-             </tr>
-           </thead>
-           <tbody className="divide-y divide-slate-100">
-             {loading ? (
-                <tr><td colSpan={9} className="px-2 py-4 text-center text-[10px] text-slate-400">Loading...</td></tr>
-             ) : orders.length === 0 ? (
-                <tr><td colSpan={9} className="px-2 py-4 text-center text-[10px] text-slate-400 uppercase font-bold tracking-tighter opacity-50">No Orders Found</td></tr>
-             ) : orders.map(order => (
-               <tr 
-                 key={order._id} 
-                 onClick={() => router.push(`/sales/web-orders/${order._id}`)}
-                 className="hover:bg-slate-50 transition-colors group cursor-pointer"
-               >
-                 <td className="px-2 py-1.5 text-[10px] font-bold text-slate-900 font-mono tracking-tighter">{order._id}</td>
-                 <td className="px-2 py-1.5 text-[10px] text-slate-600 font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px]">{order.firstName} {order.lastName}</td>
-                 <td className="px-2 py-1.5 text-[10px] text-slate-500 whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px]">{order.email}</td>
-                 <td className="px-2 py-1.5">
-                    <span className={cn(
-                        "px-1.5 py-0.5 rounded-[2px] text-[8px] font-bold uppercase",
-                        order.status === 'completed' || order.status === 'Completed' ? "bg-green-100 text-green-700" :
-                        order.status === 'processing' ? "bg-blue-100 text-blue-700" :
-                        "bg-slate-100 text-slate-600"
-                    )}>
-                        {order.status}
-                    </span>
-                 </td>
-                 <td className="px-2 py-1.5 text-[10px] text-slate-500 font-mono">{new Date(order.createdAt).toLocaleDateString()}</td>
-                 <td className="px-2 py-1.5 text-[10px] text-slate-500 whitespace-nowrap overflow-hidden text-ellipsis max-w-[100px]">{order.city}, {order.state}</td>
-                 <td className="px-2 py-1.5 text-[10px] font-bold text-slate-900 font-mono">{formatCurrency(order.orderAmount)}</td>
-                 <td className="px-2 py-1.5 text-center text-[10px] font-bold text-slate-600">{order.lineItems?.length || 0}</td>
-                  <td className="px-2 py-1.5 text-right">
-                    <div className="flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                         <button className="p-1 text-slate-400 hover:text-blue-600 rounded hover:bg-slate-200">
-                           <Pencil className="w-3 h-3" />
-                         </button>
-                         <button className="p-1 text-slate-400 hover:text-red-600 rounded hover:bg-slate-200">
-                           <Trash2 className="w-3 h-3" />
-                         </button>
+        <table className="w-full border-collapse text-left">
+          <thead className="sticky top-0 bg-slate-50 z-10 border-b border-slate-100">
+            <tr>
+              {[
+                { key: 'number', label: 'Order #' },
+                { key: 'website', label: 'Source' },
+                { key: 'billing.firstName', label: 'Customer' },
+                { key: 'status', label: 'Status' },
+                { key: 'dateCreated', label: 'Date' },
+                { key: 'total', label: 'Total' },
+                { key: 'paymentMethodTitle', label: 'Payment' },
+              ].map(col => (
+                <th
+                  key={col.key}
+                  onClick={() => handleSort(col.key)}
+                  className="px-3 py-2 text-[8px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors border-r border-slate-100 last:border-0 whitespace-nowrap"
+                >
+                  <div className="flex items-center space-x-1">
+                    <span>{col.label}</span>
+                    <ArrowUpDown className={cn("w-2.5 h-2.5", sortBy === col.key ? "text-black" : "text-slate-200")} />
+                  </div>
+                </th>
+              ))}
+              <th className="px-3 py-2 text-[8px] font-bold text-slate-400 uppercase tracking-widest text-center">Items</th>
+              <th className="px-3 py-2 text-[8px] font-bold text-slate-400 uppercase tracking-widest">Location</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-50">
+            {loading ? (
+              <tr><td colSpan={9} className="px-3 py-12 text-center text-[10px] text-slate-400">Loading Web Orders...</td></tr>
+            ) : orders.length === 0 ? (
+              <tr><td colSpan={9} className="px-3 py-12 text-center text-[10px] text-slate-400 uppercase font-bold tracking-tighter opacity-50">No Orders Found</td></tr>
+            ) : orders.map(order => (
+              <tr
+                key={order._id}
+                onClick={() => router.push(`/sales/web-orders/${order._id}`)}
+                className="hover:bg-slate-50 transition-colors group cursor-pointer"
+              >
+                <td className="px-3 py-2">
+                  <div className="flex flex-col">
+                    <span className="text-[11px] font-black text-slate-900 font-mono tracking-tighter">#{order.number}</span>
+                    <span className="text-[8px] text-slate-400 font-mono">WC-{order.webId}</span>
+                  </div>
+                </td>
+                <td className="px-3 py-2">
+                  <span className={cn(
+                    "px-2 py-0.5 rounded-full text-[8px] font-black text-white uppercase tracking-widest shadow-sm",
+                    getWebsiteColor(order.website)
+                  )}>
+                    {order.website}
+                  </span>
+                </td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                      <User className="w-3 h-3 text-slate-400" />
                     </div>
-                 </td>
-               </tr>
-             ))}
-           </tbody>
-         </table>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-bold text-slate-700">{order.billing?.firstName} {order.billing?.lastName}</span>
+                      <span className="text-[8px] text-slate-400 truncate max-w-[120px]">{order.billing?.email}</span>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-3 py-2">
+                  <span className={cn(
+                    "px-2 py-0.5 rounded-[3px] text-[8px] font-black uppercase tracking-wider border",
+                    getStatusColor(order.status)
+                  )}>
+                    {order.status}
+                  </span>
+                </td>
+                <td className="px-3 py-2 text-[10px] text-slate-500 font-mono">
+                  {order.dateCreated ? new Date(order.dateCreated).toLocaleDateString() : '-'}
+                </td>
+                <td className="px-3 py-2">
+                  <div className="flex flex-col">
+                    <span className="text-[11px] font-black text-slate-900 font-mono">${order.total?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    {order.shippingTotal > 0 && (
+                      <span className="text-[8px] text-slate-400 flex items-center space-x-0.5">
+                        <Truck className="w-2.5 h-2.5" />
+                        <span>+${order.shippingTotal?.toFixed(2)}</span>
+                      </span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center space-x-1.5">
+                    <CreditCard className="w-3 h-3 text-slate-300" />
+                    <span className="text-[9px] text-slate-500 truncate max-w-[80px]">{order.paymentMethodTitle || '-'}</span>
+                  </div>
+                </td>
+                <td className="px-3 py-2 text-center">
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-100 text-[9px] font-black text-slate-600">
+                    {order.lineItems?.length || 0}
+                  </span>
+                </td>
+                <td className="px-3 py-2 text-[9px] text-slate-500 truncate max-w-[100px]">
+                  {order.billing?.city}, {order.billing?.state}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-       <Pagination
+
+      <Pagination
         currentPage={page}
         totalPages={totalPages}
         onPageChange={setPage}

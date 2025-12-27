@@ -1,638 +1,470 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { 
-    ArrowLeft, 
-    Box, 
-    Calendar, 
-    CreditCard, 
-    Truck, 
-    CheckCircle2, 
-    Clock, 
-    MapPin, 
-    User, 
-    Mail, 
-    Phone, 
-    Printer, 
-    MoreHorizontal,
-    Pencil,
-    Trash2,
-    X,
-    Plus,
+import {
+    ArrowLeft,
+    ExternalLink,
     Package,
-    Search
+    User,
+    MapPin,
+    CreditCard,
+    Truck,
+    Calendar,
+    Clock,
+    Hash,
+    Mail,
+    Phone,
+    Receipt,
+    Tag,
+    Loader2,
+    ShoppingBag,
+    Globe
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
-import { SearchableSelect } from '@/components/ui/SearchableSelect';
-import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal'; // Import
-import { List } from 'lucide-react';
 
 interface LineItem {
-  _id: string;
-  sku: { _id: string; name: string } | string;
-  lotNumber: string;
-  qty: number;
-  total: number;
-  website?: string;
-  createdAt?: string;
-  cost?: number;
+    id: number;
+    name: string;
+    productId: number;
+    variationId: number;
+    quantity: number;
+    subtotal: number;
+    total: number;
+    sku: string;
+    price: number;
+    image?: string;
+    parentProductId?: string;
+    attributes?: any[];
 }
 
 interface WebOrder {
-  _id: string;
-  category: string;
-  status: string;
-  orderAmount: number;
-  tax: number;
-  firstName: string;
-  lastName: string;
-  city: string;
-  state: string;
-  postcode: string;
-  email: string;
-  createdAt: string;
-  lineItems: LineItem[];
+    _id: string;
+    webId: number;
+    number: string;
+    orderKey: string;
+    status: string;
+    currency: string;
+    dateCreated: string;
+    dateModified: string;
+    datePaid?: string;
+    dateCompleted?: string;
+    total: number;
+    totalTax: number;
+    shippingTotal: number;
+    shippingTax: number;
+    discountTotal: number;
+    discountTax: number;
+    cartTax: number;
+    billing: {
+        firstName: string;
+        lastName: string;
+        company?: string;
+        address1: string;
+        address2?: string;
+        city: string;
+        state: string;
+        postcode: string;
+        country: string;
+        email: string;
+        phone: string;
+    };
+    shipping: {
+        firstName: string;
+        lastName: string;
+        company?: string;
+        address1: string;
+        address2?: string;
+        city: string;
+        state: string;
+        postcode: string;
+        country: string;
+    };
+    paymentMethod: string;
+    paymentMethodTitle: string;
+    transactionId?: string;
+    customerNote?: string;
+    website: string;
+    lineItems: LineItem[];
+    shippingLines?: any[];
+    couponLines?: any[];
+    refunds?: any[];
 }
 
 export default function WebOrderDetailPage() {
-  const params = useParams();
-  const router = useRouter();
-  const [order, setOrder] = useState<WebOrder | null>(null);
-  const [loading, setLoading] = useState(true);
+    const params = useParams();
+    const router = useRouter();
+    const { id } = params;
 
-  // Item Modal State
-  const [isItemModalOpen, setIsItemModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [allSkus, setAllSkus] = useState<{ _id: string; name: string, salePrice?: number }[]>([]);
-  
-  // Derived state for form
-  const [formData, setFormData] = useState({
-      sku: '',
-      qty: 1,
-      price: 0, 
-      lotNumber: ''
-  });
+    const [order, setOrder] = useState<WebOrder | null>(null);
+    const [loading, setLoading] = useState(true);
 
-  // Lot Change State (Table Action)
-  const [isLotModalOpen, setIsLotModalOpen] = useState(false);
-  const [activeItemForLot, setActiveItemForLot] = useState<LineItem | null>(null);
+    useEffect(() => {
+        const originalBodyStyle = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => { document.body.style.overflow = originalBodyStyle; };
+    }, []);
 
-  // Lot Selection State (Form Action)
-  const [isFormLotSelectorOpen, setIsFormLotSelectorOpen] = useState(false);
-
-  const fetchOrder = async () => {
-      try {
-          const res = await fetch(`/api/retail/web-orders/${params.id}`);
-          if (res.ok) {
-              const data = await res.json();
-              setOrder(data);
-          } else {
-              toast.error('Failed to fetch web order');
-          }
-      } catch (e) {
-          toast.error('Error loading web order');
-      } finally {
-          setLoading(false);
-      }
-  };
-
-  useEffect(() => {
-      if (params.id) fetchOrder();
-  }, [params.id]);
-
-  useEffect(() => {
-    if (isItemModalOpen && allSkus.length === 0) {
-        fetch('/api/skus?limit=1000')
-            .then(res => res.json())
-            .then(data => setAllSkus(data.skus || []))
-            .catch(e => console.error("Failed to fetch SKUs", e));
-    }
-  }, [isItemModalOpen, allSkus.length]);
-
-  const handleOpenLotModal = (item: LineItem) => {
-      setActiveItemForLot(item);
-      setIsLotModalOpen(true);
-  };
-
-  const handleLotSelectFromTable = async (lotNumber: string) => {
-      if (!order || !activeItemForLot) return;
-      
-      const currentItems = order.lineItems.map(item => {
-          if (item._id === activeItemForLot._id) {
-              return { ...item, lotNumber };
-          }
-          return item;
-      });
-
-      try {
-          const res = await fetch(`/api/retail/web-orders/${order._id}`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ lineItems: currentItems })
-          });
-
-          if (res.ok) {
-              toast.success('Lot updated');
-              setIsLotModalOpen(false);
-              fetchOrder();
-          } else {
-              toast.error('Failed to update lot');
-          }
-      } catch (e) {
-          toast.error('Error updating lot');
-      }
-  };
-
-  const handleStatusChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    if (!order) return;
-    const newStatus = e.target.value;
-    const loadId = toast.loading('Updating status...');
-
-    try {
-        const res = await fetch(`/api/retail/web-orders/${order._id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: newStatus })
-        });
-
-        if (res.ok) {
-            toast.success('Status updated', { id: loadId });
-            fetchOrder();
-        } else {
-            toast.error('Failed to update status', { id: loadId });
-        }
-    } catch (e) {
-        toast.error('Error updating status', { id: loadId });
-    }
-  };
-
-  // Restored Handlers & Helpers
-  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; itemId: string | null }>({
-      isOpen: false,
-      itemId: null
-  });
-
-  const handleOpenAddModal = () => {
-    setEditingId(null);
-    setFormData({ sku: '', qty: 1, price: 0, lotNumber: '' });
-    setIsItemModalOpen(true);
-  };
-
-  const handleOpenEditModal = (item: LineItem) => {
-    setEditingId(item._id);
-    const calculatedPrice = (item.total && item.qty) ? (item.total / item.qty) : 0;
-    setFormData({
-        sku: typeof item.sku === 'object' ? item.sku._id : item.sku,
-        qty: item.qty || 1,
-        price: calculatedPrice,
-        lotNumber: item.lotNumber || ''
-    });
-    setIsItemModalOpen(true);
-  };
-
-  const handleSaveItem = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!order) return;
-    if (!formData.sku) {
-        toast.error('Please select a SKU');
-        return;
-    }
-
-    let currentItems = [...(order.lineItems || [])];
-
-    if (editingId) {
-        currentItems = currentItems.map(item => {
-            if (item._id === editingId) {
-                return {
-                    ...item,
-                    sku: formData.sku, 
-                    qty: formData.qty,
-                    total: formData.qty * formData.price,
-                    lotNumber: formData.lotNumber,
-                };
+    const fetchOrder = useCallback(async () => {
+        setLoading(true);
+        try {
+            const res = await fetch(`/api/retail/web-orders/${id}`);
+            const data = await res.json();
+            if (res.ok) {
+                setOrder(data);
+            } else {
+                toast.error(data.error || 'Failed to fetch order');
             }
-            return item;
-        });
-    } else {
-        const newItem: any = {
-            sku: formData.sku,
-            qty: formData.qty,
-            total: formData.qty * formData.price,
-            lotNumber: formData.lotNumber,
-            website: 'Manual Entry',
-            createdAt: new Date().toISOString()
-        };
-        currentItems.push(newItem);
-    }
-
-    try {
-        const res = await fetch(`/api/retail/web-orders/${order._id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ lineItems: currentItems })
-        });
-
-        if (res.ok) {
-            toast.success(editingId ? 'Item updated' : 'Item added');
-            setIsItemModalOpen(false);
-            fetchOrder();
-        } else {
-            toast.error('Failed to save item');
+        } catch (e) {
+            toast.error('Connection error');
+        } finally {
+            setLoading(false);
         }
-    } catch (e) {
-        toast.error('Error saving item');
-    }
-  };
+    }, [id]);
 
-  const handleDeleteClick = (itemId: string) => {
-    setDeleteConfirm({ isOpen: true, itemId });
-  };
+    useEffect(() => {
+        if (id) fetchOrder();
+    }, [id, fetchOrder]);
 
-  const confirmDelete = async () => {
-    const { itemId } = deleteConfirm;
-    if (!itemId || !order) return;
-
-    const updatedItems = (order.lineItems || []).filter(item => item._id !== itemId);
-
-    try {
-        const res = await fetch(`/api/retail/web-orders/${order._id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ lineItems: updatedItems })
-        });
-
-        if (res.ok) {
-            toast.success('Item deleted');
-            fetchOrder();
-            setDeleteConfirm({ isOpen: false, itemId: null });
-        } else {
-            toast.error('Failed to delete item');
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case 'completed': return 'bg-emerald-500 text-white';
+            case 'processing': return 'bg-blue-500 text-white';
+            case 'on-hold': return 'bg-amber-500 text-white';
+            case 'pending': return 'bg-yellow-500 text-black';
+            case 'cancelled': case 'refunded': case 'failed': return 'bg-rose-500 text-white';
+            default: return 'bg-slate-500 text-white';
         }
-    } catch (e) {
-        toast.error('Error deleting item');
+    };
+
+    const getWebsiteColor = (website: string) => {
+        if (website?.includes('KING')) return 'bg-amber-500';
+        if (website?.includes('GRASS')) return 'bg-emerald-500';
+        if (website?.includes('GRHK')) return 'bg-blue-500';
+        if (website?.includes('REBEL')) return 'bg-purple-500';
+        return 'bg-slate-500';
+    };
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-[calc(100vh-48px)] bg-white">
+                <div className="text-center">
+                    <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Loading Order...</p>
+                </div>
+            </div>
+        );
     }
-  };
 
-  const handleSkuChange = (skuId: string) => {
-      const sku = allSkus.find(s => s._id === skuId);
-      const newForm = { ...formData, sku: skuId };
-      if (sku && sku.salePrice) {
-          newForm.price = sku.salePrice;
-      }
-      setFormData(newForm);
-  };
+    if (!order) {
+        return (
+            <div className="flex flex-col items-center justify-center h-[calc(100vh-48px)] bg-slate-50">
+                <Package className="w-12 h-12 text-slate-200 mb-4" />
+                <p className="text-sm font-bold text-slate-400 uppercase">Order not found</p>
+                <button onClick={() => router.back()} className="mt-4 text-[10px] font-black uppercase text-blue-600 hover:underline">Go Back</button>
+            </div>
+        );
+    }
 
-  const formatDate = (dateStr: string) => {
-      if (!dateStr) return '-';
-      return new Date(dateStr).toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric'
-      });
-  };
+    const subtotal = order.lineItems?.reduce((sum, item) => sum + (item.total || 0), 0) || 0;
 
-  const formatCurrency = (val: number) => {
-      if (val === undefined || val === null) return '-';
-      return '$' + val.toFixed(2);
-  };
-
-  if (loading) {
-      return (
-          <div className="flex items-center justify-center h-screen bg-slate-50">
-              <div className="animate-spin h-8 w-8 border-b-2 border-slate-900"></div>
-          </div>
-      );
-  }
-
-  if (!order) {
-      return (
-          <div className="flex items-center justify-center h-screen bg-slate-50">
-              <div className="text-slate-400">Order not found</div>
-          </div>
-      );
-  }
-
-  return (
-    <div className="min-h-screen bg-slate-50/50 p-6 md:p-8 font-sans text-slate-900">
-        
-        {/* Top Navigation / Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-            <div className="flex items-center space-x-4">
-                <button 
-                    onClick={() => router.push('/sales/web-orders')} 
-                    className="p-2 bg-white border border-slate-200 hover:bg-slate-50 transition-colors text-slate-500 hover:text-slate-900"
-                >
-                    <ArrowLeft className="w-4 h-4" />
-                </button>
-                <div>
-                    <div className="flex items-center space-x-3 mb-1">
-                        <h1 className="text-2xl font-bold tracking-tight text-slate-900">#{order._id}</h1>
+    return (
+        <div className="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-white">
+            {/* Header */}
+            <div className="sticky top-0 z-30 bg-white border-b border-slate-200 px-4 flex items-center justify-between shrink-0 h-14 shadow-sm">
+                <div className="flex items-center space-x-4">
+                    <button onClick={() => router.back()} className="hover:bg-slate-100 transition-colors p-1.5 rounded-full group">
+                        <ArrowLeft className="w-4 h-4 text-slate-400 group-hover:text-black" />
+                    </button>
+                    <div className="flex items-center space-x-3">
                         <span className={cn(
-                            "px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider border",
-                            order.status === 'completed' ? "bg-green-50 text-green-700 border-green-100" :
-                            order.status === 'processing' ? "bg-blue-50 text-blue-700 border-blue-100" :
-                            "bg-slate-100 text-slate-600 border-slate-200"
-                        )}>
-                            {order.status}
-                        </span>
+                            "px-2.5 py-1 rounded-full text-[9px] font-black text-white uppercase tracking-widest shadow-sm",
+                            getWebsiteColor(order.website)
+                        )}>{order.website}</span>
+                        <h1 className="text-base font-black text-slate-900 tracking-tight">Order #{order.number}</h1>
+                        <span className={cn(
+                            "px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest shadow-sm",
+                            getStatusColor(order.status)
+                        )}>{order.status}</span>
                     </div>
-                    <div className="text-xs text-slate-500 font-medium">
-                        Order Details • {formatDate(order.createdAt)}
-                    </div>
+                </div>
+                <div className="flex items-center space-x-2 text-[10px] text-slate-400 font-mono">
+                    <span>WC-{order.webId}</span>
                 </div>
             </div>
 
-            <div className="flex items-center space-x-3 text-sm">
-                <button 
-                  onClick={() => toast('Feature coming soon')}
-                  className="flex items-center space-x-2 px-4 py-2 bg-white border border-slate-200 text-xs font-bold uppercase tracking-wide text-slate-600 hover:bg-slate-50 transition-colors"
-                >
-                    <Printer className="w-4 h-4" />
-                    <span>Print</span>
-                </button>
-                
-                {/* Status Dropdown / Action */}
-                <div className="relative">
-                     <select 
-                        value={order.status}
-                        onChange={handleStatusChange}
-                        className="appearance-none pl-4 pr-10 py-2 bg-slate-900 text-white text-xs font-bold uppercase tracking-wide hover:bg-slate-800 transition-colors outline-none cursor-pointer border-none"
-                     >
-                        <option value="pending">Mark as Pending</option>
-                        <option value="processing">Mark as Processing</option>
-                        <option value="shipped">Mark as Shipped</option>
-                        <option value="completed">Mark as Completed</option>
-                        <option value="cancelled">Mark as Cancelled</option>
-                     </select>
-                     <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                         <div className="border-t-[4px] border-l-[4px] border-r-[4px] border-t-white border-l-transparent border-r-transparent" />
-                     </div>
-                </div>
-            </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
-            {/* Left Column: Items */}
-            <div className="lg:col-span-2 space-y-6">
-                
-                {/* Line Items Card */}
-                <div className="bg-white border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
-                        <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Shipment Details</h3>
-                        <button onClick={handleOpenAddModal} className="text-[10px] font-bold uppercase text-blue-600 hover:underline flex items-center space-x-1">
-                            <Plus className="w-3 h-3" />
-                            <span>Add Item</span>
-                        </button>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                            <thead>
-                                <tr className="border-b border-slate-100">
-                                    <th className="px-6 py-3 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Item</th>
-                                    <th className="px-6 py-3 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Lot #</th>
-                                    <th className="px-6 py-3 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center">Qty</th>
-                                    <th className="px-6 py-3 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right">Price</th>
-                                    <th className="px-6 py-3 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right">Amount</th>
-                                    <th className="px-6 py-3 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right">Cost</th>
-                                    <th className="px-6 py-3"></th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50">
-                                {order.lineItems?.map((item, idx) => {
-                                    const skuName = typeof item.sku === 'object' ? item.sku?.name : item.sku;
-                                    const unitPrice = (item.total && item.qty) ? (item.total / item.qty) : 0;
-                                    return (
-                                        <tr key={`${item._id}-${idx}`} className="group hover:bg-slate-50/50 transition-colors">
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center space-x-3">
-                                                    <div className="w-10 h-10 bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
-                                                        <Package className="w-5 h-5 text-slate-300" />
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-xs font-bold text-slate-900">
-                                                            {typeof item.sku === 'object' && item.sku?.name ? (
-                                                                <a href={`/warehouse/skus/${item.sku._id}`} className="hover:underline hover:text-blue-600 transition-colors">
-                                                                    {item.sku.name}
-                                                                </a>
-                                                            ) : (
-                                                                skuName || 'Unknown Item'
-                                                            )}
-                                                        </div>
-                                                        {/* SKU ID shown as subtitle if needed, or just keep minimal */}
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-xs font-medium text-slate-600">
-                                                <div className="flex items-center space-x-2">
-                                                    <span>{item.lotNumber || '-'}</span>
-                                                    <button onClick={() => handleOpenLotModal(item)} className="p-1 hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-colors" title="Change Lot">
-                                                        <Pencil className="w-3 h-3" />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-xs text-slate-900 font-bold text-center">{item.qty}</td>
-                                            <td className="px-6 py-4 text-xs text-slate-600 text-right">{formatCurrency(unitPrice)}</td>
-                                            <td className="px-6 py-4 text-xs font-bold text-slate-900 text-right">{formatCurrency(item.total)}</td>
-                                            <td className="px-6 py-4 text-xs font-mono text-slate-600 text-right">
-                                                {item.cost !== undefined ? formatCurrency(item.cost) : '-'}
-                                            </td>
-                                             <td className="px-6 py-4 text-right">
-                                                <div className="flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button onClick={() => handleDeleteClick(item._id)} className="p-1 text-slate-400 hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-            </div>
-
-            {/* Right Column: Sidebar */}
-            <div className="space-y-6">
-                
-                {/* Payment Summary */}
-                <div className="bg-white border border-slate-200 p-6 shadow-sm">
-                    <div className="flex items-center justify-between mb-6">
-                        <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Payment</h3>
-                        <button className="text-[10px] font-bold uppercase text-slate-500 hover:text-slate-900 flex items-center space-x-1 border border-slate-200 px-2 py-1 hover:bg-slate-50 transition-colors">
-                            <Truck className="w-3 h-3" />
-                            <span>Invoice</span>
-                        </button>
-                    </div>
-                    
-                    <div className="space-y-3">
-                        <div className="flex justify-between text-xs text-slate-500">
-                            <span>Subtotal</span>
-                            <span className="font-medium text-slate-900">{formatCurrency(order.orderAmount - (order.tax || 0))}</span>
-                        </div>
-                        <div className="flex justify-between text-xs text-slate-500">
-                            <span>Tax</span>
-                            <span className="font-medium text-slate-900">{formatCurrency(order.tax || 0)}</span>
-                        </div>
-                         <div className="flex justify-between text-xs text-slate-500">
-                            <span>Shipping</span>
-                            <span className="font-medium text-slate-900">$0.00</span> 
-                        </div>
-                        <div className="h-px bg-slate-100 my-4" />
-                        <div className="flex justify-between items-end">
-                            <span className="text-sm font-bold text-slate-900">Total</span>
-                            <span className="text-xl font-black text-slate-900 tracking-tight">{formatCurrency(order.orderAmount)}</span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Customer Details */}
-                <div className="bg-white border border-slate-200 p-6 shadow-sm">
-                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-6">Customer</h3>
-                    
-                    <div className="space-y-6">
-                        {/* Profile */}
-                        <div className="flex items-start space-x-3">
-                            <div className="w-8 h-8 bg-blue-50 flex items-center justify-center shrink-0">
-                                <User className="w-4 h-4 text-blue-600" />
-                            </div>
-                            <div>
-                                <div className="text-xs font-bold text-slate-900">{order.firstName} {order.lastName}</div>
-                                <div className="text-[11px] text-slate-500 mt-0.5">{order.email}</div>
-                                <div className="text-[11px] text-slate-500 mt-0.5">Customer ID: {order._id.split('-')[1] || 'N/A'}</div>
-                            </div>
-                        </div>
-
-                        {/* Shipping */}
-                        <div className="flex items-start space-x-3">
-                            <div className="w-8 h-8 bg-slate-50 flex items-center justify-center shrink-0">
-                                <MapPin className="w-4 h-4 text-slate-500" />
-                            </div>
-                            <div>
-                                <div className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-1">Shipping Address</div>
-                                <div className="text-xs font-medium text-slate-700 leading-relaxed">
-                                    {order.city || 'N/A'}, {order.state || 'N/A'} <br />
-                                    {order.postcode || 'N/A'}
+            {/* Content */}
+            <div className="flex-1 flex overflow-hidden min-h-0">
+                {/* Left: Order Info */}
+                <aside className="w-[340px] h-full overflow-y-auto border-r border-slate-100 bg-white shrink-0 scrollbar-custom">
+                    <div className="p-6 space-y-8">
+                        {/* Customer */}
+                        <section>
+                            <h3 className="text-[9px] font-black text-slate-900 uppercase tracking-[0.15em] mb-4 flex items-center space-x-2">
+                                <User className="w-3.5 h-3.5 text-blue-500" />
+                                <span>Customer</span>
+                            </h3>
+                            <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-100 space-y-3">
+                                <div className="flex items-center space-x-3">
+                                    <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center">
+                                        <User className="w-5 h-5 text-slate-500" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-900">{order.billing?.firstName} {order.billing?.lastName}</p>
+                                        {order.billing?.company && <p className="text-[10px] text-slate-500">{order.billing.company}</p>}
+                                    </div>
+                                </div>
+                                <div className="pt-3 border-t border-slate-100 space-y-2">
+                                    <div className="flex items-center space-x-2 text-[10px] text-slate-600">
+                                        <Mail className="w-3 h-3 text-slate-400" />
+                                        <span>{order.billing?.email}</span>
+                                    </div>
+                                    <div className="flex items-center space-x-2 text-[10px] text-slate-600">
+                                        <Phone className="w-3 h-3 text-slate-400" />
+                                        <span>{order.billing?.phone || 'N/A'}</span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        </section>
 
                         {/* Billing */}
-                        <div className="flex items-start space-x-3">
-                            <div className="w-8 h-8 bg-slate-50 flex items-center justify-center shrink-0">
-                                <CreditCard className="w-4 h-4 text-slate-500" />
+                        <section>
+                            <h3 className="text-[9px] font-black text-slate-900 uppercase tracking-[0.15em] mb-4 flex items-center space-x-2">
+                                <Receipt className="w-3.5 h-3.5 text-emerald-500" />
+                                <span>Billing Address</span>
+                            </h3>
+                            <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-100 text-[10px] text-slate-600 space-y-1">
+                                <p className="font-bold text-slate-800">{order.billing?.firstName} {order.billing?.lastName}</p>
+                                <p>{order.billing?.address1}</p>
+                                {order.billing?.address2 && <p>{order.billing.address2}</p>}
+                                <p>{order.billing?.city}, {order.billing?.state} {order.billing?.postcode}</p>
+                                <p className="uppercase font-bold text-slate-400">{order.billing?.country}</p>
                             </div>
-                            <div>
-                                <div className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-1">Billing Address</div>
-                                <div className="text-xs font-medium text-slate-700 leading-relaxed italic text-slate-400">
-                                    Same as shipping address
+                        </section>
+
+                        {/* Shipping */}
+                        <section>
+                            <h3 className="text-[9px] font-black text-slate-900 uppercase tracking-[0.15em] mb-4 flex items-center space-x-2">
+                                <Truck className="w-3.5 h-3.5 text-orange-500" />
+                                <span>Shipping Address</span>
+                            </h3>
+                            <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-100 text-[10px] text-slate-600 space-y-1">
+                                <p className="font-bold text-slate-800">{order.shipping?.firstName} {order.shipping?.lastName}</p>
+                                <p>{order.shipping?.address1}</p>
+                                {order.shipping?.address2 && <p>{order.shipping.address2}</p>}
+                                <p>{order.shipping?.city}, {order.shipping?.state} {order.shipping?.postcode}</p>
+                                <p className="uppercase font-bold text-slate-400">{order.shipping?.country}</p>
+                            </div>
+                        </section>
+
+                        {/* Payment */}
+                        <section>
+                            <h3 className="text-[9px] font-black text-slate-900 uppercase tracking-[0.15em] mb-4 flex items-center space-x-2">
+                                <CreditCard className="w-3.5 h-3.5 text-purple-500" />
+                                <span>Payment</span>
+                            </h3>
+                            <div className="space-y-2">
+                                <div className="flex justify-between text-[10px]">
+                                    <span className="text-slate-400 font-bold uppercase">Method</span>
+                                    <span className="text-slate-900 font-bold">{order.paymentMethodTitle || order.paymentMethod}</span>
+                                </div>
+                                {order.transactionId && (
+                                    <div className="flex justify-between text-[10px]">
+                                        <span className="text-slate-400 font-bold uppercase">Transaction ID</span>
+                                        <span className="text-slate-600 font-mono">{order.transactionId}</span>
+                                    </div>
+                                )}
+                                {order.datePaid && (
+                                    <div className="flex justify-between text-[10px]">
+                                        <span className="text-slate-400 font-bold uppercase">Paid</span>
+                                        <span className="text-slate-600 font-mono">{new Date(order.datePaid).toLocaleString()}</span>
+                                    </div>
+                                )}
+                            </div>
+                        </section>
+
+                        {/* Dates */}
+                        <section>
+                            <h3 className="text-[9px] font-black text-slate-900 uppercase tracking-[0.15em] mb-4 flex items-center space-x-2">
+                                <Calendar className="w-3.5 h-3.5 text-rose-500" />
+                                <span>Timeline</span>
+                            </h3>
+                            <div className="space-y-2">
+                                <div className="flex justify-between text-[10px]">
+                                    <span className="text-slate-400 font-bold uppercase">Created</span>
+                                    <span className="text-slate-600 font-mono">{order.dateCreated ? new Date(order.dateCreated).toLocaleString() : '-'}</span>
+                                </div>
+                                <div className="flex justify-between text-[10px]">
+                                    <span className="text-slate-400 font-bold uppercase">Modified</span>
+                                    <span className="text-slate-600 font-mono">{order.dateModified ? new Date(order.dateModified).toLocaleString() : '-'}</span>
+                                </div>
+                                {order.dateCompleted && (
+                                    <div className="flex justify-between text-[10px]">
+                                        <span className="text-slate-400 font-bold uppercase">Completed</span>
+                                        <span className="text-slate-600 font-mono">{new Date(order.dateCompleted).toLocaleString()}</span>
+                                    </div>
+                                )}
+                            </div>
+                        </section>
+
+                        {order.customerNote && (
+                            <section>
+                                <h3 className="text-[9px] font-black text-slate-900 uppercase tracking-[0.15em] mb-2">Customer Note</h3>
+                                <p className="text-[10px] text-slate-600 italic bg-amber-50 p-3 rounded border border-amber-100">{order.customerNote}</p>
+                            </section>
+                        )}
+
+                        <div className="h-10" />
+                    </div>
+                </aside>
+
+                {/* Right: Line Items & Summary */}
+                <main className="flex-1 h-full overflow-y-auto bg-white scrollbar-custom">
+                    {/* Sticky Header */}
+                    <div className="sticky top-0 z-[30] bg-white border-b border-slate-100 px-6 h-12 flex items-center justify-between shadow-sm">
+                        <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center space-x-2">
+                            <ShoppingBag className="w-4 h-4 text-blue-500" />
+                            <span>Order Items</span>
+                        </h3>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">{order.lineItems?.length || 0} Items</span>
+                    </div>
+
+                    <div className="p-6 space-y-8">
+                        {/* Line Items Table */}
+                        <div className="border border-slate-100 rounded-xl overflow-hidden shadow-sm">
+                            <table className="w-full text-left border-collapse">
+                                <thead className="bg-slate-50 border-b border-slate-100">
+                                    <tr>
+                                        <th className="px-4 py-3 text-[8px] font-black text-slate-400 uppercase tracking-widest">Product</th>
+                                        <th className="px-4 py-3 text-[8px] font-black text-slate-400 uppercase tracking-widest">SKU</th>
+                                        <th className="px-4 py-3 text-[8px] font-black text-slate-400 uppercase tracking-widest text-center">Qty</th>
+                                        <th className="px-4 py-3 text-[8px] font-black text-slate-400 uppercase tracking-widest text-right">Price</th>
+                                        <th className="px-4 py-3 text-[8px] font-black text-slate-400 uppercase tracking-widest text-right">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
+                                    {order.lineItems?.map((item) => (
+                                        <tr
+                                            key={item.id}
+                                            className={cn(
+                                                "hover:bg-slate-50/50 transition-colors",
+                                                item.parentProductId && "cursor-pointer"
+                                            )}
+                                            onClick={() => item.parentProductId && router.push(`/warehouse/web-products/${item.parentProductId}`)}
+                                        >
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center space-x-3">
+                                                    <div className="w-10 h-10 rounded border border-slate-100 bg-white overflow-hidden shrink-0">
+                                                        <img src={item.image || '/sku-placeholder.png'} className="w-full h-full object-cover" alt="" />
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[11px] font-bold text-slate-800">{item.name}</span>
+                                                        {item.variationId > 0 && (
+                                                            <span className="text-[8px] text-slate-400">Variation ID: {item.variationId}</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-[10px] font-mono text-slate-500">{item.sku || '-'}</td>
+                                            <td className="px-4 py-3 text-center">
+                                                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-[10px] font-black text-slate-700">
+                                                    {item.quantity}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-right text-[10px] font-mono text-slate-600">${item.price?.toFixed(2)}</td>
+                                            <td className="px-4 py-3 text-right text-[11px] font-black font-mono text-slate-900">${item.total?.toFixed(2)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Order Summary */}
+                        <div className="max-w-md ml-auto">
+                            <div className="bg-slate-50 rounded-xl border border-slate-100 p-6 space-y-4">
+                                <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-widest border-b border-slate-200 pb-3 mb-4">Order Summary</h4>
+                                
+                                <div className="flex justify-between text-[11px]">
+                                    <span className="text-slate-500">Subtotal</span>
+                                    <span className="font-bold text-slate-700 font-mono">${subtotal.toFixed(2)}</span>
+                                </div>
+
+                                {order.discountTotal > 0 && (
+                                    <div className="flex justify-between text-[11px]">
+                                        <span className="text-slate-500">Discount</span>
+                                        <span className="font-bold text-emerald-600 font-mono">-${order.discountTotal.toFixed(2)}</span>
+                                    </div>
+                                )}
+
+                                <div className="flex justify-between text-[11px]">
+                                    <span className="text-slate-500">Shipping</span>
+                                    <span className="font-bold text-slate-700 font-mono">${order.shippingTotal?.toFixed(2)}</span>
+                                </div>
+
+                                <div className="flex justify-between text-[11px]">
+                                    <span className="text-slate-500">Tax</span>
+                                    <span className="font-bold text-slate-700 font-mono">${order.totalTax?.toFixed(2)}</span>
+                                </div>
+
+                                <div className="flex justify-between text-sm pt-4 border-t border-slate-200">
+                                    <span className="font-black text-slate-900 uppercase tracking-tight">Total</span>
+                                    <span className="font-black text-slate-900 text-lg font-mono">${order.total?.toFixed(2)}</span>
+                                </div>
+
+                                <div className="text-[9px] text-slate-400 uppercase tracking-widest text-right pt-2">
+                                    Currency: {order.currency}
                                 </div>
                             </div>
                         </div>
+
+                        {/* Coupons */}
+                        {order.couponLines && order.couponLines.length > 0 && (
+                            <section>
+                                <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-widest mb-3 flex items-center space-x-2">
+                                    <Tag className="w-3.5 h-3.5 text-purple-500" />
+                                    <span>Coupons Applied</span>
+                                </h4>
+                                <div className="flex flex-wrap gap-2">
+                                    {order.couponLines.map((coupon: any, idx: number) => (
+                                        <span key={idx} className="px-2 py-1 bg-purple-50 text-purple-700 border border-purple-100 rounded text-[9px] font-bold uppercase">
+                                            {coupon.code} (-${parseFloat(coupon.discount || 0).toFixed(2)})
+                                        </span>
+                                    ))}
+                                </div>
+                            </section>
+                        )}
+
+                        {/* Refunds */}
+                        {order.refunds && order.refunds.length > 0 && (
+                            <section>
+                                <h4 className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-3">Refunds</h4>
+                                <div className="space-y-2">
+                                    {order.refunds.map((refund: any, idx: number) => (
+                                        <div key={idx} className="flex justify-between text-[10px] bg-rose-50 p-3 rounded border border-rose-100">
+                                            <span className="text-rose-700">Refund #{refund.id}</span>
+                                            <span className="font-bold text-rose-700">-${Math.abs(parseFloat(refund.total || 0)).toFixed(2)}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </section>
+                        )}
+                    </div>
+                </main>
+            </div>
+
+            {/* Footer */}
+            <div className="h-[24px] border-t border-slate-200 bg-slate-50 shrink-0 flex items-center justify-between px-4 z-[50]">
+                <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-1.5">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Web Orders Console v2.0</span>
                     </div>
                 </div>
-
+                <div className="flex items-center space-x-4 font-mono">
+                    <span className="text-[9px] text-slate-300 uppercase tracking-tighter">Order Key: {order.orderKey}</span>
+                </div>
             </div>
         </div>
-
-        {/* Modal Logic */}
-        {isItemModalOpen && (
-             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-                 <div className="bg-white shadow-2xl w-full max-w-lg animate-in fade-in zoom-in duration-200 overflow-hidden">
-                     <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                         <h3 className="text-sm font-bold uppercase text-slate-900">{editingId ? 'Edit Item' : 'Add New Item'}</h3>
-                         <button onClick={() => setIsItemModalOpen(false)}><X className="w-4 h-4 text-slate-400 hover:text-slate-900" /></button>
-                     </div>
-                     <form onSubmit={handleSaveItem} className="p-6 space-y-4">
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-bold uppercase text-slate-500">Product SKU</label>
-                            <SearchableSelect
-                                options={allSkus.map(s => ({ value: s._id, label: s.name }))}
-                                value={formData.sku}
-                                onChange={handleSkuChange}
-                                className="w-full"
-                                required
-                            />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-bold uppercase text-slate-500">Quantity</label>
-                                <input type="number" value={formData.qty} onChange={e => setFormData({...formData, qty: parseFloat(e.target.value)})} className="w-full px-3 py-2 border border-slate-200 text-sm outline-none focus:border-blue-500 transition-colors" />
-                            </div>
-                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-bold uppercase text-slate-500">Unit Price</label>
-                                <input type="number" step="0.01" value={formData.price} onChange={e => setFormData({...formData, price: parseFloat(e.target.value)})} className="w-full px-3 py-2 border border-slate-200 text-sm outline-none focus:border-blue-500 transition-colors" />
-                            </div>
-                        </div>
-                        <div className="space-y-1.5 ">
-                            <label className="text-[10px] font-bold uppercase text-slate-500">Lot Number</label>
-                            <div className="flex gap-2">
-                                <input type="text" value={formData.lotNumber} onChange={e => setFormData({...formData, lotNumber: e.target.value})} className="w-full px-3 py-2 border border-slate-200 text-sm outline-none focus:border-blue-500 transition-colors" />
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        if (!formData.sku) {
-                                            toast.error('Please select a SKU first');
-                                            return;
-                                        }
-                                        setIsFormLotSelectorOpen(true);
-                                    }}
-                                    className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
-                                    title="Select from Inventory"
-                                >
-                                    <List className="w-4 h-4" />
-                                </button>
-                            </div>
-                        </div>
-                        <div className="pt-4">
-                            <button type="submit" className="w-full py-3 bg-slate-900 text-white text-xs font-bold uppercase tracking-wider hover:bg-slate-800 transition-colors">
-                                {editingId ? 'Save Changes' : 'Add Item'}
-                            </button>
-                        </div>
-                     </form>
-                 </div>
-             </div>
-        )}
-
-        {/* Reusable Lot Modal for Table Action */}
-        <LotSelectionModal 
-            isOpen={isLotModalOpen}
-            onClose={() => setIsLotModalOpen(false)}
-            onSelect={handleLotSelectFromTable}
-            skuId={activeItemForLot ? (typeof activeItemForLot.sku === 'object' ? activeItemForLot.sku._id : activeItemForLot.sku) : ''}
-            currentLotNumber={activeItemForLot?.lotNumber}
-        />
-
-        {/* Reusable Lot Modal for Form Action */}
-        <LotSelectionModal 
-            isOpen={isFormLotSelectorOpen}
-            onClose={() => setIsFormLotSelectorOpen(false)}
-            onSelect={(lot) => {
-                setFormData(prev => ({ ...prev, lotNumber: lot }));
-                setIsFormLotSelectorOpen(false);
-            }}
-            skuId={formData.sku}
-            currentLotNumber={formData.lotNumber}
-        />
-
-        {/* Delete Modal */}
-        {deleteConfirm.isOpen && (
-             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-                 <div className="bg-white shadow-2xl w-full max-w-sm p-6 text-center">
-                     <div className="w-12 h-12 bg-red-50 flex items-center justify-center mx-auto mb-4">
-                         <Trash2 className="w-6 h-6 text-red-500" />
-                     </div>
-                     <h3 className="text-lg font-bold text-slate-900 mb-2">Delete Item?</h3>
-                     <p className="text-sm text-slate-500 mb-6">Are you sure you want to remove this item from the order?</p>
-                     <div className="flex gap-3">
-                         <button onClick={() => setDeleteConfirm({isOpen:false, itemId:null})} className="flex-1 py-2 border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50">Cancel</button>
-                         <button onClick={confirmDelete} className="flex-1 py-2 bg-red-500 text-white text-sm font-bold hover:bg-red-600">Delete</button>
-                     </div>
-                 </div>
-             </div>
-        )}
-    </div>
-  );
+    );
 }

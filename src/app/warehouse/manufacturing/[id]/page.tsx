@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { ArrowLeft, Package, Calendar, User, Clock, Tag, Clipboard, Layers, Pencil, Trash2, X, Plus, Copy, Play, Square } from 'lucide-react';
+import Link from 'next/link';
+import { ArrowLeft, Package, Calendar, User, Clock, Tag, Clipboard, Layers, Pencil, Trash2, X, Plus, Copy, Play, Square, MoreVertical } from 'lucide-react';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
@@ -95,6 +97,18 @@ export default function ManufacturingDetailPage() {
     const [skuSearch, setSkuSearch] = useState('');
     const [isSkuDropdownOpen, setIsSkuDropdownOpen] = useState(false);
 
+    // Shell Viewport Lock: Prevents window-level scrolling
+    useEffect(() => {
+        const originalBodyStyle = document.body.style.overflow;
+        const originalHtmlStyle = document.documentElement.style.overflow;
+        document.body.style.overflow = 'hidden';
+        document.documentElement.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = originalBodyStyle;
+            document.documentElement.style.overflow = originalHtmlStyle;
+        };
+    }, []);
+
     // Qty Difference update state
     const [isSubmittingDiff, setIsSubmittingDiff] = useState(false);
 
@@ -107,30 +121,42 @@ export default function ManufacturingDetailPage() {
     // Debounce Ref for Qty Difference
     const qtyTimerRef = React.useRef<NodeJS.Timeout | null>(null);
 
-    useEffect(() => {
-        const fetchOrder = async () => {
-            try {
-                const res = await fetch(`/api/manufacturing/${params.id}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    setOrder(data);
-                } else {
-                    toast.error('Failed to fetch order');
-                }
-            } catch (e) {
-                toast.error('Error loading order');
-            } finally {
-                setLoading(false);
+    const fetchOrder = async () => {
+        try {
+            const res = await fetch(`/api/manufacturing/${params.id}`);
+            if (res.ok) {
+                const data = await res.json();
+                setOrder(data);
+            } else {
+                toast.error('Failed to fetch order');
             }
-        };
+        } catch (e) {
+            toast.error('Error loading order');
+        } finally {
+            setLoading(false);
+        }
+    };
 
+    useEffect(() => {
         if (params.id) {
             fetchOrder();
         }
     }, [params.id]);
 
-    // Fetch SKU list for Add Line Item dropdown
+    // Shell Viewport Lock: Prevents window-level scrolling
     useEffect(() => {
+        const originalStyle = window.getComputedStyle(document.body).overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = originalStyle;
+        };
+    }, []);
+
+    // Deferred fetches - only load after main order is displayed for faster initial render
+    useEffect(() => {
+        if (loading) return; // Wait until order is loaded
+        
+        // Fetch SKU list for Add Line Item dropdown (deferred)
         fetch('/api/skus?limit=0&ignoreDate=true')
             .then(res => res.json())
             .then(data => {
@@ -139,10 +165,8 @@ export default function ManufacturingDetailPage() {
                 }
             })
             .catch(() => {});
-    }, []);
-
-    // Fetch users list for Labor dropdown
-    useEffect(() => {
+        
+        // Fetch users list for Labor dropdown (deferred)
         fetch('/api/users?limit=1000')
             .then(res => res.json())
             .then(data => {
@@ -170,15 +194,13 @@ export default function ManufacturingDetailPage() {
                 }
             })
             .catch(() => {});
-    }, []);
-
-    // Fetch Global Settings
-    useEffect(() => {
+        
+        // Fetch Global Settings (deferred)
         fetch('/api/settings')
             .then(res => res.json())
             .then(data => setGlobalSettings(data))
             .catch(() => {});
-    }, []);
+    }, [loading]);
 
     // Timer Logic
     // Timer Logic
@@ -212,10 +234,13 @@ export default function ManufacturingDetailPage() {
         if (order) {
             order.lineItems?.forEach(item => {
                 const bomQty = (item.recipeQty || 0) * (order.qty || 0);
-                const sa = item.sa || 0;
+                const saPercent = item.sa || 0; // SA is stored as percentage (e.g., 55.6 for 55.6%)
+                const sa = saPercent / 100; // Convert to decimal (e.g., 0.556)
+                // qtyExtra only calculated if sa > 0
                 const qtyExtra = sa > 0 ? (bomQty / sa) - bomQty : 0;
                 const qtyScrapped = item.qtyScrapped || 0;
-                const totalQty = sa > 0 ? bomQty + qtyScrapped + qtyExtra : bomQty + qtyScrapped;
+                // Simple formula: totalQty = bomQty + qtyScrapped + qtyExtra
+                const totalQty = bomQty + qtyScrapped + qtyExtra;
                 const cost = totalQty * (item.cost || 0);
 
                 const cat = (typeof item.sku === 'object' && item.sku.category) ? item.sku.category.toLowerCase() : '';
@@ -241,6 +266,15 @@ export default function ManufacturingDetailPage() {
 
         return { material, packaging, labor, total, perUnit, qtyManufactured };
     }, [order]);
+
+    const sidebarSkuTier = React.useMemo(() => {
+        if (order?.sku && typeof order.sku === 'object' && (order.sku as any).tier) {
+            return (order.sku as any).tier;
+        }
+        const skuId = typeof order?.sku === 'object' ? order?.sku?._id : order?.sku;
+        const found = skuList.find(s => s._id === skuId);
+        return found ? (found as any).tier : null;
+    }, [order?.sku, skuList]);
 
     const skuName = React.useMemo(() => {
         if (!order?.sku) return '-';
@@ -277,7 +311,7 @@ export default function ManufacturingDetailPage() {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-[calc(100vh-48px)] bg-white">
-                <div className="text-sm text-slate-400">Loading...</div>
+                <LoadingSpinner size="lg" message="Loading Manufacturing Order" />
             </div>
         );
     }
@@ -305,7 +339,7 @@ export default function ManufacturingDetailPage() {
         [
             { label: 'Created At', value: new Date(order.createdAt).toLocaleDateString() },
             { 
-                label: 'Recipe Name', 
+                label: 'Recipe', 
                 value: (typeof order.recipesId === 'object' && order.recipesId) ? order.recipesId.name : (order.recipesId || '-') 
             },
         ],
@@ -357,12 +391,12 @@ export default function ManufacturingDetailPage() {
         setIsLotModalOpen(true);
     };
 
-    const handleLotSelect = async (lotNumber: string) => {
+    const handleLotSelect = async (lotNumber: string, cost?: number) => {
         if (!order || !editingLotItemId) return;
         
         try {
             const updatedLineItems = order.lineItems?.map(item => 
-                item._id === editingLotItemId ? { ...item, lotNumber } : item
+                item._id === editingLotItemId ? { ...item, lotNumber, cost: cost || 0 } : item
             ) || [];
 
             const res = await fetch(`/api/manufacturing/${order._id}`, {
@@ -386,8 +420,21 @@ export default function ManufacturingDetailPage() {
         }
     };
     
+    // Helper to calculate required qty for a line item (for lot suggestion)
+    // Using regular function instead of useCallback to avoid hooks order issues
+    const getRequiredQtyForItem = (item: LineItem | null): number => {
+        if (!item || !order) return 0;
+        const bomQty = (item.recipeQty || 0) * (order.qty || 0);
+        const saPercent = item.sa || 0;
+        const sa = saPercent / 100;
+        const qtyExtra = sa > 0 ? (bomQty / sa) - bomQty : 0;
+        const qtyScrapped = item.qtyScrapped || 0;
+        return bomQty + qtyExtra + qtyScrapped;
+    };
+    
     // Helper to get current lot for highlighting
     const currentEditingItem = order?.lineItems?.find(i => i._id === editingLotItemId);
+    const currentEditingItemRequiredQty = getRequiredQtyForItem(currentEditingItem || null);
 
     // Edit Item Handlers
     const handleOpenEditModal = (item: LineItem) => {
@@ -438,35 +485,62 @@ export default function ManufacturingDetailPage() {
         }
     };
 
-    // calculated costs are now at the top
+    const handleDeleteItem = async (itemId: string) => {
+        if (!order || !window.confirm('Are you sure you want to delete this item?')) return;
+        
+        try {
+            const updatedLineItems = order.lineItems?.filter(item => item._id !== itemId) || [];
+            
+            const res = await fetch(`/api/manufacturing/${order._id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lineItems: updatedLineItems })
+            });
+            
+            if (res.ok) {
+                const updatedOrder = await res.json();
+                setOrder(updatedOrder);
+                toast.success('Item deleted successfully');
+            } else {
+                toast.error('Failed to delete item');
+            }
+        } catch (e) {
+            toast.error('Error deleting item');
+        }
+    };
 
+    // deleted the misplaced memo from here
 
     return (
-        <div className="flex flex-col h-[calc(100vh-48px)] bg-white relative">
-            {/* Header Row 1: Breadcrumb + Back */}
-            <div className="flex items-center justify-between px-6 py-3 border-b border-slate-100 bg-slate-50/50 shrink-0">
-                <div className="flex items-center space-x-2 text-sm">
+        <div className="flex flex-col h-[calc(100vh-40px)] bg-white overflow-hidden">
+            {/* Header */}
+            <div className="sticky top-0 z-30 bg-white border-b border-slate-200 px-4 flex items-center justify-between shrink-0 h-10 shadow-sm">
+                <div className="flex items-center space-x-3">
                     <button
                         onClick={() => router.push('/warehouse/manufacturing')}
-                        className="text-slate-500 hover:text-black transition-colors"
+                        className="p-1 hover:bg-slate-100 rounded-full transition-colors"
                     >
-                        Work Orders
+                        <ArrowLeft className="w-4 h-4 text-slate-500" />
                     </button>
-                    <span className="text-slate-300">/</span>
-                    <span className="font-bold text-slate-900">{order.label || order._id}</span>
+                    <div className="flex items-baseline space-x-3">
+                        <h1 className="text-sm font-bold text-slate-900 uppercase tracking-tight">Manufacturing Details</h1>
+                        <p className="text-[10px] text-slate-400 font-mono uppercase">{order.label || order._id}</p>
+                    </div>
                 </div>
-                <button
-                    onClick={() => router.back()}
-                    className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold uppercase text-slate-500 hover:text-black hover:bg-slate-100 transition-colors"
-                >
-                    <ArrowLeft className="w-3.5 h-3.5" />
-                    <span>Back</span>
-                </button>
+                <div className="flex items-center space-x-2">
+                    <Link 
+                        href={`/warehouse/skus/${typeof order.sku === 'object' ? order.sku._id : order.sku}?lot=${encodeURIComponent(order.label || order._id)}`}
+                        className="px-3 py-1 bg-slate-100 border border-slate-200 text-slate-600 rounded text-[10px] font-bold uppercase hover:bg-slate-200 transition-colors flex items-center gap-1.5"
+                    >
+                        <Layers className="w-3 h-3" />
+                        <span>View Ledger</span>
+                    </Link>
+                </div>
             </div>
 
             <div className="flex flex-1 overflow-hidden">
                 {/* Left Sidebar: Details (30%) */}
-                <div className="w-[30%] border-r border-slate-200 bg-slate-50/30 overflow-y-auto p-6 space-y-6">
+                <div className="w-[30%] border-r border-slate-200 bg-slate-50/30 overflow-y-auto p-6 space-y-6 scrollbar-custom">
                     {/* Status & Priority Chips */}
                     <div className="flex items-center gap-2">
                         <div className={cn(
@@ -515,7 +589,19 @@ export default function ManufacturingDetailPage() {
                                 )}
                             </div>
                             <div>
-                                <h1 className="text-xl font-black text-slate-900 tracking-tight leading-none group-hover:text-blue-600 transition-colors">{skuName}</h1>
+                                <div className="flex items-center space-x-2">
+                                    {!!sidebarSkuTier && (
+                                        <span className={cn(
+                                            "flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[12px] font-black text-white shadow-sm",
+                                            sidebarSkuTier === 1 ? "bg-emerald-500" :
+                                            sidebarSkuTier === 2 ? "bg-blue-500" :
+                                            "bg-orange-500"
+                                        )} title={`Tier ${sidebarSkuTier}`}>
+                                            {sidebarSkuTier}
+                                        </span>
+                                    )}
+                                    <h1 className="text-xl font-black text-slate-900 tracking-tight leading-none group-hover:text-blue-600 transition-colors">{skuName}</h1>
+                                </div>
                             </div>
                         </div>
 
@@ -581,16 +667,16 @@ export default function ManufacturingDetailPage() {
                         <h3 className="text-xs font-bold uppercase text-slate-900 tracking-widest mb-4 border-b border-slate-200 pb-2">Cost Analysis</h3>
                         <div className="space-y-3">
                              <div className="flex justify-between items-center group">
-                                <span className="text-sm text-slate-500 group-hover:text-slate-900 transition-colors">Material Cost</span>
-                                <span className="text-sm font-mono font-medium text-slate-700">${costs.material.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                 <span className="text-sm text-slate-500 group-hover:text-slate-900 transition-colors">Material Cost</span>
+                                <span className="text-sm font-mono font-medium text-slate-700">${costs.material.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
                             </div>
                             <div className="flex justify-between items-center group">
                                 <span className="text-sm text-slate-500 group-hover:text-slate-900 transition-colors">Packaging Cost</span>
-                                <span className="text-sm font-mono font-medium text-slate-700">${costs.packaging.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                <span className="text-sm font-mono font-medium text-slate-700">${costs.packaging.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
                             </div>
                             <div className="flex justify-between items-center group">
                                 <span className="text-sm text-slate-500 group-hover:text-slate-900 transition-colors">Labor Cost</span>
-                                <span className="text-sm font-mono font-medium text-slate-700">${costs.labor.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                <span className="text-sm font-mono font-medium text-slate-700">${costs.labor.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
                             </div>
                             <div className="flex justify-between items-center group pt-1">
                                 <span className="text-sm text-slate-500 group-hover:text-slate-900 transition-colors italic">Cost per Unit</span>
@@ -598,7 +684,7 @@ export default function ManufacturingDetailPage() {
                             </div>
                             <div className="pt-3 mt-3 border-t border-slate-200 flex justify-between items-center">
                                 <span className="text-sm font-bold text-slate-900 uppercase tracking-wider">Total Cost</span>
-                                <span className="text-base font-mono font-bold text-emerald-600">${costs.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                <span className="text-base font-mono font-bold text-emerald-600">${costs.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
                             </div>
                         </div>
                     </div>
@@ -692,7 +778,7 @@ export default function ManufacturingDetailPage() {
                     </div>
 
                     {/* Tab Content */}
-                    <div className="flex-1 overflow-auto">
+                    <div className="flex-1 overflow-auto scrollbar-custom">
                         {activeTab === 'Items' && (
                     <div className="animate-in fade-in duration-300">
                         <table className="w-full border-collapse text-left">
@@ -700,30 +786,30 @@ export default function ManufacturingDetailPage() {
                                 <tr>
                                     {[
                                         { label: 'Date', width: 'w-[80px]' },
-                                        { label: 'SKU' },
-                                        { label: 'Category', width: 'w-[80px]' },
+                                        { label: 'SKU', width: 'w-[200px]' },
+                                        { label: 'Cat', key: 'categoryDesc', width: 'w-[40px]', hideLabel: true, align: 'text-center' }, 
                                         { label: 'Lot #', width: 'w-[100px]' },
-                                        { label: 'UOM', width: 'w-[50px]' },
-                                        { label: 'Recipe Qty', width: 'w-[70px]' },
-                                        { label: 'BOM Qty', width: 'w-[70px]' },
-                                        { label: 'SA', width: 'w-[40px]' },
-                                        { label: 'Consm', width: 'w-[80px]' },
-                                        { label: 'Extra', width: 'w-[60px]' },
-                                        { label: 'Scrapped', width: 'w-[70px]' },
-                                        { label: 'Total', width: 'w-[80px]' },
-                                        { label: 'Cost', width: 'w-[70px]' }
+                                        { label: 'UOM', width: 'w-[50px]', align: 'text-center' },
+                                        { label: 'Recipe Qty', width: 'w-[70px]', align: 'text-right' },
+                                        { label: 'BOM Qty', width: 'w-[70px]', align: 'text-right' },
+                                        { label: 'Assay', width: 'w-[50px]', align: 'text-center' },
+                                        { label: 'Consm', width: 'w-[80px]', align: 'text-right' },
+                                        { label: 'Extra', width: 'w-[60px]', align: 'text-right' },
+                                        { label: 'Scrapped', width: 'w-[70px]', align: 'text-right' },
+                                        { label: 'Total', width: 'w-[80px]', align: 'text-right' },
+                                        { label: 'Total Cost', width: 'w-[90px]', align: 'text-right' },
+                                        { label: 'Act', key: 'actionsDesc', width: 'w-[40px]', hideLabel: true, align: 'text-center' } 
                                     ].map(col => (
                                         <th 
-                                            key={col.label} 
+                                            key={col.key || col.label} 
                                             className={cn(
                                                 "px-3 py-1.5 text-[8px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap",
-                                                col.width
+                                                col.align || "text-left" 
                                             )}
                                         >
-                                            {col.label}
+                                            {col.hideLabel ? '' : col.label}
                                         </th>
                                     ))}
-                                    {/* Actions Column Removed */}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -733,28 +819,28 @@ export default function ManufacturingDetailPage() {
                                     </tr>
                                 ) : order.lineItems.map(item => {
                                     const bomQty = (item.recipeQty || 0) * (order.qty || 0);
-                                    const sa = item.sa || 0;
+                                    const saPercent = item.sa || 0; // SA is stored as percentage (e.g., 55.6%)
+                                    const sa = saPercent / 100; // Convert to decimal (e.g., 0.556)
+                                    // qtyExtra only calculated if sa > 0
                                     const qtyExtra = sa > 0 ? (bomQty / sa) - bomQty : 0;
                                     const qtyScrapped = item.qtyScrapped || 0;
-                                    
-                                    // Formula: IF([SA]>0, [QtyConsumed]+[QtyScrapped]+[QtyExtra Consumed], [QtyConsumed]+[QtyScrapped])
-                                    // Assuming QtyConsumed = BOMQty for this calculation
-                                    const totalQty = sa > 0 
-                                        ? bomQty + qtyScrapped + qtyExtra 
-                                        : bomQty + qtyScrapped;
+                                    // Simple formula: totalQty = bomQty + qtyScrapped + qtyExtra
+                                    const totalQty = bomQty + qtyScrapped + qtyExtra;
 
                                     const skuObj = typeof item.sku === 'object' ? item.sku : null;
                                     const skuId = skuObj ? (skuObj as any)._id : item.sku;
                                     
-                                    // Robust lookup for name and category
+                                    // Robust lookup for name, category and tier
                                     let displayName = skuObj ? (skuObj as any).name : '-';
                                     let displayCategory = skuObj ? (skuObj as any).category : '-';
+                                    let displayTier = skuObj ? (skuObj as any).tier : null;
                                     
-                                    if (displayName === '-' || !displayCategory || displayCategory === '-') {
+                                    if (displayName === '-' || !displayCategory || displayCategory === '-' || !displayTier) {
                                         const found = skuList.find(s => s._id === skuId);
                                         if (found) {
                                             if (displayName === '-') displayName = found.name;
                                             if (!displayCategory || displayCategory === '-') displayCategory = found.category || '-';
+                                            if (!displayTier) displayTier = (found as any).tier;
                                         }
                                     }
 
@@ -764,24 +850,56 @@ export default function ManufacturingDetailPage() {
                                                 {new Date(item.createdAt).toLocaleDateString()}
                                             </td>
                                             <td className="px-3 py-1 text-[10px] text-slate-700 leading-tight">
-                                                <span 
-                                                    className="hover:text-blue-600 hover:underline cursor-pointer transition-colors"
-                                                    onClick={() => {
-                                                        const skuId = typeof item.sku === 'object' ? item.sku._id : item.sku;
-                                                        if (skuId) router.push(`/warehouse/skus/${skuId}`);
-                                                    }}
-                                                >
-                                                    {displayName}
-                                                </span>
+                                                <div className="flex items-center space-x-1.5">
+                                                    {!!displayTier && (
+                                                        <span className={cn(
+                                                            "flex-shrink-0 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-black text-white",
+                                                            displayTier === 1 ? "bg-emerald-500" :
+                                                            displayTier === 2 ? "bg-blue-500" :
+                                                            "bg-orange-500"
+                                                        )} title={`Tier ${displayTier}`}>
+                                                            {displayTier}
+                                                        </span>
+                                                    )}
+                                                    <span 
+                                                        className="hover:text-blue-600 hover:underline cursor-pointer transition-colors"
+                                                        onClick={() => {
+                                                            const skuId = typeof item.sku === 'object' ? item.sku._id : item.sku;
+                                                            if (skuId) router.push(`/warehouse/skus/${skuId}`);
+                                                        }}
+                                                    >
+                                                        {displayName}
+                                                    </span>
+                                                </div>
                                             </td>
-                                            <td className="px-3 py-1">
-                                                <span className="text-[9px] uppercase tracking-widest text-slate-400 bg-slate-50 px-1 border border-slate-100">
-                                                    {displayCategory}
-                                                </span>
+                                            <td className="px-3 py-1 flex justify-center">
+                                                {displayCategory?.toLowerCase().includes('part') ? (
+                                                    <div title={displayCategory}>
+                                                        <Package className="w-3.5 h-3.5 text-blue-400" />
+                                                    </div>
+                                                ) : displayCategory?.toLowerCase().includes('finished') ? (
+                                                    <div title={displayCategory}>
+                                                        <Tag className="w-3.5 h-3.5 text-green-500" />
+                                                    </div>
+                                                ) : (
+                                                    <div title={displayCategory}>
+                                                        <Layers className="w-3.5 h-3.5 text-slate-400" />
+                                                    </div>
+                                                )}
                                             </td>
                                             <td className="px-3 py-1 text-[10px] text-slate-500 group relative">
                                                 <div className="flex items-center gap-1">
-                                                    <span>{item.lotNumber || '-'}</span>
+                                                    {item.lotNumber ? (
+                                                        <Link 
+                                                            href={`/warehouse/skus/${typeof item.sku === 'object' ? item.sku._id : item.sku}?lot=${encodeURIComponent(item.lotNumber)}`}
+                                                            className="hover:underline hover:text-blue-600 cursor-pointer text-slate-700 font-mono"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        >
+                                                            {item.lotNumber}
+                                                        </Link>
+                                                    ) : (
+                                                        <span>-</span>
+                                                    )}
                                                     <button 
                                                         onClick={() => item.sku && handleEditLot(item._id, typeof item.sku === 'object' ? item.sku._id : item.sku)}
                                                         className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-500 transition-all p-0.5"
@@ -791,20 +909,46 @@ export default function ManufacturingDetailPage() {
                                                     </button>
                                                 </div>
                                             </td>
-                                            <td className="px-3 py-1 text-[9px] uppercase text-slate-400">{item.uom || '-'}</td>
-                                            <td className="px-3 py-1 text-[10px] text-slate-500 font-mono">{item.recipeQty ?? '-'}</td>
-                                            <td className="px-3 py-1 text-[10px] text-slate-500 font-mono">{bomQty.toLocaleString()}</td>
-                                            <td className="px-3 py-1 text-[10px] text-slate-500 font-mono">{sa || '-'}</td>
-                                            <td className="px-3 py-1 text-[10px] text-slate-700 font-mono bg-blue-50/20">{bomQty.toLocaleString()}</td>
-                                            <td className="px-3 py-1 text-[10px] text-slate-400 font-mono">{qtyExtra > 0 ? qtyExtra.toFixed(2) : '-'}</td>
-                                            <td className="px-3 py-1 text-[10px] text-red-500/70 font-mono">{qtyScrapped || '-'}</td>
-                                            <td className="px-3 py-1 text-[10px] text-slate-700 bg-slate-50/30">
+                                            <td className="px-3 py-1 text-[9px] uppercase text-slate-400 text-center">{item.uom || '-'}</td>
+                                            <td className="px-3 py-1 text-[10px] text-slate-500 font-mono text-right">{item.recipeQty ?? '-'}</td>
+                                            <td className="px-3 py-1 text-[10px] text-slate-500 font-mono text-right">{bomQty.toLocaleString()}</td>
+                                            <td className="px-3 py-1 text-[10px] text-slate-500 font-mono text-center">{saPercent > 0 ? `${saPercent}%` : '-'}</td>
+                                            <td className="px-3 py-1 text-[10px] text-slate-700 font-mono bg-blue-50/20 text-right">{bomQty.toLocaleString()}</td>
+                                            <td className="px-3 py-1 text-[10px] text-slate-400 font-mono text-right">{qtyExtra > 0 ? qtyExtra.toFixed(2) : '-'}</td>
+                                            <td className="px-3 py-1 text-[10px] text-red-500/70 font-mono text-right">{qtyScrapped || '-'}</td>
+                                            <td className="px-3 py-1 text-[10px] text-slate-700 bg-slate-50/30 text-right">
                                                 {totalQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                                             </td>
-                                            <td className="px-3 py-1 text-[10px] font-mono text-slate-700 bg-slate-50/10 whitespace-nowrap">
-                                                {item.cost !== undefined ? `$${item.cost.toFixed(2)}` : '-'}
+                                            <td className="px-3 py-1 text-[10px] font-mono text-slate-700 bg-slate-50/10 whitespace-nowrap text-right">
+                                                {item.cost !== undefined ? `$${(totalQty * item.cost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}` : '-'}
                                             </td>
-                                            {/* Actions Cell Removed */}
+                                            <td className="px-3 py-1 text-center relative group/actions">
+                                                <button className="p-1 hover:bg-slate-100 rounded text-slate-400">
+                                                    <MoreVertical className="w-3.5 h-3.5" />
+                                                </button>
+                                                <div className="hidden group-hover/actions:block absolute right-0 top-full mt-1 w-24 bg-white shadow-md border border-slate-100 rounded z-20 py-1">
+                                                    <button 
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleOpenEditModal(item);
+                                                        }}
+                                                        className="w-full text-left px-3 py-1.5 text-[10px] text-slate-600 hover:bg-slate-50 hover:text-blue-600 flex items-center space-x-1"
+                                                    >
+                                                        <Pencil className="w-3 h-3" />
+                                                        <span>Edit</span>
+                                                    </button>
+                                                    <button 
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleDeleteItem(item._id);
+                                                        }}
+                                                        className="w-full text-left px-3 py-1.5 text-[10px] text-slate-600 hover:bg-red-50 hover:text-red-600 flex items-center space-x-1"
+                                                    >
+                                                        <Trash2 className="w-3 h-3" />
+                                                        <span>Delete</span>
+                                                    </button>
+                                                </div>
+                                            </td>
                                         </tr>
                                     );
                                 })}
@@ -854,10 +998,10 @@ export default function ManufacturingDetailPage() {
                                                 }
                                             </td>
                                             <td className="px-3 py-1 text-[10px] text-slate-500 font-mono">
-                                                {entry.hourlyRate !== undefined ? `$${entry.hourlyRate.toFixed(2)}` : '-'}
+                                                {entry.hourlyRate !== undefined ? `$${entry.hourlyRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}` : '-'}
                                             </td>
                                             <td className="px-3 py-1 text-[10px] text-slate-700 bg-slate-50/30">
-                                                ${cost.toFixed(2)}
+                                                ${cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
                                             </td>
                                             <td className="px-3 py-1 text-right">
                                                 <div className="flex items-center justify-end space-x-1">
@@ -1110,20 +1254,22 @@ export default function ManufacturingDetailPage() {
                 onSelect={handleLotSelect}
                 skuId={editingSkuId || ''}
                 currentLotNumber={currentEditingItem?.lotNumber}
+                requiredQty={currentEditingItemRequiredQty}
             />
 
             {/* Lot Selection Modal for Add Line Item */}
             <LotSelectionModal
                 isOpen={isAddLotModalOpen}
                 onClose={() => setIsAddLotModalOpen(false)}
-                onSelect={(lotNumber) => {
+                onSelect={(lotNumber, cost) => {
                     if (editingItem) {
-                        setEditingItem({ ...editingItem, lotNumber });
+                        setEditingItem({ ...editingItem, lotNumber, cost: cost || 0 });
                     }
                     setIsAddLotModalOpen(false);
                 }}
                 skuId={editingSkuId || ''}
                 currentLotNumber={editingItem?.lotNumber}
+                requiredQty={getRequiredQtyForItem(editingItem)}
             />
 
             {/* Edit Item Modal */}
@@ -1183,7 +1329,12 @@ export default function ManufacturingDetailPage() {
                                                                             .filter((l: any) => l.balance > 0)
                                                                             .sort((a: any, b: any) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime());
                                                                         if (lotsWithBalance.length > 0) {
-                                                                            setEditingItem(prev => prev ? { ...prev, sku: s._id, lotNumber: lotsWithBalance[0].lotNumber } : prev);
+                                                                            setEditingItem(prev => prev ? { 
+                                                                                ...prev, 
+                                                                                sku: s._id, 
+                                                                                lotNumber: lotsWithBalance[0].lotNumber,
+                                                                                cost: lotsWithBalance[0].cost || 0
+                                                                            } : prev);
                                                                         }
                                                                     }
                                                                 } catch (e) {
@@ -1257,28 +1408,36 @@ export default function ManufacturingDetailPage() {
                             </div>
 
                             <div className="grid grid-cols-3 gap-4">
-                                {/* SA */}
+                                {/* Assay (%) */}
                                 <div>
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">SA</label>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Assay (%)</label>
                                     <input
                                         type="number"
                                         step="0.01"
                                         value={editingItem.sa || ''}
                                         onChange={e => setEditingItem({ ...editingItem, sa: parseFloat(e.target.value) || 0 })}
                                         className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-black/10"
+                                        placeholder="e.g., 55.6"
                                     />
                                 </div>
 
-                                {/* Qty Extra */}
+                                {/* Qty Extra (Calculated - Read Only) */}
                                 <div>
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Qty Extra</label>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        value={editingItem.qtyExtra || ''}
-                                        onChange={e => setEditingItem({ ...editingItem, qtyExtra: parseFloat(e.target.value) || 0 })}
-                                        className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-black/10"
-                                    />
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Qty Extra <span className="text-slate-300 normal-case">(calc)</span></label>
+                                    {(() => {
+                                        const bomQty = (editingItem.recipeQty || 0) * (order?.qty || 0);
+                                        const saPercent = editingItem.sa || 0;
+                                        const sa = saPercent / 100;
+                                        const qtyExtra = sa > 0 ? (bomQty / sa) - bomQty : 0;
+                                        return (
+                                            <input
+                                                type="text"
+                                                value={qtyExtra > 0 ? qtyExtra.toFixed(2) : '-'}
+                                                disabled
+                                                className="w-full px-3 py-2 text-sm border border-slate-200 rounded bg-slate-50 text-slate-500 cursor-not-allowed"
+                                            />
+                                        );
+                                    })()}
                                 </div>
 
                                 {/* Qty Scrapped */}
@@ -1561,6 +1720,19 @@ export default function ManufacturingDetailPage() {
                     </div>
                 </div>
             )}
+            {/* Shell Footer */}
+            <div className="h-[24px] border-t border-slate-200 bg-slate-100/50 shrink-0 flex items-center justify-between px-4 z-[50]">
+                <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-1.5">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">System Ready</span>
+                    </div>
+                </div>
+                <div className="flex items-center space-x-4">
+                    <span className="text-[9px] text-slate-400 font-mono uppercase tracking-tighter">Manufacturing Shell v2.1</span>
+                    <span className="text-[9px] text-slate-400 font-mono uppercase tracking-tighter">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span>
+                </div>
+            </div>
         </div>
     );
 }

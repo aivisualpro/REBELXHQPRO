@@ -288,9 +288,9 @@ export default function PurchaseOrderDetailPage() {
         });
     };
 
-    const formatCurrency = (val: number, decimals: number = 2) => {
+    const formatCurrency = (val: number) => {
         if (val === undefined || val === null) return '-';
-        return '$' + val.toFixed(decimals);
+        return '$' + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 });
     };
 
     const renderVendor = (val: { _id: string; name: string } | string) => {
@@ -319,7 +319,7 @@ export default function PurchaseOrderDetailPage() {
         ],
         [
             { label: 'Created At', value: formatDate(order.createdAt) },
-            { label: 'Total Amount', value: formatCurrency(totalAmount, 2) },
+            { label: 'Total Amount', value: formatCurrency(totalAmount) },
         ],
     ];
 
@@ -432,8 +432,8 @@ export default function PurchaseOrderDetailPage() {
                                     <td className="px-4 py-2 text-[10px] uppercase font-bold text-slate-500">{item.uom || '-'}</td>
                                     <td className="px-4 py-2 text-[11px] text-slate-600">{item.qtyOrdered?.toFixed(4) ?? '-'}</td>
                                     <td className="px-4 py-2 text-[11px] text-slate-600">{item.qtyReceived?.toFixed(4) ?? '-'}</td>
-                                    <td className="px-4 py-2 text-[11px] text-slate-600">{formatCurrency(item.cost, 8)}</td>
-                                    <td className="px-4 py-2 text-[11px] font-bold text-slate-700">{formatCurrency(amount, 2)}</td>
+                                    <td className="px-4 py-2 text-[11px] text-slate-600">{formatCurrency(item.cost)}</td>
+                                    <td className="px-4 py-2 text-[11px] font-bold text-slate-700">{formatCurrency(amount)}</td>
                                     <td className="px-4 py-2 text-center">
                                         <div className="flex items-center justify-center space-x-1 opacity-100 transition-opacity">
                                             <button
@@ -463,7 +463,7 @@ export default function PurchaseOrderDetailPage() {
                                 <td className="px-4 py-2 text-[11px] font-bold text-slate-700">{totalQtyOrdered.toFixed(4)}</td>
                                 <td className="px-4 py-2 text-[11px] font-bold text-slate-700">{totalQtyReceived.toFixed(4)}</td>
                                 <td className="px-4 py-2"></td>
-                                <td className="px-4 py-2 text-[11px] font-black text-slate-900">{formatCurrency(totalAmount, 2)}</td>
+                                <td className="px-4 py-2 text-[11px] font-black text-slate-900">{formatCurrency(totalAmount)}</td>
                                 <td className="px-4 py-2"></td>
                             </tr>
                         </tfoot>

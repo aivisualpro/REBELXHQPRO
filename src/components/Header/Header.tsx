@@ -9,7 +9,7 @@ import { MobileMenu } from './MobileMenu';
 
 export const Header = () => {
     return (
-        <header className="sticky top-0 z-40 w-full bg-black border-b border-white/10">
+        <header className="sticky top-0 z-[1000] w-full bg-black border-b border-white/10">
             <div className="max-w-[1600px] mx-auto h-10 px-6 flex items-center">
                 {/* Left: 10% Logo */}
                 <div className="w-[10%] flex items-center">

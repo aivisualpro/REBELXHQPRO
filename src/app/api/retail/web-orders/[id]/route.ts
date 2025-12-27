@@ -45,7 +45,8 @@ export async function GET(
 
             order.lineItems = order.lineItems.map((item: any) => {
                 if (typeof item.sku === 'string' && skuMap.has(item.sku)) {
-                    return { ...item, sku: skuMap.get(item.sku) };
+                    // Keep sku as string, add skuDetails for extra info
+                    return { ...item, skuDetails: skuMap.get(item.sku) };
                 }
                 return item;
             });
@@ -55,8 +56,8 @@ export async function GET(
         if (order.lineItems && Array.isArray(order.lineItems)) {
             const enrichedLineItems = await Promise.all(order.lineItems.map(async (item: any) => {
                 let cost = 0;
-                // item.sku is now potentially an object from previous block
-                const skuId = (typeof item.sku === 'object' && item.sku !== null) ? item.sku._id?.toString() : item.sku;
+                // item.sku is always a string (skuDetails has the populated object if any)
+                const skuId = item.sku;
                 const lotNumber = item.lotNumber;
 
                 if (skuId && lotNumber) {

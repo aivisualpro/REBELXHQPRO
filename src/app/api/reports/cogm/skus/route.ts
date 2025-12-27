@@ -21,7 +21,7 @@ export async function GET() {
 
         // 4. Fetch details for these SKUs
         const skus = await Sku.find({ _id: { $in: allSkuIds } })
-            .select('_id name code')
+            .select('_id name code tier')
             .sort({ name: 1 })
             .lean();
 

@@ -35,18 +35,25 @@ const ManufacturingSchema = new mongoose.Schema({
     lineItems: [{
         _id: { type: String, default: () => new mongoose.Types.ObjectId().toString() },
         lotNumber: String,
-        label: String, // New field
+        label: String,
         recipeId: String,
         sku: { type: String, ref: 'Sku' },
         uom: String,
         recipeQty: Number,
-        sa: Number, // Stock Available? or Standard Amount? User said 'sa'
+        sa: Number,
         qtyExtra: Number,
         qtyScrapped: Number,
+        cost: { type: Number, default: 0 }, // Unit cost from lot/opening balance
         createdAt: { type: Date, default: Date.now }
     }],
 
-    labor: [LaborSchema]
+    labor: [LaborSchema],
+
+    // Cost tracking fields
+    materialCost: { type: Number, default: 0 },
+    packagingCost: { type: Number, default: 0 },
+    laborCost: { type: Number, default: 0 },
+    totalCost: { type: Number, default: 0 }
 });
 
 // Delete cached model if it exists to force schema refresh

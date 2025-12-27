@@ -10,57 +10,54 @@ export async function GET(request: Request) {
         const { searchParams } = new URL(request.url);
         const page = parseInt(searchParams.get('page') || '1');
         const limit = parseInt(searchParams.get('limit') || '20');
-        const sku = searchParams.get('sku') || '';
         const website = searchParams.get('website') || '';
         const fromDate = searchParams.get('fromDate') || '';
         const toDate = searchParams.get('toDate') || '';
         const search = searchParams.get('search') || '';
+        const status = searchParams.get('status') || '';
+        const sortBy = searchParams.get('sortBy') || 'dateCreated';
+        const sortOrder = searchParams.get('sortOrder') === 'asc' ? 1 : -1;
         
         let query: any = {};
 
         if (search) {
              query.$or = [
                 { _id: { $regex: search, $options: 'i' } },
-                { firstName: { $regex: search, $options: 'i' } },
-                { lastName: { $regex: search, $options: 'i' } },
-                { email: { $regex: search, $options: 'i' } }
+                { number: { $regex: search, $options: 'i' } },
+                { 'billing.firstName': { $regex: search, $options: 'i' } },
+                { 'billing.lastName': { $regex: search, $options: 'i' } },
+                { 'billing.email': { $regex: search, $options: 'i' } },
+                { 'billing.phone': { $regex: search, $options: 'i' } }
             ];
-        }
-
-        if (sku) {
-            const skus = sku.split(',');
-            query['lineItems.sku'] = { $in: skus };
         }
 
         if (website) {
             const websites = website.split(',');
-            query['lineItems.website'] = { $in: websites };
+            query.website = { $in: websites };
         }
 
-        const status = searchParams.get('status') || '';
         if (status) {
             const statuses = status.split(',');
-            // Case-insensitive match if needed, but for now exact match or $in
-            // Use regex for case insensitivity if statuses are messy, but $in is faster.
-            // Let's assume standard statuses but support Case variations if needed.
-            // Check if frontend sends consistent casing. Usually safer to allow exact match first.
             query.status = { $in: statuses };
         }
 
         if (fromDate || toDate) {
-            query.createdAt = {};
-            if (fromDate) query.createdAt.$gte = new Date(fromDate);
+            query.dateCreated = {};
+            if (fromDate) query.dateCreated.$gte = new Date(fromDate);
             if (toDate) {
                 const end = new Date(toDate);
                 end.setHours(23, 59, 59, 999);
-                query.createdAt.$lte = end;
+                query.dateCreated.$lte = end;
             }
         }
+
+        const sortQuery: any = {};
+        sortQuery[sortBy] = sortOrder;
 
         const [total, orders] = await Promise.all([
             WebOrder.countDocuments(query),
             WebOrder.find(query)
-                .sort({ createdAt: -1 })
+                .sort(sortQuery)
                 .skip((page - 1) * limit)
                 .limit(limit)
                 .lean()

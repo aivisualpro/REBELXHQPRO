@@ -4,6 +4,30 @@ import AuditAdjustment from '@/models/AuditAdjustment';
 
 export const dynamic = 'force-dynamic';
 
+export async function GET(
+    request: NextRequest,
+    context: { params: Promise<{ id: string }> }
+) {
+    try {
+        await dbConnect();
+        const { id } = await context.params;
+
+        const adjustment = await AuditAdjustment.findById(id)
+            .populate('sku', 'name uom')
+            .populate('createdBy', 'firstName lastName')
+            .lean();
+
+        if (!adjustment) {
+            return NextResponse.json({ error: 'Adjustment not found' }, { status: 404 });
+        }
+
+        return NextResponse.json({ adjustment });
+
+    } catch (error: any) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+}
+
 export async function PUT(
     request: NextRequest,
     context: { params: Promise<{ id: string }> }

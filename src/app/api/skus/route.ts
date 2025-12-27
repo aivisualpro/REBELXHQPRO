@@ -26,6 +26,7 @@ export async function GET(request: Request) {
         const category = searchParams.get('category');
         const subCategory = searchParams.get('subCategory');
         const materialType = searchParams.get('materialType');
+        const isWebProduct = searchParams.get('isWebProduct');
 
         let query: any = {};
         
@@ -56,7 +57,13 @@ export async function GET(request: Request) {
         if (materialType) {
             query.materialType = { $in: materialType.split(',') };
         }
+        if (isWebProduct === 'true') {
+            query.isWebProduct = true;
+        }
 
+        const simpleMode = searchParams.get('simple') === 'true';
+
+        console.log('SKU API Sort:', { sortBy, sortOrder, simpleMode });
         const queryObj = Sku.find(query).sort({ [sortBy]: sortOrder as any });
 
         if (limit > 0) {
@@ -68,6 +75,15 @@ export async function GET(request: Request) {
             queryObj.lean()
         ]);
 
+        if (simpleMode) {
+            return NextResponse.json({
+                skus: skusRaw,
+                total,
+                page,
+                totalPages: Math.ceil(total / (limit || 20))
+            });
+        }
+
         const skuIds = skusRaw.map(s => s._id);
         const allVarianceIds = skusRaw.flatMap(s => (s as any).variances?.map((v: any) => v._id) || []);
 
@@ -76,8 +92,8 @@ export async function GET(request: Request) {
             OpeningBalance.find({ sku: { $in: skuIds } }).lean(),
             PurchaseOrder.find({ 'lineItems.sku': { $in: skuIds }, status: 'Received' }).lean(),
             Manufacturing.find({ sku: { $in: skuIds }, status: 'Completed' }).populate('lineItems.sku labor').lean(),
-            SaleOrder.find({ 'lineItems.sku': { $in: skuIds }, orderStatus: { $in: ['Shipped', 'Completed'] } }).lean(),
-            Manufacturing.find({ 'lineItems.sku': { $in: skuIds }, status: { $in: ['In Progress', 'Completed'] } }).lean(),
+            SaleOrder.find({ 'lineItems.sku': { $in: skuIds } }).lean(),
+            Manufacturing.find({ 'lineItems.sku': { $in: skuIds } }).lean(),
             AuditAdjustment.find({ sku: { $in: skuIds } }).lean(),
             WebOrder.find({
                 $or: [
@@ -143,17 +159,27 @@ export async function GET(request: Request) {
         const sosMap = new Map();
         sosAll.forEach(so => {
             so.lineItems?.forEach((li: any) => {
-                if(!sosMap.has(li.sku)) sosMap.set(li.sku, []);
-                sosMap.get(li.sku).push(li);
+                const liSkuId = (li.sku?._id || li.sku)?.toString();
+                if(!liSkuId) return;
+                if(!sosMap.has(liSkuId)) sosMap.set(liSkuId, []);
+                sosMap.get(liSkuId).push({ ...li, so });
             });
         });
 
         const mosConsMap = new Map();
         mosIngredientsAll.forEach(mo => {
             mo.lineItems?.forEach((li: any) => {
-                const liSkuId = li.sku?._id || li.sku;
-                if(!mosConsMap.has(liSkuId)) mosConsMap.set(liSkuId, []);
-                mosConsMap.get(liSkuId).push({ ...li, mo });
+                const liSkuId = (li.sku?._id || li.sku)?.toString();
+                if(!liSkuId) return;
+                
+                // Only count as consumption if there's actual quantity
+                const bomQty = (li.recipeQty || 0) * (mo.qty || 0);
+                const totalConsumed = bomQty + (li.qtyExtra || 0) + (li.qtyScrapped || 0);
+                
+                if (totalConsumed > 0) {
+                    if(!mosConsMap.has(liSkuId)) mosConsMap.set(liSkuId, []);
+                    mosConsMap.get(liSkuId).push({ ...li, mo });
+                }
             });
         });
 
@@ -164,14 +190,15 @@ export async function GET(request: Request) {
         const wosByVariance = new Map();
         wosAll.forEach(wo => {
             wo.lineItems?.forEach((li: any) => {
-                const liSkuId = li.sku?._id || li.sku;
+                const liSkuId = (li.sku?._id || li.sku)?.toString();
                 if (liSkuId) {
                     if(!wosBySku.has(liSkuId)) wosBySku.set(liSkuId, []);
-                    wosBySku.get(liSkuId).push(li);
+                    wosBySku.get(liSkuId).push({ ...li, orderId: wo._id });
                 }
                 if (li.varianceId) {
-                    if(!wosByVariance.has(li.varianceId)) wosByVariance.set(li.varianceId, []);
-                    wosByVariance.get(li.varianceId).push(li);
+                    const vid = li.varianceId.toString();
+                    if(!wosByVariance.has(vid)) wosByVariance.set(vid, []);
+                    wosByVariance.get(vid).push({ ...li, orderId: wo._id });
                 }
             });
         });
@@ -179,6 +206,7 @@ export async function GET(request: Request) {
         // 4. Enrich SKUs using Local Maps
         const skus = skusRaw.map((sku: any) => {
             const id = sku._id;
+            const sId = id.toString();
             const varianceIds = sku.variances?.map((v: any) => v._id) || [];
 
             let qtyIn = 0;
@@ -228,27 +256,40 @@ export async function GET(request: Request) {
                 }
             });
 
-            (sosMap.get(id) || []).forEach((li: any) => {
-                const q = li.qtyShipped || li.qty || 0;
-                qtyOut += q;
-                revenue += q * (li.price || 0);
-                cogs += q * (li.cost || 0);
+            (sosMap.get(sId) || []).forEach((li: any) => {
+                const so = (li as any).so;
+                if (['Shipped', 'Completed'].includes(so?.orderStatus)) {
+                    const q = li.qtyShipped || li.qty || 0;
+                    qtyOut += q;
+                    revenue += q * (li.price || 0);
+                    cogs += q * (li.cost || 0);
+                }
             });
 
-            const webLines = [...(wosBySku.get(id) || [])];
+            const webLines = [...(wosBySku.get(sId) || [])];
             varianceIds.forEach((vid: string) => {
                 webLines.push(...(wosByVariance.get(vid) || []));
             });
+
             webLines.forEach((li: any) => {
-                const q = li.qty || 0;
-                qtyOut += q;
+                qtyOut += (li.quantity || li.qty || 0);
                 revenue += (li.total || 0);
             });
 
-            (mosConsMap.get(id) || []).forEach((li: any) => {
-                const bomQty = (li.recipeQty || 0) * (li.mo.qty || 0);
-                qtyOut += (bomQty + (li.qtyExtra || 0) + (li.qtyScrapped || 0));
+            (mosConsMap.get(sId) || []).forEach((li: any) => {
+                if (['In Progress', 'Completed'].includes(li.mo?.status)) {
+                    const bomQty = (li.recipeQty || 0) * (li.mo?.qty || 0);
+                    qtyOut += (bomQty + (li.qtyExtra || 0) + (li.qtyScrapped || 0));
+                }
             });
+
+            const hasSales = (sosMap.get(sId)?.length > 0) || (webLines.length > 0);
+            const hasConsumption = (mosConsMap.get(sId)?.length > 0);
+            
+            let tier = 0;
+            if (hasSales && !hasConsumption) tier = 1;
+            else if (hasSales && hasConsumption) tier = 2;
+            else if (!hasSales && hasConsumption) tier = 3;
 
             return {
                 ...sku,
@@ -257,7 +298,9 @@ export async function GET(request: Request) {
                 revenue,
                 cogs,
                 cogm,
-                grossProfit: revenue - cogs
+                grossProfit: revenue - cogs,
+                totalWebOrders: sku.totalWebOrders || 0,
+                tier
             };
         });
 
