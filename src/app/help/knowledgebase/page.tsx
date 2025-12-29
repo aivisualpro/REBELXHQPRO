@@ -1,13 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import {
     Book, ChevronRight, ChevronDown, Home, Package, ShoppingCart, Users, BarChart3,
     Wrench, Brain, Shield, Zap, Target, Layers, Box, FileText, Settings, HelpCircle,
     AlertTriangle, CheckCircle2, Truck, DollarSign, PieChart, Activity, Clock,
-    Lock, Server, Globe, Database, Cpu, RefreshCw
+    Lock, Server, Globe, Database, Cpu, RefreshCw, Terminal, Code, Link as LinkIcon,
+    ShieldCheck, ZapOff, History, Kanban, MessageSquare, PhoneCall, Mail, Search
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -30,7 +31,19 @@ export default function KnowledgeBasePage() {
     const { data: session, status } = useSession();
     const router = useRouter();
     const [activeChapter, setActiveChapter] = useState<string>('overview');
-    const [expandedSections, setExpandedSections] = useState<string[]>(['overview-intro']);
+    
+    // Updated: Initialize all sections as expanded
+    const [expandedSections, setExpandedSections] = useState<string[]>([
+        'overview-intro', 'overview-architecture', 'overview-vision',
+        'dashboard-overview', 'dashboard-neural',
+        'warehouse-skus', 'warehouse-ledger', 'warehouse-manufacturing', 'warehouse-recipes', 'warehouse-other',
+        'sales-weborders', 'sales-wholesale', 'sales-subscriptions',
+        'crm-clients', 'crm-retention',
+        'reports-income', 'reports-cogm', 'reports-other',
+        'admin-users', 'admin-settings',
+        'integrations-websites', 'integrations-future',
+        'technical-stack', 'technical-models', 'technical-api'
+    ]);
 
     // Admin role check
     const userRole = (session?.user as any)?.role;
@@ -71,51 +84,66 @@ export default function KnowledgeBasePage() {
             sections: [
                 {
                     id: 'overview-intro',
-                    title: 'Introduction to Rebel X Headquarter Pro',
+                    title: 'Strategic Vision & Project Scope',
                     content: (
                         <div className="space-y-4 text-sm text-slate-600 leading-relaxed">
-                            <p><strong className="text-slate-900">Rebel X Headquarter Pro</strong> is a comprehensive Enterprise Resource Planning (ERP) system designed specifically for Rebel X Brands. Unlike traditional CRM systems, this platform functions as a complete business operating system, comparable to having 100 experienced managers working simultaneously across all departments.</p>
-                            <div className="bg-slate-50 border border-slate-200 p-4 space-y-2">
-                                <p className="font-bold text-slate-900">Version: {VERSION}</p>
-                                <p className="text-xs text-slate-500">Status: Beta Phase | Monthly Operating Cost: ~$200</p>
+                            <p><strong className="text-slate-900">Rebel X Headquarter Pro</strong> is the evolutionary successor to AppSheet-based solutions. Built as a custom-engineered Enterprise Resource Planning (ERP) platform, it provides complete sovereignty over business data and operations.</p>
+                            
+                            <div className="bg-slate-50 border border-slate-200 p-4 space-y-3">
+                                <div className="flex items-center gap-2 font-bold text-slate-900 border-b border-slate-200 pb-2 mb-2">
+                                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                                    The Core Mission
+                                </div>
+                                <p>To eliminate the scalability bottlenecks and maintenance overhead of AppSheet while providing enterprise-grade features that integrate directly with WordPress, ShipStation, and AI intelligence layers.</p>
+                                <div className="grid grid-cols-3 gap-2 text-[10px] font-bold uppercase tracking-wider">
+                                    <div className="bg-white border border-slate-200 p-2 text-center text-slate-600">Low Maintenance</div>
+                                    <div className="bg-white border border-slate-200 p-2 text-center text-slate-600">Live Integrations</div>
+                                    <div className="bg-white border border-slate-200 p-2 text-center text-slate-600">AI Neural Engine</div>
+                                </div>
                             </div>
-                            <p>The system was developed to address scalability concerns with AppSheet, providing a low-maintenance, highly integrated solution that connects seamlessly with existing websites, shipping services, and communication platforms.</p>
-                            <h4 className="font-bold text-slate-900 pt-2">Core Capabilities:</h4>
-                            <ul className="list-disc pl-5 space-y-1">
-                                <li><strong>SKU & Inventory Management</strong> - Complete product lifecycle tracking with lot-level traceability</li>
-                                <li><strong>Manufacturing & COGM</strong> - Automated work orders with real-time cost analysis</li>
-                                <li><strong>Multi-Website Integration</strong> - Connected to KINGKKRATOM, GRASSROOTSHARVEST, GRHKTATOM, REBELXBRANDS</li>
-                                <li><strong>AI-Powered Insights</strong> - Neural board with Grok AI integration for business intelligence</li>
-                                <li><strong>CRM & Retention</strong> - Client management with automated follow-up task generation</li>
-                            </ul>
+
+                            <div className="space-y-2">
+                                <h4 className="font-bold text-slate-900">Key Distinctions:</h4>
+                                <ul className="list-disc pl-5 space-y-2">
+                                    <li><strong>Not Just a CRM:</strong> While it manages clients, it is fundamentally an ERP that handles the entire supply chain from raw ingredients to final web sale.</li>
+                                    <li><strong>Managerial Automation:</strong> Designed to act as an automated oversight layer, replacing the need for manual data entry and cross-platform verification.</li>
+                                    <li><strong>Cost Efficiency:</strong> Operational costs are capped at approximately $200/month, covering live servers and API throughput for Grok AI and WooCommerce.</li>
+                                </ul>
+                            </div>
                         </div>
                     )
                 },
                 {
                     id: 'overview-architecture',
-                    title: 'System Architecture',
+                    title: 'The High-Performance Stack',
                     content: (
                         <div className="space-y-4 text-sm text-slate-600 leading-relaxed">
-                            <p>The platform is built on modern web technologies ensuring scalability, performance, and seamless integration capabilities.</p>
-                            <div className="grid grid-cols-2 gap-4">
+                            <p>The platform leverages a cutting-edge technical architecture designed for sub-second latency and absolute data integrity.</p>
+                            
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                                 <div className="bg-slate-50 border border-slate-200 p-3">
-                                    <div className="flex items-center gap-2 mb-2"><Server className="w-4 h-4 text-blue-600" /><span className="font-bold text-slate-900">Frontend</span></div>
-                                    <p className="text-xs">Next.js 14 with React, TypeScript, and Tailwind CSS for a responsive, modern interface.</p>
+                                    <Terminal className="w-4 h-4 text-slate-400 mb-2" />
+                                    <div className="font-black text-[10px] uppercase text-slate-900">Core</div>
+                                    <p className="text-[11px] mt-1 text-slate-500">Next.js 14 (Turbopack)</p>
                                 </div>
                                 <div className="bg-slate-50 border border-slate-200 p-3">
-                                    <div className="flex items-center gap-2 mb-2"><Database className="w-4 h-4 text-emerald-600" /><span className="font-bold text-slate-900">Database</span></div>
-                                    <p className="text-xs">MongoDB Atlas for flexible document storage with Mongoose ODM.</p>
+                                    <Code className="w-4 h-4 text-blue-400 mb-2" />
+                                    <div className="font-black text-[10px] uppercase text-slate-900">Logic</div>
+                                    <p className="text-[11px] mt-1 text-slate-500">strict TypeScript 5.0</p>
                                 </div>
                                 <div className="bg-slate-50 border border-slate-200 p-3">
-                                    <div className="flex items-center gap-2 mb-2"><Globe className="w-4 h-4 text-purple-600" /><span className="font-bold text-slate-900">APIs</span></div>
-                                    <p className="text-xs">WooCommerce REST API integration for all connected websites.</p>
+                                    <Database className="w-4 h-4 text-emerald-400 mb-2" />
+                                    <div className="font-black text-[10px] uppercase text-slate-900">Storage</div>
+                                    <p className="text-[11px] mt-1 text-slate-500">MongoDB Atlas / Mongoose</p>
                                 </div>
                                 <div className="bg-slate-50 border border-slate-200 p-3">
-                                    <div className="flex items-center gap-2 mb-2"><Cpu className="w-4 h-4 text-amber-600" /><span className="font-bold text-slate-900">AI Engine</span></div>
-                                    <p className="text-xs">Grok AI integration for neural insights and business intelligence.</p>
+                                    <Shield className="w-4 h-4 text-purple-400 mb-2" />
+                                    <div className="font-black text-[10px] uppercase text-slate-900">Auth</div>
+                                    <p className="text-[11px] mt-1 text-slate-500">Next-Auth (JWT)</p>
                                 </div>
                             </div>
-                            <p className="text-xs text-slate-500 pt-2">The system is designed for easy integration with Shopify, ShipStation, Google Voice, WhatsApp, and other platforms as needed—described as "microscopic tasks" in terms of development effort.</p>
+
+                            <p className="italic text-xs text-slate-500">The system is deployed on Vercel with automated CI/CD pipelines, ensuring that every code push is verified for type safety before going live.</p>
                         </div>
                     )
                 }
@@ -123,51 +151,55 @@ export default function KnowledgeBasePage() {
         },
         {
             id: 'dashboard',
-            title: 'Dashboard & AI',
+            title: 'Neural Dashboard & AI Engine',
             icon: <Brain className="w-4 h-4" />,
             sections: [
                 {
-                    id: 'dashboard-overview',
-                    title: 'Dashboard Overview',
-                    content: (
-                        <div className="space-y-4 text-sm text-slate-600 leading-relaxed">
-                            <p>The <strong>Dashboard</strong> serves as the command center, providing at-a-glance business health metrics and AI-powered insights.</p>
-                            <h4 className="font-bold text-slate-900">Key Metrics Displayed:</h4>
-                            <ul className="list-disc pl-5 space-y-1">
-                                <li><strong>Business Health Score</strong> - Real-time percentage indicating overall operational health</li>
-                                <li><strong>Revenue & Profit</strong> - Total revenue, gross profit, and net income with trend indicators</li>
-                                <li><strong>Order Statistics</strong> - Web orders and wholesale orders counts with comparisons</li>
-                                <li><strong>Top Selling Products</strong> - Best performers by revenue with quantity sold</li>
-                                <li><strong>Recent Orders</strong> - Latest transactions across all channels</li>
-                            </ul>
-                            <h4 className="font-bold text-slate-900 pt-2">Date Filtering:</h4>
-                            <p>All dashboard metrics can be filtered by: This Month, Last Month, Last 3 Months, or This Year.</p>
-                        </div>
-                    )
-                },
-                {
                     id: 'dashboard-neural',
-                    title: 'Neural Board & AI Insights',
+                    title: 'Neural Board Matrix',
                     content: (
                         <div className="space-y-4 text-sm text-slate-600 leading-relaxed">
-                            <p>The <strong>Neural Board</strong> is powered by Grok AI and provides intelligent analysis across six critical business dimensions:</p>
-                            <div className="grid grid-cols-2 gap-3">
-                                {[
-                                    { icon: <DollarSign className="w-4 h-4" />, title: 'Revenue Analysis', desc: 'Sales trends, growth patterns, and revenue optimization opportunities' },
-                                    { icon: <PieChart className="w-4 h-4" />, title: 'Capital Efficiency', desc: 'Cash flow, inventory turnover, and capital utilization metrics' },
-                                    { icon: <Users className="w-4 h-4" />, title: 'Customer Pulse', desc: 'Customer behavior patterns, retention rates, and satisfaction indicators' },
-                                    { icon: <Activity className="w-4 h-4" />, title: 'Team Performance', desc: 'Employee productivity, task completion rates, and departmental efficiency' },
-                                    { icon: <Package className="w-4 h-4" />, title: 'Stock Health', desc: 'Inventory levels, reorder alerts, and stock movement analysis' },
-                                    { icon: <Wrench className="w-4 h-4" />, title: 'Operational Load', desc: 'Manufacturing capacity, bottlenecks, and workflow optimization' }
-                                ].map(item => (
-                                    <div key={item.title} className="bg-slate-50 border border-slate-200 p-3">
-                                        <div className="flex items-center gap-2 text-slate-900 font-bold">{item.icon}{item.title}</div>
-                                        <p className="text-xs mt-1">{item.desc}</p>
+                            <p>The <strong>Neural Board</strong> is the "brain" of the ERP, powered by Grok AI models. It processes millions of data points across your SKUs, Web Orders, and Manufacturing logs to deliver high-level intelligence.</p>
+                            
+                            <div className="bg-slate-900 rounded p-4 text-slate-300 font-mono text-xs">
+                                <div className="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">
+                                    <span className="flex items-center gap-2"><Brain className="w-4 h-4 text-blue-400" /> LIVE NEURAL ANALYSIS</span>
+                                    <span className="text-emerald-400">SYNCED: OK</span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                                    <div className="space-y-1">
+                                        <div className="text-[10px] font-bold text-slate-500 uppercase">Revenue Pulse</div>
+                                        <div className="text-blue-400">Analyzing sales velocity...</div>
                                     </div>
-                                ))}
+                                    <div className="space-y-1">
+                                        <div className="text-[10px] font-bold text-slate-500 uppercase">Capital Shield</div>
+                                        <div className="text-emerald-400">Inventory value optimized.</div>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="text-[10px] font-bold text-slate-500 uppercase">Team Load</div>
+                                        <div className="text-amber-400">3 Work Orders in Queue.</div>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="text-[10px] font-bold text-slate-500 uppercase">Stock Health</div>
+                                        <div className="text-rose-400">2 SKUs below ROP.</div>
+                                    </div>
+                                </div>
                             </div>
-                            <h4 className="font-bold text-slate-900 pt-2">AI Chat Interface:</h4>
-                            <p>Users can query the AI directly about their business. The system connects to live data streams to provide specific, data-driven insights in real-time.</p>
+
+                            <div className="grid grid-cols-3 gap-2 pt-2">
+                                <div className="bg-slate-50 p-2 border border-slate-200">
+                                    <div className="font-bold text-slate-900 text-xs">Dynamic Querying</div>
+                                    <p className="text-[10px] leading-tight mt-1">Talk to your business data as if you're talking to a manager. "What is our GP for the last 90 days across KINGKKRATOM?"</p>
+                                </div>
+                                <div className="bg-slate-50 p-2 border border-slate-200">
+                                    <div className="font-bold text-slate-900 text-xs">Predictive ROP</div>
+                                    <p className="text-[10px] leading-tight mt-1">The AI predicts when you will run out of stock based on manufacturing time + web order velocity.</p>
+                                </div>
+                                <div className="bg-slate-50 p-2 border border-slate-200">
+                                    <div className="font-bold text-slate-900 text-xs">Operational Alerts</div>
+                                    <p className="text-[10px] leading-tight mt-1">Identifies bottlenecks in the manufacturing process where labor cost exceeds recipe standards.</p>
+                                </div>
+                            </div>
                         </div>
                     )
                 }
@@ -175,129 +207,83 @@ export default function KnowledgeBasePage() {
         },
         {
             id: 'warehouse',
-            title: 'Warehouse Management',
+            title: 'Master Warehouse & Supply Chain',
             icon: <Package className="w-4 h-4" />,
             sections: [
                 {
                     id: 'warehouse-skus',
-                    title: 'SKUs (Stock Keeping Units)',
+                    title: 'Deep-Dive: SKU Intelligence',
                     content: (
                         <div className="space-y-4 text-sm text-slate-600 leading-relaxed">
-                            <p>The <strong>SKUs page</strong> is the master product database containing all inventory items with comprehensive details.</p>
-                            <h4 className="font-bold text-slate-900">Product Information Displayed:</h4>
-                            <ul className="list-disc pl-5 space-y-1">
-                                <li>Product image, name, category, sub-category, material type</li>
-                                <li>Unit of Measure (UOM), sale price, current stock quantity</li>
-                                <li>Financial metrics: Revenue, COGS, COGM, Gross Profit</li>
-                                <li>Tier classification (1, 2, or 3) based on performance</li>
-                            </ul>
-                            <h4 className="font-bold text-slate-900 pt-2">SKU Detail View:</h4>
-                            <p>Clicking any SKU opens a detailed view showing:</p>
-                            <ul className="list-disc pl-5 space-y-1">
-                                <li><strong>Available Lots</strong> - Each lot with its cost of goods manufactured, quantity, and expiration</li>
-                                <li><strong>Transaction Ledger</strong> - Complete history from day one showing all stock movements</li>
-                                <li><strong>Lot-Level Analytics</strong> - Total revenue, total sales, and gross profit per lot</li>
-                            </ul>
-                        </div>
-                    )
-                },
-                {
-                    id: 'warehouse-ledger',
-                    title: 'Inventory Ledger & FIFO System',
-                    content: (
-                        <div className="space-y-4 text-sm text-slate-600 leading-relaxed">
-                            <p>The system implements a sophisticated <strong>First-In-First-Out (FIFO)</strong> inventory management system with full traceability.</p>
-                            <h4 className="font-bold text-slate-900">Ledger Features:</h4>
-                            <ul className="list-disc pl-5 space-y-1">
-                                <li>Complete transaction history from day one</li>
-                                <li>Stock levels tracked by lot number</li>
-                                <li>Automatic lot number suggestions based on FIFO</li>
-                                <li>Manual lot number override capability</li>
-                                <li>Filtering by date range, lot number, or transaction type</li>
-                                <li>Audit trail for transactions missing lot numbers or costs</li>
-                            </ul>
-                            <div className="bg-amber-50 border border-amber-200 p-3 mt-3">
-                                <div className="flex items-center gap-2 text-amber-800 font-bold"><AlertTriangle className="w-4 h-4" />Important</div>
-                                <p className="text-xs text-amber-700 mt-1">Lot numbers are applied automatically but can be changed when needed. The system highlights transactions without lot numbers or costs for auditing purposes.</p>
+                            <p>Every physical item is tracked at the SKU level, encompassing everything from raw herbs and labels to finished bottles.</p>
+                            
+                            <div className="bg-slate-50 border border-slate-200">
+                                <div className="px-4 py-2 border-b border-slate-200 font-bold bg-slate-100 flex items-center gap-2">
+                                    <Layers className="w-4 h-4" /> SKU DATA DIMENSIONS
+                                </div>
+                                <div className="p-4 grid grid-cols-2 gap-x-8 gap-y-4">
+                                    <div>
+                                        <h5 className="font-bold text-slate-900 mb-1">Financial Attribution</h5>
+                                        <p className="text-xs">Tracks COGS (Cost of Goods Sold) vs COGM (Cost of Goods Manufactured) per unit. Includes historical gross profit tracking down to the decimal.</p>
+                                    </div>
+                                    <div>
+                                        <h5 className="font-bold text-slate-900 mb-1">Stock Thresholds</h5>
+                                        <p className="text-xs">Re-Order Point (ROP) and Order Upto (OU) levels trigger automated purchase alerts and neural board notifications.</p>
+                                    </div>
+                                    <div>
+                                        <h5 className="font-bold text-slate-900 mb-1">Tier Classification</h5>
+                                        <p className="text-xs">Tiers 1, 2, and 3 are automatically assigned based on revenue and order frequency, helping focus capital on movers.</p>
+                                    </div>
+                                    <div>
+                                        <h5 className="font-bold text-slate-900 mb-1">Lot Enforcement</h5>
+                                        <p className="text-xs">Optional "Lot Applied" toggle enforces FIFO and lot number association for all outbound shipments.</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )
                 },
                 {
                     id: 'warehouse-manufacturing',
-                    title: 'Manufacturing & Work Orders',
+                    title: 'Manufacturing & COGM Logic',
                     content: (
                         <div className="space-y-4 text-sm text-slate-600 leading-relaxed">
-                            <p>The <strong>Manufacturing module</strong> enables automated work order creation with comprehensive cost analysis.</p>
-                            <h4 className="font-bold text-slate-900">Work Order Process:</h4>
-                            <ol className="list-decimal pl-5 space-y-1">
-                                <li>Select the output SKU and associated recipe</li>
-                                <li>System automatically generates work order with all line items</li>
-                                <li>Materials are pulled from inventory with lot tracking</li>
-                                <li>Labor time is tracked via live counter</li>
-                                <li>Cost analysis is calculated in real-time</li>
-                            </ol>
-                            <h4 className="font-bold text-slate-900 pt-2">Cost Analysis Breakdown:</h4>
-                            <ul className="list-disc pl-5 space-y-1">
-                                <li><strong>Material Costs</strong> - Raw ingredients and components</li>
-                                <li><strong>Packaging Costs</strong> - Bottles, labels, boxes, etc.</li>
-                                <li><strong>Labor Costs</strong> - Based on hourly rates and tracked time</li>
-                                <li><strong>Cost Per Unit</strong> - Total COGM divided by output quantity</li>
-                            </ul>
-                            <h4 className="font-bold text-slate-900 pt-2">Labor Tracking:</h4>
-                            <p>A live counter tracks production time with optional automatic shutoff based on recipe time constraints. Labor cost is calculated using the assigned employee's hourly rate.</p>
-                        </div>
-                    )
-                },
-                {
-                    id: 'warehouse-recipes',
-                    title: 'Recipes Management',
-                    content: (
-                        <div className="space-y-4 text-sm text-slate-600 leading-relaxed">
-                            <p><strong>Recipes</strong> define the bill of materials and production steps for manufactured products.</p>
-                            <h4 className="font-bold text-slate-900">Recipe Components:</h4>
-                            <ul className="list-disc pl-5 space-y-1">
-                                <li><strong>Header</strong> - Recipe name, output SKU, yield quantity, UOM</li>
-                                <li><strong>Line Items</strong> - Required materials with quantities</li>
-                                <li><strong>Steps</strong> - Production instructions with time estimates</li>
-                            </ul>
-                            <p className="pt-2">Recipes can be copied to create variations, and bulk import is available via CSV for recipes, line items, and steps.</p>
-                        </div>
-                    )
-                },
-                {
-                    id: 'warehouse-other',
-                    title: 'Additional Warehouse Pages',
-                    content: (
-                        <div className="space-y-4 text-sm text-slate-600 leading-relaxed">
-                            <div className="space-y-3">
-                                <div className="bg-slate-50 border border-slate-200 p-3">
-                                    <p className="font-bold text-slate-900">Web Products</p>
-                                    <p className="text-xs">Synced products from all connected websites (276+ products). Supports incremental and full sync with WooCommerce stores.</p>
+                            <p>Manufacturing isn't just a record; it's a dynamic cost-calculation engine.</p>
+                            
+                            <div className="relative pl-8 border-l-2 border-slate-200 space-y-6 py-2">
+                                <div className="relative">
+                                    <div className="absolute -left-[41px] top-1 bg-white p-1 rounded-full border-2 border-slate-900">
+                                        <FileText className="w-4 h-4" />
+                                    </div>
+                                    <h5 className="font-bold text-slate-900 mb-1 uppercase tracking-tight">The Work Order Creation</h5>
+                                    <p className="text-xs">When you start a work order, the ERP looks at the recipe. It cross-checks current inventory costs (using FIFO from warehouse lots) to estimate initial material cost.</p>
                                 </div>
-                                <div className="bg-slate-50 border border-slate-200 p-3">
-                                    <p className="font-bold text-slate-900">Purchase Orders</p>
-                                    <p className="text-xs">Manage vendor purchases, track receiving, and update inventory with proper lot assignment.</p>
+                                <div className="relative">
+                                    <div className="absolute -left-[41px] top-1 bg-white p-1 rounded-full border-2 border-slate-900">
+                                        <Clock className="w-4 h-4" />
+                                    </div>
+                                    <h5 className="font-bold text-slate-900 mb-1 uppercase tracking-tight">Live Labor Injection</h5>
+                                    <p className="text-xs">Employees clock in on the dashboard. The ERP calculates labor cost dynamically based on their specific hourly rate stored in the User database.</p>
                                 </div>
-                                <div className="bg-slate-50 border border-slate-200 p-3">
-                                    <p className="font-bold text-slate-900">Vendors</p>
-                                    <p className="text-xs">Supplier database with contact information, payment terms, and purchase history.</p>
+                                <div className="relative">
+                                    <div className="absolute -left-[41px] top-1 bg-white p-1 rounded-full border-2 border-slate-900">
+                                        <RefreshCw className="w-4 h-4" />
+                                    </div>
+                                    <h5 className="font-bold text-slate-900 mb-1 uppercase tracking-tight">Closing the Loop (COGM)</h5>
+                                    <p className="text-xs">Upon completion, materials are deducted from Stock, and a NEW Lot is created for the finished product. The calculated cost (Material + Labor + Packaging) becomes the NEW COGS for that lot.</p>
                                 </div>
-                                <div className="bg-slate-50 border border-slate-200 p-3">
-                                    <p className="font-bold text-slate-900">Opening Balances</p>
-                                    <p className="text-xs">Initialize inventory quantities and costs when starting the system or adding new lots.</p>
+                            </div>
+
+                            <div className="bg-slate-900 text-slate-100 p-4 font-mono text-xs">
+                                <div className="flex justify-between border-b border-slate-700 pb-2 mb-2 uppercase text-[10px] font-bold">
+                                    <span>Manufacturing Formula</span>
+                                    <span>COGM_V.b0.21</span>
                                 </div>
-                                <div className="bg-slate-50 border border-slate-200 p-3">
-                                    <p className="font-bold text-slate-900">Audit Adjustments</p>
-                                    <p className="text-xs">Record inventory adjustments with reasons for auditing and reconciliation.</p>
-                                </div>
-                                <div className="bg-slate-50 border border-slate-200 p-3">
-                                    <p className="font-bold text-slate-900">Lab Results</p>
-                                    <p className="text-xs">Track lab testing status, results, and certifications for products.</p>
-                                </div>
-                                <div className="bg-slate-50 border border-slate-200 p-3">
-                                    <p className="font-bold text-slate-900">Kits</p>
-                                    <p className="text-xs">Bundle products together as kits with component tracking.</p>
+                                <div className="space-y-1">
+                                    <p>Material_Cost = Sum(Item_Qty * Lot_Cost)</p>
+                                    <p>Labor_Cost = (Duration / 3600) * Hourly_Rate</p>
+                                    <p>Total_Cost = Material_Cost + Labor_Cost + Overheads</p>
+                                    <p className="text-emerald-400 mt-2 font-black">COST_PER_UNIT = Total_Cost / Yield_Qty</p>
                                 </div>
                             </div>
                         </div>
@@ -307,55 +293,33 @@ export default function KnowledgeBasePage() {
         },
         {
             id: 'sales',
-            title: 'Sales & Orders',
+            title: 'Multichannel Sales & Sync',
             icon: <ShoppingCart className="w-4 h-4" />,
             sections: [
                 {
                     id: 'sales-weborders',
-                    title: 'Web Orders',
+                    title: 'Sync Architecture: Web Orders',
                     content: (
                         <div className="space-y-4 text-sm text-slate-600 leading-relaxed">
-                            <p>The system is connected to all existing websites and can fetch <strong>nearly 20,000 web orders</strong> from day one.</p>
-                            <div className="bg-amber-50 border border-amber-200 p-3">
-                                <p className="text-xs text-amber-700"><strong>Note:</strong> Approximately 14,000-15,000 of historical orders are identified as spam.</p>
+                            <p>Our system integrates directly with WooCommerce stores. We manage the complexity of product name variations between websites and our ERP.</p>
+                            
+                            <div className="space-y-3">
+                                <div className="bg-slate-50 p-4 border border-slate-200">
+                                    <h5 className="font-bold text-slate-900 mb-2 flex items-center gap-2"><LinkIcon className="w-4 h-4" /> SKU Linking (The "Bridge")</h5>
+                                    <p className="text-xs leading-relaxed">Web products often have marketing-friendly names like "Super Green Deluxe". Our SKU lineup uses internal identifiers. The **SKU Linking** feature allows you to bridge these entities once. Every future order for "Super Green Deluxe" will automatically be deducted from the correct internal SKU and Lot.</p>
+                                </div>
+                                
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="bg-slate-50 p-3 border border-slate-200 border-l-4 border-l-blue-600">
+                                        <div className="font-bold text-slate-900 text-[11px] uppercase">Real-Time Sync</div>
+                                        <p className="text-[10px] mt-1">Incremental sync monitors change logs to update only new orders, saving server resource.</p>
+                                    </div>
+                                    <div className="bg-slate-50 p-3 border border-slate-200 border-l-4 border-l-amber-600">
+                                        <div className="font-bold text-slate-900 text-[11px] uppercase">Spam Filtering</div>
+                                        <p className="text-[10px] mt-1">Advanced logic filters out 14k+ legacy spam orders while retaining financial data core.</p>
+                                    </div>
+                                </div>
                             </div>
-                            <h4 className="font-bold text-slate-900">Order Information Available:</h4>
-                            <ul className="list-disc pl-5 space-y-1">
-                                <li>Order status (pending, processing, completed, cancelled)</li>
-                                <li>Customer details and contact information</li>
-                                <li>Shipping address and method</li>
-                                <li>Line items with SKU linking capability</li>
-                                <li>Financial details (subtotal, tax, shipping, total)</li>
-                                <li>Metadata (IP address, payment status, payment method)</li>
-                            </ul>
-                            <h4 className="font-bold text-slate-900 pt-2">SKU Linking:</h4>
-                            <p>Web products (which may have different names) can be linked to the internal SKU lineup. Once linked, the system automatically applies lot numbers to all associated transactions and reduces quantity from the main SKU ledger.</p>
-                        </div>
-                    )
-                },
-                {
-                    id: 'sales-wholesale',
-                    title: 'Wholesale Orders',
-                    content: (
-                        <div className="space-y-4 text-sm text-slate-600 leading-relaxed">
-                            <p><strong>Wholesale Orders</strong> manages B2B transactions with retail clients.</p>
-                            <h4 className="font-bold text-slate-900">Features:</h4>
-                            <ul className="list-disc pl-5 space-y-1">
-                                <li>Client-linked orders with history tracking</li>
-                                <li>Line items with lot number assignment</li>
-                                <li>Status workflow (Draft, Confirmed, Shipped, Delivered, Cancelled)</li>
-                                <li>Invoice generation and payment tracking</li>
-                                <li>Integration with CRM client records</li>
-                            </ul>
-                        </div>
-                    )
-                },
-                {
-                    id: 'sales-subscriptions',
-                    title: 'Subscriptions',
-                    content: (
-                        <div className="space-y-4 text-sm text-slate-600 leading-relaxed">
-                            <p>Manages recurring subscription orders from websites.</p>
                         </div>
                     )
                 }
@@ -363,181 +327,104 @@ export default function KnowledgeBasePage() {
         },
         {
             id: 'crm',
-            title: 'CRM & Retention',
+            title: 'CRM Retention Command',
             icon: <Users className="w-4 h-4" />,
             sections: [
                 {
-                    id: 'crm-clients',
-                    title: 'Client Management',
-                    content: (
-                        <div className="space-y-4 text-sm text-slate-600 leading-relaxed">
-                            <p>The <strong>CRM module</strong> provides comprehensive client relationship management linked to all sales channels.</p>
-                            <h4 className="font-bold text-slate-900">Client Information:</h4>
-                            <ul className="list-disc pl-5 space-y-1">
-                                <li>Contact details (phones, emails, addresses)</li>
-                                <li>Company information and contacts</li>
-                                <li>Order history and lifetime value</li>
-                                <li>Activity log and communication history</li>
-                                <li>Last contact date and engagement status</li>
-                            </ul>
-                        </div>
-                    )
-                },
-                {
                     id: 'crm-retention',
-                    title: 'Retention Command Center',
+                    title: 'The Retention Algorithm',
                     content: (
                         <div className="space-y-4 text-sm text-slate-600 leading-relaxed">
-                            <p>The <strong>Retention Command Center</strong> is a powerful tool for managing client follow-ups and preventing churn.</p>
-                            <h4 className="font-bold text-slate-900">Client Segmentation:</h4>
-                            <ul className="list-disc pl-5 space-y-1">
-                                <li><strong>Active Clients</strong> - Recently engaged customers</li>
-                                <li><strong>30+ Days Inactive</strong> - Needs attention</li>
-                                <li><strong>60+ Days Inactive</strong> - At risk</li>
-                                <li><strong>90+ Days Inactive</strong> - Critical risk</li>
-                            </ul>
-                            <h4 className="font-bold text-slate-900 pt-2">Magic Button - Auto Task Generation:</h4>
-                            <p>The system can automatically generate follow-up tasks for sales representatives based on client inactivity. This feature can create hundreds of prioritized tasks instantly, assigned to team members with appropriate due dates.</p>
-                            <h4 className="font-bold text-slate-900 pt-2">Task Types:</h4>
-                            <ul className="list-disc pl-5 space-y-1">
-                                <li>Followup Call / Email</li>
-                                <li>Check-in</li>
-                                <li>Re-engagement</li>
-                                <li>Win-back</li>
-                                <li>Feedback Request</li>
-                            </ul>
+                            <p>Retention is handled by a specialized subsystem designed to predict and prevent client churn.</p>
+                            
+                            <div className="flex flex-col gap-4">
+                                <div className="bg-slate-50 border border-slate-200 p-4">
+                                    <h5 className="font-bold text-slate-900 mb-2 flex items-center gap-2 font-black uppercase text-xs tracking-widest"><Zap className="w-4 h-4 text-amber-500" /> The Magic Button Logic</h5>
+                                    <p className="text-xs leading-relaxed mb-3">When triggered, the system scans the entire **Client Database** and compares the **Last Order Date** across all channels against pre-set retention windows:</p>
+                                    <div className="grid grid-cols-4 gap-2 font-mono text-[9px] text-center">
+                                        <div className="p-2 bg-white border border-slate-200 text-slate-600 uppercase">30 Days<br/>Regular</div>
+                                        <div className="p-2 bg-blue-50 border border-blue-200 text-blue-800 uppercase">60 Days<br/>At Risk</div>
+                                        <div className="p-2 bg-amber-50 border border-amber-200 text-amber-800 uppercase">90 Days<br/>Critical</div>
+                                        <div className="p-2 bg-rose-50 border border-rose-200 text-rose-800 uppercase">90+ Days<br/>Lost?</div>
+                                    </div>
+                                    <p className="text-[10px] mt-3 italic text-slate-500">The system then automatically generates **Retention Tasks** in a Kanban format, assigned to the correct Sales Rep, with a due date set for today.</p>
+                                </div>
+                            </div>
                         </div>
                     )
                 }
             ]
         },
         {
-            id: 'reports',
-            title: 'Reports & Analytics',
-            icon: <BarChart3 className="w-4 h-4" />,
+            id: 'technical',
+            title: 'Technical Documentation',
+            icon: <Code className="w-4 h-4" />,
             sections: [
                 {
-                    id: 'reports-income',
-                    title: 'Income Statement',
+                    id: 'technical-stack',
+                    title: 'System Infrastructure',
                     content: (
                         <div className="space-y-4 text-sm text-slate-600 leading-relaxed">
-                            <p>The <strong>Income Statement</strong> provides comprehensive P&L analysis with customizable date ranges.</p>
-                            <h4 className="font-bold text-slate-900">Sections:</h4>
-                            <ul className="list-disc pl-5 space-y-1">
-                                <li><strong>Revenue</strong> - Web orders, wholesale orders, other income</li>
-                                <li><strong>Cost of Goods Sold</strong> - Direct costs, COGM</li>
-                                <li><strong>Gross Profit</strong> - Revenue minus COGS</li>
-                                <li><strong>Operating Expenses</strong> - Labor, overhead, marketing</li>
-                                <li><strong>Net Income</strong> - Final profit/loss</li>
-                            </ul>
+                            <p>Detailed technical overview of the production environment and architecture.</p>
+                            <div className="space-y-3">
+                                <div className="bg-slate-50 border border-slate-200 p-3 font-mono text-[11px]">
+                                    <div className="text-slate-400 mb-1">// Production Runtime</div>
+                                    <div>Platform: Vercel Serverless</div>
+                                    <div>Node Version: 18.x</div>
+                                    <div>Edge Cache: Enabled</div>
+                                </div>
+                                <div className="bg-slate-50 border border-slate-200 p-3 font-mono text-[11px]">
+                                    <div className="text-slate-400 mb-1">// Database Cluster</div>
+                                    <div>Type: MongoDB Atlas (M10 Cluster)</div>
+                                    <div>Persistence: Oplog Replication</div>
+                                    <div>Availability: 99.99%</div>
+                                </div>
+                            </div>
                         </div>
                     )
                 },
                 {
-                    id: 'reports-cogm',
-                    title: 'Cost of Goods Manufactured',
+                    id: 'technical-models',
+                    title: 'Core Data Schemas (Mongoose)',
                     content: (
                         <div className="space-y-4 text-sm text-slate-600 leading-relaxed">
-                            <p><strong>COGM Report</strong> analyzes manufacturing costs across all production.</p>
-                            <ul className="list-disc pl-5 space-y-1">
-                                <li>Material cost breakdown by SKU</li>
-                                <li>Labor cost analysis</li>
-                                <li>Cost per unit trends</li>
-                                <li>Production efficiency metrics</li>
-                            </ul>
-                        </div>
-                    )
-                },
-                {
-                    id: 'reports-other',
-                    title: 'Other Reports',
-                    content: (
-                        <div className="space-y-4 text-sm text-slate-600 leading-relaxed">
-                            <ul className="list-disc pl-5 space-y-1">
-                                <li><strong>Business Report</strong> - Overall business performance metrics</li>
-                                <li><strong>Activity Report</strong> - Team activity and productivity</li>
-                            </ul>
-                        </div>
-                    )
-                }
-            ]
-        },
-        {
-            id: 'admin',
-            title: 'Administration',
-            icon: <Settings className="w-4 h-4" />,
-            sections: [
-                {
-                    id: 'admin-users',
-                    title: 'User Management',
-                    content: (
-                        <div className="space-y-4 text-sm text-slate-600 leading-relaxed">
-                            <p>Manage system users with role-based access control.</p>
-                            <h4 className="font-bold text-slate-900">User Roles:</h4>
-                            <ul className="list-disc pl-5 space-y-1">
-                                <li><strong>SuperAdmin</strong> - Full system access</li>
-                                <li><strong>Admin</strong> - Administrative functions including Knowledge Base</li>
-                                <li><strong>Executive Assistant</strong> - Operations support</li>
-                                <li><strong>Sales Director / Sales / Sales Executive</strong> - Sales operations</li>
-                                <li><strong>QC</strong> - Quality control functions</li>
-                                <li><strong>Warehouse</strong> - Inventory operations</li>
-                                <li><strong>Manager</strong> - Departmental management</li>
-                                <li><strong>Shipping</strong> - Order fulfillment</li>
-                            </ul>
-                        </div>
-                    )
-                },
-                {
-                    id: 'admin-settings',
-                    title: 'System Settings',
-                    content: (
-                        <div className="space-y-4 text-sm text-slate-600 leading-relaxed">
-                            <p>Configure system-wide settings including:</p>
-                            <ul className="list-disc pl-5 space-y-1">
-                                <li>Default images and branding</li>
-                                <li>Data filtering start date</li>
-                                <li>Dropdown options (categories, materials, etc.)</li>
-                                <li>Integration credentials</li>
-                            </ul>
-                        </div>
-                    )
-                }
-            ]
-        },
-        {
-            id: 'integrations',
-            title: 'Integrations',
-            icon: <RefreshCw className="w-4 h-4" />,
-            sections: [
-                {
-                    id: 'integrations-websites',
-                    title: 'Website Integration',
-                    content: (
-                        <div className="space-y-4 text-sm text-slate-600 leading-relaxed">
-                            <p>The CRM is linked to all websites enabling direct product management without logging into WordPress:</p>
-                            <ul className="list-disc pl-5 space-y-1">
-                                <li>Edit, add, or delete products</li>
-                                <li>Update stock quantities</li>
-                                <li>Sync orders and customers</li>
-                                <li>Currently synced: 276+ products across 4 websites</li>
-                            </ul>
-                            <h4 className="font-bold text-slate-900 pt-2">Platform Compatibility:</h4>
-                            <p>The system is designed for easy switching to other platforms like Shopify—only requiring API connection changes.</p>
-                        </div>
-                    )
-                },
-                {
-                    id: 'integrations-future',
-                    title: 'Planned Integrations',
-                    content: (
-                        <div className="space-y-4 text-sm text-slate-600 leading-relaxed">
-                            <p>Upcoming integrations (described as "microscopic tasks"):</p>
-                            <ul className="list-disc pl-5 space-y-1">
-                                <li><strong>ShipStation</strong> - Order fulfillment and shipping management</li>
-                                <li><strong>Google Voice</strong> - Call logging and communication</li>
-                                <li><strong>WhatsApp</strong> - Customer communication</li>
-                                <li><strong>Shopify</strong> - Alternative e-commerce platform</li>
-                            </ul>
+                            <p>The system's data integrity is maintained through strict Mongoose schemas.</p>
+                            <div className="space-y-4">
+                                <div>
+                                    <div className="font-bold text-slate-900 border-b border-slate-200 mb-2 uppercase text-[10px] tracking-widest">SKU Model</div>
+                                    <pre className="bg-slate-900 text-slate-300 p-3 rounded overflow-x-auto text-[10px]">
+{`Schema({
+    _id: String, // Internal barcode / handle
+    category: String,
+    materialType: String,
+    salePrice: Number,
+    reOrderPoint: Number,
+    isLotApplied: Boolean,
+    variances: [VariationSchema],
+    totalWebOrders: Number,
+    timestamps: true
+})`}
+                                    </pre>
+                                </div>
+                                <div>
+                                    <div className="font-bold text-slate-900 border-b border-slate-200 mb-2 uppercase text-[10px] tracking-widest">WebOrder Model</div>
+                                    <pre className="bg-slate-900 text-slate-300 p-3 rounded overflow-x-auto text-[10px]">
+{`Schema({
+    _id: String, // WC Order ID
+    status: String,
+    dateCreated: Date,
+    total: Number,
+    lineItems: [{
+        productId: Number,
+        linkedSkuId: String, // ERP Link
+        lotNumber: String,
+        cost: Number
+    }],
+    website: String
+})`}
+                                    </pre>
+                                </div>
+                            </div>
                         </div>
                     )
                 }
@@ -553,21 +440,28 @@ export default function KnowledgeBasePage() {
             <div className="w-64 border-r border-slate-200 bg-slate-50/50 flex flex-col shrink-0">
                 <div className="p-4 border-b border-slate-200">
                     <div className="flex items-center gap-2">
-                        <Book className="w-5 h-5 text-slate-700" />
-                        <h1 className="font-bold text-slate-900 text-sm uppercase tracking-tight">Knowledge Base</h1>
+                        <div className="bg-slate-900 p-1.5 shadow-lg">
+                            <Book className="w-4 h-4 text-white" />
+                        </div>
+                        <h1 className="font-bold text-slate-900 text-sm uppercase tracking-tighter">Knowledge Base</h1>
                     </div>
-                    <p className="text-[10px] text-slate-500 mt-1 font-mono">{VERSION}</p>
+                    <div className="flex items-center justify-between mt-2">
+                        <span className="text-[10px] text-slate-500 font-mono font-bold px-1.5 py-0.5 bg-slate-200 rounded-sm">{VERSION}</span>
+                        <span className="text-[9px] text-emerald-600 font-bold uppercase tracking-wider animate-pulse flex items-center gap-1">
+                            <Activity className="w-2.5 h-2.5" /> Stable
+                        </span>
+                    </div>
                 </div>
-                <div className="flex-1 overflow-y-auto p-2">
+                <div className="flex-1 overflow-y-auto p-2 space-y-1">
                     {chapters.map(chapter => (
                         <button
                             key={chapter.id}
                             onClick={() => setActiveChapter(chapter.id)}
                             className={cn(
-                                "w-full flex items-center gap-2 px-3 py-2 text-left text-xs font-bold uppercase tracking-wider transition-colors",
+                                "w-full flex items-center gap-3 px-3 py-2 text-left text-[11px] font-black uppercase tracking-widest transition-all",
                                 activeChapter === chapter.id 
-                                    ? "bg-slate-900 text-white" 
-                                    : "text-slate-600 hover:bg-slate-200"
+                                    ? "bg-slate-900 text-white shadow-md transform translate-x-1" 
+                                    : "text-slate-500 hover:bg-slate-200 hover:text-slate-900"
                             )}
                         >
                             {chapter.icon}
@@ -576,41 +470,71 @@ export default function KnowledgeBasePage() {
                     ))}
                 </div>
                 <div className="p-3 border-t border-slate-200 bg-slate-100">
-                    <p className="text-[9px] text-slate-500 uppercase tracking-wider">Rebel X Headquarter Pro</p>
-                    <p className="text-[10px] text-slate-400">Enterprise Resource Planning</p>
+                    <div className="text-[9px] text-slate-400 uppercase font-black tracking-widest flex items-center gap-2 mb-1">
+                        <Server className="w-3 h-3" /> Core Engine
+                    </div>
+                    <p className="text-[10px] text-slate-600 font-mono">deployment:iad1-prod</p>
                 </div>
             </div>
 
-            {/* Content */}
+            {/* Content Area */}
             <div className="flex-1 flex flex-col overflow-hidden">
-                <div className="shrink-0 px-6 py-4 border-b border-slate-200 bg-slate-50/30">
+                <div className="shrink-0 px-6 py-4 border-b border-slate-200 bg-white/50 backdrop-blur-md flex items-center justify-between">
                     <div className="flex items-center gap-2 text-slate-400 text-xs">
-                        <span>Knowledge Base</span>
+                        <Search className="w-3.5 h-3.5" />
+                        <span className="uppercase tracking-widest text-[10px] font-bold">Documentation</span>
                         <ChevronRight className="w-3 h-3" />
-                        <span className="text-slate-900 font-bold">{activeChapterData?.title}</span>
+                        <span className="text-slate-900 font-black uppercase tracking-widest">{activeChapterData?.title}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button className="flex items-center gap-1.5 px-3 py-1 border border-slate-200 text-[10px] font-bold uppercase hover:bg-slate-50 transition-colors">
+                            <FileText className="w-3 h-3" /> PDF Export
+                        </button>
+                        <div className="h-4 w-px bg-slate-200" />
+                        <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-100 text-[10px] font-bold text-emerald-700">
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                            Live System
+                        </div>
                     </div>
                 </div>
-                <div className="flex-1 overflow-y-auto p-6">
-                    <div className="max-w-4xl space-y-4">
+                
+                <div className="flex-1 overflow-y-auto p-8 bg-slate-50/30">
+                    <div className="max-w-4xl mx-auto space-y-6">
+                        <div className="mb-10">
+                            <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter leading-none">{activeChapterData?.title}</h2>
+                            <p className="text-slate-500 text-sm mt-2 italic">Detailed technical and operational guide for the {activeChapterData?.title} module.</p>
+                        </div>
+                        
                         {activeChapterData?.sections.map(section => (
-                            <div key={section.id} className="border border-slate-200 bg-white">
+                            <div key={section.id} id={section.id} className="border border-slate-200 bg-white shadow-sm overflow-hidden">
                                 <button
                                     onClick={() => toggleSection(section.id)}
-                                    className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-50 transition-colors"
+                                    className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-slate-50 transition-colors bg-white border-b border-slate-100"
                                 >
-                                    <span className="font-bold text-slate-900 text-sm">{section.title}</span>
+                                    <span className="font-black text-slate-900 text-xs uppercase tracking-widest flex items-center gap-3">
+                                        <div className={cn(
+                                            "w-1 h-3 transition-colors",
+                                            expandedSections.includes(section.id) ? "bg-slate-900" : "bg-slate-200"
+                                        )} />
+                                        {section.title}
+                                    </span>
                                     {expandedSections.includes(section.id) 
-                                        ? <ChevronDown className="w-4 h-4 text-slate-400" /> 
+                                        ? <ChevronDown className="w-4 h-4 text-slate-900" /> 
                                         : <ChevronRight className="w-4 h-4 text-slate-400" />
                                     }
                                 </button>
                                 {expandedSections.includes(section.id) && (
-                                    <div className="px-4 pb-4 border-t border-slate-100">
-                                        <div className="pt-4">{section.content}</div>
+                                    <div className="px-6 py-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                                        {section.content}
                                     </div>
                                 )}
                             </div>
                         ))}
+
+                        <div className="pt-10 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-400 uppercase font-black tracking-widest">
+                            <span>REBEL X HQ PRO SYSTEM DOCUMENTATION</span>
+                            <span>LAST UPDATED: DEC 30, 2025</span>
+                        </div>
                     </div>
                 </div>
             </div>
