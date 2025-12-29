@@ -40,7 +40,6 @@ export default function KnowledgeBasePage() {
     const [activeChapter, setActiveChapter] = useState<string>('vision');
     
     // DEFAULT EXPANDED STATE 
-    // We maintain this comprehensive list to ensure the user is greeted with a wall of valuable text immediately.
     const [expandedSections, setExpandedSections] = useState<string[]>([
         'vision-sovereignty', 'vision-financial-architecture',
         'warehouse-integrity', 'warehouse-manufacturing-intelligence',
@@ -98,19 +97,19 @@ export default function KnowledgeBasePage() {
     const chapters: Chapter[] = [
         {
             id: 'vision',
-            title: 'Strategic Vision & Economics',
+            title: 'Strategic Architecture',
             icon: <ShieldCheck className="w-4 h-4" />,
             sections: [
                 {
                     id: 'vision-sovereignty',
-                    title: 'The Pivot to Operational Sovereignty',
+                    title: 'The Automated Managerial Layer',
                     content: (
                         <div className="space-y-6 text-sm text-slate-700 leading-7 font-sans">
                             <p>
-                                The transition from a constrained "no-code" environment like AppSheet to the <strong>Rebel X Headquarter Pro</strong> custom ERP represents a fundamental shift in business philosophy. It is the move from "renting" capability to "owning" a sovereign digital asset. In our previous architectural reviews, it became evident that while AppSheet served as a functional prototype, its linear cost scaling and rigid row limits would eventually strangle the company's growth trajectory. As we scale toward thousands of daily transactions, the "tax" levied by third-party platforms becomes punitive—both financially and operationally.
+                                <strong>Rebel X Headquarter Pro</strong> is not merely a software application; it is a custom-engineered Enterprise Resource Planning (ERP) ecosystem designed to function as an automated "Managerial Layer" for the entire business. It oversees the complete lifecycle of capital—from its initial state as raw inventory to its final state as recognized revenue.
                             </p>
                             <p>
-                                By engineering this system on a serverless architecture (Next.js/Vercel) backed by a MongoDB cluster, we have effectively decoupled the company's operational capacity from its software licensing costs. We are no longer paying "per user" or "per row." Instead, we have built a system that functions as an <strong>Automated Managerial Layer</strong>. This is not merely a CRM; it is a digital workforce. Adeel Dev's assessment is that the automated logic embedded within these thousands of lines of code performs the equivalent workload of 100 mid-level managers working in unison—monitoring stock levels, auditing extensive ledgers, recalculating manufacturing costs in real-time, and enforcing strict data integrity across the supply chain—without fatigue, error, or salary.
+                                By engineering this system on a sovereign serverless architecture (Next.js/Vercel) backed by a MongoDB cluster, we have effectively decoupled the company's operational capacity from third-party constraints. We are not paying "per user" or "per row." Instead, we have built a digital workforce. Adeel Dev's assessment is that the automated logic embedded within these thousands of lines of code performs the equivalent workload of 100 mid-level managers working in unison—monitoring stock levels, auditing extensive ledgers, recalculating manufacturing costs in real-time, and enforcing strict data integrity across the supply chain—without fatigue, error, or salary.
                             </p>
                             <p className="pl-4 border-l-2 border-slate-900 italic text-slate-600">
                                 "We are not building a tool for data entry. We are building a synthetic nervous system for the enterprise that enforces business logic 24/7."
@@ -120,14 +119,14 @@ export default function KnowledgeBasePage() {
                 },
                 {
                     id: 'vision-financial-architecture',
-                    title: 'The Financial Efficiency Index',
+                    title: 'Financial Efficiency Index',
                     content: (
                         <div className="space-y-6 text-sm text-slate-700 leading-7 font-sans">
                             <p>
-                                Kemal Whyte's primary concern regarding the "burn rate" of maintaining a custom software stack has been addressed through aggressive architectural optimization. The "Rebel X Headquarter Pro" environment has been engineered to run on a lean, high-performance infrastructure that costs approximately <strong>$200.00 per month</strong> at current scale. This figure is deceptive in its modesty; it covers enterprise-grade database replication, global edge caching via Vercel, and the API throughput required to power the Grok AI neural engines.
+                                The infrastructure has been engineered for extreme leverage. The "Rebel X Headquarter Pro" environment runs on a lean, high-performance stack that costs approximately <strong>$200.00 per month</strong> at current scale. This figure is deceptive in its modesty; it covers enterprise-grade database replication, global edge caching via Vercel, and the high-throughput API access required to power the Grok AI neural engines.
                             </p>
                             <p>
-                                Contrast this with the alternative: A fragmented stack of SaaS subscriptions (Inventory Management, separate CRMs, standalone Manufacturing software, and Zapier glue-code) would easily exceed $2,000–$5,000 monthly once user seat limits are breached. More importantly, the hidden cost of "integration friction"—where data in ShipStation doesn't match data in QuickBooks—evaporates here. By creating a unified "Source of Truth," we eliminate the reconciliation labor that typically consumes the Finance department's end-of-month cycle. We are putting a dollar figure on "data trust," and by that metric, the ROI of this system is nearly infinite.
+                                This efficiency allows us to reallocate capital from "software rent" to "business intelligence." By creating a unified "Source of Truth," we eliminate the hidden cost of "integration friction"—where data in shipping platforms doesn't match accounting software. Every web order, every manufacturing run, and every client interaction flows into a single, immutable ledger. We are putting a dollar figure on "data trust," and by that metric, the ROI of this system is nearly infinite.
                             </p>
                         </div>
                     )
@@ -145,10 +144,10 @@ export default function KnowledgeBasePage() {
                     content: (
                         <div className="space-y-6 text-sm text-slate-700 leading-7 font-sans">
                             <p>
-                                In many retail operations, inventory is treated as a simple integer: "We have 50 units." In the Rebel X ecosystem, this simplicity is rejected in favor of granular <strong>Lot-Level Accountability</strong>. We do not just track <em>how many</em> units exist; we track the specific history, cost basis, and expiration timeline of every single bottle and bag via the Ledger. This allows us to enforce a strict First-In-First-Out (FIFO) protocol.
+                                In the Rebel X ecosystem, inventory is never treated as a simple integer. We enforce granular <strong>Lot-Level Accountability</strong>. We track the specific history, cost basis, and expiration timeline of every single bottle and bag via the Ledger. This allows us to enforce a strict First-In-First-Out (FIFO) protocol.
                             </p>
                             <p>
-                                Why does this matter? Because without FIFO, your Cost of Goods Sold (COGS) is a guess. If you sell a bottle today, did it cost you $4.00 to make (from a batch made last year) or $6.50 (from a batch made during a supply crunch)? The ERP answers this question automatically by allocating the oldest available lot to every outgoing Web Order. This transforms "Gross Profit" from a vague estimation into a distinct financial fact. The Ledger effectively becomes a forensic audit trail, allowing us to trace a specific customer complaint back to the exact day, hour, and employee involved in its manufacturing.
+                                Why does this matter? Because without FIFO, your Cost of Goods Sold (COGS) is a guess. If you sell a bottle today, the ERP answers the critical financial question: "Did this unit cost $4.00 or $6.50?" It does this by automatically allocating the oldest available lot to every outgoing Web Order. This transforms "Gross Profit" from a vague estimation into a distinct financial fact. The Ledger effectively becomes a forensic audit trail, allowing us to trace a specific customer complaint back to the exact day, hour, and employee involved in its manufacturing.
                             </p>
                         </div>
                     )
@@ -183,10 +182,10 @@ export default function KnowledgeBasePage() {
                     content: (
                         <div className="space-y-6 text-sm text-slate-700 leading-7 font-sans">
                             <p>
-                                Launching this ERP required a massive capability regarding historical data "ingestion." We did not start with a blank slate; we had to digest nearly 20,000 legacy web orders across multiple domains (KINGKKRATOM, GRASSROOTSHARVEST, etc.). This process was akin to digital archaeology. As noted by Kemal, a significant portion of this history—approximately 14,000 to 15,000 orders—was constituted of "spam" or failed transactions that clouded the company's financial history.
+                                The strength of this ERP lies in its massive historical context. We successfully ingested nearly 20,000 legacy web orders across multiple domains (KINGKKRATOM, GRASSROOTSHARVEST, etc.) to build a complete picture of the company's performance. This process was akin to digital archaeology.
                             </p>
                             <p>
-                                We engineered a sophisticated filtration layer during the ingestion process. Instead of blindly importing every record, the system analyzes payment statuses, customer metadata, and IP patterns to segregate "noise" from "signal." This means the historical revenue charts you see on the Dashboard are not just raw dumps; they are refined, purified datasets. We have effectively rewritten the company's history to be accurate, discarding the digital debris that accumulated over years of operation.
+                                Crucially, we implemented a sophisticated filtration layer during this ingestion. Kemal noted that a significant portion—approximately 14,000 to 15,000 orders—was constituted of "spam" or failed transactions. The system automatically analyzes payment statuses, customer metadata, and IP patterns to segregate this "noise" from the "signal." This means the historical revenue charts you see on the Dashboard are refined, purified datasets. We have effectively rewritten the company's history to be accurate, ensuring that future trend analysis is based on real financial performance, not legacy debris.
                             </p>
                         </div>
                     )
@@ -197,7 +196,7 @@ export default function KnowledgeBasePage() {
                     content: (
                         <div className="space-y-6 text-sm text-slate-700 leading-7 font-sans">
                             <p>
-                                A classic friction point in e-commerce is the disconnect between "Marketing Naming" and "Inventory Naming." The website calls it "Super Green Maeng Da - Mega Pack," but the warehouse knows it as "SKU-3049-KG." In lesser systems, this translation requires constant human intervention or messy spreadsheet lookups.
+                                A classic friction point in e-commerce is the disconnect between "Marketing Naming" and "Inventory Naming." The website calls it "Super Green Maeng Da - Mega Pack," but the warehouse knows it as "SKU-3049-KG."
                             </p>
                             <p>
                                 We solved this with a permanent <strong>Semantic Bridge</strong> known as "Web Product Linking." The system exposes an interface where we link a WooCommerce Product ID to an Internal SKU exactly once. This creates an immutable bond in the database. From that moment forward, the ERP acts as a universal translator. It receives an order for the fancy marketing name, instantly resolves it to the internal SKU, checks the Ledger for the oldest Lot, and decrements stock—all in milliseconds. This allows Marketing to be creative with product names and bundles without ever confusing the Warehouse or breaking the financial chain of custody.
@@ -256,14 +255,14 @@ export default function KnowledgeBasePage() {
             sections: [
                 {
                     id: 'scalability-future-proof',
-                    title: 'Platform Agnosticism (The Shopify Pivot)',
+                    title: 'Platform Agnosticism & Integrations',
                     content: (
                         <div className="space-y-6 text-sm text-slate-700 leading-7 font-sans">
                             <p>
-                                A key concern raised was the "Vendor Lock-in" risk—specifically, what happens if Rebel X moves from WooCommerce to Shopify? Because we have built a custom ERP, the logic of our business resides <em>here</em>, not in the e-commerce platform. The "Store" is merely a frontend input mechanism.
+                                A key strategic advantage of this system is its "Frontend Agnosticism." Because the core business logic resides here, in our custom ERP, we are not beholden to any single e-commerce platform. For example, if the business decides to expand to Shopify, the ERP remains the central brain. We would simply activate a new "Order Ingestion Adapter" to listen to Shopify's data stream alongside WooCommerce. The Warehouse team would see no difference; the Finance team would see no difference.
                             </p>
                             <p>
-                                This decoupling means that switching to Shopify is an infrastructure detail, not a business crisis. We would simply rewrite the "Order Ingestion Adapter"—a microscopic task in the grand scheme of software engineering—to listen to Shopify's webhooks instead of WooCommerce's. The Warehouse team would see no difference. The Finance team would see no difference. The "Internal Reality" of the business remains stable even as the external sales channels mutate. This includes integrating new channels like ShipStation, WhatsApp, or Google Voice. These are merely new APIs to consume, not new systems to learn.
+                                This extensibility applies equally to communication and logistics. Integrating new channels is a matter of "microscopic tasks," not system overhauls. We can rapidly plug in <strong>Google Voice</strong> for call logging, <strong>WhatsApp</strong> for direct customer messaging, and <strong>ShipStation</strong> for logistical synchronization. These are treated as modular plugins to the core system, allowing the business to adopt new technologies rapidly without disrupting the central operational workflow.
                             </p>
                         </div>
                     )
