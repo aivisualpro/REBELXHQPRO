@@ -356,22 +356,26 @@ export default function RecipesPage() {
           <div className="w-px h-4 bg-slate-200 mx-1"></div>
 
           {/* Actions */}
-          <input type="file" accept=".csv" className="hidden" ref={importRecipeRef} onChange={(e) => handleImport(e, '/api/recipes/import', 'Recipes')} />
-          <input type="file" accept=".csv" className="hidden" ref={importLineItemsRef} onChange={(e) => handleImport(e, '/api/recipes/import-lineitems', 'Line Items')} />
-          <input type="file" accept=".csv" className="hidden" ref={importStepsRef} onChange={(e) => handleImport(e, '/api/recipes/import-steps', 'Steps')} />
+          {session?.user?.email === 'adeel@grassrootsharvest.com' && (
+            <>
+              <input type="file" accept=".csv" className="hidden" ref={importRecipeRef} onChange={(e) => handleImport(e, '/api/recipes/import', 'Recipes')} />
+              <input type="file" accept=".csv" className="hidden" ref={importLineItemsRef} onChange={(e) => handleImport(e, '/api/recipes/import-lineitems', 'Line Items')} />
+              <input type="file" accept=".csv" className="hidden" ref={importStepsRef} onChange={(e) => handleImport(e, '/api/recipes/import-steps', 'Steps')} />
 
-          <button onClick={() => importRecipeRef.current?.click()} className="h-[28px] px-2 border border-slate-200 text-slate-600 hover:text-black hover:bg-slate-50 transition-colors rounded-sm flex items-center space-x-1 bg-white" title="Import Recipes">
-            <Upload className="w-3 h-3" />
-            <span className="hidden xl:inline text-[10px] font-bold uppercase tracking-wider">Recipes</span>
-          </button>
-          <button onClick={() => importLineItemsRef.current?.click()} className="h-[28px] px-2 border border-slate-200 text-slate-600 hover:text-black hover:bg-slate-50 transition-colors rounded-sm flex items-center space-x-1 bg-white" title="Import Line Items">
-            <Upload className="w-3 h-3" />
-            <span className="hidden xl:inline text-[10px] font-bold uppercase tracking-wider">Items</span>
-          </button>
-          <button onClick={() => importStepsRef.current?.click()} className="h-[28px] px-2 border border-slate-200 text-slate-600 hover:text-black hover:bg-slate-50 transition-colors rounded-sm flex items-center space-x-1 bg-white" title="Import Steps">
-            <Upload className="w-3 h-3" />
-            <span className="hidden xl:inline text-[10px] font-bold uppercase tracking-wider">Steps</span>
-          </button>
+              <button onClick={() => importRecipeRef.current?.click()} className="h-[28px] px-2 border border-slate-200 text-slate-600 hover:text-black hover:bg-slate-50 transition-colors rounded-sm flex items-center space-x-1 bg-white" title="Import Recipes">
+                <Upload className="w-3 h-3" />
+                <span className="hidden xl:inline text-[10px] font-bold uppercase tracking-wider">Recipes</span>
+              </button>
+              <button onClick={() => importLineItemsRef.current?.click()} className="h-[28px] px-2 border border-slate-200 text-slate-600 hover:text-black hover:bg-slate-50 transition-colors rounded-sm flex items-center space-x-1 bg-white" title="Import Line Items">
+                <Upload className="w-3 h-3" />
+                <span className="hidden xl:inline text-[10px] font-bold uppercase tracking-wider">Items</span>
+              </button>
+              <button onClick={() => importStepsRef.current?.click()} className="h-[28px] px-2 border border-slate-200 text-slate-600 hover:text-black hover:bg-slate-50 transition-colors rounded-sm flex items-center space-x-1 bg-white" title="Import Steps">
+                <Upload className="w-3 h-3" />
+                <span className="hidden xl:inline text-[10px] font-bold uppercase tracking-wider">Steps</span>
+              </button>
+            </>
+          )}
 
           <button onClick={() => openModal('create')} className="h-[28px] px-3 bg-black text-white hover:bg-slate-800 transition-colors rounded-sm flex items-center space-x-1.5 shadow-sm ml-1">
             <Plus className="w-3 h-3" />
