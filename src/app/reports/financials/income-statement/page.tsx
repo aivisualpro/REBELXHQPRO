@@ -44,7 +44,7 @@ export default function IncomeStatementPage() {
     const [data, setData] = useState<IncomeData | null>(null);
     const [loading, setLoading] = useState(true);
     const [dateRange, setDateRange] = useState({
-        startDate: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0], // Jan 1
+        startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0], // 1st of current month
         endDate: new Date().toISOString().split('T')[0] // Today
     });
 
@@ -78,53 +78,57 @@ export default function IncomeStatementPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-6 lg:p-10">
-            {/* Header */}
-            <div className="max-w-[1400px] mx-auto">
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-10 gap-6">
-                    <div>
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+        <div className="flex flex-col h-[calc(100vh-40px)] bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white overflow-hidden">
+            {/* Sticky Page Header */}
+            <div className="shrink-0 bg-slate-900/95 backdrop-blur-md border-b border-slate-700/50 px-6 py-4 z-10">
+                <div className="max-w-[1400px] mx-auto">
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/30">
                                 <DollarSign className="w-6 h-6 text-white" />
                             </div>
                             <div>
-                                <h1 className="text-3xl font-black tracking-tight">Income Statement</h1>
-                                <p className="text-slate-400 text-sm">Profit & Loss Report</p>
+                                <h1 className="text-xl font-black tracking-tight uppercase">Income Statement</h1>
+                                <p className="text-slate-400 text-xs">Profit & Loss Report</p>
                             </div>
                         </div>
-                    </div>
 
-                    {/* Date Range Picker */}
-                    <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2 bg-slate-800/60 border border-slate-700/50 rounded-xl px-4 py-2.5">
-                            <Calendar className="w-4 h-4 text-slate-400" />
-                            <input 
-                                type="date" 
-                                value={dateRange.startDate}
-                                onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
-                                className="bg-transparent text-sm text-white focus:outline-none"
-                            />
-                            <span className="text-slate-500">to</span>
-                            <input 
-                                type="date" 
-                                value={dateRange.endDate}
-                                onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
-                                className="bg-transparent text-sm text-white focus:outline-none"
-                            />
+                        {/* Date Range Picker */}
+                        <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2 bg-slate-800/60 border border-slate-700/50 px-4 py-2">
+                                <Calendar className="w-4 h-4 text-slate-400" />
+                                <input 
+                                    type="date" 
+                                    value={dateRange.startDate}
+                                    onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
+                                    className="bg-transparent text-sm text-white focus:outline-none"
+                                />
+                                <span className="text-slate-500">to</span>
+                                <input 
+                                    type="date" 
+                                    value={dateRange.endDate}
+                                    onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
+                                    className="bg-transparent text-sm text-white focus:outline-none"
+                                />
+                            </div>
+                            <button 
+                                onClick={fetchData}
+                                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase px-4 py-2.5 transition-colors"
+                            >
+                                <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
+                                Apply
+                            </button>
                         </div>
-                        <button 
-                            onClick={fetchData}
-                            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-5 py-2.5 rounded-xl transition-colors"
-                        >
-                            <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
-                            Apply
-                        </button>
                     </div>
                 </div>
+            </div>
 
-                {/* Summary Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-                    <SummaryCard 
+            {/* Scrollable Content Area */}
+            <div className="flex-1 overflow-y-auto px-6 py-6">
+                <div className="max-w-[1400px] mx-auto space-y-6">
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <SummaryCard 
                         label="Total Revenue"
                         value={loading ? '...' : formatCompact(data?.revenue?.total || 0)}
                         icon={TrendingUp}
@@ -152,9 +156,9 @@ export default function IncomeStatementPage() {
                         color="purple"
                         subtext={`${data?.netMargin?.toFixed(1) || 0}% Net Margin`}
                     />
-                </div>
+                    </div>
 
-                {/* Income Statement Table */}
+                    {/* Income Statement Table */}
                 <div className="bg-slate-800/40 backdrop-blur-sm border border-slate-700/50 rounded-2xl overflow-hidden">
                     {/* Table Header */}
                     <div className="px-6 py-4 border-b border-slate-700/50 flex items-center justify-between">
@@ -278,6 +282,7 @@ export default function IncomeStatementPage() {
                             {loading ? 'Loading chart data...' : 'No monthly data available for this period.'}
                         </div>
                     )}
+                </div>
                 </div>
             </div>
         </div>

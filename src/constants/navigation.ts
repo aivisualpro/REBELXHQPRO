@@ -2,7 +2,7 @@ import {
     Users, Settings, UsersRound, Activity, ShoppingCart, CreditCard,
     Globe, Package, Clock, Database, Factory, Truck, BookOpen,
     Layers, FlaskConical, Store, BarChart3, PieChart, LineChart, Scale,
-    HelpCircle, Ticket, Book, ClipboardCheck
+    HelpCircle, Ticket, Book, ClipboardCheck, Target
 } from 'lucide-react';
 
 export const MENU_ITEMS = [
@@ -20,6 +20,7 @@ export const MENU_ITEMS = [
         items: [
             { title: 'Clients', href: '/crm/clients', icon: UsersRound },
             { title: 'Activities', href: '/crm/activities', icon: Activity },
+            { title: 'Retention', href: '/crm/retention', icon: Target },
         ]
     },
     {

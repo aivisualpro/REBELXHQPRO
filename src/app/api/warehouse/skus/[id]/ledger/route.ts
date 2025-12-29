@@ -55,7 +55,7 @@ export async function GET(
                 .populate('vendor', 'name')
                 .lean(),
             Manufacturing.find({ $or: [{ sku: id }, { "lineItems.sku": id }], ...dateFilter })
-                .select('_id sku qty uom lotNumber label scheduledStart scheduledFinish createdAt lineItems')
+                .select('_id sku qty qtyDifference uom lotNumber label scheduledStart scheduledFinish createdAt lineItems labor totalCost packagingCost')
                 .lean(),
             SaleOrder.find({ "lineItems.sku": id, ...dateFilter })
                 .select('_id label createdAt shippedDate lineItems')
@@ -72,7 +72,7 @@ export async function GET(
                 ],
                 ...dateFilter
             })
-                .select('_id createdAt status lineItems')
+                .select('_id createdAt dateCompleted status lineItems')
                 .lean()
         ]);
 
@@ -145,19 +145,29 @@ export async function GET(
         manufacturingJobs.forEach((job: any) => {
             const jobSkuId = job.sku?._id || job.sku;
             if (jobSkuId?.toString() === id) {
-                let totalMatCost = 0;
-                job.lineItems?.forEach((li: any) => {
-                    const liSkuId = (li.sku?._id || li.sku)?.toString();
-                    if (!liSkuId) return;
-                    const totalConsumed = ((li.recipeQty || 0) * (job.qty || 0)) + (li.qtyExtra || 0) + (li.qtyScrapped || 0);
-                    totalMatCost += totalConsumed * getIngredientCost(liSkuId, li.lotNumber);
-                });
+                let costPerUnit = 0;
+                
+                // Use stored totalCost if available (more accurate as it includes all cost components)
+                if (job.totalCost && job.totalCost > 0) {
+                    const totalQtyProduced = (job.qty || 0) + (job.qtyDifference || 0);
+                    costPerUnit = totalQtyProduced > 0 ? job.totalCost / totalQtyProduced : 0;
+                } else {
+                    // Fallback: Calculate from raw components (materials + labor + packaging)
+                    let totalMatCost = 0;
+                    job.lineItems?.forEach((li: any) => {
+                        const liSkuId = (li.sku?._id || li.sku)?.toString();
+                        if (!liSkuId) return;
+                        const totalConsumed = ((li.recipeQty || 0) * (job.qty || 0)) + (li.qtyExtra || 0) + (li.qtyScrapped || 0);
+                        totalMatCost += totalConsumed * getIngredientCost(liSkuId, li.lotNumber);
+                    });
 
-                let totalLaborCost = 0;
-                job.labor?.forEach((l: any) => { totalLaborCost += durationToHours(l.duration) * (l.hourlyRate || 0); });
-
-                const totalQtyProduced = (job.qty || 0) + (job.qtyDifference || 0);
-                const costPerUnit = totalQtyProduced > 0 ? (totalMatCost + totalLaborCost) / totalQtyProduced : 0;
+                    let totalLaborCost = 0;
+                    job.labor?.forEach((l: any) => { totalLaborCost += durationToHours(l.duration) * (l.hourlyRate || 0); });
+                    
+                    const packagingCost = job.packagingCost || 0;
+                    const totalQtyProduced = (job.qty || 0) + (job.qtyDifference || 0);
+                    costPerUnit = totalQtyProduced > 0 ? (totalMatCost + totalLaborCost + packagingCost) / totalQtyProduced : 0;
+                }
                 
                 const lot = job.lotNumber || job.label;
                 if (lot && !lotCosts.has(lot)) {
@@ -215,16 +225,17 @@ export async function GET(
         // Manufacturing
         manufacturingJobs.forEach((job: any) => {
             const jobSkuId = job.sku?._id || job.sku;
-            // Production Record
+            // Production Record - use actual manufactured qty (qty + qtyDifference)
             if (jobSkuId?.toString() === id) {
                 const lot = job.lotNumber || job.label || '';
+                const actualQtyManufactured = (job.qty || 0) + (job.qtyDifference || 0);
                 transactions.push({
                     _id: job._id + '_prod',
                     date: job.scheduledFinish ? new Date(job.scheduledFinish) : new Date(job.createdAt),
                     type: 'Produced',
                     reference: job.label || job._id,
                     lotNumber: lot,
-                    quantity: round8(job.qty || 0),
+                    quantity: round8(actualQtyManufactured),
                     uom: job.uom,
                     cost: round8(lotCosts.get(lot) || 0),
                     docId: job._id,
@@ -313,14 +324,14 @@ export async function GET(
                         const virtualCost = lotCosts.get(lot);
                         transactions.push({
                            _id: line._id || `${wo._id}_${id}`,
-                           date: new Date(wo.createdAt),
+                           date: wo.dateCompleted ? new Date(wo.dateCompleted) : new Date(wo.createdAt),
                            type: 'Web Order',
                            reference: line.varianceId ? `${wo._id} (${line.varianceId})` : wo._id,
                            lotNumber: lot || 'N/A',
-                           quantity: round8(-Math.abs(line.qty || 0)),
+                           quantity: round8(-Math.abs(line.quantity || 0)),
                            uom: 'Unit',
                            cost: round8(virtualCost !== undefined ? virtualCost : (line.cost || 0)),
-                           salePrice: round8((line.total && line.qty) ? (line.total / line.qty) : 0),
+                           salePrice: round8((line.total && line.quantity) ? (line.total / line.quantity) : 0),
                            docId: wo._id,
                            link: `/sales/web-orders/${wo._id}`,
                            varianceId: line.varianceId,
@@ -400,7 +411,7 @@ export async function GET(
             const liSkuId = (li.sku?._id || li.sku)?.toString();
             // For web orders, check if it's this exact SKU (not just a variance match for raw materials)
             // and the order was completed/shipped
-            return liSkuId === id && (li.qty > 0) && (wo.status === 'Shipped' || wo.status === 'Delivered' || wo.status === 'Completed');
+            return liSkuId === id && (li.quantity > 0) && (wo.status === 'Shipped' || wo.status === 'Delivered' || wo.status === 'Completed');
         }));
 
         const hasConsumption = manufacturingJobs.some(job => job.lineItems?.some((li: any) => {

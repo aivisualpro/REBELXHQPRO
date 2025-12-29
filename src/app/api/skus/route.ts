@@ -85,48 +85,155 @@ export async function GET(request: Request) {
         }
 
         const skuIds = skusRaw.map(s => s._id);
-        const allVarianceIds = skusRaw.flatMap(s => (s as any).variances?.map((v: any) => v._id) || []);
+        const allVariances = skusRaw.flatMap(s => (s as any).variances?.map((v: any) => v._id) || []);
 
-        // 1. Bulk Fetch all related data for ALL SKUs on the page
-        const [obsAll, posAll, mosCompletedAll, sosAll, mosIngredientsAll, adjsAll, wosAll] = await Promise.all([
-            OpeningBalance.find({ sku: { $in: skuIds } }).lean(),
-            PurchaseOrder.find({ 'lineItems.sku': { $in: skuIds }, status: 'Received' }).lean(),
-            Manufacturing.find({ sku: { $in: skuIds }, status: 'Completed' }).populate('lineItems.sku labor').lean(),
-            SaleOrder.find({ 'lineItems.sku': { $in: skuIds } }).lean(),
-            Manufacturing.find({ 'lineItems.sku': { $in: skuIds } }).lean(),
-            AuditAdjustment.find({ sku: { $in: skuIds } }).lean(),
-            WebOrder.find({
-                $or: [
-                    { "lineItems.sku": { $in: skuIds } },
-                    { "lineItems.varianceId": { $in: allVarianceIds } }
-                ],
-                status: { $in: ['completed', 'shipped', 'Completed', 'Shipped', 'processing', 'Processing', 'pending', 'Pending', 'on-hold', 'On Hold'] }
-            }).lean()
+        // --- Optimized Aggregations ---
+
+        const [
+            obsAgg,
+            posAgg,
+            sosAgg,
+            mosProdAgg,
+            mosConsAgg,
+            adjsAgg,
+            wosSkuAgg,
+            wosVarAgg
+        ] = await Promise.all([
+            // 1. Opening Balances
+            OpeningBalance.aggregate([
+                { $match: { sku: { $in: skuIds } } },
+                { $group: { 
+                    _id: "$sku", 
+                    qty: { $sum: "$qty" }, 
+                    costVal: { $sum: { $multiply: ["$qty", "$cost"] } } 
+                }}
+            ]),
+            // 2. Purchase Orders (Stock In)
+            PurchaseOrder.aggregate([
+                { $match: { "lineItems.sku": { $in: skuIds }, status: "Received" } },
+                { $unwind: "$lineItems" },
+                { $match: { "lineItems.sku": { $in: skuIds } } },
+                { $group: { 
+                    _id: "$lineItems.sku", 
+                    qty: { $sum: "$lineItems.qtyReceived" },
+                    costVal: { $sum: { $multiply: ["$lineItems.qtyReceived", "$lineItems.cost"] } }
+                }}
+            ]),
+            // 3. Sale Orders (Stock Out + Revenue)
+            SaleOrder.aggregate([
+                { $match: { "lineItems.sku": { $in: skuIds } } },
+                { $unwind: "$lineItems" },
+                { $match: { "lineItems.sku": { $in: skuIds } } },
+                { $match: { orderStatus: { $in: ['Shipped', 'Completed'] } } }, // Assuming status is on root, but aggregate loses root if we strictly unwind? No, aggregate keeps other fields unless project excludes them. But wait, $match after unwind filters the *result* of unwind. The root 'orderStatus' is still available? Yes, if we haven't grouped yet.
+                // Wait, if we unwind lineItems, the root fields are duplicated for each line item. So we can filter by orderStatus.
+                { $group: {
+                    _id: "$lineItems.sku",
+                    qty: { $sum: "$lineItems.qtyShipped" }, 
+                    revenue: { $sum: { $multiply: ["$lineItems.qtyShipped", "$lineItems.price"] } },
+                    cogs: { $sum: { $multiply: ["$lineItems.qtyShipped", "$lineItems.cost"] } }
+                }}
+            ]),
+            // 4. Manufacturing - Produced (Stock In)
+            // We fetch full documents for Prod to handle complex cost logic if needed, but we can optimize projection.
+            Manufacturing.find({ sku: { $in: skuIds }, status: 'Completed' })
+                .select('sku qty qtyDifference lineItems labor')
+                .lean(),
+
+            // 5. Manufacturing - Consumed (Stock Out)
+            Manufacturing.find({ "lineItems.sku": { $in: skuIds }, status: { $in: ['In Progress', 'Completed'] } })
+                .select('lineItems qty status')
+                .lean(),
+
+            // 6. Audit Adjustments
+            AuditAdjustment.aggregate([
+                { $match: { sku: { $in: skuIds } } },
+                { $group: {
+                    _id: "$sku",
+                    netQty: { $sum: "$qty" },
+                    costVal: { $sum: { $multiply: ["$qty", "$cost"] } }
+                }}
+            ]), 
+            
+            // 7. Web Orders (By SKU)
+            WebOrder.aggregate([
+                { $match: { 
+                    "lineItems.sku": { $in: skuIds }, 
+                    status: { $in: ['completed', 'shipped', 'Completed', 'Shipped', 'processing', 'Processing', 'pending', 'Pending', 'on-hold', 'On Hold'] } 
+                }},
+                { $unwind: "$lineItems" },
+                { $match: { "lineItems.sku": { $in: skuIds } } },
+                { $group: {
+                    _id: "$lineItems.sku",
+                    qty: { $sum: "$lineItems.quantity" },
+                    revenue: { $sum: "$lineItems.total" } 
+                }}
+            ]),
+
+            // 8. Web Orders (By Variance)
+             WebOrder.aggregate([
+                { $match: { 
+                    "lineItems.varianceId": { $in: allVariances },
+                    status: { $in: ['completed', 'shipped', 'Completed', 'Shipped', 'processing', 'Processing', 'pending', 'Pending', 'on-hold', 'On Hold'] }
+                }},
+                { $unwind: "$lineItems" },
+                { $match: { "lineItems.varianceId": { $in: allVariances } } },
+                { $group: {
+                    _id: "$lineItems.varianceId",
+                    qty: { $sum: "$lineItems.quantity" },
+                    revenue: { $sum: "$lineItems.total" }
+                }}
+            ])
         ]);
 
-        // 2. Pre-fetch Ingredient costs for COGM calculations
+        // --- Value Mapping Helpers ---
+        const obsMap = new Map();
+        obsAgg.forEach((r: any) => obsMap.set(r._id, r));
+
+        const posMap = new Map();
+        posAgg.forEach((r: any) => posMap.set(r._id, r));
+
+        const sosMap = new Map();
+        sosAgg.forEach((r: any) => sosMap.set(r._id, r));
+
+        const adjsMap = new Map();
+        adjsAgg.forEach((r: any) => adjsMap.set(r._id, r));
+
+        const wosSkuMap = new Map();
+        wosSkuAgg.forEach((r: any) => wosSkuMap.set(r._id, r));
+
+        const wosVarMap = new Map();
+        wosVarAgg.forEach((r: any) => wosVarMap.set(r._id, r));
+
+        // Manufacturing requires ingredient cost lookups. 
         const ingredientKeys: Set<string> = new Set();
-        mosCompletedAll.forEach((mo: any) => {
+        (mosProdAgg as any[]).forEach((mo: any) => {
             mo.lineItems?.forEach((li: any) => {
                 const liSkuId = (li.sku?._id || li.sku);
                 if (liSkuId && li.lotNumber) ingredientKeys.add(`${liSkuId}:${li.lotNumber}`);
             });
         });
 
-        const [ingObs, ingPos] = await Promise.all([
-            OpeningBalance.find({
-                sku: { $in: Array.from(ingredientKeys).map(k => k.split(':')[0]) },
-                lotNumber: { $in: Array.from(ingredientKeys).map(k => k.split(':')[1]) }
-            }).select('sku lotNumber cost').lean(),
-            PurchaseOrder.find({
-                "lineItems": {
-                    $elemMatch: {
-                        sku: { $in: Array.from(ingredientKeys).map(k => k.split(':')[0]) },
-                        lotNumber: { $in: Array.from(ingredientKeys).map(k => k.split(':')[1]) }
-                    }
-                }
-            }).select('lineItems status').lean()
-        ]);
+        // Bulk fetch ingredient costs (only if needed)
+        let ingObs: any[] = [];
+        let ingPos: any[] = [];
+        
+        if (ingredientKeys.size > 0) {
+            [ingObs, ingPos] = await Promise.all([
+                OpeningBalance.find({
+                    sku: { $in: Array.from(ingredientKeys).map(k => k.split(':')[0]) },
+                    lotNumber: { $in: Array.from(ingredientKeys).map(k => k.split(':')[1]) }
+                }).select('sku lotNumber cost').lean(),
+                PurchaseOrder.find({
+                    "lineItems": {
+                        $elemMatch: {
+                            sku: { $in: Array.from(ingredientKeys).map(k => k.split(':')[0]) },
+                            lotNumber: { $in: Array.from(ingredientKeys).map(k => k.split(':')[1]) }
+                        }
+                    },
+                    status: 'Received' 
+                }).select('lineItems status').lean()
+            ]);
+        }
 
         const getLotCostBulk = (skuId: string, lot: string) => {
             const ob = ingObs.find(o => o.sku.toString() === skuId && o.lotNumber === lot);
@@ -138,75 +245,12 @@ export async function GET(request: Request) {
                 });
                 if (line) return line.cost || 0;
             }
-            return 0;
+            return 0; // fallback
         };
 
-        // 3. Map values for quick lookup
-        const obsMap = new Map();
-        obsAll.forEach(o => { if(!obsMap.has(o.sku)) obsMap.set(o.sku, []); obsMap.get(o.sku).push(o); });
-        
-        const posMap = new Map();
-        posAll.forEach(po => {
-            po.lineItems?.forEach((li: any) => {
-                if(!posMap.has(li.sku)) posMap.set(li.sku, []);
-                posMap.get(li.sku).push({ ...li, poId: po._id });
-            });
-        });
-
-        const mosProdMap = new Map();
-        mosCompletedAll.forEach(mo => { if(!mosProdMap.has(mo.sku)) mosProdMap.set(mo.sku, []); mosProdMap.get(mo.sku).push(mo); });
-
-        const sosMap = new Map();
-        sosAll.forEach(so => {
-            so.lineItems?.forEach((li: any) => {
-                const liSkuId = (li.sku?._id || li.sku)?.toString();
-                if(!liSkuId) return;
-                if(!sosMap.has(liSkuId)) sosMap.set(liSkuId, []);
-                sosMap.get(liSkuId).push({ ...li, so });
-            });
-        });
-
-        const mosConsMap = new Map();
-        mosIngredientsAll.forEach(mo => {
-            mo.lineItems?.forEach((li: any) => {
-                const liSkuId = (li.sku?._id || li.sku)?.toString();
-                if(!liSkuId) return;
-                
-                // Only count as consumption if there's actual quantity
-                const bomQty = (li.recipeQty || 0) * (mo.qty || 0);
-                const totalConsumed = bomQty + (li.qtyExtra || 0) + (li.qtyScrapped || 0);
-                
-                if (totalConsumed > 0) {
-                    if(!mosConsMap.has(liSkuId)) mosConsMap.set(liSkuId, []);
-                    mosConsMap.get(liSkuId).push({ ...li, mo });
-                }
-            });
-        });
-
-        const adjsMap = new Map();
-        adjsAll.forEach(a => { if(!adjsMap.has(a.sku)) adjsMap.set(a.sku, []); adjsMap.get(a.sku).push(a); });
-
-        const wosBySku = new Map();
-        const wosByVariance = new Map();
-        wosAll.forEach(wo => {
-            wo.lineItems?.forEach((li: any) => {
-                const liSkuId = (li.sku?._id || li.sku)?.toString();
-                if (liSkuId) {
-                    if(!wosBySku.has(liSkuId)) wosBySku.set(liSkuId, []);
-                    wosBySku.get(liSkuId).push({ ...li, orderId: wo._id });
-                }
-                if (li.varianceId) {
-                    const vid = li.varianceId.toString();
-                    if(!wosByVariance.has(vid)) wosByVariance.set(vid, []);
-                    wosByVariance.get(vid).push({ ...li, orderId: wo._id });
-                }
-            });
-        });
-
-        // 4. Enrich SKUs using Local Maps
+        // --- Final Assembly ---
         const skus = skusRaw.map((sku: any) => {
-            const id = sku._id;
-            const sId = id.toString();
+            const id = sku._id.toString();
             const varianceIds = sku.variances?.map((v: any) => v._id) || [];
 
             let qtyIn = 0;
@@ -216,18 +260,24 @@ export async function GET(request: Request) {
             let cogs = 0;
             let cogm = 0;
 
-            (obsMap.get(id) || []).forEach((o: any) => {
-                qtyIn += (o.qty || 0);
-                totalCostIn += (o.qty || 0) * (o.cost || 0);
-            });
+            // 1. OBs
+            const obData = obsMap.get(id);
+            if(obData) {
+                qtyIn += obData.qty || 0;
+                totalCostIn += obData.costVal || 0;
+            }
 
-            (posMap.get(id) || []).forEach((li: any) => {
-                const received = (li.qtyReceived || li.qty || 0);
-                qtyIn += received;
-                totalCostIn += received * (li.cost || 0);
-            });
+            // 2. POs
+            const poData = posMap.get(id);
+            if(poData) {
+                qtyIn += poData.qty || 0;
+                totalCostIn += poData.costVal || 0;
+            }
 
-            (mosProdMap.get(id) || []).forEach((mo: any) => {
+            // 3. MOs (Production - In)
+            // Still iterating here but only on relevant subset
+            const myMos = (mosProdAgg as any[]).filter((m: any) => m.sku?.toString() === id);
+            myMos.forEach((mo: any) => {
                 const qty = (mo.qty || 0) + (mo.qtyDifference || 0);
                 qtyIn += qty;
 
@@ -243,48 +293,63 @@ export async function GET(request: Request) {
                     const hours = parseInt(parts[0] || '0') + parseInt(parts[1] || '0')/60 + parseInt(parts[2] || '0')/3600;
                     moCost += hours * (lab.hourlyRate || 0);
                 });
+                
                 if (qty > 0) totalCostIn += moCost;
                 cogm += moCost;
             });
 
-            (adjsMap.get(id) || []).forEach((a: any) => {
-                if (a.qty > 0) {
-                    qtyIn += a.qty;
-                    totalCostIn += a.qty * (a.cost || 0);
-                } else {
-                    qtyOut += Math.abs(a.qty);
-                }
+            // 4. MOs (Consumption - Out)
+             // Need to filter locally as we fetched by Ingredient
+            const myConsMos = (mosConsAgg as any[]).filter((m: any) => {
+                return m.lineItems.some((li: any) => (li.sku?._id || li.sku)?.toString() === id);
+            });
+            
+            myConsMos.forEach((mo: any) => {
+                const li = mo.lineItems.find((l: any) => (l.sku?._id || l.sku)?.toString() === id);
+                 if (li) {
+                     const bomQty = (li.recipeQty || 0) * (mo.qty || 0);
+                     const totalConsumed = bomQty + (li.qtyExtra || 0) + (li.qtyScrapped || 0);
+                     qtyOut += totalConsumed;
+                 }
             });
 
-            (sosMap.get(sId) || []).forEach((li: any) => {
-                const so = (li as any).so;
-                if (['Shipped', 'Completed'].includes(so?.orderStatus)) {
-                    const q = li.qtyShipped || li.qty || 0;
-                    qtyOut += q;
-                    revenue += q * (li.price || 0);
-                    cogs += q * (li.cost || 0);
-                }
-            });
+            // 5. Adjustments
+            const adjData = adjsMap.get(id);
+            if(adjData) {
+                 const netAdj = adjData.netQty || 0;
+                 if (netAdj > 0) {
+                     qtyIn += netAdj;
+                     totalCostIn += adjData.costVal || 0; 
+                 } else {
+                     qtyOut += Math.abs(netAdj);
+                 }
+            }
 
-            const webLines = [...(wosBySku.get(sId) || [])];
+            // 6. Sales
+            const soData = sosMap.get(id);
+            if(soData) {
+                qtyOut += soData.qty || 0;
+                revenue += soData.revenue || 0;
+                cogs += soData.cogs || 0;
+            }
+
+            // 7. Web Orders
+            const woSku = wosSkuMap.get(id);
+            if(woSku) {
+                qtyOut += woSku.qty || 0;
+                revenue += woSku.revenue || 0;
+            }
+            
             varianceIds.forEach((vid: string) => {
-                webLines.push(...(wosByVariance.get(vid) || []));
-            });
-
-            webLines.forEach((li: any) => {
-                qtyOut += (li.quantity || li.qty || 0);
-                revenue += (li.total || 0);
-            });
-
-            (mosConsMap.get(sId) || []).forEach((li: any) => {
-                if (['In Progress', 'Completed'].includes(li.mo?.status)) {
-                    const bomQty = (li.recipeQty || 0) * (li.mo?.qty || 0);
-                    qtyOut += (bomQty + (li.qtyExtra || 0) + (li.qtyScrapped || 0));
+                const woVar = wosVarMap.get(vid);
+                if(woVar) {
+                     qtyOut += woVar.qty || 0;
+                     revenue += woVar.revenue || 0;
                 }
             });
 
-            const hasSales = (sosMap.get(sId)?.length > 0) || (webLines.length > 0);
-            const hasConsumption = (mosConsMap.get(sId)?.length > 0);
+            const hasSales = (soData || woSku || wosVarMap.has(varianceIds[0])); // approximated check
+            const hasConsumption = (myConsMos.length > 0);
             
             let tier = 0;
             if (hasSales && !hasConsumption) tier = 1;
@@ -300,7 +365,7 @@ export async function GET(request: Request) {
                 cogm,
                 grossProfit: revenue - cogs,
                 totalWebOrders: sku.totalWebOrders || 0,
-                tier
+                tier: sku.tier || tier
             };
         });
 
@@ -310,21 +375,6 @@ export async function GET(request: Request) {
             page,
             totalPages: Math.ceil(total / limit)
         });
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-}
-
-export async function POST(request: Request) {
-    try {
-        await dbConnect();
-        const body = await request.json();
-
-        // _id will be auto-generated if not provided, or mapped from sku if present
-        const skuData = { ...body };
-        if (body.sku) skuData._id = body.sku;
-        const newSku = await Sku.create(skuData);
-        return NextResponse.json(newSku);
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }

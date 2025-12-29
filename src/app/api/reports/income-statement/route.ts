@@ -15,13 +15,20 @@ export async function GET(req: Request) {
         const startDate = searchParams.get('startDate');
         const endDate = searchParams.get('endDate');
 
-        // Build date filter
-        let dateFilter: any = {};
+        // Build date filter - WebOrders use dateCreated, others use createdAt
+        let webDateFilter: any = {};
+        let defaultDateFilter: any = {};
         if (startDate && endDate) {
-            dateFilter = {
+            webDateFilter = {
+                dateCreated: {
+                    $gte: new Date(startDate),
+                    $lte: new Date(endDate + 'T23:59:59.999Z')
+                }
+            };
+            defaultDateFilter = {
                 createdAt: {
                     $gte: new Date(startDate),
-                    $lte: new Date(endDate)
+                    $lte: new Date(endDate + 'T23:59:59.999Z')
                 }
             };
         }
@@ -31,9 +38,9 @@ export async function GET(req: Request) {
         const webRevenueAgg = await WebOrder.aggregate([
             { $match: { 
                 status: { $in: ['completed', 'shipped', 'Completed', 'Shipped', 'processing', 'Processing'] },
-                ...dateFilter
+                ...webDateFilter
             }},
-            { $group: { _id: null, total: { $sum: '$orderAmount' }, count: { $sum: 1 } } }
+            { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }
         ]);
         const webRevenue = webRevenueAgg[0]?.total || 0;
         const webOrdersCount = webRevenueAgg[0]?.count || 0;
@@ -41,7 +48,7 @@ export async function GET(req: Request) {
         // Sales Orders (Manual/Wholesale)
         // Sales Orders (Manual/Wholesale) - Calculate Grand Total (Subtotal + Shipping - Discount)
         const saleRevenueAgg = await SaleOrder.aggregate([
-            { $match: { orderStatus: { $ne: 'Cancelled' }, ...dateFilter } },
+            { $match: { orderStatus: { $ne: 'Cancelled' }, ...defaultDateFilter } },
             // Add fields to calculate total per order first
             { $addFields: {
                 lineItemsTotal: { $sum: "$lineItems.total" },
@@ -62,7 +69,7 @@ export async function GET(req: Request) {
         // 2. COST OF GOODS SOLD (COGS)
         // For simplicity, we'll use purchase order costs as a proxy
         const cogsAgg = await PurchaseOrder.aggregate([
-            { $match: dateFilter },
+            { $match: defaultDateFilter },
             { $unwind: "$lineItems" },
             { $group: { _id: null, total: { $sum: { $multiply: ["$lineItems.qtyReceived", "$lineItems.cost"] } } } }
         ]);
@@ -85,24 +92,24 @@ export async function GET(req: Request) {
         const netIncome = grossProfit - operatingExpenses.total;
         const netMargin = totalRevenue > 0 ? (netIncome / totalRevenue) * 100 : 0;
 
-        // Revenue Breakdown by Month (for charts) - simplified aggregation
-        // First try to get by createdAt, fallback to getting order amounts grouped
+        // Revenue Breakdown by Month (for charts) - using dateCreated for WebOrders
         const monthlyRevenue = await WebOrder.aggregate([
             { $match: { 
                 status: { $in: ['completed', 'shipped', 'Completed', 'Shipped', 'processing', 'Processing'] },
-                orderAmount: { $gt: 0 } // Only orders with revenue
+                total: { $gt: 0 }, // Only orders with revenue
+                ...webDateFilter
             }},
             { $project: {
-                orderAmount: 1,
-                // Try to parse the date in multiple formats
+                total: 1,
+                // Use dateCreated for grouping
                 yearMonth: {
                     $cond: {
-                        if: { $eq: [{ $type: "$createdAt" }, "date"] },
-                        then: { $dateToString: { format: "%Y-%m", date: "$createdAt" } },
+                        if: { $eq: [{ $type: "$dateCreated" }, "date"] },
+                        then: { $dateToString: { format: "%Y-%m", date: "$dateCreated" } },
                         else: {
                             $cond: {
-                                if: { $eq: [{ $type: "$createdAt" }, "string"] },
-                                then: { $substr: ["$createdAt", 0, 7] }, // Take first 7 chars (YYYY-MM)
+                                if: { $eq: [{ $type: "$dateCreated" }, "string"] },
+                                then: { $substr: ["$dateCreated", 0, 7] }, // Take first 7 chars (YYYY-MM)
                                 else: "Unknown"
                             }
                         }
@@ -111,7 +118,7 @@ export async function GET(req: Request) {
             }},
             { $group: {
                 _id: "$yearMonth",
-                revenue: { $sum: "$orderAmount" },
+                revenue: { $sum: "$total" },
                 orders: { $sum: 1 }
             }},
             { $match: { _id: { $ne: "Unknown" } } }, // Filter out unknowns

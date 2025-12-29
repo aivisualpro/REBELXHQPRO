@@ -91,7 +91,7 @@ export default function WebProductDetailsPage() {
     const [product, setProduct] = useState<WebProduct | null>(null);
     const [loading, setLoading] = useState(true);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
-    const [variationFilter, setVariationFilter] = useState<number | null>(null);
+    const [variationFilter, setVariationFilter] = useState<number | string | null>(null);
 
     // SKU Linking State
     const [skuList, setSkuList] = useState<any[]>([]);
@@ -855,7 +855,7 @@ function RelatedSaleOrders({ skuId }: { skuId: string }) {
 }
 
 // Related Web Orders Component - Shows line items from web orders (Ledger Style)
-function RelatedWebOrders({ productWebId, website, baseProductName, variationId, refreshLedger }: { productWebId: number; website: string; baseProductName: string; variationId: number | null; refreshLedger: number }) {
+function RelatedWebOrders({ productWebId, website, baseProductName, variationId, refreshLedger }: { productWebId: number; website: string; baseProductName: string; variationId: number | string | null; refreshLedger: number }) {
     const router = useRouter();
     const [lineItems, setLineItems] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -916,7 +916,7 @@ function RelatedWebOrders({ productWebId, website, baseProductName, variationId,
                 const selectedLot = availableLots.find(l => l.lotNumber === lotNumber);
                 const optimisticCost = selectedLot ? selectedLot.cost : 0;
                 
-                return { ...item, lotNumber: lotNumber, cost: optimisticCost };
+                return { ...item, lotNumber: lotNumber, cost: optimisticCost, lotIsSuggested: false };
             }
             return item;
         }));
@@ -939,7 +939,7 @@ function RelatedWebOrders({ productWebId, website, baseProductName, variationId,
                 // Update local state with confirmed data (e.g. precise cost from backend logic if different)
                 setLineItems(prev => prev.map(item => {
                     if (item.lineItemId === editingItem.lineItemId) {
-                        return { ...item, lotNumber: lotNumber, cost: data.cost };
+                        return { ...item, lotNumber: lotNumber, cost: data.cost, lotIsSuggested: false };
                     }
                     return item;
                 }));
@@ -956,21 +956,29 @@ function RelatedWebOrders({ productWebId, website, baseProductName, variationId,
         }
     };
 
+    // Reset state when filters change
     useEffect(() => {
         setPage(1);
         setLineItems([]);
         setHasMore(true);
-    }, [productWebId, website, variationId]);
+    }, [productWebId, website, variationId, refreshLedger]);
 
+    // Fetch data when page or filters change
     useEffect(() => {
-        if (!productWebId || !hasMore) return;
+        if (!productWebId) return;
 
+        // Create an abort controller for cleanup
+        const controller = new AbortController();
+        
         const fetchLineItems = async () => {
             if (page === 1) setLoading(true);
             else setFetchingMore(true);
 
             try {
-                const res = await fetch(`/api/retail/web-orders/by-product?productId=${productWebId}&website=${website}&variationId=${variationId || ''}&page=${page}&limit=20`);
+                const res = await fetch(
+                    `/api/retail/web-orders/by-product?productId=${productWebId}&website=${website}&variationId=${variationId || ''}&page=${page}&limit=20`,
+                    { signal: controller.signal }
+                );
                 const data = await res.json();
                 if (res.ok) {
                     const newItems = data.lineItems || [];
@@ -978,8 +986,10 @@ function RelatedWebOrders({ productWebId, website, baseProductName, variationId,
                     setHasMore((page * 20) < data.totalOrders);
                     setTotalRecords(data.totalOrders || 0);
                 }
-            } catch (e) {
-                console.error('Failed to fetch related orders:', e);
+            } catch (e: any) {
+                if (e.name !== 'AbortError') {
+                    console.error('Failed to fetch related orders:', e);
+                }
             } finally {
                 setLoading(false);
                 setFetchingMore(false);
@@ -987,6 +997,8 @@ function RelatedWebOrders({ productWebId, website, baseProductName, variationId,
         };
 
         fetchLineItems();
+        
+        return () => controller.abort();
     }, [productWebId, website, variationId, page, refreshLedger]);
 
     useEffect(() => {
@@ -1093,20 +1105,32 @@ function RelatedWebOrders({ productWebId, website, baseProductName, variationId,
                                         </div>
                                     </td>
                                     <td className="px-3 py-2">
-                                        <div className="flex items-center space-x-2">
-                                            <span className={cn(
-                                                "text-[9px] font-mono px-1.5 py-0.5 rounded-sm line-clamp-1 max-w-[80px]",
-                                                item.lotNumber ? "text-emerald-700 bg-emerald-50" : "text-slate-400 bg-slate-50 italic"
-                                            )}>
-                                                {item.lotNumber || 'N/A'}
-                                            </span>
+                                        <div className="flex items-center space-x-1">
+                                            {item.lotNumber ? (
+                                                <span className={cn(
+                                                    "text-[9px] font-mono px-1.5 py-0.5 line-clamp-1 max-w-[80px] flex items-center space-x-1",
+                                                    item.lotIsSuggested 
+                                                        ? "text-amber-700 bg-amber-50 border border-amber-200" 
+                                                        : "text-emerald-700 bg-emerald-50"
+                                                )}>
+                                                    {item.lotIsSuggested && <span className="text-[7px]">★</span>}
+                                                    <span>{item.lotNumber}</span>
+                                                </span>
+                                            ) : (
+                                                <span className="text-[9px] text-slate-400 bg-slate-50 italic px-1.5 py-0.5">
+                                                    N/A
+                                                </span>
+                                            )}
                                             <button 
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     handleEditLot(item);
                                                 }}
-                                                className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-blue-600 transition-colors"
-                                                title="Select Lot"
+                                                className={cn(
+                                                    "p-0.5 hover:bg-slate-100 transition-colors",
+                                                    item.linkedSkuId ? "text-slate-400 hover:text-blue-600" : "text-slate-200"
+                                                )}
+                                                title={item.linkedSkuId ? "Select Lot" : "Link SKU first"}
                                             >
                                                 <Layers className="w-3 h-3" />
                                             </button>

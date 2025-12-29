@@ -266,20 +266,24 @@ export default function UsersPage() {
         </div>
 
         <div className="flex items-center space-x-2">
-          <input
-            type="file"
-            accept=".csv"
-            className="hidden"
-            ref={fileInputRef}
-            onChange={handleImport}
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="p-2 text-slate-600 hover:text-black hover:bg-slate-200 transition-colors"
-            title="Import CSV"
-          >
-            <Upload className="w-4 h-4" />
-          </button>
+          {session?.user?.email === 'adeel@grassrootsharvest.com' && (
+            <>
+              <input
+                type="file"
+                accept=".csv"
+                className="hidden"
+                ref={fileInputRef}
+                onChange={handleImport}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="p-2 text-slate-600 hover:text-black hover:bg-slate-200 transition-colors"
+                title="Import CSV"
+              >
+                <Upload className="w-4 h-4" />
+              </button>
+            </>
+          )}
           <button
             onClick={() => openModal()}
             className="p-2 bg-black text-white hover:bg-slate-800 transition-colors shadow-sm flex items-center justify-center"

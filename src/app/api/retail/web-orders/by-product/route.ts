@@ -3,11 +3,35 @@ import dbConnect from '@/lib/mongoose';
 import WebOrder from '@/models/WebOrder';
 import Setting from '@/models/Setting';
 import WebProduct from '@/models/WebProduct';
+import { getSuggestedLotForSku } from '@/lib/lot-helpers';
 
 export const dynamic = 'force-dynamic';
 
+// Cache for suggested lots per SKU (to avoid repeated DB queries within same request)
+const lotCache = new Map<string, { lotNumber: string; cost: number } | null>();
+
+// Get suggested lot for a SKU (uses robust helper that includes ALL transaction types)
+async function getSuggestedLot(skuId: string): Promise<{ lotNumber: string; cost: number } | null> {
+    if (!skuId) return null;
+    
+    // Check cache first
+    if (lotCache.has(skuId)) {
+        return lotCache.get(skuId) || null;
+    }
+    
+    // Use the robust lot helper that includes all sources AND consumptions
+    const suggested = await getSuggestedLotForSku(skuId);
+    const result = suggested ? { lotNumber: suggested.lotNumber, cost: suggested.cost } : null;
+    lotCache.set(skuId, result);
+    return result;
+}
+
+
 export async function GET(request: Request) {
     try {
+        // Clear cache at start of request
+        lotCache.clear();
+        
         const { searchParams } = new URL(request.url);
         const productId = parseInt(searchParams.get('productId') || '0');
         const website = searchParams.get('website') || '';
@@ -85,7 +109,7 @@ export async function GET(request: Request) {
             );
             
             for (const item of matchingItems) {
-                // Determine the linkedSkuId and potential lot/cost from webProduct for fallback
+                // Determine the linkedSkuId from item or fallback to webProduct
                 let effectiveLinkedSkuId = item.linkedSkuId;
                 let effectiveLotNumber = item.lotNumber;
                 let effectiveCost = item.cost;
@@ -95,15 +119,18 @@ export async function GET(request: Request) {
                         const variation = webProduct.variations?.find((v: any) => v.id == item.variationId || v._id == item.variationId);
                         if (variation) {
                             effectiveLinkedSkuId = variation.linkedSkuId;
-                            // Fallback for lot/cost from variation if not present on item
-                            if (!effectiveLotNumber && variation.lotNumber) effectiveLotNumber = variation.lotNumber;
-                            if (!effectiveCost && variation.cost) effectiveCost = variation.cost;
                         }
                     } else {
                         effectiveLinkedSkuId = webProduct.linkedSkuId;
-                        // Fallback for lot/cost from main product if not present on item
-                        if (!effectiveLotNumber && webProduct.lotNumber) effectiveLotNumber = webProduct.lotNumber;
-                        if (!effectiveCost && webProduct.cost) effectiveCost = webProduct.cost;
+                    }
+                }
+                
+                // If we have a linkedSkuId but no lot number, dynamically suggest one
+                if (effectiveLinkedSkuId && !effectiveLotNumber) {
+                    const suggestedLot = await getSuggestedLot(effectiveLinkedSkuId);
+                    if (suggestedLot) {
+                        effectiveLotNumber = suggestedLot.lotNumber;
+                        effectiveCost = suggestedLot.cost;
                     }
                 }
 
@@ -125,10 +152,12 @@ export async function GET(request: Request) {
                     price: item.price,
                     total: item.total,
                     sku: item.sku,
-                    // NEW: Enrichment fields with dynamic fallbacks - Hardened lookup
+                    // Enrichment fields with dynamic fallbacks and lot suggestion
                     linkedSkuId: effectiveLinkedSkuId || null,
                     lotNumber: effectiveLotNumber || null,
-                    cost: effectiveCost || null
+                    cost: effectiveCost || null,
+                    // Flag to indicate if lot is suggested (not saved to DB yet)
+                    lotIsSuggested: !item.lotNumber && effectiveLotNumber ? true : false
                 });
             }
         }
@@ -143,3 +172,4 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
+

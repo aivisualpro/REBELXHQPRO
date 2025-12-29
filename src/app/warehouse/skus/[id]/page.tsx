@@ -16,12 +16,14 @@ import {
     Filter,
     Calendar,
     DollarSign,
-    Loader2
+    Loader2,
+    Pencil
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
 
 interface Sku {
     _id: string;
@@ -115,6 +117,10 @@ export default function SkuDetailsPage() {
     const [selectedLot, setSelectedLot] = useState<string>('All');
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const filterRef = useRef<HTMLDivElement>(null);
+    const [editingTx, setEditingTx] = useState<Transaction | null>(null);
+    const [isLotModalOpen, setIsLotModalOpen] = useState(false);
+    const [isUpdating, setIsUpdating] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
@@ -175,9 +181,9 @@ export default function SkuDetailsPage() {
         if (id) fetchSkuDetails();
     }, [id]);
 
-    const fetchSkuDetails = async () => {
+    const fetchSkuDetails = async (background = false) => {
         try {
-            setLoading(true);
+            if (!background) setLoading(true);
             const res = await fetch(`/api/warehouse/skus/${id}/ledger`);
             if (res.ok) {
                 const data = await res.json();
@@ -192,13 +198,64 @@ export default function SkuDetailsPage() {
                     .then(lotsData => setLots(lotsData.lots || []))
                     .catch(() => {}); // Silently fail if lots fetch fails
             } else {
-                toast.error("Failed to load SKU details");
+                if (!background) toast.error("Failed to load SKU details");
             }
         } catch (error) {
             console.error(error);
-            toast.error("Error loading data");
+            if (!background) toast.error("Error loading data");
         } finally {
-            setLoading(false);
+            if (!background) setLoading(false);
+        }
+    };
+
+    const handleSaveLotUpdate = async (newLotNumber: string) => {
+        if (!editingTx || !sku) return;
+        
+        // 1. Optimistic Update (Immediate Feedback)
+        setIsLotModalOpen(false);
+        const originalTx = editingTx;
+        const originalTransactions = [...transactions];
+        
+        // Optimistically update the transaction in the list
+        setTransactions(prev => prev.map(t => 
+            t._id === originalTx._id ? { ...t, lotNumber: newLotNumber } : t
+        ));
+        
+        setEditingTx(null);
+
+        try {
+            setIsSaving(true);
+            
+            // 2. Background Update
+            const res = await fetch(`/api/warehouse/skus/${sku._id}/transaction-update`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: originalTx.type,
+                    docId: originalTx.docId,
+                    lineItemId: originalTx._id, 
+                    newLotNumber: newLotNumber,
+                    skuId: sku._id
+                })
+            });
+
+            if (res.ok) {
+                // 3. Silent Refresh to match backend (balances, lot inventory sidebar)
+                // We wait a tiny bit to ensure DB consistency if needed, generally standard API is fast enough.
+                fetchSkuDetails(true);
+            } else {
+                // Revert on failure
+                setTransactions(originalTransactions);
+                const data = await res.json();
+                toast.error(data.error || "Failed to save lot update");
+            }
+        } catch (error) {
+            console.error(error);
+            setTransactions(originalTransactions);
+            toast.error("Error updating lot");
+        } finally {
+            setIsSaving(false);
+            setIsUpdating(false);
         }
     };
 
@@ -534,6 +591,9 @@ export default function SkuDetailsPage() {
                     <div className="sticky top-0 z-[30] bg-white border-b border-slate-100 px-4 h-10 flex items-center justify-between gap-4">
                         <div className="flex items-center space-x-3">
                             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Transaction Ledger</h3>
+                            {isSaving && (
+                                <span className="text-[10px] font-bold text-blue-500 animate-pulse">Saving changes...</span>
+                            )}
                             <div className="relative" ref={filterRef}>
                                 <button onClick={() => setIsFilterOpen(!isFilterOpen)} className={cn("flex items-center space-x-1 px-3 py-1 text-[10px] font-bold border rounded transition-all", isFilterOpen ? "bg-slate-900 border-slate-900 text-white" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm")}>
                                     <Filter className="w-3 h-3" />
@@ -633,11 +693,21 @@ export default function SkuDetailsPage() {
                                 )}
                         </div>
                         </div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                            {paginatedTransactions.length === displayTransactions.length 
-                                ? `${displayTransactions.length} Records` 
-                                : `${paginatedTransactions.length} of ${displayTransactions.length} Records`}
-                        </span>
+                        <div className="flex items-center space-x-2">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                {paginatedTransactions.length === displayTransactions.length 
+                                    ? `${displayTransactions.length} Records` 
+                                    : `${paginatedTransactions.length} of ${displayTransactions.length} Records`}
+                            </span>
+                            <span className="text-[10px] text-slate-300">|</span>
+                            <span className={cn(
+                                "text-[10px] font-bold font-mono",
+                                displayTransactions.reduce((acc, tx) => acc + tx.quantity, 0) > 0 ? "text-emerald-600" : "text-rose-600"
+                            )}>
+                                {displayTransactions.reduce((acc, tx) => acc + tx.quantity, 0) > 0 ? '+' : ''}
+                                {displayTransactions.reduce((acc, tx) => acc + tx.quantity, 0).toLocaleString()} Qty
+                            </span>
+                        </div>
                     </div>
 
                     {/* Nested Sticky Layer 2: Table Header (Pinned exactly below toolbar) */}
@@ -664,7 +734,22 @@ export default function SkuDetailsPage() {
                                         </div>
                                     </td>
                                     <td className="px-3 py-2 text-[10px] text-slate-600 truncate max-w-[120px]">{tx.reference}</td>
-                                    <td className="px-3 py-2 text-[10px] text-slate-600 font-mono">{tx.lotNumber || '-'}</td>
+                                    <td className="px-3 py-2 text-[10px] text-slate-600 font-mono group/cell relative">
+                                        <div className="flex items-center justify-between">
+                                            <span>{tx.lotNumber || '-'}</span>
+                                            <button 
+                                                onClick={(e) => { 
+                                                    e.stopPropagation(); 
+                                                    setEditingTx(tx); 
+                                                    setIsLotModalOpen(true);
+                                                }}
+                                                className="opacity-0 group-hover/cell:opacity-100 p-1 hover:bg-slate-200 rounded transition-opacity"
+                                                title="Edit Lot Number"
+                                            >
+                                                <Pencil className="w-3 h-3 text-slate-500" />
+                                            </button>
+                                        </div>
+                                    </td>
                                     <td className="px-3 py-2 text-right">
                                         <span className={cn("text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-sm", tx.quantity > 0 ? "text-emerald-700 bg-emerald-50" : "text-rose-700 bg-rose-50")}>{tx.quantity > 0 ? '+' : ''}{tx.quantity}</span>
                                     </td>
@@ -698,8 +783,10 @@ export default function SkuDetailsPage() {
             <div className="h-[24px] border-t border-slate-200 bg-slate-100/50 shrink-0 flex items-center justify-between px-4 z-[50]">
                 <div className="flex items-center space-x-4">
                     <div className="flex items-center space-x-1.5">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">System Ready</span>
+                        <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", isSaving ? "bg-blue-500" : "bg-emerald-500")} />
+                        <span className={cn("text-[9px] font-bold uppercase tracking-widest", isSaving ? "text-blue-500" : "text-slate-500")}>
+                            {isSaving ? "Saving..." : "System Ready"}
+                        </span>
                     </div>
                 </div>
                 <div className="flex items-center space-x-4">
@@ -707,6 +794,20 @@ export default function SkuDetailsPage() {
                     <span className="text-[9px] text-slate-400 font-mono uppercase tracking-tighter">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span>
                 </div>
             </div>
+            {/* Standard Lot Selection Modal */}
+            {editingTx && sku && (
+                <LotSelectionModal
+                    isOpen={isLotModalOpen}
+                    onClose={() => {
+                        setIsLotModalOpen(false);
+                        setEditingTx(null);
+                    }}
+                    onSelect={(lotNumber) => handleSaveLotUpdate(lotNumber)}
+                    skuId={sku._id}
+                    currentLotNumber={editingTx.lotNumber}
+                    title={`Update Lot for ${editingTx.type} #${editingTx.reference}`}
+                />
+            )}
         </div>
     );
 }

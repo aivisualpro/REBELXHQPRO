@@ -6,17 +6,17 @@ import {
   Upload,
   Edit2,
   Trash2,
-  ChevronLeft,
-  ChevronRight,
   ArrowUpDown,
   Plus,
   X,
-  XCircle,
   Loader2,
   Phone,
   Mail,
   MapPin,
-  CreditCard
+  CreditCard,
+  DollarSign,
+  Activity,
+  ChevronRight
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { cn } from '@/lib/utils';
@@ -24,6 +24,7 @@ import toast from 'react-hot-toast';
 import { Pagination } from '@/components/ui/Pagination';
 import { MultiSelectFilter } from '@/components/ui/filters/MultiSelectFilter';
 import { User, Tag, Briefcase, Building2, Truck } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 interface Client {
   _id: string;
@@ -40,11 +41,9 @@ interface Client {
   interactionCount?: number;
   notes?: { note: string; createdBy?: string; createdAt?: string }[];
   projectedCloseDate?: string;
-
   phones: { value: string; label: string; isWhatsApp?: boolean }[];
   emails: { value: string; label: string }[];
   addresses: { street: string; city: string; state: string; postalCode: string; label: string }[];
-
   billing?: {
     nameOnCard?: string;
     ccNumber?: string;
@@ -52,12 +51,16 @@ interface Client {
     securityCode?: string;
     zipCode?: string;
   };
-
   defaultShippingTerms?: string;
   defaultPaymentMethod?: string;
+  totalRevenue?: number;
+  orderCount?: number;
+  activityCount?: number;
+  lastActivity?: string;
 }
 
 export default function ClientsPage() {
+  const router = useRouter();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -125,14 +128,10 @@ export default function ClientsPage() {
     interactionCount: 0,
     notes: '',
     projectedCloseDate: '',
-
-    // Arrays flattened for easier form handling initially, or just manage arrays
     phone: '', phone2: '', phone3: '', whatsApp: '',
     email: '', email2: '', email3: '',
-
     address: '', city: '', state: '', postalCode: '',
     address2: '', city2: '', state2: '', postalCode2: '',
-
     nameOnCard: '', ccNumber: '', expirationDate: '', securityCode: '', zipCode: '',
     defaultShippingTerms: '', defaultPaymentMethod: ''
   };
@@ -191,7 +190,8 @@ export default function ClientsPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     if (!confirm('Are you sure you want to delete this client?')) return;
     try {
       const res = await fetch(`/api/clients/${id}`, { method: 'DELETE' });
@@ -271,12 +271,12 @@ export default function ClientsPage() {
     });
   };
 
-  const openModal = (client?: Client) => {
+  const openModal = (client?: Client, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     setActiveTab('basic');
     if (client) {
       setEditingClient(client);
 
-      // Map arrays back to form fields
       const mainPhone = client.phones?.find(p => p.label === 'Main')?.value || '';
       const secPhone = client.phones?.find(p => p.label === 'Secondary')?.value || '';
       const otherPhone = client.phones?.find(p => p.label === 'Other')?.value || '';
@@ -303,13 +303,10 @@ export default function ClientsPage() {
         interactionCount: client.interactionCount || 0,
         notes: Array.isArray(client.notes) && client.notes.length > 0 ? client.notes[0].note : (typeof client.notes === 'string' ? client.notes : ''),
         projectedCloseDate: client.projectedCloseDate ? new Date(client.projectedCloseDate).toISOString().split('T')[0] : '',
-
         phone: mainPhone, phone2: secPhone, phone3: otherPhone, whatsApp: waPhone,
         email: mainEmail, email2: secEmail, email3: otherEmail,
-
         address: mainAddr?.street || '', city: mainAddr?.city || '', state: mainAddr?.state || '', postalCode: mainAddr?.postalCode || '',
         address2: secAddr?.street || '', city2: secAddr?.city || '', state2: secAddr?.state || '', postalCode2: secAddr?.postalCode || '',
-
         nameOnCard: client.billing?.nameOnCard || '',
         ccNumber: client.billing?.ccNumber || '',
         expirationDate: client.billing?.expirationDate || '',
@@ -333,7 +330,6 @@ export default function ClientsPage() {
       const url = editingClient ? `/api/clients/${editingClient._id}` : '/api/clients';
       const method = editingClient ? 'PATCH' : 'POST';
 
-      // Reconstruct the object structure
       const phones = [];
       if (formData.phone) phones.push({ value: formData.phone, label: 'Main', isWhatsApp: false });
       if (formData.phone2) phones.push({ value: formData.phone2, label: 'Secondary', isWhatsApp: false });
@@ -403,10 +399,16 @@ export default function ClientsPage() {
     }
   };
 
+  const formatCurrency = (val: number) => {
+    if (!val) return '$0';
+    if (val >= 1000) return '$' + (val / 1000).toFixed(1) + 'k';
+    return '$' + val.toFixed(0);
+  };
+
   return (
-    <div className="flex flex-col h-[calc(100vh-48px)] bg-white">
+    <div className="flex flex-col h-[calc(100vh-40px)] bg-white overflow-hidden">
       {/* Action Bar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100 bg-slate-50/50">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100 bg-slate-50/50 shrink-0">
         <div className="flex items-center space-x-4">
           <h1 className="text-sm font-bold text-slate-900 uppercase tracking-tighter">Client Management</h1>
           <div className="relative">
@@ -420,8 +422,6 @@ export default function ClientsPage() {
             />
           </div>
         </div>
-
-
 
         <div className="flex items-center space-x-2">
           <MultiSelectFilter
@@ -476,45 +476,21 @@ export default function ClientsPage() {
 
           <div className="w-px h-6 bg-slate-200 mx-2" />
 
-          <input
-            type="file"
-            accept=".csv"
-            className="hidden"
-            ref={fileInputRef}
-            onChange={handleImport}
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="p-2 text-slate-600 hover:text-black hover:bg-slate-200 transition-colors rounded-sm"
-            title="Import Clients CSV"
-          >
+          <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={handleImport} />
+          <button onClick={() => fileInputRef.current?.click()} className="p-2 text-slate-600 hover:text-black hover:bg-slate-200 transition-colors" title="Import Clients CSV">
             <Upload className="w-4 h-4" />
           </button>
 
-          <input
-            type="file"
-            accept=".csv"
-            className="hidden"
-            ref={notesFileInputRef}
-            onChange={handleImportNotes}
-          />
-          <button
-            onClick={() => notesFileInputRef.current?.click()}
-            className="p-2 text-slate-600 hover:text-black hover:bg-slate-200 transition-colors rounded-sm ml-2 flex items-center space-x-1"
-            title="Import Notes CSV"
-          >
+          <input type="file" accept=".csv" className="hidden" ref={notesFileInputRef} onChange={handleImportNotes} />
+          <button onClick={() => notesFileInputRef.current?.click()} className="p-2 text-slate-600 hover:text-black hover:bg-slate-200 transition-colors ml-2 flex items-center space-x-1" title="Import Notes CSV">
             <Upload className="w-4 h-4" />
             <span className="text-[10px] font-bold uppercase">Notes</span>
           </button>
-          <button
-            onClick={() => openModal()}
-            className="p-2 bg-black text-white hover:bg-slate-800 transition-colors shadow-sm flex items-center justify-center"
-            title="Add Client"
-          >
+          <button onClick={() => openModal()} className="p-2 bg-black text-white hover:bg-slate-800 transition-colors shadow-sm flex items-center justify-center" title="Add Client">
             <Plus className="w-4 h-4" />
           </button>
         </div>
-      </div >
+      </div>
 
       <div className="flex-1 overflow-auto">
         <table className="w-full border-collapse text-left">
@@ -522,11 +498,9 @@ export default function ClientsPage() {
             <tr>
               {[
                 { key: 'name', label: 'Name' },
-                { key: 'salesPerson', label: 'Sales Person' },
+                { key: 'salesPerson', label: 'Sales' },
                 { key: 'contactType', label: 'Type' },
                 { key: 'contactStatus', label: 'Status' },
-                // { key: 'phones', label: 'Phone' },
-                // { key: 'emails', label: 'Email' },
                 { key: 'industry', label: 'Industry' },
               ].map((col) => (
                 <th
@@ -540,22 +514,34 @@ export default function ClientsPage() {
                   </div>
                 </th>
               ))}
-              <th className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Contact Info</th>
-              <th className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right">Actions</th>
+              <th className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right border-r border-slate-100">
+                <div className="flex items-center justify-end space-x-1.5">
+                  <DollarSign className="w-2.5 h-2.5" />
+                  <span>Revenue</span>
+                </div>
+              </th>
+              <th className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center border-r border-slate-100">
+                <div className="flex items-center justify-center space-x-1.5">
+                  <Activity className="w-2.5 h-2.5" />
+                  <span>Activities</span>
+                </div>
+              </th>
+              <th className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Contact</th>
+              <th className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right w-20"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
               <tr>
-                <td colSpan={10} className="px-4 py-12 text-center text-xs text-slate-400">Loading clients...</td>
+                <td colSpan={9} className="px-4 py-12 text-center text-xs text-slate-400">Loading clients...</td>
               </tr>
             ) : error ? (
               <tr>
-                <td colSpan={10} className="px-4 py-12 text-center text-red-500 text-xs font-bold">{error}</td>
+                <td colSpan={9} className="px-4 py-12 text-center text-red-500 text-xs font-bold">{error}</td>
               </tr>
             ) : clients.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-4 py-12 text-center text-xs text-slate-400 uppercase font-bold tracking-tighter opacity-50">No clients found</td>
+                <td colSpan={9} className="px-4 py-12 text-center text-xs text-slate-400 uppercase font-bold tracking-tighter opacity-50">No clients found</td>
               </tr>
             ) : clients.map((client) => {
               const mainPhone = client.phones?.find(p => p.label === 'Main')?.value;
@@ -564,37 +550,75 @@ export default function ClientsPage() {
               const state = client.addresses?.find(a => a.label === 'Main')?.state;
 
               return (
-                <tr key={client._id} className="hover:bg-slate-50 transition-colors group">
-                  <td className="px-4 py-1.5 text-[11px] font-bold text-slate-900 tracking-tight">{client.name}</td>
-                  <td className="px-4 py-1.5 text-[11px] text-slate-500">
+                <tr 
+                  key={client._id} 
+                  className="hover:bg-slate-50 transition-colors group cursor-pointer"
+                  onClick={() => router.push(`/crm/clients/${client._id}`)}
+                >
+                  <td className="px-4 py-2 text-[11px] font-bold text-slate-900 tracking-tight">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-6 h-6 bg-slate-200 flex items-center justify-center text-[9px] font-black text-slate-600">
+                        {client.name?.charAt(0) || '?'}
+                      </div>
+                      <span>{client.name}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-2 text-[11px] text-slate-500">
                     {typeof client.salesPerson === 'object' && client.salesPerson
                       ? `${client.salesPerson.firstName} ${client.salesPerson.lastName}`
                       : client.salesPerson}
                   </td>
-                  <td className="px-4 py-1.5 text-[10px] uppercase font-bold text-slate-500">{client.contactType}</td>
-                  <td className="px-4 py-1.5 text-[10px] uppercase font-bold text-slate-500">{client.contactStatus}</td>
-                  <td className="px-4 py-1.5 text-[10px] uppercase font-bold text-slate-500">{client.industry}</td>
-                  <td className="px-4 py-1.5">
+                  <td className="px-4 py-2 text-[10px] uppercase font-bold text-slate-500">{client.contactType}</td>
+                  <td className="px-4 py-2">
+                    <span className={cn(
+                      "text-[9px] uppercase font-bold px-2 py-0.5",
+                      client.contactStatus === 'Closed won' ? "bg-emerald-100 text-emerald-700" :
+                      client.contactStatus === 'Closed lost' ? "bg-red-100 text-red-700" :
+                      client.contactStatus === 'Sampling' ? "bg-blue-100 text-blue-700" :
+                      "bg-slate-100 text-slate-600"
+                    )}>
+                      {client.contactStatus}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2 text-[10px] uppercase font-bold text-slate-500">{client.industry}</td>
+                  <td className="px-4 py-2 text-right">
+                    <span className={cn(
+                      "text-[11px] font-bold font-mono",
+                      (client.totalRevenue || 0) > 0 ? "text-emerald-600" : "text-slate-400"
+                    )}>
+                      {formatCurrency(client.totalRevenue || 0)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2 text-center">
+                    <span className={cn(
+                      "text-[11px] font-bold font-mono px-2 py-0.5",
+                      (client.activityCount || 0) > 0 ? "bg-purple-50 text-purple-600" : "text-slate-400"
+                    )}>
+                      {client.activityCount || 0}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2">
                     <div className="flex flex-col space-y-0.5">
                       {mainPhone && <div className="flex items-center text-[10px] text-slate-600"><Phone className="w-2.5 h-2.5 mr-1 text-slate-400" /> {mainPhone}</div>}
                       {mainEmail && <div className="flex items-center text-[10px] text-slate-600"><Mail className="w-2.5 h-2.5 mr-1 text-slate-400" /> {mainEmail}</div>}
                       {(city || state) && <div className="flex items-center text-[10px] text-slate-500"><MapPin className="w-2.5 h-2.5 mr-1 text-slate-300" /> {city}{city && state ? ', ' : ''}{state}</div>}
                     </div>
                   </td>
-                  <td className="px-4 py-1.5 text-right">
+                  <td className="px-4 py-2 text-right">
                     <div className="flex items-center justify-end space-x-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
-                        onClick={() => openModal(client)}
+                        onClick={(e) => openModal(client, e)}
                         className="p-1 text-slate-400 hover:text-black hover:bg-slate-200 transition-colors"
                       >
                         <Edit2 className="w-3 h-3" />
                       </button>
                       <button
-                        onClick={() => handleDelete(client._id)}
+                        onClick={(e) => handleDelete(client._id, e)}
                         className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                       >
                         <Trash2 className="w-3 h-3" />
                       </button>
+                      <ChevronRight className="w-3 h-3 text-slate-300" />
                     </div>
                   </td>
                 </tr>
@@ -614,216 +638,203 @@ export default function ClientsPage() {
       />
 
       {/* Add/Edit Modal */}
-      {
-        isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white w-full max-w-2xl shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
-              {/* Modal Header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
-                <h2 className="text-sm font-black uppercase tracking-widest text-slate-900">
-                  {editingClient ? 'Edit Client' : 'Add New Client'}
-                </h2>
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-2xl shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+              <h2 className="text-sm font-black uppercase tracking-widest text-slate-900">
+                {editingClient ? 'Edit Client' : 'Add New Client'}
+              </h2>
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-black transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex items-center px-6 border-b border-slate-100 bg-slate-50/50 shrink-0">
+              {['basic', 'contact', 'address', 'billing'].map(tab => (
                 <button
-                  onClick={() => setIsModalOpen(false)}
-                  className="text-slate-400 hover:text-black transition-colors"
+                  key={tab}
+                  onClick={() => setActiveTab(tab as any)}
+                  className={cn(
+                    "px-4 py-3 text-[10px] font-bold uppercase tracking-wider border-b-2 transition-colors",
+                    activeTab === tab ? "border-black text-black" : "border-transparent text-slate-400 hover:text-slate-600"
+                  )}
                 >
-                  <X className="w-5 h-5" />
+                  {tab}
                 </button>
-              </div>
+              ))}
+            </div>
 
-              {/* Tabs */}
-              <div className="flex items-center px-6 border-b border-slate-100 bg-slate-50/50 shrink-0">
-                {['basic', 'contact', 'address', 'billing'].map(tab => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab as any)}
-                    className={cn(
-                      "px-4 py-3 text-[10px] font-bold uppercase tracking-wider border-b-2 transition-colors",
-                      activeTab === tab ? "border-black text-black" : "border-transparent text-slate-400 hover:text-slate-600"
-                    )}
-                  >
-                    {tab}
-                  </button>
-                ))}
-              </div>
-
-              {/* Modal Body - Scrollable */}
-              <div className="flex-1 overflow-y-auto p-6">
-                <form id="client-form" onSubmit={handleSubmit} className="space-y-6">
-                  {/* Basic Tab */}
-                  {activeTab === 'basic' && (
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <FormInput label="Company/Client Name" value={formData.name} onChange={v => setFormData({ ...formData, name: v })} required />
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-slate-500 uppercase">Sales Person</label>
-                          <select
-                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:border-black focus:ring-0 transition-colors appearance-none"
-                            value={formData.salesPerson}
-                            onChange={e => setFormData({ ...formData, salesPerson: e.target.value })}
-                          >
-                            <option value="">Select Sales Person</option>
-                            {users.map(u => (
-                              <option key={u._id} value={u._id}>{u.firstName} {u.lastName}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-slate-500 uppercase">Contact Status</label>
-                          <select
-                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:border-black focus:ring-0 transition-colors appearance-none"
-                            value={formData.contactStatus}
-                            onChange={e => setFormData({ ...formData, contactStatus: e.target.value })}
-                          >
-                            <option value="">Select Status</option>
-                            {['Sampling', 'New Prospect', 'Uncategorized', 'Closed lost', 'Initial Contact', 'Closed won'].map(s => (
-                              <option key={s} value={s}>{s}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-slate-500 uppercase">Contact Type</label>
-                          <select
-                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:border-black focus:ring-0 transition-colors appearance-none"
-                            value={formData.contactType}
-                            onChange={e => setFormData({ ...formData, contactType: e.target.value })}
-                          >
-                            <option value="">Select Type</option>
-                            {['Potential Customer', 'Current Customer', 'Inactive Customer', 'Uncategorized'].map(s => (
-                              <option key={s} value={s}>{s}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <FormInput label="Company Type" value={formData.companyType} onChange={v => setFormData({ ...formData, companyType: v })} />
-                        <FormInput label="Industry" value={formData.industry} onChange={v => setFormData({ ...formData, industry: v })} />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <FormInput label="Forecasted Amount ($)" type="number" value={formData.forecastedAmount} onChange={v => setFormData({ ...formData, forecastedAmount: Number(v) })} />
-                        <FormInput label="Projected Close Date" type="date" value={formData.projectedCloseDate} onChange={v => setFormData({ ...formData, projectedCloseDate: v })} />
-                      </div>
-
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <form id="client-form" onSubmit={handleSubmit} className="space-y-6">
+                {activeTab === 'basic' && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormInput label="Company/Client Name" value={formData.name} onChange={v => setFormData({ ...formData, name: v })} required />
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase">Description / Notes</label>
-                        <textarea
-                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:border-black focus:ring-0 transition-colors h-24 resize-none"
-                          value={formData.notes}
-                          onChange={e => setFormData({ ...formData, notes: e.target.value })}
-                        />
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Sales Person</label>
+                        <select
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:border-black focus:ring-0 transition-colors appearance-none"
+                          value={formData.salesPerson}
+                          onChange={e => setFormData({ ...formData, salesPerson: e.target.value })}
+                        >
+                          <option value="">Select Sales Person</option>
+                          {users.map(u => (
+                            <option key={u._id} value={u._id}>{u.firstName} {u.lastName}</option>
+                          ))}
+                        </select>
                       </div>
                     </div>
-                  )}
 
-                  {/* Contact Tab */}
-                  {activeTab === 'contact' && (
-                    <div className="space-y-6">
-                      <div className="space-y-4">
-                        <h3 className="text-xs font-bold uppercase text-slate-900 border-b border-slate-100 pb-2">Phone Numbers</h3>
-                        <div className="grid grid-cols-2 gap-4">
-                          <FormInput label="Phone (Main)" value={formData.phone} onChange={v => setFormData({ ...formData, phone: v })} />
-                          <FormInput label="Phone (Secondary)" value={formData.phone2} onChange={v => setFormData({ ...formData, phone2: v })} />
-                          <FormInput label="Phone (Other)" value={formData.phone3} onChange={v => setFormData({ ...formData, phone3: v })} />
-                          <FormInput label="WhatsApp" value={formData.whatsApp} onChange={v => setFormData({ ...formData, whatsApp: v })} />
-                        </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Contact Status</label>
+                        <select
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:border-black focus:ring-0 transition-colors appearance-none"
+                          value={formData.contactStatus}
+                          onChange={e => setFormData({ ...formData, contactStatus: e.target.value })}
+                        >
+                          <option value="">Select Status</option>
+                          {['Sampling', 'New Prospect', 'Uncategorized', 'Closed lost', 'Initial Contact', 'Closed won'].map(s => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
                       </div>
-
-                      <div className="space-y-4">
-                        <h3 className="text-xs font-bold uppercase text-slate-900 border-b border-slate-100 pb-2">Email Addresses</h3>
-                        <div className="grid grid-cols-2 gap-4">
-                          <FormInput label="Email (Main)" type="email" value={formData.email} onChange={v => setFormData({ ...formData, email: v })} />
-                          <FormInput label="Email (Secondary)" type="email" value={formData.email2} onChange={v => setFormData({ ...formData, email2: v })} />
-                          <FormInput label="Email (Other)" type="email" value={formData.email3} onChange={v => setFormData({ ...formData, email3: v })} />
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <h3 className="text-xs font-bold uppercase text-slate-900 border-b border-slate-100 pb-2">Social / Web</h3>
-                        <div className="grid grid-cols-2 gap-4">
-                          <FormInput label="Website" value={formData.website} onChange={v => setFormData({ ...formData, website: v })} />
-                          <FormInput label="Facebook Page" value={formData.facebookPage} onChange={v => setFormData({ ...formData, facebookPage: v })} />
-                        </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Contact Type</label>
+                        <select
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:border-black focus:ring-0 transition-colors appearance-none"
+                          value={formData.contactType}
+                          onChange={e => setFormData({ ...formData, contactType: e.target.value })}
+                        >
+                          <option value="">Select Type</option>
+                          {['Potential Customer', 'Current Customer', 'Inactive Customer', 'Uncategorized'].map(s => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
                       </div>
                     </div>
-                  )}
 
-                  {/* Address Tab */}
-                  {activeTab === 'address' && (
-                    <div className="space-y-8">
-                      <div className="space-y-4">
-                        <h3 className="text-xs font-bold uppercase text-slate-900 border-b border-slate-100 pb-2 flex items-center"><MapPin className="w-3 h-3 mr-2" /> Main Address</h3>
-                        <FormInput label="Street Address" value={formData.address} onChange={v => setFormData({ ...formData, address: v })} />
-                        <div className="grid grid-cols-3 gap-4">
-                          <FormInput label="City" value={formData.city} onChange={v => setFormData({ ...formData, city: v })} />
-                          <FormInput label="State" value={formData.state} onChange={v => setFormData({ ...formData, state: v })} />
-                          <FormInput label="Postal Code" value={formData.postalCode} onChange={v => setFormData({ ...formData, postalCode: v })} />
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <h3 className="text-xs font-bold uppercase text-slate-900 border-b border-slate-100 pb-2 flex items-center"><MapPin className="w-3 h-3 mr-2 text-slate-400" /> Secondary Address</h3>
-                        <FormInput label="Street Address" value={formData.address2} onChange={v => setFormData({ ...formData, address2: v })} />
-                        <div className="grid grid-cols-3 gap-4">
-                          <FormInput label="City" value={formData.city2} onChange={v => setFormData({ ...formData, city2: v })} />
-                          <FormInput label="State" value={formData.state2} onChange={v => setFormData({ ...formData, state2: v })} />
-                          <FormInput label="Postal Code" value={formData.postalCode2} onChange={v => setFormData({ ...formData, postalCode2: v })} />
-                        </div>
-                      </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormInput label="Company Type" value={formData.companyType} onChange={v => setFormData({ ...formData, companyType: v })} />
+                      <FormInput label="Industry" value={formData.industry} onChange={v => setFormData({ ...formData, industry: v })} />
                     </div>
-                  )}
 
-                  {/* Billing Tab */}
-                  {activeTab === 'billing' && (
-                    <div className="space-y-6">
-                      <div className="space-y-4">
-                        <h3 className="text-xs font-bold uppercase text-slate-900 border-b border-slate-100 pb-2 flex items-center"><CreditCard className="w-3 h-3 mr-2" /> Default Billing</h3>
-                        <FormInput label="Name on Card" value={formData.nameOnCard} onChange={v => setFormData({ ...formData, nameOnCard: v })} />
-                        <FormInput label="Credit Card Number" value={formData.ccNumber} onChange={v => setFormData({ ...formData, ccNumber: v })} placeholder="**** **** **** ****" />
-                        <div className="grid grid-cols-3 gap-4">
-                          <FormInput label="Expiration Date" value={formData.expirationDate} onChange={v => setFormData({ ...formData, expirationDate: v })} placeholder="MM/YY" />
-                          <FormInput label="Security Code" value={formData.securityCode} onChange={v => setFormData({ ...formData, securityCode: v })} type="password" />
-                          <FormInput label="Billing Zip" value={formData.zipCode} onChange={v => setFormData({ ...formData, zipCode: v })} />
-                        </div>
-                      </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormInput label="Forecasted Amount ($)" type="number" value={formData.forecastedAmount} onChange={v => setFormData({ ...formData, forecastedAmount: Number(v) })} />
+                      <FormInput label="Projected Close Date" type="date" value={formData.projectedCloseDate} onChange={v => setFormData({ ...formData, projectedCloseDate: v })} />
+                    </div>
 
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Description / Notes</label>
+                      <textarea
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:border-black focus:ring-0 transition-colors h-24 resize-none"
+                        value={formData.notes}
+                        onChange={e => setFormData({ ...formData, notes: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'contact' && (
+                  <div className="space-y-6">
+                    <div className="space-y-4">
+                      <h3 className="text-xs font-bold uppercase text-slate-900 border-b border-slate-100 pb-2">Phone Numbers</h3>
                       <div className="grid grid-cols-2 gap-4">
-                        <FormInput label="Default Shipping Terms" value={formData.defaultShippingTerms} onChange={v => setFormData({ ...formData, defaultShippingTerms: v })} />
-                        <FormInput label="Default Payment Method" value={formData.defaultPaymentMethod} onChange={v => setFormData({ ...formData, defaultPaymentMethod: v })} />
+                        <FormInput label="Phone (Main)" value={formData.phone} onChange={v => setFormData({ ...formData, phone: v })} />
+                        <FormInput label="Phone (Secondary)" value={formData.phone2} onChange={v => setFormData({ ...formData, phone2: v })} />
+                        <FormInput label="Phone (Other)" value={formData.phone3} onChange={v => setFormData({ ...formData, phone3: v })} />
+                        <FormInput label="WhatsApp" value={formData.whatsApp} onChange={v => setFormData({ ...formData, whatsApp: v })} />
                       </div>
                     </div>
-                  )}
-                </form>
-              </div>
+                    <div className="space-y-4">
+                      <h3 className="text-xs font-bold uppercase text-slate-900 border-b border-slate-100 pb-2">Email Addresses</h3>
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormInput label="Email (Main)" type="email" value={formData.email} onChange={v => setFormData({ ...formData, email: v })} />
+                        <FormInput label="Email (Secondary)" type="email" value={formData.email2} onChange={v => setFormData({ ...formData, email2: v })} />
+                        <FormInput label="Email (Other)" type="email" value={formData.email3} onChange={v => setFormData({ ...formData, email3: v })} />
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <h3 className="text-xs font-bold uppercase text-slate-900 border-b border-slate-100 pb-2">Social / Web</h3>
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormInput label="Website" value={formData.website} onChange={v => setFormData({ ...formData, website: v })} />
+                        <FormInput label="Facebook Page" value={formData.facebookPage} onChange={v => setFormData({ ...formData, facebookPage: v })} />
+                      </div>
+                    </div>
+                  </div>
+                )}
 
-              {/* Modal Footer */}
-              <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 shrink-0 flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-black hover:bg-slate-100 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  form="client-form"
-                  disabled={isSubmitting}
-                  className="px-6 py-2.5 bg-black text-white text-xs font-bold uppercase tracking-wider hover:bg-slate-800 transition-colors disabled:opacity-50 flex items-center space-x-2"
-                >
-                  {isSubmitting && <Loader2 className="w-3 h-3 animate-spin" />}
-                  <span>{editingClient ? 'Save Changes' : 'Create Client'}</span>
-                </button>
-              </div>
+                {activeTab === 'address' && (
+                  <div className="space-y-8">
+                    <div className="space-y-4">
+                      <h3 className="text-xs font-bold uppercase text-slate-900 border-b border-slate-100 pb-2 flex items-center"><MapPin className="w-3 h-3 mr-2" /> Main Address</h3>
+                      <FormInput label="Street Address" value={formData.address} onChange={v => setFormData({ ...formData, address: v })} />
+                      <div className="grid grid-cols-3 gap-4">
+                        <FormInput label="City" value={formData.city} onChange={v => setFormData({ ...formData, city: v })} />
+                        <FormInput label="State" value={formData.state} onChange={v => setFormData({ ...formData, state: v })} />
+                        <FormInput label="Postal Code" value={formData.postalCode} onChange={v => setFormData({ ...formData, postalCode: v })} />
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <h3 className="text-xs font-bold uppercase text-slate-900 border-b border-slate-100 pb-2 flex items-center"><MapPin className="w-3 h-3 mr-2 text-slate-400" /> Secondary Address</h3>
+                      <FormInput label="Street Address" value={formData.address2} onChange={v => setFormData({ ...formData, address2: v })} />
+                      <div className="grid grid-cols-3 gap-4">
+                        <FormInput label="City" value={formData.city2} onChange={v => setFormData({ ...formData, city2: v })} />
+                        <FormInput label="State" value={formData.state2} onChange={v => setFormData({ ...formData, state2: v })} />
+                        <FormInput label="Postal Code" value={formData.postalCode2} onChange={v => setFormData({ ...formData, postalCode2: v })} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'billing' && (
+                  <div className="space-y-6">
+                    <div className="space-y-4">
+                      <h3 className="text-xs font-bold uppercase text-slate-900 border-b border-slate-100 pb-2 flex items-center"><CreditCard className="w-3 h-3 mr-2" /> Default Billing</h3>
+                      <FormInput label="Name on Card" value={formData.nameOnCard} onChange={v => setFormData({ ...formData, nameOnCard: v })} />
+                      <FormInput label="Credit Card Number" value={formData.ccNumber} onChange={v => setFormData({ ...formData, ccNumber: v })} placeholder="**** **** **** ****" />
+                      <div className="grid grid-cols-3 gap-4">
+                        <FormInput label="Expiration Date" value={formData.expirationDate} onChange={v => setFormData({ ...formData, expirationDate: v })} placeholder="MM/YY" />
+                        <FormInput label="Security Code" value={formData.securityCode} onChange={v => setFormData({ ...formData, securityCode: v })} type="password" />
+                        <FormInput label="Billing Zip" value={formData.zipCode} onChange={v => setFormData({ ...formData, zipCode: v })} />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormInput label="Default Shipping Terms" value={formData.defaultShippingTerms} onChange={v => setFormData({ ...formData, defaultShippingTerms: v })} />
+                      <FormInput label="Default Payment Method" value={formData.defaultPaymentMethod} onChange={v => setFormData({ ...formData, defaultPaymentMethod: v })} />
+                    </div>
+                  </div>
+                )}
+              </form>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 shrink-0 flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-black hover:bg-slate-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="client-form"
+                disabled={isSubmitting}
+                className="px-6 py-2.5 bg-black text-white text-xs font-bold uppercase tracking-wider hover:bg-slate-800 transition-colors disabled:opacity-50 flex items-center space-x-2"
+              >
+                {isSubmitting && <Loader2 className="w-3 h-3 animate-spin" />}
+                <span>{editingClient ? 'Save Changes' : 'Create Client'}</span>
+              </button>
             </div>
           </div>
-        )
-      }
-    </div >
+        </div>
+      )}
+    </div>
   );
 }
 
