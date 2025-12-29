@@ -29,25 +29,7 @@ export const DynamicActions = () => {
     return (
         <div className="flex items-center justify-end space-x-3 w-full h-full">
             {/* Route Specific Actions */}
-            {actions.length > 0 && (
-                <div className="hidden md:flex items-center space-x-2 mr-4 border-r border-white/10 pr-6">
-                    {actions.map((action, idx) => (
-                        <button
-                            key={idx}
-                            onClick={action.onClick}
-                            className={cn(
-                                "flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all transform active:scale-95",
-                                action.variant === 'primary'
-                                    ? "bg-accent text-white shadow-lg shadow-accent/20 hover:bg-accent/90"
-                                    : "bg-white/10 text-white border border-white/10 hover:bg-white/20"
-                            )}
-                        >
-                            <action.icon className="w-4 h-4" />
-                            <span className="hidden xl:inline">{action.label}</span>
-                        </button>
-                    ))}
-                </div>
-            )}
+
 
             {/* Global Actions */}
             <div className="flex items-center space-x-2">
