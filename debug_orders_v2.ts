@@ -74,10 +74,10 @@ async function debug() {
         console.log('Found Sample Order by Number ID Query:', sampleOrder._id);
         const item = sampleOrder.lineItems.find((i: any) => i.variationId == variationId);
         console.log('Sample Item from DB:', {
-            productId: item.productId,
-            variationId: item.variationId,
-            productIdType: typeof item.productId,
-            variationIdType: typeof item.variationId
+            productId: item?.productId,
+            variationId: item?.variationId,
+            productIdType: typeof item?.productId,
+            variationIdType: typeof item?.variationId
         });
     } else {
         console.log('Could NOT find sample order with Number ID query.');
@@ -91,10 +91,10 @@ async function debug() {
              console.log('Found an order by simple variationId query.');
              const item = anyOrder.lineItems.find((i: any) => i.variationId == variationId);
              console.log('Item format in DB:', {
-                productId: item.productId,
-                variationId: item.variationId,
-                productIdType: typeof item.productId,
-                variationIdType: typeof item.variationId
+                productId: item?.productId,
+                variationId: item?.variationId,
+                productIdType: typeof item?.productId,
+                variationIdType: typeof item?.variationId
             });
         }
     }
