@@ -531,7 +531,7 @@ export default function ClientDashboardPage() {
                                         <tr 
                                             key={order._id} 
                                             className="hover:bg-slate-50/50 transition-colors group cursor-pointer"
-                                            onClick={() => router.push(`/sales/wholesale/${order._id}`)}
+                                            onClick={() => router.push(`/sales/wholesale-orders/${order._id}`)}
                                         >
                                             <td className="px-4 py-3 text-[11px] text-slate-500 font-mono whitespace-nowrap">
                                                 {formatDate(order.createdAt)}
