@@ -51,6 +51,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 
         // Fetch wholesale orders (SaleOrders) for this client (paginated)
         const ordersQuery = SaleOrder.find({ clientId: id })
+            .populate('salesRep', 'firstName lastName')
             .sort({ createdAt: -1 })
             .skip((page - 1) * limit)
             .limit(limit);
