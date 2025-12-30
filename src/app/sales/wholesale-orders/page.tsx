@@ -72,6 +72,7 @@ interface SaleOrder {
   totalAmount?: number; // Calculated on frontend or populated
   createdAt: string;
   lineItems: LineItem[];
+  payments?: { paymentAmount: number }[];
 }
 
 const UOM_OPTIONS = [
@@ -941,6 +942,7 @@ export default function SaleOrdersPage() {
                 { key: 'shippingCost', label: 'Shipping' },
                 { key: 'discount', label: 'Discount' },
                 { key: 'grandTotal', label: 'Grandtotal' },
+                { key: 'balance', label: 'Balance' },
                 { key: 'cost', label: 'Cost' },
                 { key: 'margin', label: 'Margin' },
               ].map(col => (
@@ -972,6 +974,9 @@ export default function SaleOrdersPage() {
                 const grandTotal = subtotal + shipping + tax - discount;
                 const cost = calculateCost(order);
                 const margin = grandTotal - cost;
+
+                const orderPaid = (order.payments || []).reduce((sum, p) => sum + (p.paymentAmount || 0), 0);
+                const balance = grandTotal - orderPaid;
 
                 return (
                   <tr
@@ -1010,6 +1015,9 @@ export default function SaleOrdersPage() {
                     </td>
                     <td className="px-2 py-1.5 text-[10px] font-black text-slate-900 bg-slate-50 font-mono text-right border-r border-slate-50">
                         {formatCurrency(grandTotal)}
+                    </td>
+                    <td className={cn("px-2 py-1.5 text-[10px] font-bold font-mono text-right border-r border-slate-50", balance > 0.01 ? "text-red-500" : "text-emerald-500")}>
+                        {formatCurrency(balance)}
                     </td>
                     <td className="px-2 py-1.5 text-[10px] text-slate-600 font-mono text-right border-r border-slate-50">
                         {formatCurrency(cost)}
