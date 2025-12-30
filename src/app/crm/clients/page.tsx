@@ -16,7 +16,8 @@ import {
   CreditCard,
   DollarSign,
   Activity,
-  ChevronRight
+  ChevronRight,
+  MoreVertical
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { cn } from '@/lib/utils';
@@ -54,6 +55,7 @@ interface Client {
   defaultShippingTerms?: string;
   defaultPaymentMethod?: string;
   totalRevenue?: number;
+  balance?: number;
   orderCount?: number;
   activityCount?: number;
   lastActivity?: string;
@@ -113,6 +115,7 @@ export default function ClientsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [activeTab, setActiveTab] = useState<'basic' | 'contact' | 'address' | 'billing'>('basic');
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const initialFormState = {
     name: '',
@@ -492,30 +495,37 @@ export default function ClientsPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto" onClick={() => setOpenMenuId(null)}>
         <table className="w-full border-collapse text-left">
           <thead className="sticky top-0 bg-slate-50 z-10 border-b border-slate-100">
             <tr>
               {[
-                { key: 'name', label: 'Name' },
-                { key: 'salesPerson', label: 'Sales' },
-                { key: 'contactType', label: 'Type' },
-                { key: 'contactStatus', label: 'Status' },
-                { key: 'industry', label: 'Industry' },
+                { key: 'name', label: 'Name', width: 'w-64' },
+                { key: 'address', label: 'Address', width: 'w-48' },
+                { key: 'email', label: 'Contact', width: 'w-48' },
+                { key: 'phone', label: 'Phone', width: 'w-32' },
+                { key: 'salesPerson', label: 'Sale Rep', width: 'w-32' },
+                { key: 'contactStatus', label: 'Status', width: 'w-24' },
               ].map((col) => (
                 <th
                   key={col.key}
-                  onClick={() => handleSort(col.key)}
-                  className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors border-r border-slate-100 last:border-0"
+                  onClick={() => (col.key !== 'address' && col.key !== 'email' && col.key !== 'phone') && handleSort(col.key)}
+                  className={cn(
+                    "px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100 last:border-0",
+                    col.width,
+                    (col.key !== 'address' && col.key !== 'email' && col.key !== 'phone') ? "cursor-pointer hover:bg-slate-100 transition-colors" : ""
+                  )}
                 >
                   <div className="flex items-center space-x-1.5">
                     <span>{col.label}</span>
-                    <ArrowUpDown className={cn("w-2.5 h-2.5", sortBy === col.key ? "text-black" : "text-slate-200")} />
+                    {(col.key !== 'address' && col.key !== 'email' && col.key !== 'phone') && (
+                      <ArrowUpDown className={cn("w-2.5 h-2.5", sortBy === col.key ? "text-black" : "text-slate-200")} />
+                    )}
                   </div>
                 </th>
               ))}
               <th 
-                className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right border-r border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors"
+                className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right border-r border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors w-24"
                 onClick={() => handleSort('totalRevenue')}
               >
                 <div className="flex items-center justify-end space-x-1.5">
@@ -524,34 +534,45 @@ export default function ClientsPage() {
                   <ArrowUpDown className={cn("w-2.5 h-2.5", sortBy === 'totalRevenue' ? "text-black" : "text-slate-200")} />
                 </div>
               </th>
-              <th className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center border-r border-slate-100">
+              <th 
+                className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right border-r border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors w-24"
+                onClick={() => handleSort('balance')}
+              >
+                <div className="flex items-center justify-end space-x-1.5">
+                  <DollarSign className="w-2.5 h-2.5" />
+                  <span>Balance</span>
+                  <ArrowUpDown className={cn("w-2.5 h-2.5", sortBy === 'balance' ? "text-black" : "text-slate-200")} />
+                </div>
+              </th>
+              <th className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center border-r border-slate-100 w-24">
                 <div className="flex items-center justify-center space-x-1.5">
                   <Activity className="w-2.5 h-2.5" />
                   <span>Activities</span>
                 </div>
               </th>
-              <th className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Contact</th>
-              <th className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right w-20"></th>
+              <th className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center w-12">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
               <tr>
-                <td colSpan={9} className="px-4 py-12 text-center text-xs text-slate-400">Loading clients...</td>
+                <td colSpan={10} className="px-4 py-12 text-center text-xs text-slate-400">Loading clients...</td>
               </tr>
             ) : error ? (
               <tr>
-                <td colSpan={9} className="px-4 py-12 text-center text-red-500 text-xs font-bold">{error}</td>
+                <td colSpan={10} className="px-4 py-12 text-center text-red-500 text-xs font-bold">{error}</td>
               </tr>
             ) : clients.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-12 text-center text-xs text-slate-400 uppercase font-bold tracking-tighter opacity-50">No clients found</td>
+                <td colSpan={10} className="px-4 py-12 text-center text-xs text-slate-400 uppercase font-bold tracking-tighter opacity-50">No clients found</td>
               </tr>
             ) : clients.map((client) => {
               const mainPhone = client.phones?.find(p => p.label === 'Main')?.value;
               const mainEmail = client.emails?.find(e => e.label === 'Main')?.value;
-              const city = client.addresses?.find(a => a.label === 'Main')?.city;
-              const state = client.addresses?.find(a => a.label === 'Main')?.state;
+              const addr = client.addresses?.find(a => a.label === 'Main');
+              const addressStr = addr ? [addr.city, addr.state].filter(Boolean).join(', ') : '-';
 
               return (
                 <tr 
@@ -559,6 +580,7 @@ export default function ClientsPage() {
                   className="hover:bg-slate-50 transition-colors group cursor-pointer"
                   onClick={() => router.push(`/crm/clients/${client._id}`)}
                 >
+                  {/* 1. Name */}
                   <td className="px-4 py-2 text-[11px] font-bold text-slate-900 tracking-tight">
                     <div className="flex items-center space-x-2">
                       <div className="w-6 h-6 bg-slate-200 flex items-center justify-center text-[9px] font-black text-slate-600">
@@ -567,32 +589,72 @@ export default function ClientsPage() {
                       <span>{client.name}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-2 text-[11px] text-slate-500">
+
+                  {/* 2. Address */}
+                  <td className="px-4 py-2 text-[10px] text-slate-500">
+                    <div className="flex items-center">
+                       <MapPin className="w-2.5 h-2.5 mr-1.5 text-slate-300" />
+                       {addressStr}
+                    </div>
+                  </td>
+
+                  {/* 3. Contact (Email) */}
+                  <td className="px-4 py-2 text-[10px] text-slate-500 truncate max-w-[150px]">
+                    <div className="flex items-center" title={mainEmail}>
+                        <Mail className="w-2.5 h-2.5 mr-1.5 text-slate-300" />
+                        {mainEmail || '-'}
+                    </div>
+                  </td>
+
+                  {/* 4. Phone */}
+                  <td className="px-4 py-2 text-[10px] text-slate-500">
+                    <div className="flex items-center">
+                        <Phone className="w-2.5 h-2.5 mr-1.5 text-slate-300" />
+                        {mainPhone || '-'}
+                    </div>
+                  </td>
+
+                  {/* 5. Sales Rep */}
+                  <td className="px-4 py-2 text-[11px] text-slate-500 font-medium">
                     {typeof client.salesPerson === 'object' && client.salesPerson
                       ? `${client.salesPerson.firstName} ${client.salesPerson.lastName}`
-                      : client.salesPerson}
+                      : client.salesPerson || '-'}
                   </td>
-                  <td className="px-4 py-2 text-[10px] uppercase font-bold text-slate-500">{client.contactType}</td>
+
+                  {/* 6. Status */}
                   <td className="px-4 py-2">
                     <span className={cn(
-                      "text-[9px] uppercase font-bold px-2 py-0.5",
+                      "text-[9px] uppercase font-bold px-2 py-0.5 whitespace-nowrap",
                       client.contactStatus === 'Closed won' ? "bg-emerald-100 text-emerald-700" :
                       client.contactStatus === 'Closed lost' ? "bg-red-100 text-red-700" :
                       client.contactStatus === 'Sampling' ? "bg-blue-100 text-blue-700" :
                       "bg-slate-100 text-slate-600"
                     )}>
-                      {client.contactStatus}
+                      {client.contactStatus || 'Unknown'}
                     </span>
                   </td>
-                  <td className="px-4 py-2 text-[10px] uppercase font-bold text-slate-500">{client.industry}</td>
+
+                  {/* 7. Revenue */}
                   <td className="px-4 py-2 text-right">
                     <span className={cn(
                       "text-[11px] font-bold font-mono",
-                      (client.totalRevenue || 0) > 0 ? "text-emerald-600" : "text-slate-400"
+                      (client.totalRevenue || 0) > 0 ? "text-slate-900" : "text-slate-400"
                     )}>
                       {formatCurrency(client.totalRevenue || 0)}
                     </span>
                   </td>
+
+                  {/* 8. Balance */}
+                  <td className="px-4 py-2 text-right">
+                    <span className={cn(
+                      "text-[11px] font-bold font-mono",
+                      (client.balance || 0) > 0.01 ? "text-red-500" : "text-emerald-500"
+                    )}>
+                      {formatCurrency(client.balance || 0)}
+                    </span>
+                  </td>
+
+                  {/* 9. Activities */}
                   <td className="px-4 py-2 text-center">
                     <span className={cn(
                       "text-[11px] font-bold font-mono px-2 py-0.5",
@@ -601,29 +663,44 @@ export default function ClientsPage() {
                       {client.activityCount || 0}
                     </span>
                   </td>
-                  <td className="px-4 py-2">
-                    <div className="flex flex-col space-y-0.5">
-                      {mainPhone && <div className="flex items-center text-[10px] text-slate-600"><Phone className="w-2.5 h-2.5 mr-1 text-slate-400" /> {mainPhone}</div>}
-                      {mainEmail && <div className="flex items-center text-[10px] text-slate-600"><Mail className="w-2.5 h-2.5 mr-1 text-slate-400" /> {mainEmail}</div>}
-                      {(city || state) && <div className="flex items-center text-[10px] text-slate-500"><MapPin className="w-2.5 h-2.5 mr-1 text-slate-300" /> {city}{city && state ? ', ' : ''}{state}</div>}
-                    </div>
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    <div className="flex items-center justify-end space-x-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={(e) => openModal(client, e)}
-                        className="p-1 text-slate-400 hover:text-black hover:bg-slate-200 transition-colors"
-                      >
-                        <Edit2 className="w-3 h-3" />
-                      </button>
-                      <button
-                        onClick={(e) => handleDelete(client._id, e)}
-                        className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                      <ChevronRight className="w-3 h-3 text-slate-300" />
-                    </div>
+
+                   {/* 10. Actions (3 dots) */}
+                  <td className="px-4 py-2 text-center relative z-20">
+                     <button 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenMenuId(openMenuId === client._id ? null : client._id);
+                        }}
+                        className="p-1.5 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-600"
+                     >
+                        <MoreVertical className="w-3.5 h-3.5" />
+                     </button>
+                     
+                     {/* Dropdown Menu */}
+                     {openMenuId === client._id && (
+                        <div className="absolute right-0 top-full mt-1 w-32 bg-white shadow-xl border border-slate-100 py-1 z-50 animate-in fade-in zoom-in-95 duration-100 origin-top-right rounded-sm">
+                            <button
+                                onClick={(e) => {
+                                    openModal(client, e);
+                                    setOpenMenuId(null);
+                                }}
+                                className="w-full text-left px-4 py-2 text-[10px] uppercase font-bold text-slate-600 hover:bg-slate-50 hover:text-black flex items-center space-x-2"
+                            >
+                                <Edit2 className="w-3 h-3" />
+                                <span>Edit</span>
+                            </button>
+                            <button
+                                onClick={(e) => {
+                                    handleDelete(client._id, e);
+                                    setOpenMenuId(null);
+                                }}
+                                className="w-full text-left px-4 py-2 text-[10px] uppercase font-bold text-red-600 hover:bg-red-50 flex items-center space-x-2"
+                            >
+                                <Trash2 className="w-3 h-3" />
+                                <span>Delete</span>
+                            </button>
+                        </div>
+                     )}
                   </td>
                 </tr>
               );

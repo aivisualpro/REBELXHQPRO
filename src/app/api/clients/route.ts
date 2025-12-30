@@ -113,13 +113,26 @@ export async function GET(request: Request) {
         // Get client IDs for aggregation
         const clientIds = clients.map((c: any) => c._id);
 
-        // Aggregate revenue per client from SaleOrders
+        // Aggregate revenue and balance per client from SaleOrders
         const revenueAgg = await SaleOrder.aggregate([
             { $match: { clientId: { $in: clientIds }, orderStatus: { $ne: 'Cancelled' } } },
-            { $unwind: { path: '$lineItems', preserveNullAndEmptyArrays: true } },
+            { $project: {
+                clientId: 1,
+                itemsTotal: { $sum: { $ifNull: ["$lineItems.total", 0] } },
+                shippingCost: { $ifNull: ["$shippingCost", 0] },
+                tax: { $ifNull: ["$tax", 0] },
+                discount: { $ifNull: ["$discount", 0] },
+                paidAmount: { $sum: { $ifNull: ["$payments.paymentAmount", 0] } }
+            }},
+            { $project: {
+                clientId: 1,
+                orderRevenue: { $subtract: [ { $add: ["$itemsTotal", "$shippingCost", "$tax"] }, "$discount" ] },
+                paidAmount: 1
+            }},
             { $group: {
                 _id: '$clientId',
-                totalRevenue: { $sum: { $ifNull: ['$lineItems.total', 0] } },
+                totalRevenue: { $sum: '$orderRevenue' },
+                totalPaid: { $sum: '$paidAmount' },
                 orderCount: { $sum: 1 }
             }}
         ]);
@@ -135,18 +148,26 @@ export async function GET(request: Request) {
         ]);
 
         // Create lookup maps
-        const revenueMap = new Map(revenueAgg.map((r: any) => [r._id?.toString(), { revenue: r.totalRevenue || 0, orderCount: r.orderCount || 0 }]));
+        const revenueMap = new Map(revenueAgg.map((r: any) => [
+            r._id?.toString(), 
+            { 
+                revenue: r.totalRevenue || 0, 
+                balance: (r.totalRevenue || 0) - (r.totalPaid || 0),
+                orderCount: r.orderCount || 0 
+            }
+        ]));
         const activityMap = new Map(activityAgg.map((a: any) => [a._id?.toString(), { count: a.activityCount || 0, lastActivity: a.lastActivity }]));
 
         // Enrich clients with stats
         const enrichedClients = clients.map((c: any) => {
             const clientId = c._id?.toString();
-            const revenueData = revenueMap.get(clientId) || { revenue: 0, orderCount: 0 };
+            const revenueData = revenueMap.get(clientId) || { revenue: 0, balance: 0, orderCount: 0 };
             const activityData = activityMap.get(clientId) || { count: 0, lastActivity: null };
             
             return {
                 ...c,
                 totalRevenue: revenueData.revenue,
+                balance: revenueData.balance,
                 orderCount: revenueData.orderCount,
                 activityCount: activityData.count,
                 lastActivity: activityData.lastActivity
