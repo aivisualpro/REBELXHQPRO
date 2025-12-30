@@ -76,7 +76,7 @@ interface OrderItem {
 interface Summary {
     totalOrders: number;
     totalRevenue: number;
-    totalItemsSold: number;
+    totalBalance: number;
     totalActivities: number;
     lastActivityDate: string | null;
     lastOrderDate: string | null;
@@ -277,8 +277,10 @@ export default function ClientDashboardPage() {
                                 <div className="text-xl font-black text-purple-700">{summary?.totalActivities || 0}</div>
                             </div>
                             <div className="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-100 p-3">
-                                <div className="text-[9px] font-bold text-orange-600 uppercase tracking-widest mb-1">Items Sold</div>
-                                <div className="text-xl font-black text-orange-700">{summary?.totalItemsSold || 0}</div>
+                                <div className="text-[9px] font-bold text-orange-600 uppercase tracking-widest mb-1">Payment Balance</div>
+                                <div className={cn("text-xl font-black", (summary?.totalBalance || 0) > 0 ? "text-red-600" : "text-emerald-600")}>
+                                    {formatCurrency(summary?.totalBalance || 0)}
+                                </div>
                             </div>
                         </div>
 

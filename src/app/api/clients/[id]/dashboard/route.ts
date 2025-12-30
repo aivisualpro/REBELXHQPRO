@@ -64,12 +64,18 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
         // Calculate summary stats
         const allOrders = await SaleOrder.find({ clientId: id, orderStatus: { $ne: 'Cancelled' } }).lean();
         let totalRevenue = 0;
-        let totalItemsSold = 0;
+        let totalPaid = 0;
+        
         allOrders.forEach((o: any) => {
-            const lineTotal = (o.lineItems || []).reduce((sum: number, li: any) => sum + (li.total || 0), 0);
-            totalRevenue += lineTotal + (o.shippingCost || 0) - (o.discount || 0);
-            totalItemsSold += (o.lineItems || []).reduce((sum: number, li: any) => sum + (li.qtyShipped || 0), 0);
+            const lineTotal = (o.lineItems || []).reduce((sum: number, li: any) => sum + ((li.qtyShipped || 0) * (li.price || 0)), 0);
+            const orderTotal = lineTotal + (o.shippingCost || 0) + (o.tax || 0) - (o.discount || 0);
+            totalRevenue += orderTotal;
+            
+            const orderPaid = (o.payments || []).reduce((sum: number, p: any) => sum + (p.paymentAmount || 0), 0);
+            totalPaid += orderPaid;
         });
+
+        const totalBalance = totalRevenue - totalPaid;
 
         // Find last activity and last order dates
         const lastActivity = await Activity.findOne({ client: id }).sort({ createdAt: -1 }).lean();
@@ -83,7 +89,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
             summary: {
                 totalOrders: totalOrders,
                 totalRevenue,
-                totalItemsSold,
+                totalBalance,
                 totalActivities,
                 lastActivityDate: lastActivity?.createdAt || null,
                 lastOrderDate: lastOrder?.createdAt || null
