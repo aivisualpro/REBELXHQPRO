@@ -69,8 +69,8 @@ export default function ClientsPage() {
   const [totalClients, setTotalClients] = useState(0);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [sortBy, setSortBy] = useState('name');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [sortBy, setSortBy] = useState('totalRevenue');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // Filter States
   const [selectedSalesPersons, setSelectedSalesPersons] = useState<string[]>([]);
@@ -514,10 +514,14 @@ export default function ClientsPage() {
                   </div>
                 </th>
               ))}
-              <th className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right border-r border-slate-100">
+              <th 
+                className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right border-r border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors"
+                onClick={() => handleSort('totalRevenue')}
+              >
                 <div className="flex items-center justify-end space-x-1.5">
                   <DollarSign className="w-2.5 h-2.5" />
                   <span>Revenue</span>
+                  <ArrowUpDown className={cn("w-2.5 h-2.5", sortBy === 'totalRevenue' ? "text-black" : "text-slate-200")} />
                 </div>
               </th>
               <th className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center border-r border-slate-100">

@@ -57,15 +57,58 @@ export async function GET(request: Request) {
             query['addresses.state'] = { $in: state.split(',').map(s => new RegExp(s, 'i')) };
         }
 
-        const [total, clients] = await Promise.all([
-            Client.countDocuments(query),
-            Client.find(query)
-                .populate('salesPerson', 'firstName lastName')
-                .sort({ [sortBy]: sortOrder as any })
-                .skip((page - 1) * limit)
-                .limit(limit)
-                .lean()
-        ]);
+        let clients: any[] = [];
+        let total = 0;
+
+        if (sortBy === 'totalRevenue') {
+            total = await Client.countDocuments(query);
+            
+            clients = await Client.aggregate([
+                { $match: query },
+                { $lookup: {
+                    from: 'saleorders',
+                    localField: '_id',
+                    foreignField: 'clientId',
+                    pipeline: [
+                         { $project: { lineItems: 1 } },
+                         { $unwind: { path: "$lineItems", preserveNullAndEmptyArrays: true } },
+                         { $group: { _id: null, total: { $sum: { $ifNull: ["$lineItems.total", 0] } } } }
+                    ],
+                    as: 'revenueData'
+                }},
+                { $addFields: {
+                    totalRevenue: { $ifNull: [ { $arrayElemAt: ["$revenueData.total", 0] }, 0 ] }
+                }},
+                { $sort: { totalRevenue: sortOrder as 1 | -1 } },
+                { $skip: (page - 1) * limit },
+                { $limit: limit },
+                { $lookup: {
+                    from: 'rxhqusers',
+                    localField: 'salesPerson',
+                    foreignField: '_id',
+                    as: 'salesPersonDoc'
+                }},
+                { $unwind: { path: '$salesPersonDoc', preserveNullAndEmptyArrays: true } },
+                { $addFields: {
+                     salesPerson: {
+                         _id: '$salesPersonDoc._id',
+                         firstName: '$salesPersonDoc.firstName',
+                         lastName: '$salesPersonDoc.lastName'
+                     }
+                }},
+                { $project: { revenueData: 0, salesPersonDoc: 0 } }
+            ]);
+        } else {
+            [total, clients] = await Promise.all([
+                Client.countDocuments(query),
+                Client.find(query)
+                    .populate('salesPerson', 'firstName lastName')
+                    .sort({ [sortBy]: sortOrder as any })
+                    .skip((page - 1) * limit)
+                    .limit(limit)
+                    .lean()
+            ]);
+        }
 
         // Get client IDs for aggregation
         const clientIds = clients.map((c: any) => c._id);
