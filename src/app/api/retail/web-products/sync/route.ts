@@ -99,8 +99,13 @@ async function fetchVariations(baseUrl: string, productId: number, key: string, 
 }
 
 export async function GET() {
+    const startTime = syncProgress.startTime || 0;
+    const elapsedMinutes = syncProgress.isSyncing ? ((Date.now() - startTime) / 1000 / 60).toFixed(1) : '0';
+    
     return NextResponse.json({
         ...syncProgress,
+        elapsedMinutes,
+        isStale: syncProgress.isSyncing && parseFloat(elapsedMinutes) > 10,
         debug: {
             logsCount: syncProgress.logs.length,
             lastLog: syncProgress.logs[syncProgress.logs.length - 1] || null
@@ -109,8 +114,21 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+    // If syncing has been 'running' for more than 10 minutes, it's likely stuck (Vercel timeout)
     if (syncProgress.isSyncing) {
-        return NextResponse.json({ error: 'Sync already in progress' }, { status: 409 });
+        const startTime = syncProgress.startTime || 0;
+        const elapsedMinutes = (Date.now() - startTime) / 1000 / 60;
+        
+        if (elapsedMinutes > 10) {
+            console.log(`Sync was stuck for ${elapsedMinutes.toFixed(1)}m. Resetting.`);
+            syncProgress.isSyncing = false;
+        } else {
+            return NextResponse.json({ 
+                error: 'Sync already in progress',
+                startedAt: new Date(startTime).toISOString(),
+                elapsedMinutes: elapsedMinutes.toFixed(1)
+            }, { status: 409 });
+        }
     }
 
     const { searchParams } = new URL(request.url);
@@ -180,7 +198,12 @@ export async function POST(request: Request) {
 
             for (const site of websites) {
                 if (!site.baseUrl || !site.key || !site.secret) {
-                    syncProgress.logs.push(`⏭️ Skipping ${site.name}: Missing credentials`);
+                    const missing = [];
+                    if (!site.baseUrl) missing.push('API URL');
+                    if (!site.key) missing.push('Consumer Key');
+                    if (!site.secret) missing.push('Consumer Secret');
+                    syncProgress.logs.push(`⏭️ Skipping ${site.name}: Missing ${missing.join(', ')}`);
+                    console.warn(`Skipping ${site.name} due to missing env vars: ${missing.join(', ')}`);
                     continue;
                 }
 
@@ -234,8 +257,9 @@ export async function POST(request: Request) {
                 syncProgress.currentProductName = p.name?.substring(0, 50) || `Product ${p.id}`;
                 
                 try {
-                    // Generate WebProduct ID
-                    const webProductId = p.sku?.trim() || `WC-${site.name}-${p.id}`;
+                    // Generate WebProduct ID - Use Site Name + Web ID to avoid collisions across sites
+                    // Previously this was using p.sku which caused products with same SKUs on different sites to overwrite each other
+                    const webProductId = `WC-${site.name}-${p.id}`;
                     
                     // Get existing WebProduct to preserve linkedSkuId
                     const existingWebProduct = await WebProduct.findById(webProductId).lean();
