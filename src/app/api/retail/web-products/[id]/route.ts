@@ -47,3 +47,22 @@ export async function PATCH(
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
+
+export async function DELETE(
+    request: NextRequest,
+    context: { params: Promise<{ id: string }> }
+) {
+    try {
+        await dbConnect();
+        const { id } = await context.params;
+        const deletedProduct = await WebProduct.findByIdAndDelete(id);
+
+        if (!deletedProduct) {
+            return NextResponse.json({ error: 'Web Product not found' }, { status: 404 });
+        }
+
+        return NextResponse.json({ message: 'Web Product deleted successfully' });
+    } catch (error: any) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+}

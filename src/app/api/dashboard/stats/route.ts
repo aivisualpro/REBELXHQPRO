@@ -136,8 +136,26 @@ export async function GET(request: Request) {
         // 6. Tickets
         const openTicketsCount = await Ticket.countDocuments({ status: { $in: ['Open', 'In Progress'] } });
 
-        // 7. Active Clients (Total clients)
-        const clientsCount = await Client.countDocuments({});
+        // 7. Qualified Wholesale Clients (Revenue >= $100)
+        // This is used for both the KPIs and the Retention analysis to remain consistent with crm/clients view
+        const qualifiedClientsAgg = await SaleOrder.aggregate([
+            { $match: { orderStatus: { $ne: 'Cancelled' } } },
+            {
+                $project: {
+                    clientId: 1,
+                    orderRevenue: {
+                        $subtract: [
+                            { $add: [{ $sum: { $ifNull: ["$lineItems.total", 0] } }, { $ifNull: ["$shippingCost", 0] }, { $ifNull: ["$tax", 0] }] },
+                            { $ifNull: ["$discount", 0] }
+                        ]
+                    }
+                }
+            },
+            { $group: { _id: "$clientId", totalRevenue: { $sum: "$orderRevenue" } } },
+            { $match: { totalRevenue: { $gte: 100 } } }
+        ]);
+        const wholesaleClientIds = qualifiedClientsAgg.map(q => q._id);
+        const clientsCount = wholesaleClientIds.length;
 
         // 8. Low Stock
         const totalSkus = await Sku.countDocuments({});
@@ -145,10 +163,6 @@ export async function GET(request: Request) {
 
         // 9. Recent Activity
         const recentOrders = await WebOrder.find().sort({ createdAt: -1 }).limit(5).lean();
-
-        // 10. Client Inactivity Analysis (ONLY for clients with at least 1 wholesale order)
-        // First, get all unique client IDs that have ever placed a wholesale order
-        const wholesaleClientIds = await SaleOrder.distinct('clientId', { orderStatus: { $ne: 'Cancelled' } });
 
         // Now get the last order and activity dates for ONLY those clients
         const [lastOrderGroups, lastActivityGroups, wholesaleClients] = await Promise.all([

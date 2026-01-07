@@ -266,30 +266,31 @@ export default function UsersPage() {
         </div>
 
         <div className="flex items-center space-x-2">
-          {session?.user?.email === 'adeel@grassrootsharvest.com' && (
-            <>
-              <input
-                type="file"
-                accept=".csv"
-                className="hidden"
-                ref={fileInputRef}
-                onChange={handleImport}
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="p-2 text-slate-600 hover:text-black hover:bg-slate-200 transition-colors"
-                title="Import CSV"
-              >
-                <Upload className="w-4 h-4" />
-              </button>
-            </>
-          )}
+          <>
+            <input
+              type="file"
+              accept=".csv"
+              className="hidden"
+              ref={fileInputRef}
+              onChange={handleImport}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="h-[30px] px-3 bg-white text-slate-600 hover:text-black hover:bg-slate-100 transition-colors border border-slate-200 shadow-sm flex items-center space-x-2 rounded-sm"
+              title="Import Users from CSV"
+            >
+              <Upload className="w-3.5 h-3.5 text-blue-500" />
+              <span className="text-[10px] font-bold uppercase tracking-wider">Import CSV</span>
+            </button>
+          </>
+          
           <button
             onClick={() => openModal()}
-            className="p-2 bg-black text-white hover:bg-slate-800 transition-colors shadow-sm flex items-center justify-center"
+            className="h-[30px] px-3 bg-black text-white hover:bg-slate-800 transition-colors shadow-sm flex items-center space-x-2 rounded-sm"
             title="Add User"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-3.5 h-3.5" />
+            <span className="text-[10px] font-bold uppercase tracking-wider">Add User</span>
           </button>
         </div>
       </div>

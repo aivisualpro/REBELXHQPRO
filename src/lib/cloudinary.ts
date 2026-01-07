@@ -17,8 +17,12 @@ export default cloudinary;
  */
 export const uploadImage = async (file: string, folder?: string) => {
     try {
+        const defaultFolder = process.env.NODE_ENV === 'development' 
+            ? 'rebelx-headquarters-Dev' 
+            : 'rebelx-headquarters';
+
         const result = await cloudinary.uploader.upload(file, {
-            folder: folder || 'rebelx-headquarters',
+            folder: folder || defaultFolder,
             resource_type: 'auto',
         });
         return result;

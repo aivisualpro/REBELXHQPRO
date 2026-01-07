@@ -128,3 +128,20 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
+
+export async function POST(request: NextRequest) {
+    try {
+        await dbConnect();
+        const body = await request.json();
+        
+        // Ensure _id is set if not provided (usually WC-Website-ID)
+        if (!body._id && body.webId && body.website) {
+            body._id = `WC-${body.website}-${body.webId}`;
+        }
+
+        const product = await WebProduct.create(body);
+        return NextResponse.json(product);
+    } catch (error: any) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+}

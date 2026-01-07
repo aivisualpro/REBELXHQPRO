@@ -295,6 +295,12 @@ export async function POST(request: Request) {
                     baseUrl: process.env.REBELXBRANDSRODUCERAPI || '',
                     key: process.env.REBELXBRANDSRODUCERCONSUMERKEY || '',
                     secret: process.env.REBELXBRANDSRODUCERCONSUMERSECRET || ''
+                },
+                {
+                    name: process.env.GUDTONICSTITLE || 'GUDTONICS',
+                    baseUrl: process.env.GUDTONICSAPI || '',
+                    key: process.env.GUDTONICSCONSUMERKEY || '',
+                    secret: process.env.GUDTONICSCONSUMERSECRET || ''
                 }
             ];
 
@@ -334,8 +340,15 @@ export async function POST(request: Request) {
                         site.baseUrl, site.key, site.secret, site.name,
                         lastSyncAt ? new Date(lastSyncAt) : undefined
                     );
-                    orders.forEach(order => allWebOrders.push({ site, order }));
-                    syncProgress.logs.push(`📋 ${site.name}: ${orders.length} orders`);
+                    
+                    // Filter out Cancelled, Trash, and Failed orders
+                    const filteredOrders = orders.filter(order => {
+                        const s = order.status?.toLowerCase();
+                        return s !== 'cancelled' && s !== 'trash' && s !== 'failed';
+                    });
+
+                    filteredOrders.forEach(order => allWebOrders.push({ site, order }));
+                    syncProgress.logs.push(`📋 ${site.name}: Found ${orders.length} total, keeping ${filteredOrders.length} valid orders`);
                 } catch (err: any) {
                     syncProgress.logs.push(`❌ ${site.name}: ${err.message}`);
                 }

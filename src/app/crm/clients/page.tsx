@@ -159,6 +159,7 @@ export default function ClientsPage() {
       if (selectedCities.length) params.append('city', selectedCities.join(','));
       if (selectedStates.length) params.append('state', selectedStates.join(','));
       if (selectedShippingTerms.length) params.append('defaultShippingTerms', selectedShippingTerms.join(','));
+      params.append('minRevenue', '100');
 
       const res = await fetch(`/api/clients?${params.toString()}`);
       const data = await res.json();
@@ -489,10 +490,11 @@ export default function ClientsPage() {
           <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={handleImport} />
           <button 
             onClick={() => fileInputRef.current?.click()} 
-            className="h-[30px] w-[30px] bg-white border border-slate-200 text-slate-600 hover:text-black hover:bg-slate-50 transition-colors shadow-sm flex items-center justify-center" 
-            title="Import Clients CSV"
+            className="h-[30px] px-3 bg-white border border-slate-200 text-slate-600 hover:text-black hover:bg-slate-100 transition-colors shadow-sm flex items-center space-x-2 rounded-sm" 
+            title="Import Clients from CSV"
           >
-            <Upload className="w-4 h-4" />
+            <Upload className="w-3.5 h-3.5 text-blue-500" />
+            <span className="text-[10px] font-bold uppercase tracking-wider">Import CSV</span>
           </button>
 
           <input type="file" accept=".csv" className="hidden" ref={notesFileInputRef} onChange={handleImportNotes} />
@@ -585,7 +587,9 @@ export default function ClientsPage() {
               </tr>
             ) : clients.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-4 py-12 text-center text-xs text-slate-400 uppercase font-bold tracking-tighter opacity-50">No clients found</td>
+                <td colSpan={10} className="px-4 py-12 text-center text-xs text-slate-400 uppercase font-bold tracking-tighter opacity-50">
+                  No clients found with revenue ≥ $100
+                </td>
               </tr>
             ) : clients.map((client) => {
               const mainPhone = client.phones?.find(p => p.label === 'Main')?.value;

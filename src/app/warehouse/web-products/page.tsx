@@ -89,9 +89,12 @@ export default function WebProductsPage() {
   const [globalSettings, setGlobalSettings] = useState<any>(null);
 
   const initialFormState = {
-    sku: '',
+    _id: '',
+    webId: 0,
+    sku_code: '',
     name: '',
     image: '',
+    website: '',
     category: '',
     subCategory: '',
     materialType: '',
@@ -268,9 +271,12 @@ export default function WebProductsPage() {
     if (sku) {
       setEditingSku(sku);
       setFormData({
-        sku: sku._id, // _id is sku
+        _id: sku._id,
+        webId: sku.webId || 0,
+        sku_code: (sku as any).sku_code || '',
         name: sku.name,
         image: sku.image || '',
+        website: sku.website || '',
         category: sku.category || '',
         subCategory: sku.subCategory || '',
         materialType: sku.materialType || '',
@@ -292,10 +298,10 @@ export default function WebProductsPage() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const url = editingSku ? `/api/skus/${editingSku._id}` : '/api/skus';
+      const url = editingSku ? `/api/retail/web-products/${editingSku._id}` : '/api/retail/web-products';
       const method = editingSku ? 'PATCH' : 'POST';
 
-      const payload = { ...formData, isWebProduct: true };
+      const payload = { ...formData };
 
       const res = await fetch(url, {
         method,
@@ -322,7 +328,7 @@ export default function WebProductsPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this product?')) return;
     try {
-      const res = await fetch(`/api/skus/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/retail/web-products/${id}`, { method: 'DELETE' });
       if (res.ok) {
         toast.success('Product deleted');
         fetchSkus();
@@ -380,7 +386,8 @@ export default function WebProductsPage() {
               { label: 'KINGKKRATOM', value: 'KINGKKRATOM' },
               { label: 'GRASSROOTSHARVEST', value: 'GRASSROOTSHARVEST' },
               { label: 'GRHKTATOM', value: 'GRHKTATOM' },
-              { label: 'REBELXBRANDS', value: 'REBELXBRANDS' }
+              { label: 'REBELXBRANDS', value: 'REBELXBRANDS' },
+              { label: 'GUDTONICS', value: 'GUDTONICS' }
             ]}
             selectedValues={selectedCategories}
             onChange={setSelectedCategories}
@@ -407,6 +414,24 @@ export default function WebProductsPage() {
           >
             <Globe className="w-4 h-4 text-amber-500" />
             <span className="text-[10px] font-bold uppercase">Full</span>
+          </button>
+
+          <div className="w-px h-6 bg-slate-200 mx-1" />
+
+          <input
+            type="file"
+            accept=".csv"
+            className="hidden"
+            ref={fileInputRef}
+            onChange={handleImport}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="h-[30px] px-3 bg-white text-slate-600 hover:text-black hover:bg-slate-100 transition-colors border border-slate-200 shadow-sm flex items-center space-x-2 rounded-sm"
+            title="Import Products from CSV"
+          >
+            <Upload className="w-3.5 h-3.5 text-blue-500" />
+            <span className="text-[10px] font-bold uppercase tracking-wider">Import CSV</span>
           </button>
 
           <button
@@ -482,6 +507,9 @@ export default function WebProductsPage() {
                     "px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter shadow-sm",
                     product.website?.includes('KING') ? "bg-amber-100 text-amber-700 border border-amber-200" :
                     product.website?.includes('GRASS') ? "bg-emerald-100 text-emerald-700 border border-emerald-200" :
+                    product.website?.includes('GRHK') ? "bg-blue-100 text-blue-700 border border-blue-200" :
+                    product.website?.includes('REBEL') ? "bg-purple-100 text-purple-700 border border-purple-200" :
+                    product.website?.includes('GUD') ? "bg-orange-100 text-orange-700 border border-orange-200" :
                     "bg-slate-100 text-slate-500"
                   )}>
                     {product.website || 'N/A'}
@@ -552,8 +580,20 @@ export default function WebProductsPage() {
             {/* Body */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
               <form id="sku-form" onSubmit={handleSubmit} className="space-y-6">
-                <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
                   <FormInput label="Name" value={formData.name} onChange={v => setFormData({ ...formData, name: v })} required />
+                  <FormInput 
+                    label="Website" 
+                    value={formData.website} 
+                    onChange={v => setFormData({ ...formData, website: v })} 
+                    placeholder="e.g. KINGKKRATOM"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormInput label="Web ID (WooCommerce)" type="number" value={formData.webId} onChange={v => setFormData({ ...formData, webId: Number(v) })} required />
+                  <FormInput label="Linked SKU Code" value={formData.sku_code} onChange={v => setFormData({ ...formData, sku_code: v })} placeholder="Matches internal SKU" />
                 </div>
 
                 <FormInput label="Image URL" value={formData.image} onChange={v => setFormData({ ...formData, image: v })} placeholder="https://..." />

@@ -198,6 +198,7 @@ export default function WebOrdersPage() {
     if (website?.includes('GRASS')) return 'bg-emerald-500';
     if (website?.includes('GRHK')) return 'bg-blue-500';
     if (website?.includes('REBEL')) return 'bg-purple-500';
+    if (website?.includes('GUD')) return 'bg-orange-500';
     return 'bg-slate-500';
   };
 
@@ -319,7 +320,8 @@ export default function WebOrdersPage() {
               { label: 'KINGKKRATOM', value: 'KINGKKRATOM' },
               { label: 'GRASSROOTSHARVEST', value: 'GRASSROOTSHARVEST' },
               { label: 'GRHKTATOM', value: 'GRHKTATOM' },
-              { label: 'REBELXBRANDS', value: 'REBELXBRANDS' }
+              { label: 'REBELXBRANDS', value: 'REBELXBRANDS' },
+              { label: 'GUDTONICS', value: 'GUDTONICS' }
             ]}
             selectedValues={selectedWebsites}
             onChange={setSelectedWebsites}

@@ -167,6 +167,12 @@ export async function POST(request: Request) {
                     baseUrl: process.env.REBELXBRANDSRODUCERAPI || '',
                     key: process.env.REBELXBRANDSRODUCERCONSUMERKEY || '',
                     secret: process.env.REBELXBRANDSRODUCERCONSUMERSECRET || ''
+                },
+                {
+                    name: process.env.GUDTONICSTITLE || 'GUDTONICS',
+                    baseUrl: process.env.GUDTONICSAPI || '',
+                    key: process.env.GUDTONICSCONSUMERKEY || '',
+                    secret: process.env.GUDTONICSCONSUMERSECRET || ''
                 }
             ];
 
@@ -363,32 +369,6 @@ export async function POST(request: Request) {
                         { upsert: true }
                     );
 
-                    // Also update Sku collection for backward compatibility
-                    await Sku.findOneAndUpdate(
-                        { _id: webProductId },
-                        {
-                            $set: {
-                                name: p.name,
-                                image: p.images?.[0]?.src || '',
-                                website: site.name,
-                                category: site.name,
-                                isWebProduct: true,
-                                updatedAt: new Date(),
-                                webId: p.id,
-                                slug: p.slug,
-                                permalink: p.permalink,
-                                type: p.type,
-                                status: p.status,
-                                salePrice: parseFloat(p.price) || 0,
-                                regularPrice: parseFloat(p.regular_price) || 0,
-                                stockQuantity: p.stock_quantity,
-                                stockStatus: p.stock_status,
-                                variances: mergedVariations
-                            }
-                        },
-                        { upsert: true }
-                    );
-                    
                     if (isNew) {
                         totalAdded++;
                     } else {
