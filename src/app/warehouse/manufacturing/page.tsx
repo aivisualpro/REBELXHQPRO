@@ -235,7 +235,7 @@ export default function ManufacturingPage() {
           <h1 className="text-sm font-bold text-slate-900 uppercase tracking-tighter">Manufacturing</h1>
           <button
             onClick={() => router.push('/warehouse/manufacturing/new')}
-            className="h-[28px] px-3 bg-black text-white text-[10px] font-bold uppercase tracking-wider hover:bg-slate-800 transition-colors flex items-center gap-1.5 rounded-none"
+            className="h-[30px] px-3 bg-black text-white text-[10px] font-bold uppercase tracking-wider hover:bg-slate-800 transition-colors flex items-center gap-1.5 rounded-none shadow-sm"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add</span>
@@ -259,6 +259,7 @@ export default function ManufacturingPage() {
             options={skuOptions}
             selectedValues={selectedSkus}
             onChange={setSelectedSkus}
+            className="h-[30px]"
           />
           <MultiSelectFilter
             label="Creator"
@@ -266,10 +267,11 @@ export default function ManufacturingPage() {
             options={creatorOptions}
             selectedValues={selectedCreators}
             onChange={setSelectedCreators}
+            className="h-[30px]"
           />
 
           {/* Date Range - Simplified for now */}
-          <div className="flex items-center space-x-1 border border-slate-200 bg-white px-2 py-1.5 rounded-sm">
+          <div className="flex items-center space-x-1 border border-slate-200 bg-white px-2 h-[30px] rounded-sm">
             <Calendar className="w-3.5 h-3.5 text-slate-400" />
             <input
               type="date"

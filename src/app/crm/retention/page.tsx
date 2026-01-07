@@ -22,11 +22,16 @@ import {
     PlayCircle,
     GripVertical,
     SkipForward,
-    ArrowRight
+    ArrowRight,
+    MapPin,
+    DollarSign,
+    Activity
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { ListTodo, GitBranch } from 'lucide-react';
 
 interface Task {
     _id: string;
@@ -56,6 +61,18 @@ interface Stats {
     overdue: number;
 }
 
+interface Client {
+    _id: string;
+    name: string;
+    contactStatus?: string;
+    totalRevenue?: number;
+    balance?: number;
+    activityCount?: number;
+    lastActivity?: string;
+    phones?: { value: string; label: string }[];
+    emails?: { value: string; label: string }[];
+}
+
 type KanbanColumn = 'Pending' | 'In Progress' | 'Completed';
 
 const COLUMNS: { id: KanbanColumn; label: string; color: string; bgColor: string; icon: React.ReactNode }[] = [
@@ -81,6 +98,15 @@ const typeIcons: { [key: string]: React.ReactNode } = {
     'Upsell Opportunity': <TrendingUp className="w-3.5 h-3.5" />
 };
 
+const PIPELINE_STAGES = [
+    { id: 'Initial Contact', label: 'Initial Contact', color: 'text-slate-600', bgColor: 'bg-slate-50 border-slate-200', icon: <User className="w-4 h-4" /> },
+    { id: 'Sampling', label: 'Sampling', color: 'text-purple-600', bgColor: 'bg-purple-50 border-purple-200', icon: <Activity className="w-4 h-4" /> },
+    { id: 'New Prospect', label: 'New Prospect', color: 'text-blue-600', bgColor: 'bg-blue-50 border-blue-200', icon: <TrendingUp className="w-4 h-4" /> },
+    { id: 'Closed won', label: 'Closed Won', color: 'text-emerald-600', bgColor: 'bg-emerald-50 border-emerald-200', icon: <CheckCircle2 className="w-4 h-4" /> },
+    { id: 'Closed lost', label: 'Closed Lost', color: 'text-red-600', bgColor: 'bg-red-50 border-red-200', icon: <X className="w-4 h-4" /> },
+    { id: 'Uncategorized', label: 'Uncategorized', color: 'text-slate-400', bgColor: 'bg-white border-slate-100', icon: <Clock className="w-4 h-4" /> },
+];
+
 export default function RetentionKanbanPage() {
     const router = useRouter();
     const [tasks, setTasks] = useState<Task[]>([]);
@@ -88,11 +114,14 @@ export default function RetentionKanbanPage() {
     const [loading, setLoading] = useState(true);
     const [generating, setGenerating] = useState(false);
     const [users, setUsers] = useState<{ _id: string; firstName: string; lastName: string }[]>([]);
-    const [clients, setClients] = useState<{ _id: string; name: string }[]>([]);
+    const [clients, setClients] = useState<Client[]>([]);
 
     // Drag state
     const [draggedTask, setDraggedTask] = useState<Task | null>(null);
     const [dragOverColumn, setDragOverColumn] = useState<KanbanColumn | null>(null);
+
+    const [draggedClient, setDraggedClient] = useState<Client | null>(null);
+    const [dragOverStage, setDragOverStage] = useState<string | null>(null);
 
     // Modal
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -110,6 +139,8 @@ export default function RetentionKanbanPage() {
         assignedTo: '',
         notes: ''
     });
+
+    const [activeTab, setActiveTab] = useState('tasks');
 
     useEffect(() => {
         fetchTasks();
@@ -243,6 +274,47 @@ export default function RetentionKanbanPage() {
         setDragOverColumn(null);
     };
 
+    const handleClientDragStart = (e: React.DragEvent, client: Client) => {
+        setDraggedClient(client);
+        e.dataTransfer.effectAllowed = 'move';
+    };
+
+    const handleClientDragOver = (e: React.DragEvent, stageId: string) => {
+        e.preventDefault();
+        setDragOverStage(stageId);
+    };
+
+    const handleClientDrop = async (e: React.DragEvent, targetStatus: string) => {
+        e.preventDefault();
+        setDragOverStage(null);
+
+        if (!draggedClient || (draggedClient.contactStatus || 'Uncategorized') === targetStatus) {
+            setDraggedClient(null);
+            return;
+        }
+
+        const previousStatus = draggedClient.contactStatus;
+        setClients(prev => prev.map(c => 
+            c._id === draggedClient._id ? { ...c, contactStatus: targetStatus } : c
+        ));
+
+        try {
+            const res = await fetch(`/api/clients/${draggedClient._id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contactStatus: targetStatus })
+            });
+            if (!res.ok) throw new Error('Failed to update status');
+            toast.success(`Client moved to ${targetStatus}`);
+        } catch (error) {
+            setClients(prev => prev.map(c => 
+                c._id === draggedClient._id ? { ...c, contactStatus: previousStatus } : c
+            ));
+            toast.error('Failed to update client status');
+        }
+        setDraggedClient(null);
+    };
+
     const handleCompleteTask = async () => {
         if (!selectedTask) return;
         setIsSubmitting(true);
@@ -335,43 +407,50 @@ export default function RetentionKanbanPage() {
 
     return (
         <div className="flex flex-col h-[calc(100vh-40px)] bg-slate-100 overflow-hidden">
-            {/* Header */}
-            <div className="shrink-0 bg-white border-b border-slate-200 px-6 py-3">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                        <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center">
-                            <Target className="w-5 h-5 text-white" />
-                        </div>
-                        <div>
-                            <h1 className="text-lg font-black uppercase tracking-tight text-slate-900">Client Retention Board</h1>
-                            <p className="text-[11px] text-slate-500">Drag tasks between columns to update status</p>
-                        </div>
+            <PageHeader
+                title="Client Retention"
+                subtitle="Nurture relationships and minimize churn"
+                icon={Target}
+                iconGradient="from-orange-500 to-red-600"
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                tabs={[
+                    { id: 'tasks', label: 'Tasks', icon: ListTodo },
+                    { id: 'pipeline', label: 'Pipeline', icon: GitBranch },
+                ]}
+                stats={
+                    <div className="flex items-center space-x-2 text-xs text-slate-500">
+                        <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+                        <span className="font-bold text-red-600">
+                            {tasks.filter(t => isOverdue(t)).length}
+                        </span>
+                        <span className="uppercase font-bold tracking-wider text-[9px]">Overdue Tasks</span>
                     </div>
-                    <div className="flex items-center space-x-3">
-                        <div className="flex items-center space-x-2 text-xs text-slate-500">
-                            <span className="flex items-center space-x-1"><AlertTriangle className="w-3.5 h-3.5 text-red-500" /> <span className="font-bold text-red-600">{tasks.filter(t => isOverdue(t)).length}</span> overdue</span>
-                        </div>
+                }
+                actions={
+                    <>
                         <button
                             onClick={handleAutoGenerate}
                             disabled={generating}
-                            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs font-bold uppercase hover:from-orange-600 hover:to-red-600 transition-all disabled:opacity-50"
+                            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs font-bold uppercase hover:from-orange-600 hover:to-red-600 transition-all disabled:opacity-50 shadow-sm"
                         >
                             {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
                             <span>Auto-Generate</span>
                         </button>
                         <button
                             onClick={() => setIsNewTaskModalOpen(true)}
-                            className="flex items-center space-x-2 px-4 py-2 bg-black text-white text-xs font-bold uppercase hover:bg-slate-800 transition-colors"
+                            className="flex items-center space-x-2 px-4 py-2 bg-black text-white text-xs font-bold uppercase hover:bg-slate-800 transition-colors shadow-sm"
                         >
                             <Plus className="w-4 h-4" />
                             <span>New Task</span>
                         </button>
-                    </div>
-                </div>
-            </div>
+                    </>
+                }
+            />
 
-            {/* Kanban Board */}
-            <div className="flex-1 overflow-x-auto p-6">
+            {/* Kanban Board - Tasks Tab */}
+            {activeTab === 'tasks' && (
+                <div className="flex-1 overflow-x-auto p-6">
                 {loading ? (
                     <div className="flex items-center justify-center h-full">
                         <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
@@ -485,6 +564,115 @@ export default function RetentionKanbanPage() {
                     </div>
                 )}
             </div>
+            )}
+
+            {/* Pipeline Tab Content */}
+            {activeTab === 'pipeline' && (
+                <div className="flex-1 overflow-x-auto p-6">
+                    <div className="flex space-x-4 h-full min-w-max">
+                        {PIPELINE_STAGES.map((stage) => (
+                            <div
+                                key={stage.id}
+                                className={cn(
+                                    "flex flex-col w-[360px] bg-white border shadow-sm h-full transition-all",
+                                    dragOverStage === stage.id && "ring-2 ring-blue-400 ring-offset-2"
+                                )}
+                                onDragOver={(e) => handleClientDragOver(e, stage.id)}
+                                onDragLeave={() => setDragOverStage(null)}
+                                onDrop={(e) => handleClientDrop(e, stage.id)}
+                            >
+                                {/* Stage Header */}
+                                <div className={cn("px-4 py-3 border-b flex items-center justify-between shrink-0", stage.bgColor)}>
+                                    <div className="flex items-center space-x-2">
+                                        <span className={stage.color}>{stage.icon}</span>
+                                        <span className={cn("text-xs font-black uppercase tracking-wider", stage.color)}>{stage.label}</span>
+                                    </div>
+                                    <span className={cn("text-sm font-black", stage.color)}>
+                                        {clients.filter(c => (c.contactStatus || 'Uncategorized') === stage.id).length}
+                                    </span>
+                                </div>
+
+                                {/* Stage Content */}
+                                <div className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-custom">
+                                    {clients.filter(c => (c.contactStatus || 'Uncategorized') === stage.id).length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center py-8 text-slate-400 opacity-50">
+                                            <p className="text-[10px] font-bold uppercase italic">Stage Empty</p>
+                                        </div>
+                                    ) : (
+                                        clients.filter(c => (c.contactStatus || 'Uncategorized') === stage.id).map((client) => (
+                                            <div
+                                                key={client._id}
+                                                draggable
+                                                onDragStart={(e) => handleClientDragStart(e, client)}
+                                                onClick={() => router.push(`/crm/clients/${client._id}`)}
+                                                className={cn(
+                                                    "bg-white border p-3 cursor-grab animate-in fade-in slide-in-from-bottom-2 duration-300 active:cursor-grabbing hover:shadow-md transition-all group",
+                                                    draggedClient?._id === client._id && "opacity-50 scale-95"
+                                                )}
+                                            >
+                                                <div className="flex items-start justify-between mb-2">
+                                                    <div className="flex items-center space-x-2">
+                                                        <div className="w-6 h-6 bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-600 uppercase border border-slate-200">
+                                                            {client.name?.charAt(0)}
+                                                        </div>
+                                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Client Profile</span>
+                                                    </div>
+                                                    <GripVertical className="w-4 h-4 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                </div>
+
+                                                <div className="text-sm font-black text-slate-900 mb-3 truncate group-hover:text-blue-600 transition-colors">
+                                                    {client.name}
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-4 mb-3">
+                                                    <div>
+                                                        <div className="text-[9px] font-bold text-slate-400 uppercase mb-1">Total Revenue</div>
+                                                        <div className="flex items-center space-x-1">
+                                                            <DollarSign className="w-3 h-3 text-emerald-500" />
+                                                            <span className="text-xs font-black text-slate-700">
+                                                                {client.totalRevenue?.toLocaleString() || '0'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-[9px] font-bold text-slate-400 uppercase mb-1">Activities</div>
+                                                        <div className="flex items-center space-x-1">
+                                                            <Activity className="w-3 h-3 text-purple-500" />
+                                                            <span className="text-xs font-black text-slate-700">
+                                                                {client.activityCount || 0}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center justify-between pt-2 border-t border-slate-50">
+                                                    <div className="flex items-center space-x-2">
+                                                        {client.phones?.[0] && (
+                                                            <div className="w-5 h-5 bg-slate-50 flex items-center justify-center rounded-full">
+                                                                <Phone className="w-2.5 h-2.5 text-slate-400" />
+                                                            </div>
+                                                        )}
+                                                        {client.emails?.[0] && (
+                                                            <div className="w-5 h-5 bg-slate-50 flex items-center justify-center rounded-full">
+                                                                <Mail className="w-2.5 h-2.5 text-slate-400" />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    {client.lastActivity && (
+                                                        <div className="text-[9px] font-bold text-slate-400 uppercase">
+                                                            {new Date(client.lastActivity).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* Task Detail Modal */}
             {isModalOpen && selectedTask && (

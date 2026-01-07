@@ -277,6 +277,7 @@ export default function SkusPage() {
             options={Array.from(new Set(skus.map(s => s.category).filter(Boolean))).map(c => ({ label: c, value: c }))}
             selectedValues={selectedCategories}
             onChange={setSelectedCategories}
+            className="h-[30px]"
           />
           <MultiSelectFilter
             label="Sub Cat"
@@ -284,6 +285,7 @@ export default function SkusPage() {
             options={Array.from(new Set(skus.map(s => s.subCategory).filter(Boolean))).map(c => ({ label: c, value: c }))}
             selectedValues={selectedSubCategories}
             onChange={setSelectedSubCategories}
+            className="h-[30px]"
           />
           <MultiSelectFilter
             label="Material"
@@ -291,6 +293,7 @@ export default function SkusPage() {
             options={Array.from(new Set(skus.map(s => s.materialType).filter(Boolean))).map(c => ({ label: c, value: c }))}
             selectedValues={selectedMaterialTypes}
             onChange={setSelectedMaterialTypes}
+            className="h-[30px]"
           />
 
           <div className="w-px h-6 bg-slate-200 mx-2" />
@@ -311,7 +314,7 @@ export default function SkusPage() {
           />
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="p-2 text-slate-600 hover:text-black hover:bg-slate-200 transition-colors rounded-sm flex items-center space-x-1"
+            className="h-[30px] px-3 text-slate-600 hover:text-black hover:bg-slate-200 transition-colors rounded-sm flex items-center space-x-1 border border-slate-200 bg-white shadow-sm"
             title="Import SKUs"
           >
             <Upload className="w-4 h-4" />
@@ -319,7 +322,7 @@ export default function SkusPage() {
           </button>
           <button
             onClick={() => variancesInputRef.current?.click()}
-            className="p-2 text-slate-600 hover:text-black hover:bg-slate-200 transition-colors rounded-sm flex items-center space-x-1"
+            className="h-[30px] px-3 text-slate-600 hover:text-black hover:bg-slate-200 transition-colors rounded-sm flex items-center space-x-1 border border-slate-200 bg-white shadow-sm"
             title="Import Variances"
           >
             <Upload className="w-4 h-4" />
@@ -328,7 +331,7 @@ export default function SkusPage() {
 
           <button
             onClick={() => openModal()}
-            className="p-2 bg-black text-white hover:bg-slate-800 transition-colors shadow-sm flex items-center justify-center rounded-sm"
+            className="h-[30px] w-[30px] bg-black text-white hover:bg-slate-800 transition-colors shadow-sm flex items-center justify-center rounded-sm"
             title="Add SKU"
           >
             <Plus className="w-4 h-4" />

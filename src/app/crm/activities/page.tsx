@@ -262,6 +262,7 @@ export default function ActivitiesPage() {
             options={['Call', 'Text', 'Email', 'Visit'].map(t => ({ label: t, value: t }))}
             selectedValues={selectedTypes}
             onChange={setSelectedTypes}
+            className="h-[30px]"
           />
           <MultiSelectFilter
             label="Client"
@@ -269,6 +270,7 @@ export default function ActivitiesPage() {
             options={clientOptions.map(c => ({ label: c.name, value: c._id }))}
             selectedValues={selectedClients}
             onChange={setSelectedClients}
+            className="h-[30px]"
           />
           <MultiSelectFilter
             label="Sales Rep"
@@ -276,6 +278,7 @@ export default function ActivitiesPage() {
             options={users.map(u => ({ label: `${u.firstName} ${u.lastName}`, value: u._id }))}
             selectedValues={selectedCreatedBy}
             onChange={setSelectedCreatedBy}
+            className="h-[30px]"
           />
 
           <div className="w-px h-6 bg-slate-200 mx-2" />
@@ -289,7 +292,7 @@ export default function ActivitiesPage() {
           />
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="p-2 text-slate-600 hover:text-black hover:bg-slate-200 transition-colors rounded-sm flex items-center space-x-1"
+            className="h-[30px] px-3 text-slate-600 hover:text-black hover:bg-slate-200 transition-colors rounded-sm flex items-center space-x-1 border border-slate-200 bg-white shadow-sm"
             title="Import CSV"
           >
             <Upload className="w-4 h-4" />
@@ -298,7 +301,7 @@ export default function ActivitiesPage() {
 
           <button
             onClick={() => openModal()}
-            className="p-2 bg-black text-white hover:bg-slate-800 transition-colors shadow-sm flex items-center justify-center rounded-sm"
+            className="h-[30px] w-[30px] bg-black text-white hover:bg-slate-800 transition-colors shadow-sm flex items-center justify-center rounded-sm"
             title="Add Activity"
           >
             <Plus className="w-4 h-4" />

@@ -224,7 +224,7 @@ export default function COGMPage() {
                 {/* Inline Filters */}
                 <div className="flex items-center gap-2">
                     {/* Date Range */}
-                    <div className="flex items-center gap-2 bg-white border border-slate-200 px-2 h-7 shadow-sm transition-colors hover:border-slate-300">
+                    <div className="flex items-center gap-2 bg-white border border-slate-200 px-2 h-[30px] shadow-sm transition-colors hover:border-slate-300">
                         <Calendar className="w-3 h-3 text-slate-400" />
                         <input
                             type="date"
@@ -248,7 +248,7 @@ export default function COGMPage() {
                         options={skuOptions}
                         selectedValues={selectedSkus}
                         onChange={setSelectedSkus}
-                        className="h-7 border-slate-200 bg-white hover:border-slate-300 text-slate-600 shadow-sm rounded-none"
+                        className="h-[30px] border-slate-200 bg-white hover:border-slate-300 text-slate-600 shadow-sm rounded-none"
                     />
                 </div>
             </div>

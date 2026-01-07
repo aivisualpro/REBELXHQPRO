@@ -384,6 +384,7 @@ export default function WebProductsPage() {
             ]}
             selectedValues={selectedCategories}
             onChange={setSelectedCategories}
+            className="h-[30px]"
           />
 
           <div className="w-px h-6 bg-slate-200 mx-2" />
@@ -391,7 +392,7 @@ export default function WebProductsPage() {
           <button
             onClick={() => handleSync(false)}
             disabled={syncStatus.isSyncing}
-            className="p-2 text-slate-600 hover:text-black hover:bg-slate-200 transition-colors rounded-sm flex items-center space-x-1 disabled:opacity-50"
+            className="h-[30px] px-3 text-slate-600 hover:text-black hover:bg-slate-200 transition-colors rounded-sm flex items-center space-x-1 disabled:opacity-50 border border-slate-200 bg-white shadow-sm"
             title="Incremental Sync - Only changed products"
           >
             {syncStatus.isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4 text-blue-500" />}
@@ -401,7 +402,7 @@ export default function WebProductsPage() {
           <button
             onClick={() => handleSync(true)}
             disabled={syncStatus.isSyncing}
-            className="p-2 text-slate-600 hover:text-amber-600 hover:bg-amber-50 transition-colors rounded-sm flex items-center space-x-1 disabled:opacity-50"
+            className="h-[30px] px-3 text-slate-600 hover:text-amber-600 hover:bg-amber-50 transition-colors rounded-sm flex items-center space-x-1 disabled:opacity-50 border border-slate-200 bg-white shadow-sm"
             title="Full Sync - All products from scratch"
           >
             <Globe className="w-4 h-4 text-amber-500" />
@@ -410,7 +411,7 @@ export default function WebProductsPage() {
 
           <button
             onClick={() => openModal()}
-            className="px-3 py-1.5 bg-black text-white hover:bg-slate-800 transition-colors shadow-sm flex items-center space-x-2 rounded-sm"
+            className="h-[30px] px-3 bg-black text-white hover:bg-slate-800 transition-colors shadow-sm flex items-center space-x-2 rounded-sm"
             title="Add Product"
           >
             <Plus className="w-3.5 h-3.5" />

@@ -409,7 +409,7 @@ export default function ClientsPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-40px)] bg-white overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-48px)] bg-white overflow-hidden">
       {/* Action Bar */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100 bg-slate-50/50 shrink-0">
         <div className="flex items-center space-x-4">
@@ -433,6 +433,7 @@ export default function ClientsPage() {
             options={users.map(u => ({ label: `${u.firstName} ${u.lastName}`, value: u._id }))}
             selectedValues={selectedSalesPersons}
             onChange={setSelectedSalesPersons}
+            className="h-[30px]"
           />
           <MultiSelectFilter
             label="Status"
@@ -440,6 +441,7 @@ export default function ClientsPage() {
             options={['Sampling', 'New Prospect', 'Uncategorized', 'Closed lost', 'Initial Contact', 'Closed won'].map(s => ({ label: s, value: s }))}
             selectedValues={selectedContactStatuses}
             onChange={setSelectedContactStatuses}
+            className="h-[30px]"
           />
           <MultiSelectFilter
             label="Type"
@@ -447,6 +449,7 @@ export default function ClientsPage() {
             options={['Potential Customer', 'Current Customer', 'Inactive Customer', 'Uncategorized'].map(s => ({ label: s, value: s }))}
             selectedValues={selectedContactTypes}
             onChange={setSelectedContactTypes}
+            className="h-[30px]"
           />
           <MultiSelectFilter
             label="Company"
@@ -454,6 +457,7 @@ export default function ClientsPage() {
             options={['LLC', 'Corporation', 'Sole Proprietorship', 'Partnership'].map(s => ({ label: s, value: s }))}
             selectedValues={selectedCompanyTypes}
             onChange={setSelectedCompanyTypes}
+            className="h-[30px]"
           />
           <MultiSelectFilter
             label="City"
@@ -461,6 +465,7 @@ export default function ClientsPage() {
             options={Array.from(new Set(clients.map(c => c.addresses?.find(a => a.label === 'Main')?.city).filter(Boolean))).map(c => ({ label: c as string, value: c as string }))}
             selectedValues={selectedCities}
             onChange={setSelectedCities}
+            className="h-[30px]"
           />
           <MultiSelectFilter
             label="State"
@@ -468,6 +473,7 @@ export default function ClientsPage() {
             options={Array.from(new Set(clients.map(c => c.addresses?.find(a => a.label === 'Main')?.state).filter(Boolean))).map(s => ({ label: s as string, value: s as string }))}
             selectedValues={selectedStates}
             onChange={setSelectedStates}
+            className="h-[30px]"
           />
           <MultiSelectFilter
             label="Shipping"
@@ -475,21 +481,34 @@ export default function ClientsPage() {
             options={['Prepaid', 'Collect', 'Prepaid & Add', 'Third Party'].map(s => ({ label: s, value: s }))}
             selectedValues={selectedShippingTerms}
             onChange={setSelectedShippingTerms}
+            className="h-[30px]"
           />
 
           <div className="w-px h-6 bg-slate-200 mx-2" />
 
           <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={handleImport} />
-          <button onClick={() => fileInputRef.current?.click()} className="p-2 text-slate-600 hover:text-black hover:bg-slate-200 transition-colors" title="Import Clients CSV">
+          <button 
+            onClick={() => fileInputRef.current?.click()} 
+            className="h-[30px] w-[30px] bg-white border border-slate-200 text-slate-600 hover:text-black hover:bg-slate-50 transition-colors shadow-sm flex items-center justify-center" 
+            title="Import Clients CSV"
+          >
             <Upload className="w-4 h-4" />
           </button>
 
           <input type="file" accept=".csv" className="hidden" ref={notesFileInputRef} onChange={handleImportNotes} />
-          <button onClick={() => notesFileInputRef.current?.click()} className="p-2 text-slate-600 hover:text-black hover:bg-slate-200 transition-colors ml-2 flex items-center space-x-1" title="Import Notes CSV">
+          <button 
+            onClick={() => notesFileInputRef.current?.click()} 
+            className="h-[30px] px-3 bg-white border border-slate-200 text-slate-600 hover:text-black hover:bg-slate-50 transition-colors shadow-sm flex items-center justify-center space-x-1 ml-2" 
+            title="Import Notes CSV"
+          >
             <Upload className="w-4 h-4" />
             <span className="text-[10px] font-bold uppercase">Notes</span>
           </button>
-          <button onClick={() => openModal()} className="p-2 bg-black text-white hover:bg-slate-800 transition-colors shadow-sm flex items-center justify-center" title="Add Client">
+          <button 
+            onClick={() => openModal()} 
+            className="h-[30px] w-[30px] bg-black text-white hover:bg-slate-800 transition-colors shadow-sm flex items-center justify-center" 
+            title="Add Client"
+          >
             <Plus className="w-4 h-4" />
           </button>
         </div>

@@ -323,6 +323,7 @@ export default function WebOrdersPage() {
             ]}
             selectedValues={selectedWebsites}
             onChange={setSelectedWebsites}
+            className="h-[30px]"
           />
 
           <MultiSelectFilter
@@ -339,6 +340,7 @@ export default function WebOrdersPage() {
             ]}
             selectedValues={selectedStatuses}
             onChange={setSelectedStatuses}
+            className="h-[30px]"
           />
 
           <div className="flex items-center space-x-1 border border-slate-200 bg-white px-3 h-[30px] rounded-sm">
@@ -363,7 +365,7 @@ export default function WebOrdersPage() {
           <button
             onClick={() => handleSync(false)}
             disabled={syncStatus.isSyncing}
-            className="px-3 py-1.5 bg-black text-white hover:bg-slate-800 transition-colors shadow-sm flex items-center space-x-2 rounded-sm disabled:opacity-50"
+            className="h-[30px] px-3 bg-black text-white hover:bg-slate-800 transition-colors shadow-sm flex items-center space-x-2 rounded-sm disabled:opacity-50"
             title="Incremental Sync - Only changed orders"
           >
             {syncStatus.isSyncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
@@ -373,7 +375,7 @@ export default function WebOrdersPage() {
           <button
             onClick={() => handleSync(true)}
             disabled={syncStatus.isSyncing}
-            className="px-3 py-1.5 bg-amber-500 text-white hover:bg-amber-600 transition-colors shadow-sm flex items-center space-x-2 rounded-sm disabled:opacity-50"
+            className="h-[30px] px-3 bg-amber-500 text-white hover:bg-amber-600 transition-colors shadow-sm flex items-center space-x-2 rounded-sm disabled:opacity-50"
             title="Full Sync - All orders from scratch"
           >
             <Globe className="w-3.5 h-3.5" />
