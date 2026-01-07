@@ -175,10 +175,10 @@ export async function POST(request: Request) {
                     secret: process.env.GRASSROOTSHARVESTCONSUMERSECRET || ''
                 },
                 {
-                    name: process.env.REBELXHQPRODUCERTITLE || 'GRHKTATOM',
-                    baseUrl: process.env.REBELXHQPRODUCERAPI || '',
-                    key: process.env.REBELXHQPRODUCERCONSUMERKEY || '',
-                    secret: process.env.REBELXHQPRODUCERCONSUMERSECRET || ''
+                    name: process.env.GRHKTATOMTITLE || 'GRHKTATOM',
+                    baseUrl: process.env.GRHKTATOMAPI || '',
+                    key: process.env.GRHKTATOMCONSUMERKEY || '',
+                    secret: process.env.GRHKTATOMCONSUMERSECRET || ''
                 },
                 {
                     name: process.env.REBELXBRANDSRODUCERTITLE || 'REBELXBRANDS',
