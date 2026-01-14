@@ -146,7 +146,7 @@ export default function SaleOrdersPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
 
-  const [allClients, setAllClients] = useState<{ _id: string; name: string; salesPerson?: string; addresses?: { street: string; city: string; state: string }[] }[]>([]);
+  const [allClients, setAllClients] = useState<{ _id: string; name: string; salesPerson?: { _id: string; firstName: string; lastName: string } | string | null; addresses?: { street: string; city: string; state: string }[] }[]>([]);
   const [allUsers, setAllUsers] = useState<{ _id: string; firstName: string; lastName: string }[]>([]);
   const [allSkus, setAllSkus] = useState<{ _id: string; name: string; salePrice?: number }[]>([]);
   
@@ -258,10 +258,17 @@ export default function SaleOrdersPage() {
   useEffect(() => {
     const createForClientId = searchParams.get('createFor');
     if (createForClientId && allClients.length > 0) {
-      const client = allClients.find(c => c._id === createForClientId);
+      const client: any = allClients.find(c => c._id === createForClientId);
       if (client) {
-        // Find the sales rep for this client (if assigned)
-        const salesRepId = client.salesPerson || '';
+        // Get sales rep - handle both object and string formats
+        let salesRepId = '';
+        if (client.salesPerson) {
+            if (typeof client.salesPerson === 'object' && client.salesPerson._id) {
+                salesRepId = client.salesPerson._id;
+            } else if (typeof client.salesPerson === 'string') {
+                salesRepId = client.salesPerson;
+            }
+        }
         
         // Get address from client
         const mainAddress = client.addresses && client.addresses.length > 0 
@@ -536,8 +543,36 @@ export default function SaleOrdersPage() {
 
   const handleCreateOrUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate required fields
     if (!newOrder.clientId) {
       toast.error('Please select a client');
+      return;
+    }
+    if (!newOrder.salesRep) {
+      toast.error('Sales Rep is required');
+      return;
+    }
+    if (!newOrder.shippingAddress) {
+      toast.error('Address is required');
+      return;
+    }
+    if (!newOrder.city) {
+      toast.error('City is required');
+      return;
+    }
+    if (!newOrder.state) {
+      toast.error('State is required');
+      return;
+    }
+    if (newLineItems.length === 0) {
+      toast.error('At least 1 line item is required');
+      return;
+    }
+    // Validate each line item has a SKU
+    const invalidItems = newLineItems.filter(item => !item.sku);
+    if (invalidItems.length > 0) {
+      toast.error('All line items must have a SKU selected');
       return;
     }
 
@@ -804,9 +839,21 @@ export default function SaleOrdersPage() {
               ? client.addresses[0] 
               : { street: '', city: '', state: '' };
           
+          // Get sales rep from client - handle both object and string formats
+          // API returns populated object { _id, firstName, lastName } or null
+          let salesRepId = '';
+          if (client.salesPerson) {
+              if (typeof client.salesPerson === 'object' && client.salesPerson._id) {
+                  salesRepId = client.salesPerson._id;
+              } else if (typeof client.salesPerson === 'string') {
+                  salesRepId = client.salesPerson;
+              }
+          }
+          
           setNewOrder(prev => ({
               ...prev,
               clientId,
+              salesRep: salesRepId || prev.salesRep,
               shippingAddress: mainAddress.street || prev.shippingAddress,
               city: mainAddress.city || prev.city,
               state: mainAddress.state || prev.state
@@ -1118,7 +1165,7 @@ export default function SaleOrdersPage() {
                                 />
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Sales Rep</label>
+                                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Sales Rep <span className="text-red-500">*</span></label>
                                 <SearchableSelect
                                     options={allUsers.map(u => ({ label: `${u.firstName} ${u.lastName}`, value: u._id }))}
                                     value={newOrder.salesRep}
@@ -1176,7 +1223,7 @@ export default function SaleOrdersPage() {
                             </div>
                              <div className="col-span-3 grid grid-cols-3 gap-4">
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Address</label>
+                                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Address <span className="text-red-500">*</span></label>
                                     <input
                                     type="text"
                                     value={newOrder.shippingAddress}
@@ -1186,7 +1233,7 @@ export default function SaleOrdersPage() {
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">City</label>
+                                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">City <span className="text-red-500">*</span></label>
                                     <input
                                     type="text"
                                     value={newOrder.city}
@@ -1195,7 +1242,7 @@ export default function SaleOrdersPage() {
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">State</label>
+                                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">State <span className="text-red-500">*</span></label>
                                     <input
                                     type="text"
                                     value={newOrder.state}
@@ -1279,7 +1326,7 @@ export default function SaleOrdersPage() {
 
                 <div className="border-t border-slate-100 pt-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Line Items</h3>
+                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Line Items <span className="text-red-500">*</span></h3>
                     <div className="flex items-center space-x-2">
                         <button
                         type="button"
