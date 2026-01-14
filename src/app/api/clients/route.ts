@@ -29,6 +29,8 @@ export async function GET(request: Request) {
         const defaultShippingTerms = searchParams.get('defaultShippingTerms');
         const minRevenue = searchParams.get('minRevenue') ? parseFloat(searchParams.get('minRevenue')!) : null;
         const maxRevenue = searchParams.get('maxRevenue') ? parseFloat(searchParams.get('maxRevenue')!) : null;
+        const minBalance = searchParams.get('minBalance') ? parseFloat(searchParams.get('minBalance')!) : null;
+        const maxBalance = searchParams.get('maxBalance') ? parseFloat(searchParams.get('maxBalance')!) : null;
 
         let query: any = {};
 
@@ -63,8 +65,8 @@ export async function GET(request: Request) {
         let clients: any[] = [];
         let total = 0;
 
-        // Optimized revenue calculation pipeline chunk
-        const revenueLookup = [
+        // Optimized revenue and balance calculation pipeline chunk
+        const financialLookup = [
             {
                 $lookup: {
                     from: 'saleorders',
@@ -79,31 +81,41 @@ export async function GET(request: Request) {
                                         { $add: [{ $sum: "$lineItems.total" }, { $ifNull: ["$shippingCost", 0] }, { $ifNull: ["$tax", 0] }] },
                                         { $ifNull: ["$discount", 0] }
                                     ]
-                                }
+                                },
+                                paid: { $sum: "$payments.paymentAmount" }
                             }
                         },
-                        { $group: { _id: null, total: { $sum: "$amount" } } }
+                        { $group: { _id: null, total: { $sum: "$amount" }, paid: { $sum: "$paid" } } }
                     ],
-                    as: 'rev'
+                    as: 'pricing'
                 }
             },
             {
                 $addFields: {
-                    totalRevenue: { $ifNull: [{ $arrayElemAt: ["$rev.total", 0] }, 0] }
+                    totalRevenue: { $ifNull: [{ $arrayElemAt: ["$pricing.total", 0] }, 0] },
+                    totalPaid: { $ifNull: [{ $arrayElemAt: ["$pricing.paid", 0] }, 0] }
+                }
+            },
+            {
+                $addFields: {
+                    balance: { $subtract: ["$totalRevenue", "$totalPaid"] }
                 }
             }
         ];
 
         // Execute main fetch logic
-        if (minRevenue !== null || maxRevenue !== null || sortBy === 'totalRevenue') {
-            const basePipeline = [{ $match: query }, ...revenueLookup];
+        if (minRevenue !== null || maxRevenue !== null || minBalance !== null || maxBalance !== null || sortBy === 'totalRevenue' || sortBy === 'balance') {
+            const basePipeline = [{ $match: query }, ...financialLookup];
             
-            const revenueRange: any = {};
-            if (minRevenue !== null) revenueRange.$gte = minRevenue;
-            if (maxRevenue !== null) revenueRange.$lt = maxRevenue;
+            const rangeFilter: any = {};
+            if (minRevenue !== null) rangeFilter.totalRevenue = { ...rangeFilter.totalRevenue, $gte: minRevenue };
+            if (maxRevenue !== null) rangeFilter.totalRevenue = { ...rangeFilter.totalRevenue, $lt: maxRevenue };
             
-            if (Object.keys(revenueRange).length > 0) {
-                basePipeline.push({ $match: { totalRevenue: revenueRange } });
+            if (minBalance !== null) rangeFilter.balance = { ...rangeFilter.balance, $gte: minBalance };
+            if (maxBalance !== null) rangeFilter.balance = { ...rangeFilter.balance, $lt: maxBalance };
+            
+            if (Object.keys(rangeFilter).length > 0) {
+                basePipeline.push({ $match: rangeFilter });
             }
 
             // Using facet to get both count and paginated data in one go might be slower for very large collections,
@@ -112,10 +124,10 @@ export async function GET(request: Request) {
                 Client.aggregate([...basePipeline, { $count: 'total' }]),
                 Client.aggregate([
                     ...basePipeline,
-                    { $sort: { [sortBy === 'totalRevenue' ? 'totalRevenue' : sortBy]: sortOrder as any } },
+                    { $sort: { [sortBy === 'totalRevenue' || sortBy === 'balance' ? sortBy : sortBy]: sortOrder as any } },
                     { $skip: (page - 1) * limit },
                     { $limit: limit },
-                    { $project: { rev: 0 } } // Clean up temp fields
+                    { $project: { pricing: 0 } } // Clean up temp fields
                 ])
             ]);
 

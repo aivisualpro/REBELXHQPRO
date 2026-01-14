@@ -6,14 +6,37 @@ import {
   GitBranch, MessageSquare, ListTodo, BarChart3, 
   Plus, Search, ListFilter, HelpCircle, Plug, Settings, 
   ChevronLeft, Phone, PhoneCall, Hourglass, 
-  Eye, Briefcase, Activity
+  Eye, Briefcase, Activity, Send
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 
 export default function CRMLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { data: session } = useSession();
+  const [unreadCount, setUnreadCount] = React.useState<number | null>(null);
+
+  const fetchUnreadCount = React.useCallback(async () => {
+    try {
+        const res = await fetch('/api/gmail?label=INBOX&limit=1');
+        const data = await res.json();
+        if (typeof data.unreadCount === 'number') {
+            setUnreadCount(data.unreadCount);
+        }
+    } catch (e) {
+        console.error("Failed to fetch unread count");
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (session?.user) {
+        fetchUnreadCount();
+        const interval = setInterval(fetchUnreadCount, 60000); // Refresh every minute
+        return () => clearInterval(interval);
+    }
+  }, [session?.user, fetchUnreadCount]);
 
   const isActive = (path: string) => pathname === path;
 
@@ -25,19 +48,37 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
         {/* Top Navigation */}
         <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-0.5">
           
-          {/* Inbox */}
-          <Link href="/crm" className="block">
-              <div className={cn(
-                  "flex items-center justify-between px-3 py-2 rounded-md cursor-pointer transition-colors group",
-                  isActive('/crm') ? "bg-[#2C2C2C] text-white" : "hover:bg-[#2A2A2A]"
-              )}>
-                <div className="flex items-center space-x-3">
-                  <Inbox className="w-5 h-5" />
-                  <span className="text-[14px] font-medium">Inbox</span>
+          {/* Inbox & Sent */}
+          <div className="space-y-0.5">
+            <Link href="/crm/inbox" className="block">
+                <div className={cn(
+                    "flex items-center justify-between px-3 py-2 rounded-md cursor-pointer transition-colors group",
+                    isActive('/crm/inbox') ? "bg-[#2C2C2C] text-white" : "hover:bg-[#2A2A2A]"
+                )}>
+                  <div className="flex items-center space-x-3">
+                    <Inbox className="w-5 h-5 mr-3 group-hover:text-white transition-colors" />
+                    <span className="text-[14px] font-medium group-hover:text-white transition-colors">Inbox</span>
+                  </div>
+                  {!!unreadCount && (
+                    <span className="bg-[#FFEF5F] text-black text-[10px] font-black px-1.5 py-0.5 rounded-sm">
+                        {unreadCount}
+                    </span>
+                  )}
                 </div>
-                <span className="bg-[#4ADE80] text-black text-[10px] font-bold px-1.5 py-0.5 rounded-full">77</span>
-              </div>
-          </Link>
+            </Link>
+
+            <Link href="/crm/sent" className="block">
+                <div className={cn(
+                    "flex items-center justify-between px-3 py-2 rounded-md cursor-pointer transition-colors group",
+                    isActive('/crm/sent') ? "bg-[#2C2C2C] text-white" : "hover:bg-[#2A2A2A]"
+                )}>
+                  <div className="flex items-center space-x-3">
+                    <Send className="w-5 h-5 mr-3 group-hover:text-white transition-colors" />
+                    <span className="text-[14px] font-medium group-hover:text-white transition-colors">Sent</span>
+                  </div>
+                </div>
+            </Link>
+          </div>
 
           {[
             { name: 'Done', icon: CheckCircle2, href: '/crm/done' },

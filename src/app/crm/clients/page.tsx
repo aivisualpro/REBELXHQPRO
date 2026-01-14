@@ -80,6 +80,12 @@ export default function ClientsPage() {
   const [selectedStates, setSelectedStates] = useState<string[]>([]);
   const [selectedCompanyTypes, setSelectedCompanyTypes] = useState<string[]>([]);
   
+  // Numeric Filters
+  const [minRev, setMinRev] = useState('');
+  const [maxRev, setMaxRev] = useState('');
+  const [minBal, setMinBal] = useState('');
+  const [maxBal, setMaxBal] = useState('');
+  
   // Refs for remote opening filters from header
   const repFilterRef = useRef<MultiSelectFilterRef>(null);
   const typeFilterRef = useRef<MultiSelectFilterRef>(null);
@@ -145,7 +151,10 @@ export default function ClientsPage() {
             search: debouncedSearch,
             sortBy,
             sortOrder,
-            minRevenue: minRevenueSlab
+            minRevenue: minRev || '',
+            maxRevenue: maxRev || '',
+            minBalance: minBal || '',
+            maxBalance: maxBal || ''
         });
 
         if (selectedSalesReps.length) queryParams.append('salesPerson', selectedSalesReps.join(','));
@@ -166,7 +175,7 @@ export default function ClientsPage() {
     } finally {
         setLoading(false);
     }
-  }, [page, limit, debouncedSearch, sortBy, sortOrder, selectedSalesReps, selectedStates]);
+  }, [page, limit, debouncedSearch, sortBy, sortOrder, selectedSalesReps, selectedStates, minRev, maxRev, minBal, maxBal]);
 
   useEffect(() => {
     if (!settingsLoading) {
@@ -185,6 +194,17 @@ export default function ClientsPage() {
       } else if (key === 'companyType') {
           typeFilterRef.current?.open();
       }
+  };
+
+  const handleNumericFilter = (key: string, min: string, max: string) => {
+      if (key === 'totalRevenue') {
+          setMinRev(min);
+          setMaxRev(max);
+      } else if (key === 'balance') {
+          setMinBal(min);
+          setMaxBal(max);
+      }
+      setPage(1);
   };
 
   const handleSort = (key: string) => {
@@ -280,15 +300,17 @@ export default function ClientsPage() {
             />
             <button 
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center space-x-1.5 px-3 py-1.5 text-[11px] font-bold text-blue-600 bg-blue-50 border border-blue-100 rounded hover:bg-blue-100 transition-all uppercase tracking-wide"
+                className="p-2 text-blue-600 bg-blue-50 border border-blue-100 rounded hover:bg-blue-100 transition-all shadow-sm"
+                title="Import CSV"
             >
-                <Upload className="w-3.5 h-3.5" />
-                <span>Import CSV</span>
+                <Upload className="w-4 h-4" />
             </button>
 
-            <button className="flex items-center space-x-1.5 px-3 py-1.5 text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded hover:bg-slate-50 transition-all uppercase tracking-wide">
-                <FileText className="w-3.5 h-3.5 text-slate-400" />
-                <span>Notes</span>
+            <button 
+                className="p-2 text-slate-600 bg-white border border-slate-200 rounded hover:bg-slate-50 transition-all shadow-sm"
+                title="Notes"
+            >
+                <FileText className="w-4 h-4 text-slate-400" />
             </button>
 
             <button className="flex items-center justify-center w-8 h-8 bg-black text-white hover:bg-slate-800 rounded shadow-sm transition-all">
@@ -329,7 +351,11 @@ export default function ClientsPage() {
                                     currentSortBy={sortBy}
                                     currentSortOrder={sortOrder}
                                     onSort={handleHeaderSort}
-                                    onFilter={handleHeaderFilter}
+                                    onFilter={col.key === 'salesPerson' || col.key === 'companyType' ? handleHeaderFilter : undefined}
+                                    onNumericFilter={col.key === 'totalRevenue' || col.key === 'balance' ? handleNumericFilter : undefined}
+                                    isNumeric={col.key === 'totalRevenue' || col.key === 'balance'}
+                                    currentMin={col.key === 'totalRevenue' ? minRev : minBal}
+                                    currentMax={col.key === 'totalRevenue' ? maxRev : maxBal}
                                     className={cn(col.align === 'text-right' && "justify-end", col.align === 'text-center' && "justify-center")}
                                 />
                             </th>

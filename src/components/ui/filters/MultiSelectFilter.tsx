@@ -31,15 +31,26 @@ export const MultiSelectFilter = forwardRef<MultiSelectFilterRef, FilterProps>((
         close: () => setIsOpen(false)
     }));
 
-    // Close dropdown when clicking outside
+    // Close dropdown when clicking outside or pressing Escape
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
                 setIsOpen(false);
             }
         };
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setIsOpen(false);
+            }
+        };
+
         document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
     }, []);
 
     // Reset search when opening

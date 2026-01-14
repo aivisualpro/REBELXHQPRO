@@ -7,7 +7,7 @@ import { Providers } from "@/components/Providers";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "RebelX Headquarters | Unified ERP",
+  title: "RebelXBrands | ERP Systems",
   description: "Advanced ERP system for RebelX operations, CRM, and warehouse management.",
   icons: {
     icon: "/logo.png",
