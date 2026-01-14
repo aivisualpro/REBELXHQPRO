@@ -30,10 +30,29 @@ export function SearchableSelect({
 }: SearchableSelectProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState('');
+    const [openDirection, setOpenDirection] = useState<'down' | 'up'>('down');
     const containerRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const dropdownRef = useRef<HTMLDivElement>(null);
 
     const selectedOption = options.find(o => o.value === value);
+
+    // Check available space and set dropdown direction
+    useEffect(() => {
+        if (isOpen && containerRef.current) {
+            const rect = containerRef.current.getBoundingClientRect();
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const spaceAbove = rect.top;
+            const dropdownHeight = 260; // max-h-60 = 15rem = 240px + some padding
+            
+            // If not enough space below but more space above, open upward
+            if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
+                setOpenDirection('up');
+            } else {
+                setOpenDirection('down');
+            }
+        }
+    }, [isOpen]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -71,7 +90,7 @@ export function SearchableSelect({
                 onClick={() => setIsOpen(!isOpen)}
             >
                 <span className="truncate">{selectedOption ? selectedOption.label : (creatable && value ? value : placeholder)}</span>
-                <ChevronDown className="w-4 h-4 text-slate-400 ml-2 shrink-0" />
+                <ChevronDown className={cn("w-4 h-4 text-slate-400 ml-2 shrink-0 transition-transform", isOpen && "rotate-180")} />
             </div>
 
             {required && (
@@ -86,7 +105,13 @@ export function SearchableSelect({
             )}
 
             {isOpen && (
-                <div className="absolute z-50 w-full mt-1 bg-white border border-slate-100 rounded-md shadow-lg max-h-60 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100">
+                <div 
+                    ref={dropdownRef}
+                    className={cn(
+                        "absolute z-50 w-full bg-white border border-slate-100 rounded-md shadow-lg max-h-60 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100",
+                        openDirection === 'down' ? "mt-1 top-full" : "mb-1 bottom-full"
+                    )}
+                >
                     <div className="p-2 border-b border-slate-50 relative">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                         <input

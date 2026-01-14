@@ -765,6 +765,17 @@ export default function ClientDashboardPage() {
                         </button>
                     )}
 
+                    {/* Floating Create Order Button for Orders Tab */}
+                    {activeTab === 'Orders' && (
+                        <button 
+                            onClick={() => router.push(`/sales/wholesale-orders?createFor=${id}`)}
+                            className="fixed bottom-6 right-6 z-[60] w-10 h-10 bg-emerald-600 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-emerald-700 hover:scale-110 transition-all group"
+                            title="Create New Order"
+                        >
+                            <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
+                        </button>
+                    )}
+
 
                     {/* Table Content */}
                     {activeTab !== 'Orders' ? (
@@ -1067,7 +1078,7 @@ export default function ClientDashboardPage() {
                     </table>
                     ) : (
                         <table className="w-full text-left border-collapse">
-                            <thead className="sticky top-12 z-[20] bg-slate-50/90 backdrop-blur-sm border-b border-slate-100">
+                            <thead className="sticky top-0 z-[20] bg-slate-50/90 backdrop-blur-sm border-b border-slate-100">
                                 <tr>
                                     <th className="px-2 py-2 text-[8px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100">Order #</th>
                                     <th className="px-2 py-2 text-[8px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100">Date</th>

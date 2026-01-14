@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Search,
   Upload,
@@ -118,6 +118,7 @@ const SHIPPING_METHODS = [
 
 export default function SaleOrdersPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [orders, setOrders] = useState<SaleOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -145,7 +146,7 @@ export default function SaleOrdersPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
 
-  const [allClients, setAllClients] = useState<{ _id: string; name: string }[]>([]);
+  const [allClients, setAllClients] = useState<{ _id: string; name: string; salesPerson?: string; addresses?: { street: string; city: string; state: string }[] }[]>([]);
   const [allUsers, setAllUsers] = useState<{ _id: string; firstName: string; lastName: string }[]>([]);
   const [allSkus, setAllSkus] = useState<{ _id: string; name: string; salePrice?: number }[]>([]);
   
@@ -252,6 +253,38 @@ export default function SaleOrdersPage() {
     };
     fetchResources();
   }, []);
+
+  // Handle createFor URL parameter (auto-open modal with client pre-selected)
+  useEffect(() => {
+    const createForClientId = searchParams.get('createFor');
+    if (createForClientId && allClients.length > 0) {
+      const client = allClients.find(c => c._id === createForClientId);
+      if (client) {
+        // Find the sales rep for this client (if assigned)
+        const salesRepId = client.salesPerson || '';
+        
+        // Get address from client
+        const mainAddress = client.addresses && client.addresses.length > 0 
+          ? client.addresses[0] 
+          : { street: '', city: '', state: '' };
+        
+        setNewOrder(prev => ({
+          ...prev,
+          clientId: createForClientId,
+          salesRep: salesRepId,
+          shippingAddress: mainAddress.street || '',
+          city: mainAddress.city || '',
+          state: mainAddress.state || ''
+        }));
+        setNewLineItems([]);
+        setEditingOrderId(null);
+        setIsCreateModalOpen(true);
+        
+        // Clear the URL parameter without navigation
+        router.replace('/sales/wholesale-orders', { scroll: false });
+      }
+    }
+  }, [searchParams, allClients, router]);
 
   // Generate Label
   useEffect(() => {
