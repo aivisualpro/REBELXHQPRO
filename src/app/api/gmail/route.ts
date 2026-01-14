@@ -10,9 +10,30 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const label = searchParams.get('label') || 'INBOX';
     const pageToken = searchParams.get('pageToken');
+    const attachmentId = searchParams.get('attachmentId');
+    const messageId = searchParams.get('messageId');
 
     try {
         const gmail = await getGmailClient(session.user.id);
+
+        if (attachmentId && messageId) {
+            const res = await gmail.users.messages.attachments.get({
+                userId: 'me',
+                messageId: messageId,
+                id: attachmentId
+            });
+
+            const data = res.data.data;
+            if (!data) return NextResponse.json({ error: 'Attachment data not found' }, { status: 404 });
+
+            // Detect mime type for headers (optional, but good for browser preview)
+            // For now we'll rely on the client knowing what to do with the Blob
+            return new Response(Buffer.from(data, 'base64'), {
+                headers: {
+                    'Content-Disposition': `attachment; filename="attachment"`,
+                },
+            });
+        }
         
         // Fetch list of messages
         const listResponse = await gmail.users.messages.list({
@@ -39,13 +60,28 @@ export async function GET(request: NextRequest) {
                 const to = headers.find(h => h.name === 'To')?.value || '(Unknown Recipient)';
                 const date = headers.find(h => h.name === 'Date')?.value || '';
                 
-                // Extract body
+                // Extract body and attachments
                 let body = '';
+                const attachments: any[] = [];
+
+                const processParts = (parts: any[]) => {
+                    parts.forEach(part => {
+                        if (part.mimeType === 'text/plain' && part.body?.data) {
+                            body = Buffer.from(part.body.data, 'base64').toString();
+                        } else if (part.filename && part.body?.attachmentId) {
+                            attachments.push({
+                                id: part.body.attachmentId,
+                                filename: part.filename,
+                                mimeType: part.mimeType,
+                                size: part.body.size
+                            });
+                        }
+                        if (part.parts) processParts(part.parts);
+                    });
+                };
+
                 if (details.data.payload?.parts) {
-                    const part = details.data.payload.parts.find(p => p.mimeType === 'text/plain') || details.data.payload.parts[0];
-                    if (part?.body?.data) {
-                        body = Buffer.from(part.body.data, 'base64').toString();
-                    }
+                    processParts(details.data.payload.parts);
                 } else if (details.data.payload?.body?.data) {
                     body = Buffer.from(details.data.payload.body.data, 'base64').toString();
                 }
@@ -60,10 +96,12 @@ export async function GET(request: NextRequest) {
                 return {
                     id: msg.id,
                     sender: senderName,
+                    senderEmail: from.match(/<([^>]+)>/)?.[1] || from,
                     recipient: to,
                     subject,
                     snippet: details.data.snippet,
                     body,
+                    attachments,
                     time: new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                     date: new Date(date).toLocaleDateString([], { month: 'short', day: 'numeric' }),
                     timestamp: new Date(date).getTime(),

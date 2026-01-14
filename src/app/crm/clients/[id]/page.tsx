@@ -25,11 +25,15 @@ import {
     MapPinned,
     Plus,
     MoreVertical,
-    ExternalLink
+    ExternalLink,
+    CreditCard,
+    Search,
+    Edit
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import ClientModal from '@/components/crm/ClientModal';
 
 interface Client {
     _id: string;
@@ -49,6 +53,13 @@ interface Client {
     addresses?: { street: string; city: string; state: string; postalCode: string; country: string; label: string }[];
     defaultShippingTerms?: string;
     defaultPaymentMethod?: string;
+    billing?: {
+        nameOnCard?: string;
+        ccNumber?: string;
+        expirationDate?: string;
+        securityCode?: string;
+        zipCode?: string;
+    };
     createdAt?: string;
 }
 
@@ -85,6 +96,9 @@ interface Summary {
     totalRevenue: number;
     totalBalance: number;
     totalActivities: number;
+    totalEmails?: number;
+    totalCalls?: number;
+    totalSMS?: number;
     lastActivityDate: string | null;
     lastOrderDate: string | null;
 }
@@ -101,7 +115,7 @@ export default function ClientDashboardPage() {
     const [activities, setActivities] = useState<ActivityItem[]>([]);
     const [orders, setOrders] = useState<OrderItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'activities' | 'orders'>('activities');
+    const [activeTab, setActiveTab] = useState<'Emails' | 'Calls' | 'SMS' | 'Orders'>('Emails');
     
     // Pagination
     const [activitiesPage, setActivitiesPage] = useState(1);
@@ -109,6 +123,8 @@ export default function ClientDashboardPage() {
     const [hasMoreActivities, setHasMoreActivities] = useState(false);
     const [hasMoreOrders, setHasMoreOrders] = useState(false);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const loadMoreRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -127,7 +143,7 @@ export default function ClientDashboardPage() {
                 setSummary(data.summary);
                 
                 if (append) {
-                    if (activeTab === 'activities') {
+                    if (activeTab !== 'Orders') {
                         setActivities(prev => [...prev, ...data.activities]);
                     } else {
                         setOrders(prev => [...prev, ...data.orders]);
@@ -152,11 +168,11 @@ export default function ClientDashboardPage() {
     };
 
     const loadMore = () => {
-        if (activeTab === 'activities' && hasMoreActivities && !isLoadingMore) {
+        if (activeTab !== 'Orders' && hasMoreActivities && !isLoadingMore) {
             const newPage = activitiesPage + 1;
             setActivitiesPage(newPage);
             fetchClientData(newPage, true);
-        } else if (activeTab === 'orders' && hasMoreOrders && !isLoadingMore) {
+        } else if (activeTab === 'Orders' && hasMoreOrders && !isLoadingMore) {
             const newPage = ordersPage + 1;
             setOrdersPage(newPage);
             fetchClientData(newPage, true);
@@ -166,7 +182,7 @@ export default function ClientDashboardPage() {
     // Infinite scroll observer
     useEffect(() => {
         if (!loadMoreRef.current) return;
-        const hasMore = activeTab === 'activities' ? hasMoreActivities : hasMoreOrders;
+        const hasMore = activeTab !== 'Orders' ? hasMoreActivities : hasMoreOrders;
         if (!hasMore) return;
 
         const observer = new IntersectionObserver(
@@ -229,94 +245,67 @@ export default function ClientDashboardPage() {
     const lastOrderDays = daysSince(summary?.lastOrderDate || null);
 
     return (
-        <div className="flex flex-col h-[calc(100vh-40px)] overflow-hidden bg-white">
+        <>
+            <div className="flex flex-col h-[calc(100vh-40px)] overflow-hidden bg-white">
             {/* Shell Layer 1: Route Header */}
-            <div className="sticky top-0 z-[10] bg-white border-b border-slate-200 px-4 flex items-center justify-between space-x-3 shrink-0 h-12 shadow-sm">
-                <div className="flex items-center space-x-3">
-                    <button onClick={() => router.back()} className="hover:bg-slate-100 transition-colors p-1.5">
-                        <ArrowLeft className="w-4 h-4 text-slate-500" />
-                    </button>
-                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
-                        {client.name?.charAt(0) || '?'}
-                    </div>
-                    <div className="flex flex-col">
-                        <h1 className="text-sm font-bold text-slate-900 leading-tight">{client.name}</h1>
-                        <p className="text-[10px] text-slate-400 font-mono">{client._id}</p>
-                    </div>
+            <div className="sticky top-0 z-[50] bg-white border-b border-slate-200 px-4 flex items-center space-x-2 shrink-0 h-14 shadow-sm">
+                <button 
+                    onClick={() => router.back()} 
+                    className="w-9 h-9 bg-black flex items-center justify-center text-white hover:bg-slate-800 transition-colors shrink-0"
+                >
+                    <ArrowLeft className="w-4 h-4" />
+                </button>
+
+                <button 
+                    onClick={() => setIsEditModalOpen(true)}
+                    className="w-9 h-9 bg-black flex items-center justify-center text-white hover:bg-slate-800 transition-colors shrink-0"
+                >
+                    <Edit className="w-4 h-4" />
+                </button>
+
+                <div className="flex-1 max-w-sm relative group h-9">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 group-focus-within:text-blue-500 transition-colors" />
+                    <input 
+                        type="text" 
+                        placeholder={`Search ${activeTab.toLowerCase()}...`}
+                        className="w-full h-full pl-9 pr-4 bg-slate-50 border border-slate-100 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white focus:border-blue-500 transition-all rounded-sm placeholder:text-slate-400 font-medium"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                    />
                 </div>
-                <div className="flex items-center space-x-2">
-                    <button
-                        onClick={async () => {
-                            const toastId = toast.loading('Syncing communications for this client...');
-                            try {
-                                const res = await fetch('/api/crm/sync-google-all'); // Syncing all is easier than specific for now as it handles loop
-                                if (res.ok) {
-                                    toast.success('Sync complete', { id: toastId });
-                                    fetchClientData();
-                                }
-                            } catch (e) { toast.error('Sync failed', { id: toastId }); }
-                        }}
-                        className="flex items-center space-x-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-colors shadow-sm rounded-sm"
-                    >
-                        <Globe className="w-3.5 h-3.5" />
-                        <span className="text-[10px] font-bold uppercase tracking-widest">Sync Comms</span>
-                    </button>
 
-                    <button
-                        onClick={async () => {
-                            const phoneNumber = client.phones?.[0]?.value || '';
-                            const duration = prompt('Call duration (e.g., "2m 30s" or leave blank):') || '';
-                            const notes = prompt('Call notes (optional):') || '';
-                            
-                            if (!phoneNumber) {
-                                toast.error('No phone number found for this client');
-                                return;
-                            }
-                            
-                            try {
-                                const res = await fetch('/api/crm/log-call', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                        clientId: client._id,
-                                        phoneNumber,
-                                        duration,
-                                        type: 'Call',
-                                        notes
-                                    })
-                                });
-                                
-                                if (res.ok) {
-                                    toast.success('Call logged successfully!');
-                                    fetchClientData();
-                                } else {
-                                    toast.error('Failed to log call');
-                                }
-                            } catch (err) {
-                                toast.error('Error logging call');
-                            }
-                        }}
-                        className="flex items-center space-x-1.5 px-3 py-1.5 bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-sm rounded-sm"
-                    >
-                        <Phone className="w-3.5 h-3.5" />
-                        <span className="text-[10px] font-bold uppercase tracking-widest">Log Activity</span>
-                    </button>
-
-                    {client.contactStatus && (
-                        <span className={cn(
-                            "text-[9px] font-bold uppercase tracking-widest px-2 py-1",
-                            client.contactStatus === 'Active' ? "bg-emerald-100 text-emerald-700" :
-                            client.contactStatus === 'Lead' ? "bg-blue-100 text-blue-700" :
-                            "bg-slate-100 text-slate-600"
-                        )}>
-                            {client.contactStatus}
-                        </span>
-                    )}
-                    {client.companyType && (
-                        <span className="text-[9px] font-bold uppercase tracking-widest px-2 py-1 bg-purple-100 text-purple-700">
-                            {client.companyType}
-                        </span>
-                    )}
+                <div className="flex items-center space-x-1 h-9 ml-4">
+                    {[
+                        { id: 'Emails', icon: Mail, count: summary?.totalEmails },
+                        { id: 'Calls', icon: Phone, count: summary?.totalCalls },
+                        { id: 'SMS', icon: MessageSquare, count: summary?.totalSMS },
+                        { id: 'Orders', icon: ShoppingCart, count: summary?.totalOrders }
+                    ].map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => {
+                                setActiveTab(tab.id as any);
+                                setSearchQuery(''); // Clear search when switching tabs
+                            }}
+                            className={cn(
+                                "flex items-center space-x-2 px-4 h-full text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm",
+                                activeTab === tab.id
+                                    ? "bg-slate-100 text-slate-900 shadow-sm"
+                                    : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+                            )}
+                        >
+                            <tab.icon className="w-3.5 h-3.5" />
+                            <span>{tab.id}</span>
+                            {tab.count !== undefined && (
+                                <span className={cn(
+                                    "px-1.5 py-0.5 text-[9px] rounded-sm font-mono",
+                                    activeTab === tab.id ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-500"
+                                )}>
+                                    {tab.count}
+                                </span>
+                            )}
+                        </button>
+                    ))}
                 </div>
             </div>
 
@@ -324,239 +313,169 @@ export default function ClientDashboardPage() {
             <div className="flex-1 flex overflow-hidden min-h-0 bg-white">
                 {/* Left Column (30%) - Client Details */}
                 <aside className="w-[30%] h-full overflow-y-auto border-r border-slate-100 bg-white shrink-0 scrollbar-custom">
-                    <div className="p-4 space-y-6">
+                    <div className="p-6 space-y-8">
                         
-                        {/* Summary Stats */}
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 p-3">
-                                <div className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest mb-1">Total Revenue</div>
-                                <div className="text-xl font-black text-emerald-700">{formatCurrency(summary?.totalRevenue || 0)}</div>
+                        {/* Profile Header */}
+                        <div className="flex flex-col items-center text-center space-y-3">
+                            <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-3xl shadow-lg">
+                                {client.name?.charAt(0) || '?'}
                             </div>
-                            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 p-3">
-                                <div className="text-[9px] font-bold text-blue-600 uppercase tracking-widest mb-1">Orders</div>
-                                <div className="text-xl font-black text-blue-700">{summary?.totalOrders || 0}</div>
-                            </div>
-                            <div className="bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-100 p-3">
-                                <div className="text-[9px] font-bold text-purple-600 uppercase tracking-widest mb-1">Activities</div>
-                                <div className="text-xl font-black text-purple-700">{summary?.totalActivities || 0}</div>
-                            </div>
-                            <div className="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-100 p-3">
-                                <div className="text-[9px] font-bold text-orange-600 uppercase tracking-widest mb-1">Payment Balance</div>
-                                <div className={cn("text-xl font-black", (summary?.totalBalance || 0) > 0 ? "text-red-600" : "text-emerald-600")}>
-                                    {formatCurrency(summary?.totalBalance || 0)}
-                                </div>
+                            <div className="space-y-1">
+                                <h1 className="text-lg font-black text-slate-900 leading-tight">{client.name}</h1>
+                                <p className="text-[10px] text-slate-400 font-mono tracking-tighter">{client._id}</p>
                             </div>
                         </div>
 
-                        {/* Activity Health */}
-                        <div className="bg-slate-50 border border-slate-100 p-4">
-                            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Engagement Health</h3>
-                            <div className="space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs text-slate-600">Last Activity</span>
-                                    <span className={cn(
-                                        "text-xs font-bold",
-                                        lastActivityDays === null ? "text-slate-400" :
-                                        lastActivityDays <= 30 ? "text-emerald-600" :
-                                        lastActivityDays <= 60 ? "text-amber-600" :
-                                        "text-red-600"
-                                    )}>
-                                        {lastActivityDays === null ? 'Never' : lastActivityDays === 0 ? 'Today' : `${lastActivityDays}d ago`}
-                                    </span>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs text-slate-600">Last Order</span>
-                                    <span className={cn(
-                                        "text-xs font-bold",
-                                        lastOrderDays === null ? "text-slate-400" :
-                                        lastOrderDays <= 30 ? "text-emerald-600" :
-                                        lastOrderDays <= 60 ? "text-amber-600" :
-                                        "text-red-600"
-                                    )}>
-                                        {lastOrderDays === null ? 'Never' : lastOrderDays === 0 ? 'Today' : `${lastOrderDays}d ago`}
-                                    </span>
-                                </div>
+                        {/* Primary Address */}
+                        <div className="space-y-2">
+                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center space-x-2">
+                                <MapPin className="w-3 h-3" />
+                                <span>Address</span>
+                            </div>
+                            <div className="p-3 bg-slate-50 border border-slate-100 rounded-sm">
+                                {client.addresses && client.addresses.length > 0 ? (
+                                    <div className="text-xs text-slate-700 leading-relaxed">
+                                        <div className="font-bold text-slate-900 mb-1">{client.addresses[0].label || 'Primary'}</div>
+                                        <div>{client.addresses[0].street}</div>
+                                        <div>{[client.addresses[0].city, client.addresses[0].state, client.addresses[0].postalCode].filter(Boolean).join(', ')}</div>
+                                        {client.addresses[0].country && <div>{client.addresses[0].country}</div>}
+                                    </div>
+                                ) : (
+                                    <span className="text-xs text-slate-400 italic">No address provided</span>
+                                )}
                             </div>
                         </div>
-
-                        {/* Contact Info */}
-                        <div className="space-y-4">
-                            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-100 pb-2">Contact Information</h3>
-                            
-                            {/* Phones */}
-                            {client.phones && client.phones.length > 0 && (
-                                <div className="space-y-2">
-                                    {client.phones.map((p, idx) => (
-                                        <a key={idx} href={`tel:${p.value}`} className="flex items-center space-x-3 group hover:bg-slate-50 p-2 transition-colors">
-                                            <div className="w-8 h-8 bg-blue-100 flex items-center justify-center">
-                                                <Phone className="w-4 h-4 text-blue-600" />
-                                            </div>
-                                            <div className="flex-1">
-                                                <div className="text-xs font-medium text-slate-700 group-hover:text-blue-600">{p.value}</div>
-                                                <div className="text-[10px] text-slate-400">{p.label || 'Phone'}{p.isWhatsApp && ' • WhatsApp'}</div>
-                                            </div>
-                                            <button 
-                                                onClick={async (e) => {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    const width = 450;
-                                                    const height = 650;
-                                                    const left = (window.screen.width / 2) - (width / 2);
-                                                    const top = (window.screen.height / 2) - (height / 2);
-                                                    // Smart phone number normalization for US and international numbers
-                                                    const digitsOnly = p.value.replace(/\D/g, '');
-                                                    let e164;
-                                                    
-                                                    if (p.value.includes('+')) {
-                                                        // Already has country code (e.g., +92), use digits as-is
-                                                        e164 = digitsOnly;
-                                                    } else if (digitsOnly.startsWith('1') && digitsOnly.length === 11) {
-                                                        // US number with country code
-                                                        e164 = digitsOnly;
-                                                    } else if (digitsOnly.length === 10) {
-                                                        // US number without country code
-                                                        e164 = '1' + digitsOnly;
-                                                    } else {
-                                                        // International or other format, use as-is
-                                                        e164 = digitsOnly;
-                                                    }
-                                                    
-                                                    window.open(
-                                                        `https://voice.google.com/u/0/calls?a=nc,%2B${e164}`, 
-                                                        'GoogleVoiceDialer', 
-                                                        `width=${width},height=${height},left=${left},top=${top},menubar=no,status=no,toolbar=no`
-                                                    );
-                                                    
-                                                    // Auto-log the call after a brief delay
-                                                    setTimeout(async () => {
-                                                        const shouldLog = confirm('Log this call to CRM?\n\nClick OK to log, or Cancel if call was not completed.');
-                                                        
-                                                        if (shouldLog) {
-                                                            const duration = prompt('Call duration (optional):');
-                                                            
-                                                            try {
-                                                                const res = await fetch('/api/crm/log-call', {
-                                                                    method: 'POST',
-                                                                    headers: { 'Content-Type': 'application/json' },
-                                                                    body: JSON.stringify({
-                                                                        clientId: client._id,
-                                                                        phoneNumber: p.value,
-                                                                        duration,
-                                                                        type: 'Call'
-                                                                    })
-                                                                });
-                                                                
-                                                                if (res.ok) {
-                                                                    toast.success('Call logged to CRM!');
-                                                                    fetchClientData();
-                                                                } else {
-                                                                    toast.error('Failed to log call');
-                                                                }
-                                                            } catch (err) {
-                                                                toast.error('Error logging call');
-                                                            }
-                                                        }
-                                                    }, 3000); // Wait 3 seconds after opening dialer
-                                                }}
-                                                className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all border border-blue-100"
-                                                title="Open in Google Voice"
-                                            >
-                                                <Phone className="w-3.5 h-3.5" />
-                                            </button>
-                                        </a>
-                                    ))}
-                                </div>
-                            )}
-
-                            {/* Emails */}
-                            {client.emails && client.emails.length > 0 && (
-                                <div className="space-y-2">
-                                    {client.emails.map((e, idx) => (
-                                        <a key={idx} href={`mailto:${e.value}`} className="flex items-center space-x-3 group hover:bg-slate-50 p-2 transition-colors">
-                                            <div className="w-8 h-8 bg-purple-100 flex items-center justify-center">
-                                                <Mail className="w-4 h-4 text-purple-600" />
-                                            </div>
-                                            <div className="flex-1">
-                                                <div className="text-xs font-medium text-slate-700 group-hover:text-purple-600 truncate">{e.value}</div>
-                                                <div className="text-[10px] text-slate-400">{e.label || 'Email'}</div>
-                                            </div>
-                                        </a>
-                                    ))}
-                                </div>
-                            )}
-
-                            {/* Website */}
-                            {client.website && (
-                                <a href={client.website.startsWith('http') ? client.website : `https://${client.website}`} target="_blank" rel="noopener noreferrer" className="flex items-center space-x-3 group hover:bg-slate-50 p-2 transition-colors">
-                                    <div className="w-8 h-8 bg-emerald-100 flex items-center justify-center">
-                                        <Globe className="w-4 h-4 text-emerald-600" />
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className="text-xs font-medium text-slate-700 group-hover:text-emerald-600 truncate">{client.website}</div>
-                                        <div className="text-[10px] text-slate-400">Website</div>
-                                    </div>
-                                    <ExternalLink className="w-3 h-3 text-slate-400" />
-                                </a>
-                            )}
-                        </div>
-
-                        {/* Addresses */}
-                        {client.addresses && client.addresses.length > 0 && (
-                            <div className="space-y-4">
-                                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-100 pb-2">Addresses</h3>
-                                {client.addresses.map((addr, idx) => (
-                                    <div key={idx} className="flex items-start space-x-3 p-2">
-                                        <div className="w-8 h-8 bg-orange-100 flex items-center justify-center shrink-0">
-                                            <MapPin className="w-4 h-4 text-orange-600" />
-                                        </div>
-                                        <div className="flex-1">
-                                            <div className="text-[10px] font-bold text-slate-500 uppercase mb-1">{addr.label || 'Address'}</div>
-                                            <div className="text-xs text-slate-700 leading-relaxed">
-                                                {addr.street && <div>{addr.street}</div>}
-                                                <div>{[addr.city, addr.state, addr.postalCode].filter(Boolean).join(', ')}</div>
-                                                {addr.country && <div>{addr.country}</div>}
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
 
                         {/* Sales Rep */}
-                        {client.salesRepInfo && (
-                            <div className="space-y-2">
-                                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-100 pb-2">Sales Representative</h3>
-                                <div className="flex items-center space-x-3 p-2">
-                                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
-                                        {client.salesRepInfo.firstName?.charAt(0) || '?'}
+                        <div className="space-y-2">
+                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center space-x-2">
+                                <User className="w-3 h-3" />
+                                <span>Sales Representative</span>
+                            </div>
+                            <div className="flex items-center space-x-3 p-3 bg-blue-50/50 border border-blue-100/50 rounded-sm">
+                                <div className="w-10 h-10 bg-blue-600 flex items-center justify-center text-white font-bold text-sm rounded-sm">
+                                    {client.salesRepInfo?.firstName?.charAt(0) || '?'}
+                                </div>
+                                <div>
+                                    <div className="text-xs font-bold text-slate-900">
+                                        {client.salesRepInfo ? `${client.salesRepInfo.firstName} ${client.salesRepInfo.lastName}` : 'Unassigned'}
                                     </div>
-                                    <div>
-                                        <div className="text-sm font-medium text-slate-800">
-                                            {client.salesRepInfo.firstName} {client.salesRepInfo.lastName}
+                                    <div className="text-[10px] text-slate-500 font-medium">{client.salesRepInfo?.email || '-'}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Contact Channels (2 Columns) */}
+                        <div className="grid grid-cols-2 gap-6">
+                            {/* Phones Column */}
+                            <div className="space-y-3">
+                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center space-x-2">
+                                    <Phone className="w-3 h-3" />
+                                    <span>Phones</span>
+                                </div>
+                                <div className="space-y-2">
+                                    {client.phones?.map((p, idx) => (
+                                        <div key={idx} className="group flex flex-col">
+                                            <a href={`tel:${p.value}`} className="text-xs font-bold text-slate-700 hover:text-blue-600 transition-colors truncate">
+                                                {p.value}
+                                            </a>
+                                            <span className="text-[9px] text-slate-400 font-medium uppercase">{p.label || 'Phone'}</span>
                                         </div>
-                                        <div className="text-xs text-slate-400">{client.salesRepInfo.email}</div>
+                                    )) || <span className="text-[10px] text-slate-400 italic">None</span>}
+                                </div>
+                            </div>
+
+                            {/* Emails Column */}
+                            <div className="space-y-3">
+                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center space-x-2">
+                                    <Mail className="w-3 h-3" />
+                                    <span>Emails</span>
+                                </div>
+                                <div className="space-y-2">
+                                    {client.emails?.map((e, idx) => (
+                                        <div key={idx} className="flex flex-col">
+                                            <a href={`mailto:${e.value}`} className="text-xs font-bold text-slate-700 hover:text-purple-600 transition-colors truncate">
+                                                {e.value}
+                                            </a>
+                                            <span className="text-[9px] text-slate-400 font-medium uppercase">{e.label || 'Email'}</span>
+                                        </div>
+                                    )) || <span className="text-[10px] text-slate-400 italic">None</span>}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Billing Section (Object) */}
+                        <div className="space-y-3 pt-4 border-t border-slate-100">
+                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center space-x-2">
+                                <CreditCard className="w-3 h-3" />
+                                <span>Billing Information</span>
+                            </div>
+                            <div className="bg-slate-900 p-4 rounded-sm space-y-3 shadow-inner">
+                                <div className="flex items-center justify-between">
+                                    <div className="text-[9px] text-slate-400 uppercase font-black tracking-widest">Credit Card</div>
+                                    <div className="flex space-x-1">
+                                        <div className="w-4 h-2.5 bg-white/20 rounded-sm" />
+                                        <div className="w-4 h-2.5 bg-white/20 rounded-sm" />
+                                    </div>
+                                </div>
+                                
+                                <div className="space-y-1">
+                                    <div className="text-[13px] font-mono text-white tracking-[0.2em]">
+                                        {client.billing?.ccNumber || '•••• •••• •••• ••••'}
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-between items-end">
+                                    <div className="space-y-1">
+                                        <div className="text-[8px] text-slate-500 uppercase font-bold">Card Holder</div>
+                                        <div className="text-[10px] text-white font-medium uppercase tracking-wider">
+                                            {client.billing?.nameOnCard || '-'}
+                                        </div>
+                                    </div>
+                                    <div className="flex space-x-4">
+                                        <div className="space-y-1">
+                                            <div className="text-[8px] text-slate-500 uppercase font-bold">Expires</div>
+                                            <div className="text-[10px] text-white font-mono">{client.billing?.expirationDate || '••/••'}</div>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <div className="text-[8px] text-slate-500 uppercase font-bold">CVV</div>
+                                            <div className="text-[10px] text-white font-mono">{client.billing?.securityCode || '•••'}</div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        )}
+                        </div>
 
-                        {/* Additional Info */}
-                        <div className="space-y-2 pt-4 border-t border-slate-100">
-                            <div className="flex justify-between text-xs">
-                                <span className="text-slate-400">Industry</span>
-                                <span className="text-slate-700 font-medium">{client.industry || '-'}</span>
-                            </div>
-                            <div className="flex justify-between text-xs">
-                                <span className="text-slate-400">Payment Method</span>
-                                <span className="text-slate-700 font-medium">{client.defaultPaymentMethod || '-'}</span>
-                            </div>
-                            <div className="flex justify-between text-xs">
-                                <span className="text-slate-400">Shipping Terms</span>
-                                <span className="text-slate-700 font-medium">{client.defaultShippingTerms || '-'}</span>
-                            </div>
-                            <div className="flex justify-between text-xs">
-                                <span className="text-slate-400">Created</span>
-                                <span className="text-slate-700 font-medium">{formatDate(client.createdAt || '')}</span>
+                        {/* Rest of the Information */}
+                        <div className="space-y-4 pt-4 border-t border-slate-100">
+                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Metadata</div>
+                            <div className="grid grid-cols-1 gap-3">
+                                <div className="flex justify-between text-xs py-1 border-b border-slate-50">
+                                    <span className="text-slate-500">Contact Status</span>
+                                    <span className="font-bold text-slate-800">{client.contactStatus || '-'}</span>
+                                </div>
+                                <div className="flex justify-between text-xs py-1 border-b border-slate-50">
+                                    <span className="text-slate-500">Company Type</span>
+                                    <span className="font-bold text-slate-800">{client.companyType || '-'}</span>
+                                </div>
+                                <div className="flex justify-between text-xs py-1 border-b border-slate-50">
+                                    <span className="text-slate-500">Industry</span>
+                                    <span className="font-bold text-slate-800">{client.industry || '-'}</span>
+                                </div>
+                                <div className="flex justify-between text-xs py-1 border-b border-slate-50">
+                                    <span className="text-slate-500">Payment Terms</span>
+                                    <span className="font-bold text-slate-800">{client.defaultPaymentMethod || '-'}</span>
+                                </div>
+                                {client.website && (
+                                    <div className="flex justify-between text-xs py-1 border-b border-slate-50">
+                                        <span className="text-slate-500">Website</span>
+                                        <a href={client.website.startsWith('http') ? client.website : `https://${client.website}`} target="_blank" className="text-blue-600 font-bold truncate max-w-[150px]">{client.website}</a>
+                                    </div>
+                                )}
+                                <div className="flex justify-between text-xs py-1 border-b border-slate-50">
+                                    <span className="text-slate-500">Created At</span>
+                                    <span className="font-medium text-slate-600">{formatDate(client.createdAt || '')}</span>
+                                </div>
                             </div>
                         </div>
 
@@ -566,44 +485,10 @@ export default function ClientDashboardPage() {
 
                 {/* Right Column: Activity/Orders Table */}
                 <main className="flex-1 h-full overflow-y-auto bg-white relative scrollbar-custom">
-                    {/* Toolbar with Tabs */}
-                    <div className="sticky top-0 z-[30] bg-white border-b border-slate-100 px-4 h-12 flex items-center justify-between">
-                        <div className="flex items-center space-x-1">
-                            <button
-                                onClick={() => setActiveTab('activities')}
-                                className={cn(
-                                    "flex items-center space-x-2 px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all",
-                                    activeTab === 'activities'
-                                        ? "bg-slate-900 text-white"
-                                        : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-                                )}
-                            >
-                                <Activity className="w-3.5 h-3.5" />
-                                <span>Activities</span>
-                                <span className="bg-white/20 px-1.5 py-0.5 text-[10px]">{summary?.totalActivities || 0}</span>
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('orders')}
-                                className={cn(
-                                    "flex items-center space-x-2 px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all",
-                                    activeTab === 'orders'
-                                        ? "bg-slate-900 text-white"
-                                        : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-                                )}
-                            >
-                                <ShoppingCart className="w-3.5 h-3.5" />
-                                <span>Wholesale Orders</span>
-                                <span className="bg-white/20 px-1.5 py-0.5 text-[10px]">{summary?.totalOrders || 0}</span>
-                            </button>
-                        </div>
-                        <button className="flex items-center space-x-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-colors">
-                            <Plus className="w-3.5 h-3.5" />
-                            <span>{activeTab === 'activities' ? 'Log Activity' : 'New Order'}</span>
-                        </button>
-                    </div>
+
 
                     {/* Table Content */}
-                    {activeTab === 'activities' ? (
+                    {activeTab !== 'Orders' ? (
                         <table className="w-full text-left border-collapse">
                             <thead className="sticky top-12 z-[20] bg-slate-50/90 backdrop-blur-sm border-b border-slate-100">
                                 <tr>
@@ -614,13 +499,23 @@ export default function ClientDashboardPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
-                                {activities.length === 0 ? (
+                                {activities.filter(a => {
+                                    if (activeTab === 'Emails') return a.type === 'Email';
+                                    if (activeTab === 'Calls') return a.type === 'Call';
+                                    if (activeTab === 'SMS') return a.type === 'Text';
+                                    return false;
+                                }).length === 0 ? (
                                     <tr>
-                                        <td colSpan={4} className="px-4 py-12 text-center text-slate-400 text-sm">
-                                            No activities recorded yet
+                                        <td colSpan={4} className="px-4 py-12 text-center text-slate-400 text-sm italic">
+                                            No {activeTab.toLowerCase()} recorded yet
                                         </td>
                                     </tr>
-                                ) : activities.map((act) => (
+                                ) : activities.filter(a => {
+                                    if (activeTab === 'Emails') return a.type === 'Email';
+                                    if (activeTab === 'Calls') return a.type === 'Call';
+                                    if (activeTab === 'SMS') return a.type === 'Text';
+                                    return false;
+                                }).map((act) => (
                                     <tr key={act._id} className="hover:bg-slate-50/50 transition-colors group">
                                         <td className="px-4 py-3 text-[11px] text-slate-500 font-mono whitespace-nowrap">
                                             {formatDate(act.createdAt)}
@@ -751,7 +646,7 @@ export default function ClientDashboardPage() {
 
                     {/* Load More Indicator */}
                     <div ref={loadMoreRef} className="h-16 flex items-center justify-center">
-                        {((activeTab === 'activities' && hasMoreActivities) || (activeTab === 'orders' && hasMoreOrders)) && (
+                        {((activeTab !== 'Orders' && hasMoreActivities) || (activeTab === 'Orders' && hasMoreOrders)) && (
                             <div className="flex items-center space-x-2 text-slate-400">
                                 {isLoadingMore ? (
                                     <>
@@ -783,5 +678,16 @@ export default function ClientDashboardPage() {
                 </div>
             </div>
         </div>
+
+            <ClientModal
+                isOpen={isEditModalOpen}
+                onClose={() => setIsEditModalOpen(false)}
+                onSuccess={() => {
+                    fetchClientData();
+                    toast.success('Client updated successfully');
+                }}
+                initialData={client}
+            />
+        </>
     );
 }

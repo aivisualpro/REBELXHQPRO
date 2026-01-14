@@ -27,6 +27,7 @@ export function GmailEmailView({ initialLabel }: GmailEmailViewProps) {
   const [totalEstimated, setTotalEstimated] = useState(0);
   const [unreadCount, setUnreadCount] = useState(0);
   const [attachments, setAttachments] = useState<File[]>([]);
+  const [previewAttachment, setPreviewAttachment] = useState<{ url: string, type: string, name: string } | null>(null);
   const attachmentInputRef = React.useRef<HTMLInputElement>(null);
   const imageInputRef = React.useRef<HTMLInputElement>(null);
   const emailsPerPage = 50;
@@ -112,6 +113,38 @@ export function GmailEmailView({ initialLabel }: GmailEmailViewProps) {
         setUnreadCount(prev => currentlyRead ? prev + 1 : Math.max(0, prev - 1));
     } catch (error) {
         console.error('Error toggling read status:', error);
+    }
+  };
+
+  const handleAttachmentClick = async (emailId: string, att: any) => {
+    try {
+        const res = await fetch(`/api/gmail?messageId=${emailId}&attachmentId=${att.id}`);
+        if (!res.ok) throw new Error('Failed to fetch attachment');
+        
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(new Blob([blob], { type: att.mimeType }));
+        
+        // Supported types for preview in popup
+        const isSupportedPreview = 
+            att.mimeType === 'application/pdf' || 
+            att.mimeType.startsWith('image/') || 
+            att.mimeType.startsWith('video/') ||
+            att.mimeType.startsWith('audio/');
+
+        if (isSupportedPreview) {
+            setPreviewAttachment({ url, type: att.mimeType, name: att.filename });
+        } else {
+            // Otherwise, force download
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', att.filename);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        }
+    } catch (error) {
+        console.error('Error handling attachment:', error);
+        toast.error('Failed to open attachment');
     }
   };
 
@@ -203,7 +236,10 @@ export function GmailEmailView({ initialLabel }: GmailEmailViewProps) {
                                 {email.snippet}
                              </span>
                         </div>
-                        <div className="shrink-0 flex items-center justify-end min-w-[100px]">
+                        <div className="shrink-0 flex items-center justify-end min-w-[120px] space-x-3">
+                            {email.attachments?.length > 0 && (
+                                <Paperclip className="w-3.5 h-3.5 text-slate-400" />
+                            )}
                             <span className={cn(
                                 "text-[12px] group-hover:hidden",
                                 email.isRead ? "font-normal text-slate-500" : "font-black text-slate-900"
@@ -247,6 +283,29 @@ export function GmailEmailView({ initialLabel }: GmailEmailViewProps) {
                                 <div className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap font-medium">
                                     {email.body}
                                 </div>
+
+                                {email.attachments?.length > 0 && (
+                                    <div className="pt-8 border-t border-slate-50">
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Attachments ({email.attachments.length})</p>
+                                        <div className="flex flex-wrap gap-3">
+                                            {email.attachments.map((att: any) => (
+                                                <div 
+                                                    key={att.id} 
+                                                    onClick={() => handleAttachmentClick(email.id, att)}
+                                                    className="group relative flex items-center space-x-3 p-3 bg-slate-50 hover:bg-slate-100 transition-all border border-slate-100 min-w-[200px] cursor-pointer"
+                                                >
+                                                    <div className="p-2 bg-white border border-slate-200">
+                                                        <Paperclip className="w-4 h-4 text-slate-400" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-[11px] font-black text-slate-900 truncate">{att.filename}</p>
+                                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{(att.size / 1024).toFixed(1)} KB</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -350,6 +409,57 @@ export function GmailEmailView({ initialLabel }: GmailEmailViewProps) {
                              </button>
                         </div>
                     </div>
+                </div>
+            </div>
+        )}
+
+        {/* Attachment Preview Modal */}
+        {previewAttachment && (
+            <div className="fixed inset-0 bg-black/90 z-[2000] flex flex-col animate-in fade-in duration-200">
+                <div className="flex items-center justify-between px-6 py-4 bg-black/40 backdrop-blur-md border-b border-white/10 text-white">
+                    <div className="flex items-center space-x-4">
+                         <Paperclip className="w-4 h-4 text-slate-400" />
+                         <span className="text-sm font-black uppercase tracking-widest">{previewAttachment.name}</span>
+                    </div>
+                    <div className="flex items-center space-x-6">
+                        <button 
+                            onClick={() => {
+                                const link = document.createElement('a');
+                                link.href = previewAttachment.url;
+                                link.setAttribute('download', previewAttachment.name);
+                                document.body.appendChild(link);
+                                link.click();
+                                link.remove();
+                            }}
+                            className="flex items-center space-x-2 text-[10px] font-black uppercase tracking-widest hover:text-[#FFEF5F] transition-colors"
+                        >
+                            <span>Download</span>
+                        </button>
+                        <button 
+                            onClick={() => {
+                                window.URL.revokeObjectURL(previewAttachment.url);
+                                setPreviewAttachment(null);
+                            }}
+                            className="p-1 hover:bg-white/10 transition-colors"
+                        >
+                            <X className="w-6 h-6" />
+                        </button>
+                    </div>
+                </div>
+                
+                <div className="flex-1 flex items-center justify-center p-8 overflow-hidden">
+                    {previewAttachment.type.startsWith('image/') && (
+                        <img src={previewAttachment.url} alt={previewAttachment.name} className="max-w-full max-h-full object-contain shadow-2xl" />
+                    )}
+                    {previewAttachment.type === 'application/pdf' && (
+                        <iframe src={previewAttachment.url} className="w-full h-full bg-white shadow-2xl" />
+                    )}
+                    {previewAttachment.type.startsWith('video/') && (
+                        <video src={previewAttachment.url} controls autoPlay className="max-w-full max-h-full shadow-2xl" />
+                    )}
+                    {previewAttachment.type.startsWith('audio/') && (
+                        <audio src={previewAttachment.url} controls autoPlay className="w-[400px]" />
+                    )}
                 </div>
             </div>
         )}

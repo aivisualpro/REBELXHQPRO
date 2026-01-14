@@ -14,6 +14,7 @@ import { useRouter } from 'next/navigation';
 import { TableColumnHeader } from '@/components/ui/TableColumnHeader';
 import { Pagination } from '@/components/ui/Pagination';
 import toast from 'react-hot-toast';
+import ClientModal from '@/components/crm/ClientModal';
 
 interface Lead {
     _id: string;
@@ -160,6 +161,7 @@ export default function LeadsPage() {
   // Pipeline Drag State
   const [draggedLead, setDraggedLead] = useState<Lead | null>(null);
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   
   // Pagination & Sort
   const [page, setPage] = useState(1);
@@ -520,7 +522,7 @@ export default function LeadsPage() {
         </div>
 
         {/* Right: Filters & Actions */}
-        <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar">
+        <div className="flex items-center space-x-2">
             
             {/* Filter Group */}
             <div className="flex items-center space-x-2 mr-4">
@@ -532,40 +534,26 @@ export default function LeadsPage() {
                     <LucideMap className="w-3.5 h-3.5 text-slate-400" />
                     <span>State</span>
                 </button>
-                 <button className="flex items-center space-x-1.5 px-3 py-1.5 text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded hover:bg-slate-50 hover:border-slate-300 transition-all uppercase tracking-wide">
-                    <Truck className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Shipping</span>
-                </button>
             </div>
 
-            <div className="w-px h-6 bg-slate-200" />
-
-            {/* Actions Group */}
-            <input
-                type="file"
-                accept=".csv"
-                className="hidden"
-                ref={fileInputRef}
-                onChange={handleImport}
-            />
             <button 
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center space-x-1.5 px-3 py-1.5 text-[11px] font-bold text-blue-600 bg-blue-50 border border-blue-100 rounded hover:bg-blue-100 transition-all uppercase tracking-wide"
+                onClick={() => setIsModalOpen(true)}
+                className="flex items-center justify-center w-8 h-8 bg-black text-white hover:bg-slate-800 rounded shadow-sm transition-all"
             >
-                <Upload className="w-3.5 h-3.5" />
-                <span>Import CSV</span>
-            </button>
-
-            <button className="flex items-center space-x-1.5 px-3 py-1.5 text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded hover:bg-slate-50 transition-all uppercase tracking-wide">
-                <FileText className="w-3.5 h-3.5 text-slate-400" />
-                <span>Notes</span>
-            </button>
-
-            <button className="flex items-center justify-center w-8 h-8 bg-black text-white hover:bg-slate-800 rounded shadow-sm transition-all">
                 <Plus className="w-4 h-4" />
             </button>
         </div>
       </div>
+
+      <ClientModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        onSuccess={() => {
+            if (viewMode === 'table') fetchLeads();
+            else PIPELINE_STAGES.forEach(s => fetchPipelineStage(s.id, 1, false));
+        }}
+        initialType="Lead"
+      />
 
       {/* Main View Area */}
       <div className="flex-1 overflow-auto bg-white">

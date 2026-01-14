@@ -14,6 +14,7 @@ import { TableColumnHeader } from '@/components/ui/TableColumnHeader';
 import { Pagination } from '@/components/ui/Pagination';
 import { MultiSelectFilter, MultiSelectFilterRef } from '@/components/ui/filters/MultiSelectFilter';
 import toast from 'react-hot-toast';
+import ClientModal from '@/components/crm/ClientModal';
 
 interface Client {
     _id: string;
@@ -63,6 +64,7 @@ export default function ClientsPage() {
   const [loading, setLoading] = useState(true);
   const [minRevenueSlab, setMinRevenueSlab] = useState('20');
   const [settingsLoading, setSettingsLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   
   // Pagination & Sort
   const [page, setPage] = useState(1);
@@ -313,11 +315,21 @@ export default function ClientsPage() {
                 <FileText className="w-4 h-4 text-slate-400" />
             </button>
 
-            <button className="flex items-center justify-center w-8 h-8 bg-black text-white hover:bg-slate-800 rounded shadow-sm transition-all">
+            <button 
+                onClick={() => setIsModalOpen(true)}
+                className="flex items-center justify-center w-8 h-8 bg-black text-white hover:bg-slate-800 rounded shadow-sm transition-all"
+            >
                 <Plus className="w-4 h-4" />
             </button>
         </div>
       </div>
+
+      <ClientModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        onSuccess={() => fetchClients()}
+        initialType="Client"
+      />
 
       {/* Table Content */}
       <div className="flex-1 overflow-auto bg-white">

@@ -10,13 +10,17 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import ClientModal from '@/components/crm/ClientModal';
 
 export default function CRMLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { data: session } = useSession();
   const [unreadCount, setUnreadCount] = React.useState<number | null>(null);
+  const [isClientModalOpen, setIsClientModalOpen] = React.useState(false);
+  const [clientModalType, setClientModalType] = React.useState<'Client' | 'Lead'>('Lead');
 
   const fetchUnreadCount = React.useCallback(async () => {
     try {
@@ -94,32 +98,54 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
           ))}
 
           {/* Leads */}
-          <Link href="/crm/leads" className="block">
-              <div className={cn(
-                  "flex items-center justify-between px-3 py-2 rounded-md cursor-pointer transition-colors group",
-                  isActive('/crm/leads') ? "bg-[#2C2C2C] text-white" : "hover:bg-[#2A2A2A]"
-              )}>
-                <div className="flex items-center space-x-3">
-                  <Building2 className="w-5 h-5 group-hover:text-white transition-colors" />
-                  <span className="text-[14px] font-medium group-hover:text-white transition-colors">Leads</span>
+          <div className="group/sidebar-item relative">
+            <Link href="/crm/leads" className="block">
+                <div className={cn(
+                    "flex items-center justify-between px-3 py-2 rounded-md cursor-pointer transition-colors group",
+                    isActive('/crm/leads') ? "bg-[#2C2C2C] text-white" : "hover:bg-[#2A2A2A]"
+                )}>
+                  <div className="flex items-center space-x-3">
+                    <Building2 className="w-5 h-5 group-hover:text-white transition-colors" />
+                    <span className="text-[14px] font-medium group-hover:text-white transition-colors">Leads</span>
+                  </div>
                 </div>
-                <Plus className="w-4 h-4 hover:text-white" />
-              </div>
-          </Link>
+            </Link>
+            <button 
+                onClick={(e) => {
+                    e.preventDefault();
+                    setClientModalType('Lead');
+                    setIsClientModalOpen(true);
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-[#3A3A3A] rounded transition-colors text-slate-500 hover:text-white"
+            >
+                <Plus className="w-4 h-4" />
+            </button>
+          </div>
 
            {/* Clients - New Tab */}
-           <Link href="/crm/clients" className="block">
-              <div className={cn(
-                  "flex items-center justify-between px-3 py-2 rounded-md cursor-pointer transition-colors group",
-                  isActive('/crm/clients') ? "bg-[#2C2C2C] text-white" : "hover:bg-[#2A2A2A]"
-              )}>
-                <div className="flex items-center space-x-3">
-                  <Briefcase className="w-5 h-5 group-hover:text-white transition-colors" />
-                  <span className="text-[14px] font-medium group-hover:text-white transition-colors">Clients</span>
+           <div className="group/sidebar-item relative">
+            <Link href="/crm/clients" className="block">
+                <div className={cn(
+                    "flex items-center justify-between px-3 py-2 rounded-md cursor-pointer transition-colors group",
+                    isActive('/crm/clients') ? "bg-[#2C2C2C] text-white" : "hover:bg-[#2A2A2A]"
+                )}>
+                  <div className="flex items-center space-x-3">
+                    <Briefcase className="w-5 h-5 group-hover:text-white transition-colors" />
+                    <span className="text-[14px] font-medium group-hover:text-white transition-colors">Clients</span>
+                  </div>
                 </div>
-                <Plus className="w-4 h-4 hover:text-white" />
-              </div>
-           </Link>
+            </Link>
+            <button 
+                onClick={(e) => {
+                    e.preventDefault();
+                    setClientModalType('Client');
+                    setIsClientModalOpen(true);
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-[#3A3A3A] rounded transition-colors text-slate-500 hover:text-white"
+            >
+                <Plus className="w-4 h-4" />
+            </button>
+           </div>
 
           {/* Contacts */}
           <div className="flex items-center px-3 py-2 hover:bg-[#2A2A2A] rounded-md cursor-pointer transition-colors group">
@@ -232,6 +258,21 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
       <main className="flex-1 overflow-auto bg-slate-50">
         {children}
       </main>
+
+      <ClientModal 
+        isOpen={isClientModalOpen}
+        onClose={() => setIsClientModalOpen(false)}
+        initialType={clientModalType}
+        onSuccess={() => {
+            // Force refresh if we are on the page of the type we just created
+            const targetPath = clientModalType === 'Lead' ? '/crm/leads' : '/crm/clients';
+            if (pathname === targetPath) {
+                window.location.reload();
+            } else {
+                router.push(targetPath);
+            }
+        }}
+      />
     </div>
   );
 }

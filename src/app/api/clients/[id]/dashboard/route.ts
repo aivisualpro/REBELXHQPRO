@@ -34,9 +34,12 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
             .skip((page - 1) * limit)
             .limit(limit);
 
-        const [activities, totalActivities] = await Promise.all([
+        const [activities, totalActivities, totalEmails, totalCalls, totalSMS] = await Promise.all([
             activitiesQuery.lean(),
-            Activity.countDocuments({ client: id })
+            Activity.countDocuments({ client: id }),
+            Activity.countDocuments({ client: id, type: 'Email' }),
+            Activity.countDocuments({ client: id, type: 'Call' }),
+            Activity.countDocuments({ client: id, type: 'Text' })
         ]);
 
         // Fetch activity creators for name display
@@ -91,6 +94,9 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
                 totalRevenue,
                 totalBalance,
                 totalActivities,
+                totalEmails,
+                totalCalls,
+                totalSMS,
                 lastActivityDate: lastActivity?.createdAt || null,
                 lastOrderDate: lastOrder?.createdAt || null
             },
