@@ -21,6 +21,7 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
   const [unreadCount, setUnreadCount] = React.useState<number | null>(null);
   const [isClientModalOpen, setIsClientModalOpen] = React.useState(false);
   const [clientModalType, setClientModalType] = React.useState<'Client' | 'Lead'>('Lead');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
 
   const fetchUnreadCount = React.useCallback(async () => {
     try {
@@ -47,7 +48,10 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen w-full bg-white overflow-hidden font-sans">
       {/* Sidebar */}
-      <div className="w-[260px] bg-[#1C1C1C] flex flex-col text-slate-400 h-full shrink-0 border-r border-[#2A2A2A]">
+      <div className={cn(
+        "bg-[#1C1C1C] flex flex-col text-slate-400 h-full shrink-0 border-r border-[#2A2A2A] transition-all duration-300",
+        isSidebarCollapsed ? "w-[80px]" : "w-[260px]"
+      )}>
         
         {/* Top Navigation */}
         <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-0.5">
@@ -56,12 +60,13 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
           <div className="space-y-0.5">
             <Link href="/crm/inbox" className="block">
                 <div className={cn(
-                    "flex items-center justify-between px-3 py-2 rounded-md cursor-pointer transition-colors group",
+                    "flex items-center rounded-md cursor-pointer transition-colors group",
+                    isSidebarCollapsed ? "justify-center py-3 px-2" : "justify-between px-3 py-2",
                     isActive('/crm/inbox') ? "bg-[#2C2C2C] text-white" : "hover:bg-[#2A2A2A]"
                 )}>
-                  <div className="flex items-center space-x-3">
-                    <Inbox className="w-5 h-5 mr-3 group-hover:text-white transition-colors" />
-                    <span className="text-[14px] font-medium group-hover:text-white transition-colors">Inbox</span>
+                  <div className={cn("flex items-center", isSidebarCollapsed ? "justify-center" : "space-x-3")}>
+                    <Inbox className={cn("w-5 h-5 group-hover:text-white transition-colors", !isSidebarCollapsed && "mr-3")} />
+                    {!isSidebarCollapsed && <span className="text-[14px] font-medium group-hover:text-white transition-colors">Inbox</span>}
                   </div>
                   {!!unreadCount && (
                     <span className="bg-[#FFEF5F] text-black text-[10px] font-black px-1.5 py-0.5 rounded-sm">
@@ -73,12 +78,39 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
 
             <Link href="/crm/sent" className="block">
                 <div className={cn(
-                    "flex items-center justify-between px-3 py-2 rounded-md cursor-pointer transition-colors group",
+                    "flex items-center rounded-md cursor-pointer transition-colors group",
+                    isSidebarCollapsed ? "justify-center py-3 px-2" : "justify-between px-3 py-2",
                     isActive('/crm/sent') ? "bg-[#2C2C2C] text-white" : "hover:bg-[#2A2A2A]"
                 )}>
-                  <div className="flex items-center space-x-3">
-                    <Send className="w-5 h-5 mr-3 group-hover:text-white transition-colors" />
-                    <span className="text-[14px] font-medium group-hover:text-white transition-colors">Sent</span>
+                  <div className={cn("flex items-center", isSidebarCollapsed ? "justify-center" : "space-x-3")}>
+                    <Send className={cn("w-5 h-5 group-hover:text-white transition-colors", !isSidebarCollapsed && "mr-3")} />
+                    {!isSidebarCollapsed && <span className="text-[14px] font-medium group-hover:text-white transition-colors">Sent</span>}
+                  </div>
+                </div>
+            </Link>
+
+            <Link href="/crm/calls" className="block">
+                <div className={cn(
+                    "flex items-center rounded-md cursor-pointer transition-colors group",
+                    isSidebarCollapsed ? "justify-center py-3 px-2" : "justify-between px-3 py-2",
+                    isActive('/crm/calls') ? "bg-[#2C2C2C] text-white" : "hover:bg-[#2A2A2A]"
+                )}>
+                  <div className={cn("flex items-center", isSidebarCollapsed ? "justify-center" : "space-x-3")}>
+                    <Phone className={cn("w-5 h-5 group-hover:text-white transition-colors", !isSidebarCollapsed && "mr-3")} />
+                    {!isSidebarCollapsed && <span className="text-[14px] font-medium group-hover:text-white transition-colors">Calls</span>}
+                  </div>
+                </div>
+            </Link>
+
+            <Link href="/crm/sms" className="block">
+                <div className={cn(
+                    "flex items-center rounded-md cursor-pointer transition-colors group",
+                    isSidebarCollapsed ? "justify-center py-3 px-2" : "justify-between px-3 py-2",
+                    isActive('/crm/sms') ? "bg-[#2C2C2C] text-white" : "hover:bg-[#2A2A2A]"
+                )}>
+                  <div className={cn("flex items-center", isSidebarCollapsed ? "justify-center" : "space-x-3")}>
+                    <MessageSquare className={cn("w-5 h-5 group-hover:text-white transition-colors", !isSidebarCollapsed && "mr-3")} />
+                    {!isSidebarCollapsed && <span className="text-[14px] font-medium group-hover:text-white transition-colors">SMS</span>}
                   </div>
                 </div>
             </Link>
@@ -90,9 +122,12 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
             { name: 'Opportunities', icon: Trophy, href: '/crm/opportunities' },
           ].map((item) => (
             <Link key={item.name} href={item.href} className="block">
-                <div className="flex items-center px-3 py-2 hover:bg-[#2A2A2A] rounded-md cursor-pointer transition-colors group">
-                  <item.icon className="w-5 h-5 mr-3 group-hover:text-white transition-colors" />
-                  <span className="text-[14px] font-medium group-hover:text-white transition-colors">{item.name}</span>
+                <div className={cn(
+                  "flex items-center rounded-md cursor-pointer transition-colors group",
+                  isSidebarCollapsed ? "justify-center py-3 px-2" : "px-3 py-2 hover:bg-[#2A2A2A]"
+                )}>
+                  <item.icon className={cn("w-5 h-5 group-hover:text-white transition-colors", !isSidebarCollapsed && "mr-3")} />
+                  {!isSidebarCollapsed && <span className="text-[14px] font-medium group-hover:text-white transition-colors">{item.name}</span>}
                 </div>
             </Link>
           ))}
@@ -101,15 +136,17 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
           <div className="group/sidebar-item relative">
             <Link href="/crm/leads" className="block">
                 <div className={cn(
-                    "flex items-center justify-between px-3 py-2 rounded-md cursor-pointer transition-colors group",
+                    "flex items-center rounded-md cursor-pointer transition-colors group",
+                    isSidebarCollapsed ? "justify-center py-3 px-2" : "justify-between px-3 py-2",
                     isActive('/crm/leads') ? "bg-[#2C2C2C] text-white" : "hover:bg-[#2A2A2A]"
                 )}>
-                  <div className="flex items-center space-x-3">
-                    <Building2 className="w-5 h-5 group-hover:text-white transition-colors" />
-                    <span className="text-[14px] font-medium group-hover:text-white transition-colors">Leads</span>
+                  <div className={cn("flex items-center", isSidebarCollapsed ? "justify-center" : "space-x-3")}>
+                    <Building2 className={cn("w-5 h-5 group-hover:text-white transition-colors", !isSidebarCollapsed && "mr-3")} />
+                    {!isSidebarCollapsed && <span className="text-[14px] font-medium group-hover:text-white transition-colors">Leads</span>}
                   </div>
                 </div>
             </Link>
+            {!isSidebarCollapsed && (
             <button 
                 onClick={(e) => {
                     e.preventDefault();
@@ -120,21 +157,24 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
             >
                 <Plus className="w-4 h-4" />
             </button>
+            )}
           </div>
 
            {/* Clients - New Tab */}
            <div className="group/sidebar-item relative">
             <Link href="/crm/clients" className="block">
                 <div className={cn(
-                    "flex items-center justify-between px-3 py-2 rounded-md cursor-pointer transition-colors group",
+                    "flex items-center rounded-md cursor-pointer transition-colors group",
+                    isSidebarCollapsed ? "justify-center py-3 px-2" : "justify-between px-3 py-2",
                     isActive('/crm/clients') ? "bg-[#2C2C2C] text-white" : "hover:bg-[#2A2A2A]"
                 )}>
-                  <div className="flex items-center space-x-3">
-                    <Briefcase className="w-5 h-5 group-hover:text-white transition-colors" />
-                    <span className="text-[14px] font-medium group-hover:text-white transition-colors">Clients</span>
+                  <div className={cn("flex items-center", isSidebarCollapsed ? "justify-center" : "space-x-3")}>
+                    <Briefcase className={cn("w-5 h-5 group-hover:text-white transition-colors", !isSidebarCollapsed && "mr-3")} />
+                    {!isSidebarCollapsed && <span className="text-[14px] font-medium group-hover:text-white transition-colors">Clients</span>}
                   </div>
                 </div>
             </Link>
+            {!isSidebarCollapsed && (
             <button 
                 onClick={(e) => {
                     e.preventDefault();
@@ -145,36 +185,43 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
             >
                 <Plus className="w-4 h-4" />
             </button>
+            )}
            </div>
 
           {/* Contacts */}
-          <div className="flex items-center px-3 py-2 hover:bg-[#2A2A2A] rounded-md cursor-pointer transition-colors group">
-            <Users className="w-5 h-5 mr-3 group-hover:text-white transition-colors" />
-            <span className="text-[14px] font-medium group-hover:text-white transition-colors">Contacts</span>
+          <div className={cn(
+            "flex items-center rounded-md cursor-pointer transition-colors group",
+            isSidebarCollapsed ? "justify-center py-3 px-2" : "px-3 py-2 hover:bg-[#2A2A2A]"
+          )}>
+            <Users className={cn("w-5 h-5 group-hover:text-white transition-colors", !isSidebarCollapsed && "mr-3")} />
+            {!isSidebarCollapsed && <span className="text-[14px] font-medium group-hover:text-white transition-colors">Contacts</span>}
           </div>
 
           {/* Workflows */}
-          <div className="flex items-center justify-between px-3 py-2 hover:bg-[#2A2A2A] rounded-md cursor-pointer transition-colors group">
-            <div className="flex items-center space-x-3">
-              <GitBranch className="w-5 h-5 group-hover:text-white transition-colors" />
-              <span className="text-[14px] font-medium group-hover:text-white transition-colors">Workflows</span>
+          <div className={cn(
+            "flex items-center rounded-md cursor-pointer transition-colors group",
+            isSidebarCollapsed ? "justify-center py-3 px-2" : "justify-between px-3 py-2 hover:bg-[#2A2A2A]"
+          )}>
+            <div className={cn("flex items-center", isSidebarCollapsed ? "justify-center" : "space-x-3")}>
+              <GitBranch className={cn("w-5 h-5 group-hover:text-white transition-colors", !isSidebarCollapsed && "mr-3")} />
+              {!isSidebarCollapsed && <span className="text-[14px] font-medium group-hover:text-white transition-colors">Workflows</span>}
             </div>
-            <Plus className="w-4 h-4 hover:text-white" />
+            {!isSidebarCollapsed && <Plus className="w-4 h-4 hover:text-white" />}
           </div>
 
           {[
             { name: 'Conversations', icon: MessageSquare, href: '/crm/conversations' },
             { name: 'Tasks', icon: ListTodo, href: '/crm/tasks' },
-            { name: 'Activities', icon: Activity, href: '/crm/activities' },
             { name: 'Reports', icon: BarChart3, href: '/crm/reports' },
           ].map((item) => (
             <Link key={item.name} href={item.href} className="block">
                 <div className={cn(
-                    "flex items-center px-3 py-2 rounded-md cursor-pointer transition-colors group",
+                    "flex items-center rounded-md cursor-pointer transition-colors group",
+                    isSidebarCollapsed ? "justify-center py-3 px-2" : "px-3 py-2",
                     isActive(item.href) ? "bg-[#2C2C2C] text-white" : "hover:bg-[#2A2A2A]"
                 )}>
-                  <item.icon className="w-5 h-5 mr-3 group-hover:text-white transition-colors" />
-                  <span className="text-[14px] font-medium group-hover:text-white transition-colors">{item.name}</span>
+                  <item.icon className={cn("w-5 h-5 group-hover:text-white transition-colors", !isSidebarCollapsed && "mr-3")} />
+                  {!isSidebarCollapsed && <span className="text-[14px] font-medium group-hover:text-white transition-colors">{item.name}</span>}
                 </div>
             </Link>
           ))}
@@ -182,6 +229,7 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
           <div className="my-4 border-t border-[#2A2A2A]" />
 
           {/* Smart Views Header */}
+          {!isSidebarCollapsed && (
           <div className="px-3 pb-2 flex items-center justify-between group">
             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Smart Views</span>
             <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -189,42 +237,58 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
               <Search className="w-3.5 h-3.5 hover:text-white cursor-pointer" />
             </div>
           </div>
+          )}
 
           {/* Smart View Items */}
           <div className="space-y-0.5">
-            <div className="flex items-center px-3 py-2 hover:bg-[#2A2A2A] rounded-md cursor-pointer transition-colors">
-              <div className="w-5 flex justify-center mr-3">
+            <div className={cn(
+              "flex items-center rounded-md cursor-pointer transition-colors hover:bg-[#2A2A2A]",
+              isSidebarCollapsed ? "justify-center py-3 px-2" : "px-3 py-2"
+            )}>
+              <div className={cn("flex justify-center", !isSidebarCollapsed && "mr-3 w-5")}>
                 <Phone className="w-4 h-4 text-slate-400" />
               </div>
-              <span className="text-[13px] text-slate-400">Daily Calling List</span>
+              {!isSidebarCollapsed && <span className="text-[13px] text-slate-400">Daily Calling List</span>}
             </div>
             
-            <div className="flex items-center px-3 py-2 hover:bg-[#2A2A2A] rounded-md cursor-pointer transition-colors">
-              <div className="w-5 flex justify-center mr-3">
+            <div className={cn(
+              "flex items-center rounded-md cursor-pointer transition-colors hover:bg-[#2A2A2A]",
+              isSidebarCollapsed ? "justify-center py-3 px-2" : "px-3 py-2"
+            )}>
+              <div className={cn("flex justify-center", !isSidebarCollapsed && "mr-3 w-5")}>
                 <div className="w-3 h-3 rounded-full bg-red-600 shadow-[0_0_8px_rgba(220,38,38,0.5)]" />
               </div>
-              <span className="text-[13px] text-slate-400">Red Flag Opportunities</span>
+              {!isSidebarCollapsed && <span className="text-[13px] text-slate-400">Red Flag Opportunities</span>}
             </div>
 
-            <div className="flex items-center px-3 py-2 hover:bg-[#2A2A2A] rounded-md cursor-pointer transition-colors">
-              <div className="w-5 flex justify-center mr-3">
+            <div className={cn(
+              "flex items-center rounded-md cursor-pointer transition-colors hover:bg-[#2A2A2A]",
+              isSidebarCollapsed ? "justify-center py-3 px-2" : "px-3 py-2"
+            )}>
+              <div className={cn("flex justify-center", !isSidebarCollapsed && "mr-3 w-5")}>
                 <PhoneCall className="w-4 h-4 text-red-500" />
               </div>
-              <span className="text-[13px] text-slate-400">Leads to Call</span>
+              {!isSidebarCollapsed && <span className="text-[13px] text-slate-400">Leads to Call</span>}
             </div>
 
-            <div className="flex items-center px-3 py-2 hover:bg-[#2A2A2A] rounded-md cursor-pointer transition-colors">
-              <div className="w-5 flex justify-center mr-3">
+            <div className={cn(
+              "flex items-center rounded-md cursor-pointer transition-colors hover:bg-[#2A2A2A]",
+              isSidebarCollapsed ? "justify-center py-3 px-2" : "px-3 py-2"
+            )}>
+              <div className={cn("flex justify-center", !isSidebarCollapsed && "mr-3 w-5")}>
                 <Hourglass className="w-4 h-4 text-amber-600" />
               </div>
-              <span className="text-[13px] text-slate-400">No Contact &gt; 7 Days</span>
+              {!isSidebarCollapsed && <span className="text-[13px] text-slate-400">No Contact &gt; 7 Days</span>}
             </div>
 
-            <div className="flex items-center px-3 py-2 hover:bg-[#2A2A2A] rounded-md cursor-pointer transition-colors">
-              <div className="w-5 flex justify-center mr-3">
+            <div className={cn(
+              "flex items-center rounded-md cursor-pointer transition-colors hover:bg-[#2A2A2A]",
+              isSidebarCollapsed ? "justify-center py-3 px-2" : "px-3 py-2"
+            )}>
+              <div className={cn("flex justify-center", !isSidebarCollapsed && "mr-3 w-5")}>
                 <Eye className="w-4 h-4 text-slate-400" />
               </div>
-              <span className="text-[13px] text-slate-400">Email Opened This Week</span>
+              {!isSidebarCollapsed && <span className="text-[13px] text-slate-400">Email Opened This Week</span>}
             </div>
           </div>
         </div>
@@ -236,20 +300,30 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
             { name: 'Integrations', icon: Plug },
             { name: 'Settings', icon: Settings },
           ].map((item) => (
-            <div key={item.name} className="flex items-center justify-between px-3 py-2 hover:bg-[#2A2A2A] rounded-md cursor-pointer transition-colors group">
-              <div className="flex items-center space-x-3">
-                <item.icon className="w-5 h-5 group-hover:text-white transition-colors" />
-                <span className="text-[14px] font-medium group-hover:text-white transition-colors">{item.name}</span>
+            <div key={item.name} className={cn(
+              "flex items-center rounded-md cursor-pointer transition-colors group",
+              isSidebarCollapsed ? "justify-center py-3 px-2" : "justify-between px-3 py-2 hover:bg-[#2A2A2A]"
+            )}>
+              <div className={cn("flex items-center", isSidebarCollapsed ? "justify-center" : "space-x-3")}>
+                <item.icon className={cn("w-5 h-5 group-hover:text-white transition-colors", !isSidebarCollapsed && "mr-3")} />
+                {!isSidebarCollapsed && <span className="text-[14px] font-medium group-hover:text-white transition-colors">{item.name}</span>}
               </div>
-              {item.external && <div className="text-xs">↗</div>}
+              {!isSidebarCollapsed && item.external && <div className="text-xs">↗</div>}
             </div>
           ))}
           
           <div className="my-2 border-t border-[#2A2A2A]" />
           
-          <div className="flex items-center justify-between px-3 py-2 hover:bg-[#2A2A2A] rounded-md cursor-pointer transition-colors group text-slate-500 hover:text-white">
-            <span className="text-[14px] font-medium">Collapse</span>
-            <ChevronLeft className="w-5 h-5" />
+          <div 
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            className={cn(
+              "flex items-center rounded-md cursor-pointer transition-colors group text-slate-500 hover:text-white hover:bg-[#2A2A2A]",
+              isSidebarCollapsed ? "justify-center py-3 px-2" : "justify-between px-3 py-2"
+            )}
+            title={isSidebarCollapsed ? "Expand" : "Collapse"}
+          >
+            {!isSidebarCollapsed && <span className="text-[14px] font-medium">Collapse</span>}
+            <ChevronLeft className={cn("w-5 h-5 transition-transform duration-300", isSidebarCollapsed && "rotate-180")} />
           </div>
         </div>
       </div>

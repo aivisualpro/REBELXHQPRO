@@ -2,6 +2,93 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getGmailClient } from '@/lib/google-api';
+import dbConnect from '@/lib/mongoose';
+import User from '@/models/User';
+
+// Helper to fetch and parse message details
+async function fetchMessageDetails(gmail: any, messages: any[]) {
+    return (await Promise.all(
+        messages.map(async (msg) => {
+            try {
+                const details = await gmail.users.messages.get({
+                    userId: 'me',
+                    id: msg.id!,
+                    format: 'full'
+                });
+
+                const headers = details.data.payload?.headers || [];
+                const findHeader = (name: string) => headers.find((h: any) => h.name?.toLowerCase() === name.toLowerCase())?.value || '';
+                
+                const subject = findHeader('Subject') || '(No Subject)';
+                const from = findHeader('From') || '(Unknown Sender)';
+                const to = findHeader('To') || '(Unknown Recipient)';
+                const cc = findHeader('Cc');
+                const bcc = findHeader('Bcc');
+                const date = findHeader('Date') || '';
+                
+                // Extract body and attachments
+                let body = '';
+                const attachments: any[] = [];
+
+                const processParts = (parts: any[]) => {
+                    parts.forEach(part => {
+                        if (part.mimeType === 'text/plain' && part.body?.data) {
+                            body = Buffer.from(part.body.data, 'base64').toString();
+                        } else if (part.filename && part.body?.attachmentId) {
+                            attachments.push({
+                                id: part.body.attachmentId,
+                                filename: part.filename,
+                                mimeType: part.mimeType,
+                                size: part.body.size
+                            });
+                        }
+                        if (part.parts) processParts(part.parts);
+                    });
+                };
+
+                if (details.data.payload?.parts) {
+                    processParts(details.data.payload.parts);
+                } else if (details.data.payload?.body?.data) {
+                    body = Buffer.from(details.data.payload.body.data, 'base64').toString();
+                }
+
+                // Clean sender name
+                let senderName = from;
+                const match = from.match(/^"?([^"<]+)"?/);
+                if (match && match[1]) {
+                    senderName = match[1].trim();
+                }
+
+                // Safe date formatting
+                const dateObj = date ? new Date(date) : null;
+                const isValidDate = dateObj && !isNaN(dateObj.getTime());
+
+                return {
+                    id: msg.id,
+                    sender: senderName,
+                    senderEmail: from.match(/<([^>]+)>/)?.[1] || from,
+                    recipient: to,
+                    cc,
+                    bcc,
+                    subject,
+                    snippet: details.data.snippet,
+                    body,
+                    attachments,
+                    time: isValidDate ? dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+                    date: isValidDate ? dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' }) : '',
+                    timestamp: isValidDate ? dateObj.getTime() : 0,
+                    isRead: !details.data.labelIds?.includes('UNREAD'),
+                    isStarred: details.data.labelIds?.includes('STARRED'),
+                    labelIds: details.data.labelIds || [],
+                    hasAttachments: attachments.length > 0,
+                };
+            } catch (e) {
+                console.error(`Error fetching message details for ${msg.id}:`, e);
+                return null;
+            }
+        })
+    )).filter(m => m !== null);
+}
 
 export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions);
@@ -15,135 +102,100 @@ export async function GET(request: NextRequest) {
     const messageId = searchParams.get('messageId');
 
     try {
-        const gmail = await getGmailClient(session.user.id);
-
-        if (attachmentId && messageId) {
-            const res = await gmail.users.messages.attachments.get({
-                userId: 'me',
-                messageId: messageId,
-                id: attachmentId
-            });
-
-            const data = res.data.data;
-            if (!data) return NextResponse.json({ error: 'Attachment data not found' }, { status: 404 });
-
-            return new Response(Buffer.from(data, 'base64'), {
-                headers: {
-                    'Content-Disposition': `attachment; filename="attachment"`,
-                },
-            });
-        }
+        // If searching (q exists), we search across ALL connected users
+        // If traversing inbox (label exists, q missing), we only check current user
         
-        // Fetch list of messages
-        const listResponse = await gmail.users.messages.list({
-            userId: 'me',
-            q: q || (label === 'SENT' ? 'in:sent' : 'in:inbox'),
-            maxResults: 50,
-            pageToken: pageToken || undefined
-        });
+        let detailedMessages: any[] = [];
+        let nextPageToken = null;
+        let resultSizeEstimate = 0;
+        let unreadCount = 0;
 
-        const messages = listResponse.data.messages || [];
-        console.log(`Found ${messages.length} messages for query: ${q || label || 'Inbox'}`);
-        
-        // Fetch details for each message
-        const detailedMessages = (await Promise.all(
-            messages.map(async (msg) => {
+        if (q) {
+            // GLOBAL SEARCH ACROSS ALL CONNECTED USERS
+            await dbConnect();
+            // Assuming User model has googleConnected field as per User.ts
+            const users = await User.find({ googleConnected: true });
+            console.log(`Global search '${q}' across ${users.length} connected users`);
+
+            const allResults = await Promise.all(users.map(async (user) => {
                 try {
-                    const details = await gmail.users.messages.get({
+                    const gmail = await getGmailClient(user._id as string);
+                    const listResponse = await gmail.users.messages.list({
                         userId: 'me',
-                        id: msg.id!,
-                        format: 'full'
+                        q: q, 
+                        maxResults: 20 // Fetch top 20 from each user to combine
                     });
 
-                    const headers = details.data.payload?.headers || [];
-                    const findHeader = (name: string) => headers.find(h => h.name?.toLowerCase() === name.toLowerCase())?.value || '';
-                    
-                    const subject = findHeader('Subject') || '(No Subject)';
-                    const from = findHeader('From') || '(Unknown Sender)';
-                    const to = findHeader('To') || '(Unknown Recipient)';
-                    const cc = findHeader('Cc');
-                    const bcc = findHeader('Bcc');
-                    const date = findHeader('Date') || '';
-                    
-                    // Extract body and attachments
-                    let body = '';
-                    const attachments: any[] = [];
+                    const messages = listResponse.data.messages || [];
+                    if (messages.length === 0) return [];
 
-                    const processParts = (parts: any[]) => {
-                        parts.forEach(part => {
-                            if (part.mimeType === 'text/plain' && part.body?.data) {
-                                body = Buffer.from(part.body.data, 'base64').toString();
-                            } else if (part.filename && part.body?.attachmentId) {
-                                attachments.push({
-                                    id: part.body.attachmentId,
-                                    filename: part.filename,
-                                    mimeType: part.mimeType,
-                                    size: part.body.size
-                                });
-                            }
-                            if (part.parts) processParts(part.parts);
-                        });
-                    };
-
-                    if (details.data.payload?.parts) {
-                        processParts(details.data.payload.parts);
-                    } else if (details.data.payload?.body?.data) {
-                        body = Buffer.from(details.data.payload.body.data, 'base64').toString();
-                    }
-
-                    // Clean sender name
-                    let senderName = from;
-                    const match = from.match(/^"?([^"<]+)"?/);
-                    if (match && match[1]) {
-                        senderName = match[1].trim();
-                    }
-
-                    // Safe date formatting
-                    const dateObj = date ? new Date(date) : null;
-                    const isValidDate = dateObj && !isNaN(dateObj.getTime());
-
-                    return {
-                        id: msg.id,
-                        sender: senderName,
-                        senderEmail: from.match(/<([^>]+)>/)?.[1] || from,
-                        recipient: to,
-                        cc,
-                        bcc,
-                        subject,
-                        snippet: details.data.snippet,
-                        body,
-                        attachments,
-                        time: isValidDate ? dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
-                        date: isValidDate ? dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' }) : '',
-                        timestamp: isValidDate ? dateObj.getTime() : 0,
-                        isRead: !details.data.labelIds?.includes('UNREAD'),
-                        isStarred: details.data.labelIds?.includes('STARRED'),
-                        labelIds: details.data.labelIds || [],
-                        hasAttachments: attachments.length > 0,
-                    };
-                } catch (e) {
-                    console.error(`Error fetching message details for ${msg.id}:`, e);
-                    return null;
+                    return await fetchMessageDetails(gmail, messages);
+                } catch (err) {
+                    // Fail silently for individual user errors (token exp, etc) during global search
+                    console.warn(`Failed to search emails for user ${user.email}:`, err);
+                    return [];
                 }
-            })
-        )).filter(m => m !== null);
+            }));
 
-        // Fetch unread count
-        let unreadCount = 0;
-        try {
-            const inboxInfo = await gmail.users.labels.get({
+            detailedMessages = allResults.flat();
+            // Sort merged results by timestamp descending
+            detailedMessages.sort((a, b) => b.timestamp - a.timestamp);
+            
+            resultSizeEstimate = detailedMessages.length;
+            
+        } else {
+            // STANDARD SINGLE USER MODE
+            const gmail = await getGmailClient(session.user.id);
+
+            if (attachmentId && messageId) {
+                const res = await gmail.users.messages.attachments.get({
+                    userId: 'me',
+                    messageId: messageId,
+                    id: attachmentId
+                });
+
+                const data = res.data.data;
+                if (!data) return NextResponse.json({ error: 'Attachment data not found' }, { status: 404 });
+
+                return new Response(Buffer.from(data, 'base64'), {
+                    headers: {
+                        'Content-Disposition': `attachment; filename="attachment"`,
+                    },
+                });
+            }
+            
+            // Fetch list of messages
+            const listResponse = await gmail.users.messages.list({
                 userId: 'me',
-                id: 'INBOX'
+                q: label === 'SENT' ? 'in:sent' : 'in:inbox',
+                maxResults: 50,
+                pageToken: pageToken || undefined
             });
-            unreadCount = inboxInfo.data.messagesUnread || 0;
-        } catch (e) {
-            console.warn('Could not fetch unread count');
+
+            const messages = listResponse.data.messages || [];
+            console.log(`Found ${messages.length} messages for current user in ${label || 'Inbox'}`);
+            
+            detailedMessages = await fetchMessageDetails(gmail, messages);
+            
+            nextPageToken = listResponse.data.nextPageToken;
+            resultSizeEstimate = listResponse.data.resultSizeEstimate;
+
+            // Fetch unread count only for current user context
+            try {
+                const inboxInfo = await gmail.users.labels.get({
+                    userId: 'me',
+                    id: 'INBOX'
+                });
+                unreadCount = inboxInfo.data.messagesUnread || 0;
+            } catch (e) {
+                console.warn('Could not fetch unread count');
+            }
         }
 
         return NextResponse.json({ 
             emails: detailedMessages,
-            nextPageToken: listResponse.data.nextPageToken,
-            resultSizeEstimate: listResponse.data.resultSizeEstimate,
+            nextPageToken,
+            resultSizeEstimate,
             unreadCount
         });
     } catch (error: any) {

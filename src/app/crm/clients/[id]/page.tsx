@@ -338,7 +338,10 @@ export default function ClientDashboardPage() {
         
         setLoadingGmail(true);
         try {
-            const q = emailsToSearch.map((e: any) => e.value).join(' OR ');
+            const q = 'in:inbox (' + emailsToSearch.map((e: any) => {
+                const email = e.value;
+                return `to:${email} OR cc:${email} OR bcc:${email}`;
+            }).join(' OR ') + ')';
             console.log('Fetching Gmail with query:', q);
             const res = await fetch(`/api/gmail?q=${encodeURIComponent(q)}`);
             if (res.ok) {
