@@ -178,7 +178,7 @@ export async function GET(request: NextRequest) {
             detailedMessages = await fetchMessageDetails(gmail, messages);
             
             nextPageToken = listResponse.data.nextPageToken;
-            resultSizeEstimate = listResponse.data.resultSizeEstimate;
+            resultSizeEstimate = listResponse.data.resultSizeEstimate || 0;
 
             // Fetch unread count only for current user context
             try {
