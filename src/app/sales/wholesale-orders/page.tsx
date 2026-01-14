@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Search,
@@ -116,7 +116,7 @@ const SHIPPING_METHODS = [
     { label: 'Courier', value: 'Courier' }
 ];
 
-export default function SaleOrdersPage() {
+function SaleOrdersContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [orders, setOrders] = useState<SaleOrder[]>([]);
@@ -1528,4 +1528,12 @@ export default function SaleOrdersPage() {
       )}
     </div>
   );
+}
+
+export default function SaleOrdersPage() {
+    return (
+        <Suspense fallback={<div className="p-8">Loading orders...</div>}>
+            <SaleOrdersContent />
+        </Suspense>
+    );
 }
