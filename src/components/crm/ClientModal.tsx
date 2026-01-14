@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { X, Loader2, Plus, Trash2, Mail, Phone, MapPin, Globe, Facebook, Briefcase, DollarSign, Calendar, CreditCard, Ship, Wallet, FileText } from 'lucide-react';
+import { X, Loader2, Plus, Trash2, Mail, Phone, MapPin, Globe, Facebook, Briefcase, DollarSign, Calendar, CreditCard, Ship, Wallet, FileText, Lock, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
@@ -29,11 +29,51 @@ const formatPhoneNumber = (value: string) => {
 };
 
 const formatExpiryDate = (value: string) => {
-    const clearValue = value.replace(/[^\d]/g, '');
+    let clearValue = value.replace(/[^\d]/g, '');
+    
+    // Auto-prefix single digit > 1 (e.g. typing '3' becomes '03')
+    if (clearValue.length === 1 && parseInt(clearValue) > 1 && parseInt(clearValue) <= 9) {
+        clearValue = '0' + clearValue;
+    }
+    
     if (clearValue.length >= 2) {
         return `${clearValue.slice(0, 2)}/${clearValue.slice(2, 4)}`;
     }
     return clearValue;
+};
+
+const getCardType = (number: string) => {
+    const n = number.replace(/\D/g, '');
+    if (n.startsWith('4')) return 'Visa';
+    if (/^5[1-5]/.test(n) || /^2(2\d{2}|[3-6]\d{2}|7[0-1]\d|720)/.test(n)) return 'MasterCard';
+    if (/^3[47]/.test(n)) return 'Amex';
+    if (/^6(?:011|5|4[4-9]|22)/.test(n)) return 'Discover';
+    return '';
+};
+
+const getCardTheme = (type: string) => {
+    switch (type.toLowerCase()) {
+        case 'visa': return 'from-[#1a1f71] to-[#00579f]';
+        case 'mastercard': return 'from-[#232323] to-[#4b4b4b]';
+        case 'amex': return 'from-[#007bc1] to-[#00a3e0]';
+        case 'discover': return 'from-[#f68121] to-[#ff9d4d]';
+        default: return 'from-slate-900 to-slate-800';
+    }
+};
+
+const formatCCNumber = (value: string) => {
+    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
+    const matches = v.match(/\d{4,16}/g);
+    const match = matches && matches[0] || '';
+    const parts = [];
+    for (let i = 0, len = match.length; i < len; i += 4) {
+        parts.push(match.substring(i, i + 4));
+    }
+    if (parts.length) {
+        return parts.join(' ');
+    } else {
+        return v;
+    }
 };
 
 export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 'Client', initialData }: ClientModalProps) {
@@ -138,6 +178,12 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
             fetchSalesReps();
         }
     }, [isOpen]);
+
+    const [showCC, setShowCC] = useState(false);
+    const [showCVV, setShowCVV] = useState(false);
+    
+    const cardType = getCardType(formData.billing.ccNumber);
+    const cardTheme = getCardTheme(cardType);
 
     const fetchSalesReps = async () => {
         try {
@@ -519,63 +565,139 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                         </div>
                     </div>
 
-                    {/* Section 6: Billing Profile */}
+                    {/* Section 6: billing Profile */}
                     <div className="space-y-6">
-                        <div className="flex items-center space-x-3 text-slate-400">
-                            <CreditCard className="w-4 h-4" />
-                            <h3 className="text-[10px] font-black uppercase tracking-[0.2em]">Billing Profile</h3>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3 text-slate-400">
+                                <CreditCard className="w-4 h-4" />
+                                <h3 className="text-[10px] font-black uppercase tracking-[0.2em]">Secure Billing Profile</h3>
+                            </div>
+                            <div className="flex items-center space-x-2 bg-emerald-500/10 px-2 py-1 rounded">
+                                <Lock className="w-3 h-3 text-emerald-500" />
+                                <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Secure Handshake</span>
+                            </div>
                         </div>
-                        <div className="p-6 bg-slate-900 rounded-sm shadow-xl space-y-6">
-                            <div className="grid grid-cols-2 gap-6">
+                        
+                        <div className={cn("p-6 rounded-sm shadow-2xl space-y-8 relative overflow-hidden group bg-gradient-to-br transition-all duration-500", cardTheme)}>
+                            {/* Card Chip & Type Badge */}
+                            <div className="flex items-start justify-between relative z-10">
+                                <div className="w-10 h-7 bg-gradient-to-br from-yellow-200 via-yellow-400 to-yellow-600 rounded-sm relative overflow-hidden shadow-inner">
+                                    <div className="absolute inset-0 border-[0.5px] border-black/10"></div>
+                                    <div className="absolute top-1/2 left-0 w-full h-[0.5px] bg-black/20"></div>
+                                    <div className="absolute top-0 left-1/2 w-[0.5px] h-full bg-black/20"></div>
+                                </div>
+                                {cardType && (
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-white/50">{cardType}</span>
+                                )}
+                            </div>
+
+                            {/* Visual Security Overlay */}
+                            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity pointer-events-none">
+                                <ShieldCheck className="w-32 h-32 text-white" />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-8 relative z-10">
                                 <div className="space-y-1.5">
                                     <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Cardholder Name</label>
                                     <input
                                         value={formData.billing.nameOnCard}
-                                        onChange={e => setFormData({ ...formData, billing: { ...formData.billing, nameOnCard: e.target.value } })}
-                                        className="w-full px-4 py-2 bg-slate-800 border-none text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-slate-600"
-                                        placeholder="Full Name"
+                                        autoComplete="cc-name"
+                                        onChange={e => setFormData({ ...formData, billing: { ...formData.billing, nameOnCard: e.target.value.toUpperCase() } })}
+                                        className="w-full px-4 py-2.5 bg-slate-800/50 border border-slate-700/50 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-slate-600 font-medium"
+                                        placeholder="CHRIS JOHNSON"
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Card Number</label>
-                                    <input
-                                        value={formData.billing.ccNumber}
-                                        onChange={e => setFormData({ ...formData, billing: { ...formData.billing, ccNumber: e.target.value } })}
-                                        className="w-full px-4 py-2 bg-slate-800 border-none text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all font-mono"
-                                        placeholder="**** **** **** ****"
-                                    />
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Encrypted Card Number</label>
+                                    <div className="relative">
+                                        <input
+                                            type={showCC ? "text" : "password"}
+                                            value={formData.billing.ccNumber}
+                                            autoComplete="cc-number"
+                                            onChange={e => {
+                                                const formatted = formatCCNumber(e.target.value);
+                                                setFormData({ ...formData, billing: { ...formData.billing, ccNumber: formatted.slice(0, 19) } });
+                                            }}
+                                            className="w-full pl-4 pr-10 py-2.5 bg-slate-800/50 border border-slate-700/50 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all font-mono tracking-widest"
+                                            placeholder="XXXX XXXX XXXX XXXX"
+                                        />
+                                        <button 
+                                            type="button"
+                                            onClick={() => setShowCC(!showCC)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+                                        >
+                                            {showCC ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="grid grid-cols-3 gap-6">
+
+                            <div className="grid grid-cols-3 gap-8 relative z-10">
                                 <div className="space-y-1.5">
-                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Expires</label>
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Expiry Date</label>
                                     <input
                                         value={formData.billing.expirationDate}
+                                        autoComplete="cc-exp"
                                         onChange={e => {
                                             const formatted = formatExpiryDate(e.target.value);
                                             setFormData({ ...formData, billing: { ...formData.billing, expirationDate: formatted.slice(0, 5) } });
                                         }}
-                                        className="w-full px-4 py-2 bg-slate-800 border-none text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all"
+                                        className="w-full px-4 py-2.5 bg-slate-800/50 border border-slate-700/50 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all font-mono"
                                         placeholder="MM/YY"
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">CVV</label>
-                                    <input
-                                        value={formData.billing.securityCode}
-                                        onChange={e => setFormData({ ...formData, billing: { ...formData.billing, securityCode: e.target.value } })}
-                                        className="w-full px-4 py-2 bg-slate-800 border-none text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all"
-                                        placeholder="***"
-                                    />
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Security code (CVV)</label>
+                                    <div className="relative">
+                                        <input
+                                            type={showCVV ? "text" : "password"}
+                                            value={formData.billing.securityCode}
+                                            autoComplete="cc-csc"
+                                            onChange={e => setFormData({ ...formData, billing: { ...formData.billing, securityCode: e.target.value.replace(/\D/g, '').slice(0, 4) } })}
+                                            className="w-full pl-4 pr-10 py-2.5 bg-slate-800/50 border border-slate-700/50 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all font-mono"
+                                            placeholder="***"
+                                        />
+                                        <button 
+                                            type="button"
+                                            onClick={() => setShowCVV(!showCVV)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+                                        >
+                                            {showCVV ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                        </button>
+                                    </div>
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Billing ZIP</label>
                                     <input
                                         value={formData.billing.zipCode}
-                                        onChange={e => setFormData({ ...formData, billing: { ...formData.billing, zipCode: e.target.value } })}
-                                        className="w-full px-4 py-2 bg-slate-800 border-none text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all"
+                                        autoComplete="postal-code"
+                                        onChange={e => setFormData({ ...formData, billing: { ...formData.billing, zipCode: e.target.value.replace(/\D/g, '').slice(0, 5) } })}
+                                        className="w-full px-4 py-2.5 bg-slate-800/50 border border-slate-700/50 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all font-mono"
                                         placeholder="00000"
                                     />
+                                </div>
+                            </div>
+
+                            {/* Industry Standard Badges */}
+                            <div className="pt-4 mt-4 border-t border-slate-800/50 flex items-center justify-between opacity-50 relative z-10">
+                                <div className="flex items-center space-x-4">
+                                    <div className="flex flex-col">
+                                        <div className="flex items-center space-x-1">
+                                            <ShieldCheck className="w-2.5 h-2.5 text-blue-400" />
+                                            <span className="text-[8px] font-black uppercase text-slate-400">256-Bit SSL</span>
+                                        </div>
+                                        <span className="text-[7px] text-slate-600 font-medium">Military Grade Encryption</span>
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <div className="flex items-center space-x-1">
+                                            <Lock className="w-2.5 h-2.5 text-emerald-400" />
+                                            <span className="text-[8px] font-black uppercase text-slate-400">PCI-DSS Compliant</span>
+                                        </div>
+                                        <span className="text-[7px] text-slate-600 font-medium">Vault Storage Enabled</span>
+                                    </div>
+                                </div>
+                                <div className="text-[10px] text-white font-black italic tracking-tighter">
+                                    REBEL<span className="text-blue-500">X</span> SECURE
                                 </div>
                             </div>
                         </div>

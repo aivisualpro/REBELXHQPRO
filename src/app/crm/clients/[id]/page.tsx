@@ -8,11 +8,10 @@ import {
     Phone,
     Mail,
     MapPin,
-    Building2,
-    Calendar,
     DollarSign,
     ShoppingCart,
     MessageSquare,
+    Facebook,
     Activity,
     TrendingUp,
     Clock,
@@ -28,7 +27,17 @@ import {
     ExternalLink,
     CreditCard,
     Search,
-    Edit
+    Edit,
+    Inbox,
+    Send,
+    Star,
+    Paperclip,
+    X,
+    Trash2,
+    Reply,
+    Forward,
+    Eye,
+    EyeOff
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -40,7 +49,7 @@ interface Client {
     name: string;
     description?: string;
     salesPerson?: string;
-    salesRepInfo?: { firstName: string; lastName: string; email: string };
+    salesRepInfo?: { firstName: string; lastName: string; email: string; image?: string };
     contactStatus?: string;
     contactType?: string;
     companyType?: string;
@@ -48,6 +57,7 @@ interface Client {
     facebookPage?: string;
     industry?: string;
     forecastedAmount?: number;
+    projectedCloseDate?: string;
     phones?: { value: string; label: string; isWhatsApp?: boolean }[];
     emails?: { value: string; label: string }[];
     addresses?: { street: string; city: string; state: string; postalCode: string; country: string; label: string }[];
@@ -125,6 +135,152 @@ export default function ClientDashboardPage() {
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [gmailEmails, setGmailEmails] = useState<any[]>([]);
+    const [loadingGmail, setLoadingGmail] = useState(false);
+    const [expandedEmailId, setExpandedEmailId] = useState<string | null>(null);
+    const [isComposeOpen, setIsComposeOpen] = useState(false);
+    const [composeData, setComposeData] = useState({ to: '', subject: '', body: '' });
+    const [sendingEmail, setSendingEmail] = useState(false);
+    
+    // Billing visibility state
+    const [showBillingDetails, setShowBillingDetails] = useState(false);
+    const [billingPasswordModal, setBillingPasswordModal] = useState(false);
+    const [billingPassword, setBillingPassword] = useState('');
+    const [billingPasswordError, setBillingPasswordError] = useState('');
+    const billingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+
+    const filteredEmails = useMemo(() => {
+        if (!searchQuery) return gmailEmails;
+        const q = searchQuery.toLowerCase();
+        return gmailEmails.filter(e => 
+            e.subject?.toLowerCase().includes(q) || 
+            e.sender?.toLowerCase().includes(q) || 
+            e.snippet?.toLowerCase().includes(q) ||
+            e.body?.toLowerCase().includes(q)
+        );
+    }, [gmailEmails, searchQuery]);
+
+    const handleGmailAction = async (messageId: string, action: 'READ' | 'UNREAD' | 'STAR' | 'UNSTAR' | 'TRASH') => {
+        try {
+            const res = await fetch('/api/gmail', {
+                method: 'PATCH',
+                body: JSON.stringify({ messageId, action })
+            });
+            if (res.ok) {
+                if (action === 'TRASH') {
+                    setGmailEmails(prev => prev.filter(e => e.id !== messageId));
+                    toast.success('Email moved to trash');
+                } else {
+                    setGmailEmails(prev => prev.map(e => {
+                        if (e.id === messageId) {
+                            if (action === 'READ') return { ...e, isRead: true };
+                            if (action === 'UNREAD') return { ...e, isRead: false };
+                            if (action === 'STAR') return { ...e, isStarred: true };
+                            if (action === 'UNSTAR') return { ...e, isStarred: false };
+                        }
+                        return e;
+                    }));
+                }
+            }
+        } catch (error) {
+            console.error('Gmail action error:', error);
+            toast.error('Failed to update email status');
+        }
+    };
+
+    const handleSendEmail = async () => {
+        if (!composeData.to || !composeData.subject) {
+            toast.error('Please fill in recipient and subject');
+            return;
+        }
+        setSendingEmail(true);
+        try {
+            const res = await fetch('/api/gmail', {
+                method: 'POST',
+                body: JSON.stringify(composeData)
+            });
+            const data = await res.json();
+            if (res.ok) {
+                toast.success('Email sent successfully!');
+                setIsComposeOpen(false);
+                setComposeData({ to: '', subject: '', body: '' });
+                // Refresh emails to show the sent email
+                if (client?.emails?.length) {
+                    fetchGmailEmails(client.emails);
+                }
+            } else {
+                toast.error(data.error || 'Failed to send email');
+            }
+        } catch (error) {
+            console.error('Send email error:', error);
+            toast.error('Failed to send email');
+        } finally {
+            setSendingEmail(false);
+        }
+    };
+
+    const handleVerifyBillingPassword = async () => {
+        if (!billingPassword) {
+            setBillingPasswordError('Please enter your password');
+            return;
+        }
+        
+        try {
+            const res = await fetch('/api/auth/verify-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: billingPassword })
+            });
+            
+            if (res.ok) {
+                // Password verified successfully
+                setBillingPasswordModal(false);
+                setBillingPassword('');
+                setBillingPasswordError('');
+                setShowBillingDetails(true);
+                toast.success('Verification successful');
+                
+                // Auto-hide after 60 seconds
+                if (billingTimeoutRef.current) {
+                    clearTimeout(billingTimeoutRef.current);
+                }
+                billingTimeoutRef.current = setTimeout(() => {
+                    setShowBillingDetails(false);
+                    toast('Billing details hidden for security', { icon: '🔒' });
+                }, 60000); // 60 seconds
+            } else {
+                const data = await res.json();
+                setBillingPasswordError(data.error || 'Invalid password');
+            }
+        } catch (error) {
+            console.error('Password verification error:', error);
+            setBillingPasswordError('Failed to verify password');
+        }
+    };
+
+    const getCardType = (number: string) => {
+        const n = number?.replace(/\D/g, '') || '';
+        if (n.startsWith('4')) return 'Visa';
+        if (/^5[1-5]/.test(n) || /^2(2\d{2}|[3-6]\d{2}|7[0-1]\d|720)/.test(n)) return 'MasterCard';
+        if (/^3[47]/.test(n)) return 'Amex';
+        if (/^6(?:011|5|4[4-9]|22)/.test(n)) return 'Discover';
+        return '';
+    };
+
+    const getCardTheme = (type: string) => {
+        switch (type.toLowerCase()) {
+            case 'visa': return 'from-[#1a1f71] to-[#00579f]';
+            case 'mastercard': return 'from-[#232323] to-[#4b4b4b]';
+            case 'amex': return 'from-[#007bc1] to-[#00a3e0]';
+            case 'discover': return 'from-[#f68121] to-[#ff9d4d]';
+            default: return 'from-slate-900 to-slate-800';
+        }
+    };
+
+    const cardType = getCardType(client?.billing?.ccNumber || '');
+    const cardTheme = getCardTheme(cardType);
+
     const loadMoreRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -143,14 +299,23 @@ export default function ClientDashboardPage() {
                 setSummary(data.summary);
                 
                 if (append) {
-                    if (activeTab !== 'Orders') {
+                    if (activeTab !== 'Orders' && activeTab !== 'Emails') {
                         setActivities(prev => [...prev, ...data.activities]);
-                    } else {
+                    } else if (activeTab === 'Orders') {
                         setOrders(prev => [...prev, ...data.orders]);
                     }
                 } else {
                     setActivities(data.activities);
                     setOrders(data.orders);
+                    
+                    // Trigger Gmail fetch if client data is now available
+                    if (data.client?.emails?.length) {
+                        fetchGmailEmails(data.client.emails);
+                    }
+                    
+                    if (summary?.totalEmails === undefined) {
+                        setSummary(prev => ({ ...prev!, totalEmails: data.summary.totalEmails }));
+                    }
                 }
                 
                 setHasMoreActivities(data.pagination.hasMoreActivities);
@@ -164,6 +329,32 @@ export default function ClientDashboardPage() {
         } finally {
             setLoading(false);
             setIsLoadingMore(false);
+        }
+    };
+
+    const fetchGmailEmails = async (providedEmails?: any[]) => {
+        const emailsToSearch = providedEmails || client?.emails;
+        if (!emailsToSearch?.length) return;
+        
+        setLoadingGmail(true);
+        try {
+            const q = emailsToSearch.map((e: any) => e.value).join(' OR ');
+            console.log('Fetching Gmail with query:', q);
+            const res = await fetch(`/api/gmail?q=${encodeURIComponent(q)}`);
+            if (res.ok) {
+                const data = await res.json();
+                console.log('Gmail Emails Loaded Successfully:', data.emails?.length);
+                setGmailEmails(data.emails || []);
+                if (data.resultSizeEstimate !== undefined) {
+                    setSummary(prev => prev ? { ...prev, totalEmails: data.resultSizeEstimate } : null);
+                }
+            } else {
+                console.error('Gmail API Error:', await res.text());
+            }
+        } catch (error) {
+            console.error('Failed to fetch Gmail emails:', error);
+        } finally {
+            setLoadingGmail(false);
         }
     };
 
@@ -197,6 +388,12 @@ export default function ClientDashboardPage() {
         observer.observe(loadMoreRef.current);
         return () => observer.disconnect();
     }, [hasMoreActivities, hasMoreOrders, isLoadingMore, activeTab]);
+
+    useEffect(() => {
+        if (activeTab === 'Emails' && client?.emails?.length) {
+            fetchGmailEmails();
+        }
+    }, [activeTab, client?.emails]);
 
     const getActivityIcon = (type: string) => {
         switch (type) {
@@ -322,7 +519,6 @@ export default function ClientDashboardPage() {
                             </div>
                             <div className="space-y-1">
                                 <h1 className="text-lg font-black text-slate-900 leading-tight">{client.name}</h1>
-                                <p className="text-[10px] text-slate-400 font-mono tracking-tighter">{client._id}</p>
                             </div>
                         </div>
 
@@ -353,14 +549,17 @@ export default function ClientDashboardPage() {
                                 <span>Sales Representative</span>
                             </div>
                             <div className="flex items-center space-x-3 p-3 bg-blue-50/50 border border-blue-100/50 rounded-sm">
-                                <div className="w-10 h-10 bg-blue-600 flex items-center justify-center text-white font-bold text-sm rounded-sm">
-                                    {client.salesRepInfo?.firstName?.charAt(0) || '?'}
+                                <div className="w-10 h-10 bg-blue-600 flex items-center justify-center text-white font-bold text-sm rounded-sm overflow-hidden shrink-0">
+                                    {client.salesRepInfo?.image ? (
+                                        <img src={client.salesRepInfo.image} alt="" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <span>{client.salesRepInfo?.firstName?.charAt(0) || '?'}</span>
+                                    )}
                                 </div>
                                 <div>
                                     <div className="text-xs font-bold text-slate-900">
                                         {client.salesRepInfo ? `${client.salesRepInfo.firstName} ${client.salesRepInfo.lastName}` : 'Unassigned'}
                                     </div>
-                                    <div className="text-[10px] text-slate-500 font-medium">{client.salesRepInfo?.email || '-'}</div>
                                 </div>
                             </div>
                         </div>
@@ -376,10 +575,14 @@ export default function ClientDashboardPage() {
                                 <div className="space-y-2">
                                     {client.phones?.map((p, idx) => (
                                         <div key={idx} className="group flex flex-col">
-                                            <a href={`tel:${p.value}`} className="text-xs font-bold text-slate-700 hover:text-blue-600 transition-colors truncate">
+                                            <a 
+                                                href={`https://voice.google.com/u/0/calls?number=${p.value.replace(/\D/g, '')}&action=dial`} 
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-xs font-bold text-slate-700 hover:text-blue-600 transition-colors truncate"
+                                            >
                                                 {p.value}
                                             </a>
-                                            <span className="text-[9px] text-slate-400 font-medium uppercase">{p.label || 'Phone'}</span>
                                         </div>
                                     )) || <span className="text-[10px] text-slate-400 italic">None</span>}
                                 </div>
@@ -397,7 +600,6 @@ export default function ClientDashboardPage() {
                                             <a href={`mailto:${e.value}`} className="text-xs font-bold text-slate-700 hover:text-purple-600 transition-colors truncate">
                                                 {e.value}
                                             </a>
-                                            <span className="text-[9px] text-slate-400 font-medium uppercase">{e.label || 'Email'}</span>
                                         </div>
                                     )) || <span className="text-[10px] text-slate-400 italic">None</span>}
                                 </div>
@@ -406,40 +608,69 @@ export default function ClientDashboardPage() {
 
                         {/* Billing Section (Object) */}
                         <div className="space-y-3 pt-4 border-t border-slate-100">
-                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center space-x-2">
-                                <CreditCard className="w-3 h-3" />
-                                <span>Billing Information</span>
-                            </div>
-                            <div className="bg-slate-900 p-4 rounded-sm space-y-3 shadow-inner">
+                            <div className={cn("p-4 rounded-sm space-y-3 shadow-inner bg-gradient-to-br transition-all duration-500", cardTheme)}>
                                 <div className="flex items-center justify-between">
-                                    <div className="text-[9px] text-slate-400 uppercase font-black tracking-widest">Credit Card</div>
-                                    <div className="flex space-x-1">
-                                        <div className="w-4 h-2.5 bg-white/20 rounded-sm" />
-                                        <div className="w-4 h-2.5 bg-white/20 rounded-sm" />
+                                    <div className="w-8 h-5.5 bg-gradient-to-br from-yellow-200 via-yellow-400 to-yellow-600 rounded-sm relative overflow-hidden shadow-inner flex shrink-0">
+                                        <div className="absolute inset-0 border-[0.5px] border-black/10"></div>
+                                        <div className="absolute top-1/2 left-0 w-full h-[0.5px] bg-black/20"></div>
+                                        <div className="absolute top-0 left-1/2 w-[0.5px] h-full bg-black/20"></div>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        {cardType && (
+                                            <div className="text-[9px] text-white/50 uppercase font-black tracking-widest">{cardType}</div>
+                                        )}
+                                        <button
+                                            onClick={() => {
+                                                if (showBillingDetails) {
+                                                    setShowBillingDetails(false);
+                                                    if (billingTimeoutRef.current) {
+                                                        clearTimeout(billingTimeoutRef.current);
+                                                    }
+                                                } else {
+                                                    setBillingPasswordModal(true);
+                                                }
+                                            }}
+                                            className="p-1 hover:bg-white/10 rounded transition-colors"
+                                            title={showBillingDetails ? "Hide details" : "View details"}
+                                        >
+                                            {showBillingDetails ? (
+                                                <EyeOff className="w-3.5 h-3.5 text-white/60" />
+                                            ) : (
+                                                <Eye className="w-3.5 h-3.5 text-white/60" />
+                                            )}
+                                        </button>
                                     </div>
                                 </div>
                                 
                                 <div className="space-y-1">
-                                    <div className="text-[13px] font-mono text-white tracking-[0.2em]">
-                                        {client.billing?.ccNumber || '•••• •••• •••• ••••'}
+                                    <div className="text-[12px] font-mono text-white tracking-[0.2em] truncate">
+                                        {showBillingDetails 
+                                            ? (client.billing?.ccNumber || '•••• •••• •••• ••••')
+                                            : '•••• •••• •••• ••••'
+                                        }
                                     </div>
                                 </div>
 
                                 <div className="flex justify-between items-end">
                                     <div className="space-y-1">
-                                        <div className="text-[8px] text-slate-500 uppercase font-bold">Card Holder</div>
-                                        <div className="text-[10px] text-white font-medium uppercase tracking-wider">
+                                        <div className="text-[7px] text-white/40 uppercase font-black tracking-tighter transition-colors">Card Holder</div>
+                                        <div className="text-[9px] text-white font-bold uppercase tracking-wider truncate max-w-[100px]">
                                             {client.billing?.nameOnCard || '-'}
                                         </div>
                                     </div>
-                                    <div className="flex space-x-4">
+                                    <div className="flex space-x-3">
                                         <div className="space-y-1">
-                                            <div className="text-[8px] text-slate-500 uppercase font-bold">Expires</div>
-                                            <div className="text-[10px] text-white font-mono">{client.billing?.expirationDate || '••/••'}</div>
+                                            <div className="text-[7px] text-white/40 uppercase font-black tracking-tighter">Expires</div>
+                                            <div className="text-[9px] text-white font-mono">{client.billing?.expirationDate || '••/••'}</div>
                                         </div>
                                         <div className="space-y-1">
-                                            <div className="text-[8px] text-slate-500 uppercase font-bold">CVV</div>
-                                            <div className="text-[10px] text-white font-mono">{client.billing?.securityCode || '•••'}</div>
+                                            <div className="text-[7px] text-white/40 uppercase font-black tracking-tighter">CVV</div>
+                                            <div className="text-[9px] text-white font-mono">
+                                                {showBillingDetails 
+                                                    ? (client.billing?.securityCode || '•••')
+                                                    : '•••'
+                                                }
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -450,6 +681,10 @@ export default function ClientDashboardPage() {
                         <div className="space-y-4 pt-4 border-t border-slate-100">
                             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Metadata</div>
                             <div className="grid grid-cols-1 gap-3">
+                                <div className="flex flex-col text-xs py-2 border-b border-slate-50">
+                                    <span className="text-slate-500 mb-1">Business Description</span>
+                                    <span className="text-slate-700 leading-relaxed italic">{client.description || 'No description provided'}</span>
+                                </div>
                                 <div className="flex justify-between text-xs py-1 border-b border-slate-50">
                                     <span className="text-slate-500">Contact Status</span>
                                     <span className="font-bold text-slate-800">{client.contactStatus || '-'}</span>
@@ -462,18 +697,44 @@ export default function ClientDashboardPage() {
                                     <span className="text-slate-500">Industry</span>
                                     <span className="font-bold text-slate-800">{client.industry || '-'}</span>
                                 </div>
+                                {client.website && (
+                                    <div className="flex justify-between text-xs py-1 border-b border-slate-50">
+                                        <span className="text-slate-500 uppercase font-black text-[8px] tracking-widest text-slate-400">Website</span>
+                                        <div className="flex items-center space-x-1 justify-end">
+                                            <Globe className="w-2.5 h-2.5 text-blue-500" />
+                                            <a href={client.website.startsWith('http') ? client.website : `https://${client.website}`} target="_blank" className="text-blue-600 font-bold truncate max-w-[150px]">{client.website}</a>
+                                        </div>
+                                    </div>
+                                )}
+                                {client.facebookPage && (
+                                    <div className="flex justify-between text-xs py-1 border-b border-slate-50">
+                                         <span className="text-slate-500 uppercase font-black text-[8px] tracking-widest text-slate-400">Facebook</span>
+                                        <div className="flex items-center space-x-1 justify-end">
+                                            <Facebook className="w-2.5 h-2.5 text-blue-600" />
+                                            <a href={client.facebookPage.startsWith('http') ? client.facebookPage : `https://${client.facebookPage}`} target="_blank" className="text-blue-600 font-bold truncate max-w-[150px]">{client.facebookPage}</a>
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="flex justify-between text-xs py-1 border-b border-slate-50">
+                                    <span className="text-slate-500">Forecasted</span>
+                                    <span className="font-bold text-slate-900">{formatCurrency(client.forecastedAmount || 0)}</span>
+                                </div>
+                                {client.projectedCloseDate && (
+                                    <div className="flex justify-between text-xs py-1 border-b border-slate-50">
+                                        <span className="text-slate-500">Projected Close</span>
+                                        <span className="font-bold text-emerald-600">{formatDate(client.projectedCloseDate)}</span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between text-xs py-1 border-b border-slate-50">
                                     <span className="text-slate-500">Payment Terms</span>
                                     <span className="font-bold text-slate-800">{client.defaultPaymentMethod || '-'}</span>
                                 </div>
-                                {client.website && (
-                                    <div className="flex justify-between text-xs py-1 border-b border-slate-50">
-                                        <span className="text-slate-500">Website</span>
-                                        <a href={client.website.startsWith('http') ? client.website : `https://${client.website}`} target="_blank" className="text-blue-600 font-bold truncate max-w-[150px]">{client.website}</a>
-                                    </div>
-                                )}
                                 <div className="flex justify-between text-xs py-1 border-b border-slate-50">
-                                    <span className="text-slate-500">Created At</span>
+                                    <span className="text-slate-500">Shipping Terms</span>
+                                    <span className="font-bold text-slate-800">{client.defaultShippingTerms || '-'}</span>
+                                </div>
+                                <div className="flex justify-between text-xs py-1 border-b border-slate-50">
+                                    <span className="text-slate-500 uppercase font-black text-[8px] tracking-widest text-slate-400">Created At</span>
                                     <span className="font-medium text-slate-600">{formatDate(client.createdAt || '')}</span>
                                 </div>
                             </div>
@@ -486,21 +747,269 @@ export default function ClientDashboardPage() {
                 {/* Right Column: Activity/Orders Table */}
                 <main className="flex-1 h-full overflow-y-auto bg-white relative scrollbar-custom">
 
+                    {/* Floating Compose Button for Emails Tab */}
+                    {activeTab === 'Emails' && (
+                        <button 
+                            onClick={() => {
+                                if (!client?.emails?.length) {
+                                    toast.error("No email addresses found for this client");
+                                    return;
+                                }
+                                setComposeData({ to: client.emails[0].value, subject: '', body: '' });
+                                setIsComposeOpen(true);
+                            }}
+                            className="fixed bottom-8 right-8 z-[60] w-14 h-14 bg-blue-600 text-white rounded-full flex items-center justify-center shadow-xl hover:bg-blue-700 hover:scale-110 transition-all group"
+                            title="Compose Email"
+                        >
+                            <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform" />
+                        </button>
+                    )}
+
 
                     {/* Table Content */}
                     {activeTab !== 'Orders' ? (
-                        <table className="w-full text-left border-collapse">
-                            <thead className="sticky top-12 z-[20] bg-slate-50/90 backdrop-blur-sm border-b border-slate-100">
+                    <table className="w-full text-left border-collapse">
+                        <thead className={cn(
+                            "sticky top-0 z-[20] bg-slate-50/90 backdrop-blur-sm border-b border-slate-100",
+                            activeTab === 'Emails' && "hidden"
+                        )}>
+                            {activeTab === 'Emails' ? (
+                                <tr></tr>
+                            ) : (
                                 <tr>
                                     <th className="px-4 py-3 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Date</th>
                                     <th className="px-4 py-3 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Type</th>
                                     <th className="px-4 py-3 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Comments</th>
                                     <th className="px-4 py-3 text-[9px] font-bold text-slate-400 uppercase tracking-widest">By</th>
                                 </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50">
-                                {activities.filter(a => {
-                                    if (activeTab === 'Emails') return a.type === 'Email';
+                            )}
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {activeTab === 'Emails' ? (
+                                loadingGmail ? (
+                                    <tr>
+                                        <td colSpan={4} className="px-4 py-12 text-center text-slate-400 text-xs">
+                                            <div className="flex flex-col items-center space-y-3">
+                                                <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                                                <span className="font-medium tracking-wide">Syncing Workspace Correspondence...</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ) : gmailEmails.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={4} className="px-4 py-16 text-center text-slate-400 text-sm">
+                                            <div className="flex flex-col items-center space-y-2 italic">
+                                                <span>No external correspondence matched</span>
+                                                <span className="text-[10px] text-slate-300 font-normal">Checked for: {client.emails?.map(e => e.value).join(', ')}</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ) : filteredEmails.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={4} className="px-4 py-16 text-center text-slate-400 text-sm">
+                                            <div className="flex flex-col items-center space-y-2 italic">
+                                                <span>No results match your search</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ) : filteredEmails.map((email) => {
+                                    const isSent = email.labelIds?.includes('SENT');
+                                    const isUnread = !email.isRead && !isSent;
+                                    
+                                    // Extract recipient name from "Name <email>" format
+                                    const getRecipientName = (recipient: string) => {
+                                        if (!recipient) return 'Unknown';
+                                        const namePart = recipient.split('<')[0].trim().replace(/"/g, '');
+                                        // If no name part (just email), try to get name from email
+                                        if (!namePart || namePart === recipient) {
+                                            const emailMatch = recipient.match(/<([^>]+)>/) || [null, recipient];
+                                            const emailAddr = emailMatch[1] || recipient;
+                                            // Return first part of email as fallback name
+                                            return emailAddr.split('@')[0];
+                                        }
+                                        return namePart;
+                                    };
+                                    
+                                    return (
+                                        <React.Fragment key={email.id}>
+                                            <tr 
+                                                className={cn(
+                                                    "hover:bg-slate-50 transition-colors group cursor-pointer border-l-2",
+                                                    isUnread ? "bg-white border-l-blue-600 shadow-sm" : "bg-slate-50/10 border-l-transparent",
+                                                    expandedEmailId === email.id && "bg-blue-50/30"
+                                                )}
+                                                onClick={(e) => {
+                                                    // Don't trigger if clicking star or trash
+                                                    const target = e.target as HTMLElement;
+                                                    if (target.closest('.action-btn')) return;
+                                                    
+                                                    setExpandedEmailId(expandedEmailId === email.id ? null : email.id);
+                                                    if (isUnread) handleGmailAction(email.id, 'READ');
+                                                }}
+                                            >
+                                                <td className="px-4 py-3 w-10">
+                                                    <div className="flex items-center space-x-2">
+                                                        <button 
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleGmailAction(email.id, email.isStarred ? 'UNSTAR' : 'STAR');
+                                                            }}
+                                                            className="action-btn"
+                                                        >
+                                                            <Star className={cn(
+                                                                "w-3.5 h-3.5 transition-colors",
+                                                                email.isStarred ? "text-yellow-400 fill-yellow-400" : "text-slate-300 hover:text-yellow-400"
+                                                            )} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <div className="flex items-center space-x-2 min-w-[140px]">
+                                                        {isSent ? <Send className="w-3 h-3 text-blue-500/50" /> : <Inbox className="w-3 h-3 text-purple-500/50" />}
+                                                        <span className={cn(
+                                                            "text-xs truncate max-w-[140px]",
+                                                            isUnread ? "font-black text-slate-900" : "font-medium text-slate-600"
+                                                        )}>
+                                                            {isSent ? getRecipientName(email.recipient) : email.sender}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <div className="flex items-center space-x-2 text-xs">
+                                                        <span className={cn(
+                                                            "truncate max-w-[300px]",
+                                                            isUnread ? "font-bold text-slate-900" : "font-medium text-slate-700"
+                                                        )}>
+                                                            {email.subject}
+                                                        </span>
+                                                        <span className="text-slate-400 font-normal truncate max-w-[200px]">
+                                                            - {email.snippet}
+                                                        </span>
+                                                        {email.hasAttachments && (
+                                                            <Paperclip className="w-3 h-3 text-slate-400 shrink-0" />
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3 text-right">
+                                                    <div className="flex items-center justify-end space-x-3">
+                                                        <span className={cn(
+                                                            "text-[9px] whitespace-nowrap uppercase tracking-tighter",
+                                                            isUnread ? "font-bold text-blue-600" : "font-medium text-slate-400"
+                                                        )}>
+                                                            {email.date}
+                                                        </span>
+                                                        <button 
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleGmailAction(email.id, 'TRASH');
+                                                            }}
+                                                            className="action-btn opacity-0 group-hover:opacity-100 p-1 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded transition-all"
+                                                        >
+                                                            <Trash2 className="w-3 h-3" />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            
+                                            {/* Expanded Email Content */}
+                                            {expandedEmailId === email.id && (
+                                                <tr>
+                                                    <td colSpan={4} className="p-0">
+                                                        <div className="px-16 py-8 bg-white border-y border-slate-100 animate-in slide-in-from-top-2 duration-200">
+                                                            <div className="flex items-center justify-between mb-8">
+                                                                <div className="flex items-center space-x-4">
+                                                                    <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center">
+                                                                        <User className="w-5 h-5 text-slate-400" />
+                                                                    </div>
+                                                                    <div>
+                                                                        <div className="flex items-center space-x-2">
+                                                                            <span className="text-sm font-black text-slate-900">{email.sender}</span>
+                                                                            <span className="text-xs text-slate-400 font-medium tracking-wider">&lt;{email.senderEmail || ''}&gt;</span>
+                                                                        </div>
+                                                                        <div className="flex items-center space-x-2 mt-0.5">
+                                                                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">to {isSent ? getRecipientName(email.recipient) : 'me'}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{email.date} ({email.time})</span>
+                                                            </div>
+                                                            <div className="space-y-6">
+                                                                <h3 className="text-lg font-black text-slate-900">{email.subject}</h3>
+                                                                <div className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap font-medium">
+                                                                    {email.body || <span className="text-slate-400 italic">No plain text content available</span>}
+                                                                </div>
+
+                                                                {email.attachments?.length > 0 && (
+                                                                    <div className="pt-8 border-t border-slate-50">
+                                                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Attachments ({email.attachments.length})</p>
+                                                                        <div className="flex flex-wrap gap-3">
+                                                                            {email.attachments.map((att: any) => (
+                                                                                <div 
+                                                                                    key={att.id} 
+                                                                                    className="group relative flex items-center space-x-3 p-3 bg-slate-50 hover:bg-slate-100 transition-all border border-slate-100 min-w-[200px] cursor-pointer"
+                                                                                >
+                                                                                    <div className="p-2 bg-white border border-slate-200">
+                                                                                        <Paperclip className="w-4 h-4 text-slate-400" />
+                                                                                    </div>
+                                                                                    <div className="flex-1 min-w-0">
+                                                                                        <p className="text-[11px] font-black text-slate-900 truncate">{att.filename}</p>
+                                                                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{(att.size / 1024).toFixed(1)} KB</p>
+                                                                                    </div>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+
+
+                                                                {/* Reply & Forward Actions */}
+                                                                <div className="pt-6 border-t border-slate-100 flex items-center space-x-3">
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            const replyTo = isSent ? email.recipient : (email.senderEmail || email.sender);
+                                                                            const quotedBody = "\n\n---------- Original Message ----------\nFrom: " + email.sender + " <" + (email.senderEmail || '') + ">\nDate: " + email.date + " " + email.time + "\nSubject: " + email.subject + "\nTo: " + email.recipient + "\n\n" + (email.body || '');
+                                                                            setComposeData({
+                                                                                to: replyTo,
+                                                                                subject: email.subject?.startsWith('Re:') ? email.subject : 'Re: ' + email.subject,
+                                                                                body: quotedBody
+                                                                            });
+                                                                            setIsComposeOpen(true);
+                                                                        }}
+                                                                        className="flex items-center space-x-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm"
+                                                                    >
+                                                                        <Reply className="w-3.5 h-3.5" />
+                                                                        <span>Reply</span>
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            const forwardBody = "\n\n---------- Forwarded Message ----------\nFrom: " + email.sender + " <" + (email.senderEmail || '') + ">\nDate: " + email.date + " " + email.time + "\nSubject: " + email.subject + "\nTo: " + email.recipient + "\n\n" + (email.body || '');
+                                                                            setComposeData({
+                                                                                to: '',
+                                                                                subject: email.subject?.startsWith('Fwd:') ? email.subject : 'Fwd: ' + email.subject,
+                                                                                body: forwardBody
+                                                                            });
+                                                                            setIsComposeOpen(true);
+                                                                        }}
+                                                                        className="flex items-center space-x-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm"
+                                                                    >
+                                                                        <Forward className="w-3.5 h-3.5" />
+                                                                        <span>Forward</span>
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+
+                                                </tr>
+                                            )}
+                                        </React.Fragment>
+                                    );
+                                })
+
+                            ) : (
+                                activities.filter(a => {
                                     if (activeTab === 'Calls') return a.type === 'Call';
                                     if (activeTab === 'SMS') return a.type === 'Text';
                                     return false;
@@ -511,7 +1020,6 @@ export default function ClientDashboardPage() {
                                         </td>
                                     </tr>
                                 ) : activities.filter(a => {
-                                    if (activeTab === 'Emails') return a.type === 'Email';
                                     if (activeTab === 'Calls') return a.type === 'Call';
                                     if (activeTab === 'SMS') return a.type === 'Text';
                                     return false;
@@ -553,9 +1061,10 @@ export default function ClientDashboardPage() {
                                             {act.createdByName || 'Unknown'}
                                         </td>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
                     ) : (
                         <table className="w-full text-left border-collapse">
                             <thead className="sticky top-12 z-[20] bg-slate-50/90 backdrop-blur-sm border-b border-slate-100">
@@ -684,10 +1193,164 @@ export default function ClientDashboardPage() {
                 onClose={() => setIsEditModalOpen(false)}
                 onSuccess={() => {
                     fetchClientData();
-                    toast.success('Client updated successfully');
                 }}
                 initialData={client}
             />
+
+            {/* Compose Email Modal */}
+            {isComposeOpen && (
+                <div className="fixed bottom-0 right-12 w-[540px] bg-white border border-slate-200 shadow-2xl z-[1001] animate-in slide-in-from-bottom-5 duration-300 rounded-t-lg overflow-hidden">
+                    <div className="bg-[#1A1A1A] text-white px-4 py-2.5 flex items-center justify-between">
+                        <span className="text-[11px] font-black uppercase tracking-[0.2em]">New message</span>
+                        <button onClick={() => setIsComposeOpen(false)} className="hover:text-slate-300 transition-colors">
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                    <div className="p-0">
+                        <div className="px-4 border-b border-slate-100">
+                            <input 
+                                type="text" 
+                                placeholder="Recipients" 
+                                className="w-full text-sm py-3 focus:outline-none placeholder:text-slate-400 font-medium" 
+                                value={composeData.to} 
+                                onChange={(e) => setComposeData({...composeData, to: e.target.value})} 
+                            />
+                        </div>
+                        <div className="px-4 border-b border-slate-100">
+                            <input 
+                                type="text" 
+                                placeholder="Subject" 
+                                className="w-full text-sm py-3 focus:outline-none placeholder:text-slate-400 font-medium" 
+                                value={composeData.subject} 
+                                onChange={(e) => setComposeData({...composeData, subject: e.target.value})} 
+                            />
+                        </div>
+                        <div className="px-4">
+                            <textarea 
+                                placeholder="Message" 
+                                rows={12} 
+                                className="w-full text-sm py-4 focus:outline-none resize-none placeholder:text-slate-400 font-medium leading-relaxed" 
+                                value={composeData.body} 
+                                onChange={(e) => setComposeData({...composeData, body: e.target.value})} 
+                            />
+                        </div>
+                        
+                        {/* Toolbar & Send */}
+                        <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 bg-white">
+                            <div className="flex items-center space-x-1">
+                                <button 
+                                    onClick={handleSendEmail}
+                                    disabled={sendingEmail}
+                                    className="flex items-center space-x-3 px-8 py-2.5 bg-black text-white text-[11px] font-black uppercase tracking-[0.15em] hover:bg-slate-800 transition-all mr-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {sendingEmail ? (
+                                        <>
+                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                            <span>Sending...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span>Send</span>
+                                            <Send className="w-3.5 h-3.5" />
+                                        </>
+                                    )}
+                                </button>
+                                
+                                <div className="flex items-center space-x-0.5 text-slate-500">
+                                    <button className="p-2 hover:bg-slate-50 hover:text-black transition-all rounded-sm" title="Attach files">
+                                        <Paperclip className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div className="flex items-center space-x-2">
+                                <button 
+                                    onClick={() => { 
+                                        setIsComposeOpen(false); 
+                                        setComposeData({ to: '', subject: '', body: '' }); 
+                                    }} 
+                                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all rounded-sm"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Password Confirmation Modal for Billing */}
+            {billingPasswordModal && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-lg shadow-2xl w-[380px] overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="bg-slate-900 text-white px-5 py-3 flex items-center justify-between">
+                            <span className="text-[11px] font-black uppercase tracking-[0.15em]">Security Verification</span>
+                            <button 
+                                onClick={() => {
+                                    setBillingPasswordModal(false);
+                                    setBillingPassword('');
+                                    setBillingPasswordError('');
+                                }}
+                                className="hover:text-slate-300 transition-colors"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div className="text-center space-y-2">
+                                <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto">
+                                    <CreditCard className="w-6 h-6 text-slate-500" />
+                                </div>
+                                <p className="text-sm text-slate-600">Enter your password to view sensitive billing information</p>
+                            </div>
+                            <div className="space-y-2">
+                                <input
+                                    type="password"
+                                    placeholder="Enter your password"
+                                    value={billingPassword}
+                                    onChange={(e) => {
+                                        setBillingPassword(e.target.value);
+                                        setBillingPasswordError('');
+                                    }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            // Verify password
+                                            handleVerifyBillingPassword();
+                                        }
+                                    }}
+                                    className="w-full px-4 py-3 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    autoFocus
+                                />
+                                {billingPasswordError && (
+                                    <p className="text-xs text-red-500 font-medium">{billingPasswordError}</p>
+                                )}
+                            </div>
+                            <div className="flex space-x-3">
+                                <button
+                                    onClick={() => {
+                                        setBillingPasswordModal(false);
+                                        setBillingPassword('');
+                                        setBillingPasswordError('');
+                                    }}
+                                    className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-widest rounded hover:bg-slate-50 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleVerifyBillingPassword}
+                                    className="flex-1 px-4 py-2.5 bg-slate-900 text-white text-[11px] font-bold uppercase tracking-widest rounded hover:bg-slate-800 transition-colors"
+                                >
+                                    Verify
+                                </button>
+                            </div>
+                            <p className="text-[10px] text-slate-400 text-center">
+                                Details will auto-hide after 60 seconds
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
+
     );
 }
