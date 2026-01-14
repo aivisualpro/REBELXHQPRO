@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
+import Link from 'next/link';
 import { getRouteActions } from '@/hooks/useHeaderActions';
 import { cn } from '@/lib/utils';
 import { Search, Bell, User, LogOut } from 'lucide-react';
@@ -73,10 +74,14 @@ export const DynamicActions = () => {
                                 <div className="px-4 py-2 border-b border-white/5 mb-1">
                                     <p className="text-xs text-white font-bold truncate">{session?.user?.name || session?.user?.email}</p>
                                 </div>
-                                <button className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
+                                <Link 
+                                    href="/profile" 
+                                    onClick={() => setIsUserMenuOpen(false)}
+                                    className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+                                >
                                     <User className="w-4 h-4" />
                                     <span>Profile</span>
-                                </button>
+                                </Link>
                                 <div className="my-1 border-t border-white/5" />
                                 <button
                                     onClick={() => signOut({ callbackUrl: '/login' })}

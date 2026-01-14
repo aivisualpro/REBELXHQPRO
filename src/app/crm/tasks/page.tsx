@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Phone,
     Mail,
@@ -14,7 +14,6 @@ import {
     Target,
     Plus,
     RefreshCw,
-    ChevronRight,
     MessageSquare,
     PhoneCall,
     Loader2,
@@ -22,21 +21,17 @@ import {
     PlayCircle,
     GripVertical,
     SkipForward,
-    ArrowRight,
-    MapPin,
     DollarSign,
     Activity,
-    Truck,
-    Upload,
     ShieldCheck,
     Snowflake,
-    HeartCrack
+    HeartCrack,
+    Search,
+    ListTodo
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
-import { PageHeader } from '@/components/ui/PageHeader';
-import { ListTodo, GitBranch } from 'lucide-react';
 
 interface Task {
     _id: string;
@@ -104,16 +99,6 @@ const typeIcons: { [key: string]: React.ReactNode } = {
     'Upsell Opportunity': <TrendingUp className="w-3.5 h-3.5" />
 };
 
-const PIPELINE_STAGES = [
-    { id: 'Initial Contact', label: 'Initial Contact', color: 'text-slate-600', bgColor: 'bg-slate-50 border-slate-200', icon: <User className="w-4 h-4" /> },
-    { id: 'Sampling', label: 'Sampling', color: 'text-purple-600', bgColor: 'bg-purple-50 border-purple-200', icon: <Activity className="w-4 h-4" /> },
-    { id: 'New Prospect', label: 'New Prospect', color: 'text-blue-600', bgColor: 'bg-blue-50 border-blue-200', icon: <TrendingUp className="w-4 h-4" /> },
-    { id: 'Closed won', label: 'Closed Won', color: 'text-emerald-600', bgColor: 'bg-emerald-50 border-emerald-200', icon: <CheckCircle2 className="w-4 h-4" /> },
-    { id: 'Closed lost', label: 'Closed Lost', color: 'text-red-600', bgColor: 'bg-red-50 border-red-200', icon: <X className="w-4 h-4" /> },
-    { id: 'Uncategorized', label: 'Uncategorized', color: 'text-slate-400', bgColor: 'bg-white border-slate-100', icon: <Clock className="w-4 h-4" /> },
-];
-
-
 function HeaderStatItem({ icon: Icon, value, label, colorClass, gradientClass }: { icon: any, value: string | number, label: string, colorClass: string, gradientClass: string }) {
     return (
         <div className="flex items-center space-x-2.5 px-3 py-1 border-r border-slate-100 last:border-0">
@@ -128,9 +113,10 @@ function HeaderStatItem({ icon: Icon, value, label, colorClass, gradientClass }:
     );
 }
 
-export default function RetentionKanbanPage() {
+export default function TasksPage() {
     const router = useRouter();
     const [tasks, setTasks] = useState<Task[]>([]);
+    const [search, setSearch] = useState('');
     const [stats, setStats] = useState<Stats | null>(null);
     const [loading, setLoading] = useState(true);
     const [generating, setGenerating] = useState(false);
@@ -140,9 +126,6 @@ export default function RetentionKanbanPage() {
     // Drag state
     const [draggedTask, setDraggedTask] = useState<Task | null>(null);
     const [dragOverColumn, setDragOverColumn] = useState<KanbanColumn | null>(null);
-
-    const [draggedClient, setDraggedClient] = useState<Client | null>(null);
-    const [dragOverStage, setDragOverStage] = useState<string | null>(null);
 
     // Modal
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -160,8 +143,6 @@ export default function RetentionKanbanPage() {
         assignedTo: '',
         notes: ''
     });
-
-    const [activeTab, setActiveTab] = useState('tasks');
 
     const inactivityStats = React.useMemo(() => {
         const now = Date.now();
@@ -315,47 +296,6 @@ export default function RetentionKanbanPage() {
         setDragOverColumn(null);
     };
 
-    const handleClientDragStart = (e: React.DragEvent, client: Client) => {
-        setDraggedClient(client);
-        e.dataTransfer.effectAllowed = 'move';
-    };
-
-    const handleClientDragOver = (e: React.DragEvent, stageId: string) => {
-        e.preventDefault();
-        setDragOverStage(stageId);
-    };
-
-    const handleClientDrop = async (e: React.DragEvent, targetStatus: string) => {
-        e.preventDefault();
-        setDragOverStage(null);
-
-        if (!draggedClient || (draggedClient.contactStatus || 'Uncategorized') === targetStatus) {
-            setDraggedClient(null);
-            return;
-        }
-
-        const previousStatus = draggedClient.contactStatus;
-        setClients(prev => prev.map(c => 
-            c._id === draggedClient._id ? { ...c, contactStatus: targetStatus } : c
-        ));
-
-        try {
-            const res = await fetch(`/api/clients/${draggedClient._id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contactStatus: targetStatus })
-            });
-            if (!res.ok) throw new Error('Failed to update status');
-            toast.success(`Client moved to ${targetStatus}`);
-        } catch (error) {
-            setClients(prev => prev.map(c => 
-                c._id === draggedClient._id ? { ...c, contactStatus: previousStatus } : c
-            ));
-            toast.error('Failed to update client status');
-        }
-        setDraggedClient(null);
-    };
-
     const handleCompleteTask = async () => {
         if (!selectedTask) return;
         setIsSubmitting(true);
@@ -413,18 +353,26 @@ export default function RetentionKanbanPage() {
     };
 
     const getColumnTasks = (status: KanbanColumn) => {
+        const filtered = search 
+            ? tasks.filter(t => t.clientInfo?.name?.toLowerCase().includes(search.toLowerCase()))
+            : tasks;
+
         // Include Overdue in Pending column
         if (status === 'Pending') {
-            return tasks.filter(t => t.status === 'Pending' || t.status === 'Overdue');
+            return filtered.filter(t => t.status === 'Pending' || t.status === 'Overdue');
         }
-        return tasks.filter(t => t.status === status);
+        return filtered.filter(t => t.status === status);
     };
 
     const getStatusCount = (status: string) => {
+        const filtered = search 
+            ? tasks.filter(t => t.clientInfo?.name?.toLowerCase().includes(search.toLowerCase()))
+            : tasks;
+
         if (status === 'Pending') {
-            return tasks.filter(t => t.status === 'Pending' || t.status === 'Overdue').length;
+            return filtered.filter(t => t.status === 'Pending' || t.status === 'Overdue').length;
         }
-        return tasks.filter(t => t.status === status).length;
+        return filtered.filter(t => t.status === status).length;
     };
 
     const formatDate = (dateStr: string) => {
@@ -448,79 +396,45 @@ export default function RetentionKanbanPage() {
 
     return (
         <div className="flex flex-col h-[calc(100vh-40px)] bg-slate-100 overflow-hidden">
-            <PageHeader
-                title=""
-                activeTab={activeTab}
-                onTabChange={setActiveTab}
-                tabs={[
-                    { id: 'tasks', label: 'Tasks', icon: ListTodo },
-                    { id: 'lead-pipeline', label: 'Lead Pipeline', icon: GitBranch },
-                    { id: 'client-pipeline', label: 'Client Pipeline', icon: GitBranch },
-                ]}
-                stats={
-                    <div className="flex items-center">
-                        <HeaderStatItem 
-                            icon={ShieldCheck} 
-                            value={`${inactivityStats.rate}%`} 
-                            label="Retention" 
-                            colorClass="text-emerald-600" 
-                            gradientClass="bg-gradient-to-br from-emerald-500 to-teal-600" 
+            {/* Header / Action Bar */}
+            <div className="flex items-center justify-between px-4 py-1.5 border-b border-slate-200 bg-white sticky top-0 z-20 gap-4">
+                
+                {/* Left: Search */}
+                <div className="flex items-center space-x-6">
+                    <div className="relative group">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                        <input 
+                            type="text" 
+                            placeholder="Search tasks by client..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="pl-9 pr-4 py-1.5 w-64 bg-slate-50 hover:bg-slate-100 focus:bg-white border border-transparent focus:border-blue-500 rounded text-sm transition-all focus:outline-none placeholder:text-slate-400"
                         />
-                        <HeaderStatItem 
-                            icon={Clock} 
-                            value={inactivityStats.i30} 
-                            label="Warm" 
-                            colorClass="text-amber-600" 
-                            gradientClass="bg-gradient-to-br from-amber-500 to-yellow-600" 
-                        />
-                        <HeaderStatItem 
-                            icon={Snowflake} 
-                            value={inactivityStats.i60} 
-                            label="Cold" 
-                            colorClass="text-orange-600" 
-                            gradientClass="bg-gradient-to-br from-orange-500 to-red-600" 
-                        />
-                        <HeaderStatItem 
-                            icon={HeartCrack} 
-                            value={inactivityStats.i90} 
-                            label="Lost" 
-                            colorClass="text-red-600" 
-                            gradientClass="bg-gradient-to-br from-red-500 to-rose-600" 
-                        />
-                        <div className="w-px h-8 bg-slate-200 mx-4" />
-                        <div className="flex items-center space-x-2 text-xs text-slate-500 mr-4">
-                            <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
-                            <span className="font-bold text-red-600">
-                                {tasks.filter(t => isOverdue(t)).length}
-                            </span>
-                            <span className="uppercase font-bold tracking-wider text-[9px]">Overdue</span>
-                        </div>
                     </div>
-                }
-                actions={
-                    <>
-                        <button
-                            onClick={handleAutoGenerate}
-                            disabled={generating}
-                            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs font-bold uppercase hover:from-orange-600 hover:to-red-600 transition-all disabled:opacity-50 shadow-sm"
-                        >
-                            {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-                            <span>Auto-Generate</span>
-                        </button>
-                        <button
-                            onClick={() => setIsNewTaskModalOpen(true)}
-                            className="flex items-center space-x-2 px-4 py-2 bg-black text-white text-xs font-bold uppercase hover:bg-slate-800 transition-colors shadow-sm"
-                        >
-                            <Plus className="w-4 h-4" />
-                            <span>New Task</span>
-                        </button>
-                    </>
-                }
-            />
+                </div>
 
-            {/* Kanban Board - Tasks Tab */}
-            {activeTab === 'tasks' && (
-                <div className="flex-1 overflow-x-auto p-6">
+                {/* Right: Actions */}
+                <div className="flex items-center space-x-2">
+                    <button
+                        onClick={handleAutoGenerate}
+                        disabled={generating}
+                        className="flex items-center space-x-1.5 px-3 py-1.5 text-[11px] font-bold text-orange-600 bg-orange-50 border border-orange-100 rounded hover:bg-orange-100 transition-all uppercase tracking-wide disabled:opacity-50"
+                    >
+                        {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+                        <span>Auto-Generate</span>
+                    </button>
+
+                    <button
+                        onClick={() => setIsNewTaskModalOpen(true)}
+                        className="flex items-center justify-center h-8 px-4 bg-black text-white text-[11px] font-bold uppercase hover:bg-slate-800 rounded shadow-sm transition-all"
+                    >
+                        <Plus className="w-3.5 h-3.5 mr-1.5" />
+                        <span>New Task</span>
+                    </button>
+                </div>
+            </div>
+
+            <div className="flex-1 overflow-x-auto p-1">
                 {loading ? (
                     <div className="flex items-center justify-center h-full">
                         <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
@@ -634,33 +548,6 @@ export default function RetentionKanbanPage() {
                     </div>
                 )}
             </div>
-            )}
-
-            {/* Lead Pipeline Tab Content */}
-            {activeTab === 'lead-pipeline' && (
-                <PipelineGridView 
-                    clients={clients.filter(c => c.contactType === 'Potential Customer' || !c.contactType)} 
-                    onClientClick={(client) => router.push(`/crm/clients/${client._id}`)}
-                    onClientDrop={handleClientDrop}
-                    draggedClient={draggedClient}
-                    setDraggedClient={setDraggedClient}
-                    dragOverStage={dragOverStage}
-                    setDragOverStage={setDragOverStage}
-                />
-            )}
-
-            {/* Client Pipeline Tab Content */}
-            {activeTab === 'client-pipeline' && (
-                <PipelineGridView 
-                    clients={clients.filter(c => c.contactType === 'Current Customer')} 
-                    onClientClick={(client) => router.push(`/crm/clients/${client._id}`)}
-                    onClientDrop={handleClientDrop}
-                    draggedClient={draggedClient}
-                    setDraggedClient={setDraggedClient}
-                    dragOverStage={dragOverStage}
-                    setDragOverStage={setDragOverStage}
-                />
-            )}
 
             {/* Task Detail Modal */}
             {isModalOpen && selectedTask && (
@@ -952,138 +839,6 @@ export default function RetentionKanbanPage() {
                     </div>
                 </div>
             )}
-        </div>
-    );
-}
-
-// Reusable Pipeline Grid View
-function PipelineGridView({ 
-    clients, 
-    onClientClick, 
-    onClientDrop,
-    draggedClient,
-    setDraggedClient,
-    dragOverStage,
-    setDragOverStage
-}: { 
-    clients: Client[], 
-    onClientClick: (client: Client) => void,
-    onClientDrop: (e: React.DragEvent, status: string) => void,
-    draggedClient: Client | null,
-    setDraggedClient: (client: Client | null) => void,
-    dragOverStage: string | null,
-    setDragOverStage: (stage: string | null) => void
-}) {
-    return (
-        <div className="flex-1 overflow-x-auto p-6">
-            <div className="flex space-x-4 h-full min-w-max">
-                {PIPELINE_STAGES.map((stage) => (
-                    <div
-                        key={stage.id}
-                        className={cn(
-                            "flex flex-col w-[360px] bg-white border shadow-sm h-full transition-all",
-                            dragOverStage === stage.id && "ring-2 ring-blue-400 ring-offset-2"
-                        )}
-                        onDragOver={(e) => {
-                            e.preventDefault();
-                            setDragOverStage(stage.id);
-                        }}
-                        onDragLeave={() => setDragOverStage(null)}
-                        onDrop={(e) => onClientDrop(e, stage.id)}
-                    >
-                        {/* Stage Header */}
-                        <div className={cn("px-4 py-3 border-b flex items-center justify-between shrink-0", stage.bgColor)}>
-                            <div className="flex items-center space-x-2">
-                                <span className={stage.color}>{stage.icon}</span>
-                                <span className={cn("text-xs font-black uppercase tracking-wider", stage.color)}>{stage.label}</span>
-                            </div>
-                            <span className={cn("text-sm font-black", stage.color)}>
-                                {clients.filter(c => (c.contactStatus || 'Uncategorized') === stage.id).length}
-                            </span>
-                        </div>
-
-                        {/* Stage Content */}
-                        <div className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-custom">
-                            {clients.filter(c => (c.contactStatus || 'Uncategorized') === stage.id).length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-8 text-slate-400 opacity-50">
-                                    <p className="text-[10px] font-bold uppercase italic">Stage Empty</p>
-                                </div>
-                            ) : (
-                                clients.filter(c => (c.contactStatus || 'Uncategorized') === stage.id).map((client) => (
-                                    <div
-                                        key={client._id}
-                                        draggable
-                                        onDragStart={(e) => {
-                                            setDraggedClient(client);
-                                            e.dataTransfer.effectAllowed = 'move';
-                                        }}
-                                        onClick={() => onClientClick(client)}
-                                        className={cn(
-                                            "bg-white border p-3 cursor-grab animate-in fade-in slide-in-from-bottom-2 duration-300 active:cursor-grabbing hover:shadow-md transition-all group",
-                                            draggedClient?._id === client._id && "opacity-50 scale-95"
-                                        )}
-                                    >
-                                        <div className="flex items-start justify-between mb-2">
-                                            <div className="flex items-center space-x-2">
-                                                <div className="w-6 h-6 bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-600 uppercase border border-slate-200">
-                                                    {client.name?.charAt(0)}
-                                                </div>
-                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Client Profile</span>
-                                            </div>
-                                            <GripVertical className="w-4 h-4 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                        </div>
-
-                                        <div className="text-sm font-black text-slate-900 mb-3 truncate group-hover:text-blue-600 transition-colors">
-                                            {client.name}
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-4 mb-3">
-                                            <div>
-                                                <div className="text-[9px] font-bold text-slate-400 uppercase mb-1">Total Revenue</div>
-                                                <div className="flex items-center space-x-1">
-                                                    <DollarSign className="w-3 h-3 text-emerald-500" />
-                                                    <span className="text-xs font-black text-slate-700">
-                                                        {client.totalRevenue?.toLocaleString() || '0'}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <div className="text-[9px] font-bold text-slate-400 uppercase mb-1">Activities</div>
-                                                <div className="flex items-center space-x-1">
-                                                    <Activity className="w-3 h-3 text-purple-500" />
-                                                    <span className="text-xs font-black text-slate-700">
-                                                        {client.activityCount || 0}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center justify-between pt-2 border-t border-slate-50">
-                                            <div className="flex items-center space-x-2">
-                                                {client.phones?.[0] && (
-                                                    <div className="w-5 h-5 bg-slate-50 flex items-center justify-center rounded-full">
-                                                        <Phone className="w-2.5 h-2.5 text-slate-400" />
-                                                    </div>
-                                                )}
-                                                {client.emails?.[0] && (
-                                                    <div className="w-5 h-5 bg-slate-50 flex items-center justify-center rounded-full">
-                                                        <Mail className="w-2.5 h-2.5 text-slate-400" />
-                                                    </div>
-                                                )}
-                                            </div>
-                                            {client.lastActivity && (
-                                                <div className="text-[9px] font-bold text-slate-400 uppercase">
-                                                    {new Date(client.lastActivity).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    </div>
-                ))}
-            </div>
         </div>
     );
 }

@@ -43,5 +43,8 @@ const SaleOrderSchema = new mongoose.Schema({
     }]
 });
 
+SaleOrderSchema.index({ clientId: 1 });
+SaleOrderSchema.index({ orderStatus: 1 });
+
 // Force schema refresh
 export default mongoose.models.SaleOrder || mongoose.model('SaleOrder', SaleOrderSchema);

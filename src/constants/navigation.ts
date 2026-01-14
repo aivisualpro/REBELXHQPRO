@@ -20,6 +20,7 @@ export const MENU_ITEMS = [
         items: [
             { title: 'Clients', href: '/crm/clients', icon: UsersRound },
             { title: 'Activities', href: '/crm/activities', icon: Activity },
+            { title: 'App Connections', href: '/crm/connections', icon: Globe },
             { title: 'Retention', href: '/crm/retention', icon: Target },
         ]
     },

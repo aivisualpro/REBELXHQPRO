@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { MultiSelectFilter } from '@/components/ui/filters/MultiSelectFilter';
 import { Pagination } from '@/components/ui/Pagination';
+import { TableColumnHeader } from '@/components/ui/TableColumnHeader';
 
 interface WebOrder {
   _id: string;
@@ -402,17 +403,22 @@ export default function WebOrdersPage() {
               ].map(col => (
                 <th
                   key={col.key}
-                  onClick={() => handleSort(col.key)}
-                  className="px-3 py-2 text-[8px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors border-r border-slate-100 last:border-0 whitespace-nowrap"
+                  className="border-r border-slate-100 last:border-0"
                 >
-                  <div className="flex items-center space-x-1">
-                    <span>{col.label}</span>
-                    <ArrowUpDown className={cn("w-2.5 h-2.5", sortBy === col.key ? "text-black" : "text-slate-200")} />
-                  </div>
+                  <TableColumnHeader
+                    column={col}
+                    title={col.label}
+                    currentSortBy={sortBy}
+                    currentSortOrder={sortOrder}
+                    onSort={(key, dir) => {
+                      setSortBy(key);
+                      setSortOrder(dir);
+                    }}
+                  />
                 </th>
               ))}
-              <th className="px-3 py-2 text-[8px] font-bold text-slate-400 uppercase tracking-widest text-center">Items</th>
-              <th className="px-3 py-2 text-[8px] font-bold text-slate-400 uppercase tracking-widest">Location</th>
+              <th className="font-bold text-slate-500 uppercase tracking-widest text-center">Items</th>
+              <th className="font-bold text-slate-500 uppercase tracking-widest">Location</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
@@ -426,13 +432,13 @@ export default function WebOrdersPage() {
                 onClick={() => router.push(`/sales/web-orders/${order._id}`)}
                 className="hover:bg-slate-50 transition-colors group cursor-pointer"
               >
-                <td className="px-3 py-2">
+                <td className="">
                   <div className="flex flex-col">
-                    <span className="text-[11px] font-black text-slate-900 font-mono tracking-tighter">#{order.number}</span>
-                    <span className="text-[8px] text-slate-400 font-mono">WC-{order.webId}</span>
+                    <span className="font-black text-slate-900 font-mono tracking-tighter">#{order.number}</span>
+                    <span className="font-mono">WC-{order.webId}</span>
                   </div>
                 </td>
-                <td className="px-3 py-2">
+                <td className="">
                   <span className={cn(
                     "px-2 py-0.5 rounded-full text-[8px] font-black text-white uppercase tracking-widest shadow-sm",
                     getWebsiteColor(order.website)
@@ -440,18 +446,18 @@ export default function WebOrdersPage() {
                     {order.website}
                   </span>
                 </td>
-                <td className="px-3 py-2">
+                <td className="">
                   <div className="flex items-center space-x-2">
                     <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
                       <User className="w-3 h-3 text-slate-400" />
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[10px] font-bold text-slate-700">{order.billing?.firstName} {order.billing?.lastName}</span>
-                      <span className="text-[8px] text-slate-400 truncate max-w-[120px]">{order.billing?.email}</span>
+                      <span className="font-bold text-slate-700">{order.billing?.firstName} {order.billing?.lastName}</span>
+                      <span className="truncate max-w-[120px]">{order.billing?.email}</span>
                     </div>
                   </div>
                 </td>
-                <td className="px-3 py-2">
+                <td className="">
                   <span className={cn(
                     "px-2 py-0.5 rounded-[3px] text-[8px] font-black uppercase tracking-wider border",
                     getStatusColor(order.status)
@@ -459,24 +465,24 @@ export default function WebOrdersPage() {
                     {order.status}
                   </span>
                 </td>
-                <td className="px-3 py-2 text-[10px] text-slate-500 font-mono">
+                <td className="font-mono">
                   {order.dateCreated ? new Date(order.dateCreated).toLocaleDateString() : '-'}
                 </td>
-                <td className="px-3 py-2">
+                <td className="">
                   <div className="flex flex-col">
-                    <span className="text-[11px] font-black text-slate-900 font-mono">${order.total?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    <span className="font-black text-slate-900 font-mono">${order.total?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                     {order.shippingTotal > 0 && (
-                      <span className="text-[8px] text-slate-400 flex items-center space-x-0.5">
+                      <span className="flex items-center space-x-0.5">
                         <Truck className="w-2.5 h-2.5" />
                         <span>+${order.shippingTotal?.toFixed(2)}</span>
                       </span>
                     )}
                   </div>
                 </td>
-                <td className="px-3 py-2">
+                <td className="">
                   <div className="flex items-center space-x-1.5">
                     <CreditCard className="w-3 h-3 text-slate-300" />
-                    <span className="text-[9px] text-slate-500 truncate max-w-[80px]">{order.paymentMethodTitle || '-'}</span>
+                    <span className="truncate max-w-[80px]">{order.paymentMethodTitle || '-'}</span>
                   </div>
                 </td>
                 <td className="px-3 py-2 text-center">

@@ -23,6 +23,16 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         await dbConnect();
         const { id } = await context.params;
         const body = await request.json();
+
+        // Handle notes if it's a string (from UI edit modal)
+        if (typeof body.notes === 'string') {
+            if (body.notes.trim()) {
+                body.notes = [{ note: body.notes.trim() }];
+            } else {
+                body.notes = [];
+            }
+        }
+
         const client = await Client.findByIdAndUpdate(id, body, { new: true });
         if (!client) {
             return NextResponse.json({ error: 'Client not found' }, { status: 404 });

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import {
   Search,
   Upload,
@@ -13,12 +14,15 @@ import {
   Plus,
   X,
   XCircle,
-  Loader2
+  Loader2,
+  Mail,
+  Phone
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { Pagination } from '@/components/ui/Pagination';
+import { TableColumnHeader } from '@/components/ui/TableColumnHeader';
 
 
 interface User {
@@ -38,6 +42,7 @@ const ROLES = ['SuperAdmin', 'Admin', 'Executive Assistant', 'QC', 'Warehouse', 
 const DEPARTMENTS = ['Admin', 'Finance', 'Manufacturing', 'Sales', 'Warehouse', 'Marketing'];
 
 export default function UsersPage() {
+  const router = useRouter();
   const { data: session } = useSession();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -301,99 +306,146 @@ export default function UsersPage() {
           <thead className="sticky top-0 bg-slate-50 z-10 border-b border-slate-100">
             <tr>
               {[
-                { key: 'profileImage', label: '' },
-                { key: 'firstName', label: 'First Name' },
-                { key: 'lastName', label: 'Last Name' },
-                { key: 'role', label: 'Role' },
-                { key: 'department', label: 'Department' },
-                { key: 'email', label: 'Email' },
-                { key: 'phone', label: 'Phone' },
-                { key: 'hourlyRate', label: 'Rate' },
-                { key: 'status', label: 'Status' },
+                { key: 'firstName', label: 'Name', width: 'w-64' },
+                { key: 'role', label: 'Role', width: 'w-48' },
+                { key: 'department', label: 'Department', width: 'w-48' },
+                { key: 'email', label: 'Email', width: 'w-64' },
+                { key: 'phone', label: 'Phone', width: 'w-48' },
+                { key: 'hourlyRate', label: 'Rate', width: 'w-24' },
+                { key: 'status', label: 'Status', width: 'w-32' },
               ].map((col) => (
                 <th
                   key={col.key}
-                  onClick={() => col.key !== 'profileImage' && handleSort(col.key)}
                   className={cn(
-                    "px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors border-r border-slate-100 last:border-0",
-                    col.key === 'profileImage' && "w-10 cursor-default hover:bg-transparent"
+                    "border-r border-slate-100 last:border-0",
+                    col.width
                   )}
                 >
-                  <div className="flex items-center space-x-1.5">
-                    <span>{col.label}</span>
-                    {col.key !== 'profileImage' && <ArrowUpDown className={cn("w-2.5 h-2.5", sortBy === col.key ? "text-black" : "text-slate-200")} />}
-                  </div>
+                  <TableColumnHeader
+                    column={col.key}
+                    title={col.label}
+                    currentSortBy={sortBy}
+                    currentSortOrder={sortOrder}
+                    onSort={(key: string, dir: "asc" | "desc") => {
+                      setSortBy(key);
+                      setSortOrder(dir);
+                    }}
+                    onFilter={(key: string) => {
+                        toast(`Filtering by ${key} coming soon`, { icon: '🔍' });
+                    }}
+                    className={cn(
+                        (col.key === 'hourlyRate') && "justify-end pr-4"
+                    )}
+                  />
                 </th>
               ))}
-              <th className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right">Actions</th>
+              <th className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center w-12 border-l border-slate-100 bg-slate-50">
+                Actions
+              </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-slate-100 text-slate-600">
             {loading ? (
               <tr>
                 <td colSpan={10} className="px-4 py-12 text-center text-xs text-slate-400">Loading users...</td>
               </tr>
             ) : error ? (
               <tr>
-                <td colSpan={10} className="px-4 py-12 text-center">
-                  <div className="flex flex-col items-center justify-center space-y-2">
-                    <XCircle className="w-8 h-8 text-red-500" />
-                    <p className="text-sm font-bold text-red-600 uppercase tracking-wide">Database Connection Error</p>
-                    <p className="text-xs text-slate-500 max-w-md text-center">
-                      Could not connect to MongoDB. Please check your credentials in .env.local or your IP whitelist in MongoDB Atlas. <br />
-                      <span className="font-mono bg-slate-100 px-1 py-0.5 rounded text-red-500 mt-2 block">{error}</span>
-                    </p>
-                  </div>
-                </td>
+                <td colSpan={10} className="px-4 py-12 text-center text-red-500 text-xs font-bold">{error}</td>
               </tr>
             ) : users.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-4 py-12 text-center text-xs text-slate-400 uppercase font-bold tracking-tighter opacity-50">Empty Database</td>
+                <td colSpan={10} className="px-4 py-12 text-center text-xs text-slate-400 uppercase font-bold tracking-tighter opacity-50">No users found</td>
               </tr>
             ) : users.map((user) => (
-              <tr key={user._id} className="hover:bg-slate-50 transition-colors group">
-                <td className="px-4 py-1.5">
-                  {/* Profile Image - keeping somewhat round as standard but simpler */}
-                  <div className="w-6 h-6 bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden">
-                    {user.profileImage ? (
-                      <img src={user.profileImage} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-[10px] font-bold text-slate-400">{user.firstName[0]}{user.lastName[0]}</span>
-                    )}
+              <tr 
+                key={user._id} 
+                className="hover:bg-slate-50 transition-colors group cursor-pointer"
+                onClick={() => router.push(`/profile/${user._id}`)}
+              >
+                {/* 1. Name + Avatar */}
+                <td className="px-4 py-2">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-6 h-6 bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+                      {user.profileImage ? (
+                        <img src={user.profileImage} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-[9px] font-black text-slate-400 uppercase">
+                          {user.firstName?.[0]}{user.lastName?.[0]}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-900 truncate">
+                      {user.firstName} {user.lastName}
+                    </span>
                   </div>
                 </td>
-                <td className="px-4 py-1.5 text-[11px] font-bold text-slate-900 tracking-tight">{user.firstName}</td>
-                <td className="px-4 py-1.5 text-[11px] font-bold text-slate-900 tracking-tight">{user.lastName}</td>
-                <td className="px-4 py-1.5 text-[10px] uppercase font-bold text-slate-500">{user.role}</td>
-                <td className="px-4 py-1.5 text-[10px] uppercase font-bold text-slate-400 tracking-tighter">{user.department}</td>
-                <td className="px-4 py-1.5 text-[11px] text-slate-500 font-medium">{user.email}</td>
-                <td className="px-4 py-1.5 text-[11px] text-slate-500 font-medium">{user.phone || '-'}</td>
-                <td className="px-4 py-1.5 text-[11px] text-slate-900 font-black tracking-tighter">${user.hourlyRate || 0}</td>
-                <td className="px-4 py-1.5">
+
+                {/* 2. Role */}
+                <td className="px-4 py-2">
+                    <span className="text-[10px] uppercase font-bold text-slate-500">
+                        {user.role}
+                    </span>
+                </td>
+
+                {/* 3. Department */}
+                <td className="px-4 py-2">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-tighter">
+                        {user.department === 'SUPERADMIN' ? 'Admin' : user.department}
+                    </span>
+                </td>
+
+                {/* 4. Email */}
+                <td className="px-4 py-2">
+                    <div className="flex items-center text-[11px] font-medium truncate">
+                        <Mail className="w-2.5 h-2.5 mr-1.5 text-slate-300 shrink-0" />
+                        {user.email}
+                    </div>
+                </td>
+
+                {/* 5. Phone */}
+                <td className="px-4 py-2 whitespace-nowrap">
+                    <div className="flex items-center text-[11px] font-medium">
+                        <Phone className="w-2.5 h-2.5 mr-1.5 text-slate-300 shrink-0" />
+                        {user.phone || '-'}
+                    </div>
+                </td>
+
+                {/* 6. Rate */}
+                <td className="px-4 py-2 text-right pr-6">
+                     <span className="text-[11px] text-slate-900 font-bold font-mono tracking-tighter">
+                        ${user.hourlyRate || 0}
+                     </span>
+                </td>
+
+                {/* 7. Status */}
+                <td className="px-4 py-2">
                   <div className="flex items-center space-x-2">
                     <div className={cn(
-                      "w-1.5 h-1.5 rounded-full shadow-sm",
-                      user.status === 'Active' ? "bg-green-500 animate-pulse" : "bg-slate-300"
+                      "w-1.5 h-1.5 rounded-full",
+                      user.status === 'Active' ? "bg-emerald-500 animate-pulse" : "bg-slate-300"
                     )} />
                     <span className={cn(
                       "text-[9px] font-black uppercase tracking-tight",
-                      user.status === 'Active' ? "text-green-600" : "text-slate-400"
+                      user.status === 'Active' ? "text-emerald-600" : "text-slate-400"
                     )}>
                       {user.status}
                     </span>
                   </div>
                 </td>
-                <td className="px-4 py-1.5 text-right">
-                  <div className="flex items-center justify-end space-x-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+
+                {/* 8. Actions */}
+                <td className="px-4 py-2 text-center relative">
+                  <div className="flex items-center justify-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
-                      onClick={() => openModal(user)}
-                      className="p-1 text-slate-400 hover:text-black hover:bg-slate-200 transition-colors"
+                      onClick={(e) => { e.stopPropagation(); openModal(user); }}
+                      className="p-1 text-slate-400 hover:text-black hover:bg-slate-100 transition-colors rounded"
                     >
                       <Edit2 className="w-3 h-3" />
                     </button>
                     <button
-                      onClick={() => handleDelete(user._id)}
-                      className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                      onClick={(e) => { e.stopPropagation(); handleDelete(user._id); }}
+                      className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors rounded"
                     >
                       <Trash2 className="w-3 h-3" />
                     </button>

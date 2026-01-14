@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { Filter, X, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -16,11 +16,20 @@ interface FilterProps {
     className?: string;
 }
 
+export interface MultiSelectFilterRef {
+    open: () => void;
+    close: () => void;
+}
 
-export function MultiSelectFilter({ label, options, selectedValues, onChange, icon: Icon = Filter, className }: FilterProps) {
+export const MultiSelectFilter = forwardRef<MultiSelectFilterRef, FilterProps>(({ label, options, selectedValues, onChange, icon: Icon = Filter, className }, ref) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const containerRef = useRef<HTMLDivElement>(null);
+
+    useImperativeHandle(ref, () => ({
+        open: () => setIsOpen(true),
+        close: () => setIsOpen(false)
+    }));
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -125,4 +134,6 @@ export function MultiSelectFilter({ label, options, selectedValues, onChange, ic
             )}
         </div>
     );
-}
+});
+
+MultiSelectFilter.displayName = "MultiSelectFilter";

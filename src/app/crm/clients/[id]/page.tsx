@@ -24,6 +24,7 @@ import {
     Mail as MailIcon,
     MapPinned,
     Plus,
+    MoreVertical,
     ExternalLink
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -58,6 +59,12 @@ interface ActivityItem {
     createdBy?: string;
     createdByName?: string;
     createdAt: string;
+    metadata?: {
+        phoneNumber?: string;
+        duration?: string;
+        googleVoiceLink?: string;
+        recordingAvailable?: boolean;
+    };
 }
 
 interface OrderItem {
@@ -238,6 +245,63 @@ export default function ClientDashboardPage() {
                     </div>
                 </div>
                 <div className="flex items-center space-x-2">
+                    <button
+                        onClick={async () => {
+                            const toastId = toast.loading('Syncing communications for this client...');
+                            try {
+                                const res = await fetch('/api/crm/sync-google-all'); // Syncing all is easier than specific for now as it handles loop
+                                if (res.ok) {
+                                    toast.success('Sync complete', { id: toastId });
+                                    fetchClientData();
+                                }
+                            } catch (e) { toast.error('Sync failed', { id: toastId }); }
+                        }}
+                        className="flex items-center space-x-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-colors shadow-sm rounded-sm"
+                    >
+                        <Globe className="w-3.5 h-3.5" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest">Sync Comms</span>
+                    </button>
+
+                    <button
+                        onClick={async () => {
+                            const phoneNumber = client.phones?.[0]?.value || '';
+                            const duration = prompt('Call duration (e.g., "2m 30s" or leave blank):') || '';
+                            const notes = prompt('Call notes (optional):') || '';
+                            
+                            if (!phoneNumber) {
+                                toast.error('No phone number found for this client');
+                                return;
+                            }
+                            
+                            try {
+                                const res = await fetch('/api/crm/log-call', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        clientId: client._id,
+                                        phoneNumber,
+                                        duration,
+                                        type: 'Call',
+                                        notes
+                                    })
+                                });
+                                
+                                if (res.ok) {
+                                    toast.success('Call logged successfully!');
+                                    fetchClientData();
+                                } else {
+                                    toast.error('Failed to log call');
+                                }
+                            } catch (err) {
+                                toast.error('Error logging call');
+                            }
+                        }}
+                        className="flex items-center space-x-1.5 px-3 py-1.5 bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-sm rounded-sm"
+                    >
+                        <Phone className="w-3.5 h-3.5" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest">Log Activity</span>
+                    </button>
+
                     {client.contactStatus && (
                         <span className={cn(
                             "text-[9px] font-bold uppercase tracking-widest px-2 py-1",
@@ -331,6 +395,74 @@ export default function ClientDashboardPage() {
                                                 <div className="text-xs font-medium text-slate-700 group-hover:text-blue-600">{p.value}</div>
                                                 <div className="text-[10px] text-slate-400">{p.label || 'Phone'}{p.isWhatsApp && ' • WhatsApp'}</div>
                                             </div>
+                                            <button 
+                                                onClick={async (e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    const width = 450;
+                                                    const height = 650;
+                                                    const left = (window.screen.width / 2) - (width / 2);
+                                                    const top = (window.screen.height / 2) - (height / 2);
+                                                    // Smart phone number normalization for US and international numbers
+                                                    const digitsOnly = p.value.replace(/\D/g, '');
+                                                    let e164;
+                                                    
+                                                    if (p.value.includes('+')) {
+                                                        // Already has country code (e.g., +92), use digits as-is
+                                                        e164 = digitsOnly;
+                                                    } else if (digitsOnly.startsWith('1') && digitsOnly.length === 11) {
+                                                        // US number with country code
+                                                        e164 = digitsOnly;
+                                                    } else if (digitsOnly.length === 10) {
+                                                        // US number without country code
+                                                        e164 = '1' + digitsOnly;
+                                                    } else {
+                                                        // International or other format, use as-is
+                                                        e164 = digitsOnly;
+                                                    }
+                                                    
+                                                    window.open(
+                                                        `https://voice.google.com/u/0/calls?a=nc,%2B${e164}`, 
+                                                        'GoogleVoiceDialer', 
+                                                        `width=${width},height=${height},left=${left},top=${top},menubar=no,status=no,toolbar=no`
+                                                    );
+                                                    
+                                                    // Auto-log the call after a brief delay
+                                                    setTimeout(async () => {
+                                                        const shouldLog = confirm('Log this call to CRM?\n\nClick OK to log, or Cancel if call was not completed.');
+                                                        
+                                                        if (shouldLog) {
+                                                            const duration = prompt('Call duration (optional):');
+                                                            
+                                                            try {
+                                                                const res = await fetch('/api/crm/log-call', {
+                                                                    method: 'POST',
+                                                                    headers: { 'Content-Type': 'application/json' },
+                                                                    body: JSON.stringify({
+                                                                        clientId: client._id,
+                                                                        phoneNumber: p.value,
+                                                                        duration,
+                                                                        type: 'Call'
+                                                                    })
+                                                                });
+                                                                
+                                                                if (res.ok) {
+                                                                    toast.success('Call logged to CRM!');
+                                                                    fetchClientData();
+                                                                } else {
+                                                                    toast.error('Failed to log call');
+                                                                }
+                                                            } catch (err) {
+                                                                toast.error('Error logging call');
+                                                            }
+                                                        }
+                                                    }, 3000); // Wait 3 seconds after opening dialer
+                                                }}
+                                                className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all border border-blue-100"
+                                                title="Open in Google Voice"
+                                            >
+                                                <Phone className="w-3.5 h-3.5" />
+                                            </button>
                                         </a>
                                     ))}
                                 </div>
@@ -499,8 +631,28 @@ export default function ClientDashboardPage() {
                                                 <span className="text-[10px] uppercase font-bold text-slate-600">{act.type}</span>
                                             </div>
                                         </td>
-                                        <td className="px-4 py-3 text-xs text-slate-700 max-w-sm truncate">
-                                            {act.comments || '-'}
+                                        <td className="px-4 py-3 text-xs text-slate-700 max-w-sm">
+                                            <div className="space-y-1">
+                                                <div className="truncate">{act.comments || '-'}</div>
+                                                {act.metadata?.duration && (
+                                                    <div className="text-[10px] text-emerald-600 font-medium">
+                                                        Duration: {act.metadata.duration}
+                                                    </div>
+                                                )}
+                                                {act.metadata?.googleVoiceLink && (
+                                                    <a 
+                                                        href={act.metadata.googleVoiceLink}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-[10px] text-blue-600 hover:text-blue-800 font-medium flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    >
+                                                        <span>View in Google Voice</span>
+                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                                        </svg>
+                                                    </a>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="px-4 py-3 text-[11px] text-slate-500">
                                             {act.createdByName || 'Unknown'}

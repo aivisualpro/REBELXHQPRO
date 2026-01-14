@@ -15,12 +15,13 @@ import {
     Layout,
     Calendar,
     Filter,
+    ListFilter,
     Image as ImageIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
-type Tab = 'general' | 'localization' | 'notifications' | 'security' | 'dataFilter' | 'defaults';
+type Tab = 'general' | 'localization' | 'crm' | 'notifications' | 'security' | 'dataFilter' | 'defaults';
 
 export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState<Tab>('general');
@@ -39,7 +40,8 @@ export default function SettingsPage() {
         pushNotifications: false,
         twoFactor: true,
         filterDataFrom: '', // Global Date Filter
-        missingSkuImage: ''
+        missingSkuImage: '',
+        crmMinRevenueSlab: '20'
     });
 
     React.useEffect(() => {
@@ -83,6 +85,7 @@ export default function SettingsPage() {
     const tabs = [
         { id: 'general', label: 'General', icon: Building },
         { id: 'localization', label: 'Localization', icon: Globe },
+        { id: 'crm', label: 'CRM Configuration', icon: ListFilter },
         { id: 'dataFilter', label: 'Data Filter', icon: Calendar },
         { id: 'notifications', label: 'Notifications', icon: Bell },
         { id: 'security', label: 'Security', icon: Shield },
@@ -307,7 +310,44 @@ export default function SettingsPage() {
                                 </div>
                             </div>
                         )}
+                        {/* CRM CONFIG TAB */}
+                        {activeTab === 'crm' && (
+                            <div className="space-y-6">
+                                <div className="space-y-4">
+                                    <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">CRM Business Logic</h2>
+                                    
+                                    <div className="p-4 border border-emerald-200 bg-emerald-50 rounded-lg flex items-start space-x-4 mb-4">
+                                        <div className="shrink-0 mt-0.5">
+                                            <DollarSign className="w-5 h-5 text-emerald-600" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-sm font-bold text-emerald-800">Revenue Threshold (Slab)</h4>
+                                            <p className="text-xs text-emerald-700 mt-1">
+                                                Records with lifetime revenue BELOW this amount are classified as **Leads**. 
+                                                Records at or ABOVE this amount are classified as **Clients**.
+                                            </p>
+                                        </div>
+                                    </div>
 
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-slate-700">Lead to Client Threshold ($)</label>
+                                        <div className="relative max-w-[200px]">
+                                            <DollarSign className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                                            <input 
+                                                type="number" 
+                                                value={settings.crmMinRevenueSlab}
+                                                onChange={e => setSettings({...settings, crmMinRevenueSlab: e.target.value})}
+                                                className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-black/10"
+                                                min="0"
+                                            />
+                                        </div>
+                                        <p className="text-[10px] text-slate-500">
+                                            Default is $20. Any change will immediately reflect across the CRM dashboard.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                         {/* NOTIFICATIONS TAB */}
                         {activeTab === 'notifications' && (
                              <div className="space-y-6">

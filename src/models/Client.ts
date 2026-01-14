@@ -55,4 +55,15 @@ const ClientSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now }
 });
 
+// Basic indexes for search and filtering
+ClientSchema.index({ name: 1 });
+ClientSchema.index({ salesPerson: 1 });
+ClientSchema.index({ contactStatus: 1 });
+ClientSchema.index({ contactType: 1 });
+ClientSchema.index({ companyType: 1 });
+ClientSchema.index({ 'emails.value': 1 });
+ClientSchema.index({ 'phones.value': 1 });
+ClientSchema.index({ 'addresses.city': 1 });
+ClientSchema.index({ 'addresses.state': 1 });
+
 export default mongoose.models.Client || mongoose.model('Client', ClientSchema);

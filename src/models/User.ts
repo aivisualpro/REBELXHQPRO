@@ -25,6 +25,12 @@ const UserSchema: Schema = new Schema({
     hourlyRate: { type: Number },
     profileImage: { type: String },
     status: { type: String, enum: ['Active', 'Inactive'], default: 'Active', index: true },
+    // Google Integration Fields
+    googleConnected: { type: Boolean, default: false },
+    googleEmail: { type: String },
+    googleRefreshToken: { type: String },
+    googleAccessToken: { type: String },
+    googleTokenExpiry: { type: Number },
 }, {
     timestamps: true,
     _id: false // Disable auto _id generation so we can manually set it

@@ -36,7 +36,7 @@ export function Pagination({
     };
 
     return (
-        <div className="flex items-center justify-between px-4 py-2 border-t border-slate-100 bg-slate-50/50">
+        <div className="flex items-center justify-between p-0 bg-white">
             <div className="text-[10px] text-slate-500 font-medium">
                 Showing <span className="text-black">{totalItems > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}</span> to <span className="text-black">{Math.min(currentPage * itemsPerPage, totalItems)}</span> of <span className="text-black">{totalItems}</span> {itemName}
             </div>

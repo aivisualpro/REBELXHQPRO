@@ -3,6 +3,7 @@ import dbConnect from '@/lib/mongoose';
 import Client from '@/models/Client';
 import SaleOrder from '@/models/SaleOrder';
 import Activity from '@/models/Activity';
+import mongoose from 'mongoose';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,12 +20,15 @@ export async function GET(request: Request) {
 
         const salesPerson = searchParams.get('salesPerson');
         const contactStatus = searchParams.get('contactStatus');
+        const contactStatusNin = searchParams.get('contactStatus_nin');
         const contactType = searchParams.get('contactType');
+        const contactTypeNin = searchParams.get('contactType_nin');
         const companyType = searchParams.get('companyType');
         const city = searchParams.get('city');
         const state = searchParams.get('state');
         const defaultShippingTerms = searchParams.get('defaultShippingTerms');
         const minRevenue = searchParams.get('minRevenue') ? parseFloat(searchParams.get('minRevenue')!) : null;
+        const maxRevenue = searchParams.get('maxRevenue') ? parseFloat(searchParams.get('maxRevenue')!) : null;
 
         let query: any = {};
 
@@ -36,32 +40,30 @@ export async function GET(request: Request) {
             ];
         }
 
-        if (salesPerson) {
-            query.salesPerson = { $in: salesPerson.split(',') };
-        }
+        if (salesPerson) query.salesPerson = { $in: salesPerson.split(',') };
+        
         if (contactStatus) {
             query.contactStatus = { $in: contactStatus.split(',') };
+        } else if (contactStatusNin) {
+            query.contactStatus = { $nin: contactStatusNin.split(',') };
         }
+
         if (contactType) {
             query.contactType = { $in: contactType.split(',') };
+        } else if (contactTypeNin) {
+            query.contactType = { $nin: contactTypeNin.split(',') };
         }
-        if (companyType) {
-            query.companyType = { $in: companyType.split(',') };
-        }
-        if (defaultShippingTerms) {
-            query.defaultShippingTerms = { $in: defaultShippingTerms.split(',') };
-        }
-        if (city) {
-            query['addresses.city'] = { $in: city.split(',').map(c => new RegExp(c, 'i')) };
-        }
-        if (state) {
-            query['addresses.state'] = { $in: state.split(',').map(s => new RegExp(s, 'i')) };
-        }
+        
+        if (companyType) query.companyType = { $in: companyType.split(',') };
+        if (defaultShippingTerms) query.defaultShippingTerms = { $in: defaultShippingTerms.split(',') };
+        
+        if (city) query['addresses.city'] = { $in: city.split(',').map(c => new RegExp(c.trim(), 'i')) };
+        if (state) query['addresses.state'] = { $in: state.split(',').map(s => new RegExp(s.trim(), 'i')) };
 
         let clients: any[] = [];
         let total = 0;
 
-        // Common revenue aggregation logic
+        // Optimized revenue calculation pipeline chunk
         const revenueLookup = [
             {
                 $lookup: {
@@ -72,74 +74,57 @@ export async function GET(request: Request) {
                         { $match: { orderStatus: { $ne: 'Cancelled' } } },
                         {
                             $project: {
-                                orderRevenue: {
+                                amount: {
                                     $subtract: [
-                                        { $add: [{ $sum: { $ifNull: ["$lineItems.total", 0] } }, { $ifNull: ["$shippingCost", 0] }, { $ifNull: ["$tax", 0] }] },
+                                        { $add: [{ $sum: "$lineItems.total" }, { $ifNull: ["$shippingCost", 0] }, { $ifNull: ["$tax", 0] }] },
                                         { $ifNull: ["$discount", 0] }
                                     ]
                                 }
                             }
                         },
-                        { $group: { _id: null, total: { $sum: "$orderRevenue" } } }
+                        { $group: { _id: null, total: { $sum: "$amount" } } }
                     ],
-                    as: 'revenueData'
+                    as: 'rev'
                 }
             },
             {
                 $addFields: {
-                    totalRevenue: { $ifNull: [{ $arrayElemAt: ["$revenueData.total", 0] }, 0] }
+                    totalRevenue: { $ifNull: [{ $arrayElemAt: ["$rev.total", 0] }, 0] }
                 }
             }
         ];
 
-        if (minRevenue !== null || sortBy === 'totalRevenue') {
-            const pipeline: any[] = [
-                { $match: query },
-                ...revenueLookup
-            ];
-
-            if (minRevenue !== null) {
-                pipeline.push({ $match: { totalRevenue: { $gte: minRevenue } } });
+        // Execute main fetch logic
+        if (minRevenue !== null || maxRevenue !== null || sortBy === 'totalRevenue') {
+            const basePipeline = [{ $match: query }, ...revenueLookup];
+            
+            const revenueRange: any = {};
+            if (minRevenue !== null) revenueRange.$gte = minRevenue;
+            if (maxRevenue !== null) revenueRange.$lt = maxRevenue;
+            
+            if (Object.keys(revenueRange).length > 0) {
+                basePipeline.push({ $match: { totalRevenue: revenueRange } });
             }
 
-            // Get total count for pagination
-            const countResult = await Client.aggregate([...pipeline, { $count: 'total' }]);
-            total = countResult[0]?.total || 0;
+            // Using facet to get both count and paginated data in one go might be slower for very large collections,
+            // but for typical CRM sizes it's cleaner. Let's use parallel calls instead for better reliability.
+            const [countRes, dataRes] = await Promise.all([
+                Client.aggregate([...basePipeline, { $count: 'total' }]),
+                Client.aggregate([
+                    ...basePipeline,
+                    { $sort: { [sortBy === 'totalRevenue' ? 'totalRevenue' : sortBy]: sortOrder as any } },
+                    { $skip: (page - 1) * limit },
+                    { $limit: limit },
+                    { $project: { rev: 0 } } // Clean up temp fields
+                ])
+            ]);
 
-            // Apply sort, skip, limit
-            pipeline.push({ $sort: { [sortBy === 'totalRevenue' ? 'totalRevenue' : sortBy]: sortOrder as 1 | -1 } });
-            pipeline.push({ $skip: (page - 1) * limit });
-            pipeline.push({ $limit: limit });
-
-            // Final enrichments
-            pipeline.push(
-                {
-                    $lookup: {
-                        from: 'rxhqusers',
-                        localField: 'salesPerson',
-                        foreignField: '_id',
-                        as: 'salesPersonDoc'
-                    }
-                },
-                { $unwind: { path: '$salesPersonDoc', preserveNullAndEmptyArrays: true } },
-                {
-                    $addFields: {
-                        salesPerson: {
-                            _id: '$salesPersonDoc._id',
-                            firstName: '$salesPersonDoc.firstName',
-                            lastName: '$salesPersonDoc.lastName'
-                        }
-                    }
-                },
-                { $project: { revenueData: 0, salesPersonDoc: 0 } }
-            );
-
-            clients = await Client.aggregate(pipeline);
+            total = countRes[0]?.total || 0;
+            clients = dataRes;
         } else {
             [total, clients] = await Promise.all([
                 Client.countDocuments(query),
                 Client.find(query)
-                    .populate('salesPerson', 'firstName lastName')
                     .sort({ [sortBy]: sortOrder as any })
                     .skip((page - 1) * limit)
                     .limit(limit)
@@ -147,85 +132,82 @@ export async function GET(request: Request) {
             ]);
         }
 
-        // Get client IDs for activity and balance aggregation
-        const clientIds = clients.map((c: any) => c._id);
+        // Enrich with secondary data (Balance, Activities, SalesRep) in parallel
+        if (clients.length > 0) {
+            const clientIds = clients.map(c => c._id);
+            
+            const [balanceAgg, activityAgg] = await Promise.all([
+                SaleOrder.aggregate([
+                    { $match: { clientId: { $in: clientIds }, orderStatus: { $ne: 'Cancelled' } } },
+                    {
+                        $project: {
+                            clientId: 1,
+                            revenue: { $subtract: [{ $add: [{ $sum: "$lineItems.total" }, { $ifNull: ["$shippingCost", 0] }, { $ifNull: ["$tax", 0] }] }, { $ifNull: ["$discount", 0] }] },
+                            paid: { $sum: "$payments.paymentAmount" }
+                        }
+                    },
+                    {
+                        $group: {
+                            _id: '$clientId',
+                            totalRev: { $sum: '$revenue' },
+                            totalPaid: { $sum: '$paid' },
+                            count: { $sum: 1 }
+                        }
+                    }
+                ]),
+                Activity.aggregate([
+                    { $match: { client: { $in: clientIds.map(String) } } },
+                    {
+                        $group: {
+                            _id: '$client',
+                            activityCount: { $sum: 1 },
+                            emailCount: { $sum: { $cond: [{ $eq: ['$type', 'Email'] }, 1, 0] } },
+                            callCount: { $sum: { $cond: [{ $eq: ['$type', 'Call'] }, 1, 0] } },
+                            smsCount: { $sum: { $cond: [{ $eq: ['$type', 'Text'] }, 1, 0] } },
+                            lastActivity: { $max: '$createdAt' }
+                        }
+                    }
+                ])
+            ]);
 
-        // Aggregate balance per client from SaleOrders (since totalRevenue might not have been calculated in the simple flow)
-        const balanceAgg = await SaleOrder.aggregate([
-            { $match: { clientId: { $in: clientIds }, orderStatus: { $ne: 'Cancelled' } } },
-            {
-                $project: {
-                    clientId: 1,
-                    itemsTotal: { $sum: { $ifNull: ["$lineItems.total", 0] } },
-                    shippingCost: { $ifNull: ["$shippingCost", 0] },
-                    tax: { $ifNull: ["$tax", 0] },
-                    discount: { $ifNull: ["$discount", 0] },
-                    paidAmount: { $sum: { $ifNull: ["$payments.paymentAmount", 0] } }
-                }
-            },
-            {
-                $project: {
-                    clientId: 1,
-                    orderRevenue: { $subtract: [{ $add: ["$itemsTotal", "$shippingCost", "$tax"] }, "$discount"] },
-                    paidAmount: 1
-                }
-            },
-            {
-                $group: {
-                    _id: '$clientId',
-                    totalRevenue: { $sum: '$orderRevenue' },
-                    totalPaid: { $sum: '$paidAmount' },
-                    orderCount: { $sum: 1 }
-                }
-            }
-        ]);
+            // Map results for quick lookup
+            const balanceMap = new Map(balanceAgg.map((r: any) => [r._id.toString(), r]));
+            const activityMap = new Map(activityAgg.map((a: any) => [a._id.toString(), a]));
 
-        // Aggregate activities per client
-        const activityAgg = await Activity.aggregate([
-            { $match: { client: { $in: clientIds.map(String) } } },
-            {
-                $group: {
-                    _id: '$client',
-                    activityCount: { $sum: 1 },
-                    lastActivity: { $max: '$createdAt' }
-                }
-            }
-        ]);
+            // Populate sales rep manually (often faster than populate for small arrays)
+            const salesRepIds = [...new Set(clients.map(c => c.salesPerson).filter(id => id && typeof id === 'string'))];
+            const users = await mongoose.model('RXHQUsers').find({ _id: { $in: salesRepIds } }, 'firstName lastName').lean();
+            const userMap = new Map(users.map((u: any) => [u._id.toString(), u]));
 
-        // Create lookup maps
-        const balanceMap = new Map(balanceAgg.map((r: any) => [
-            r._id?.toString(),
-            {
-                revenue: r.totalRevenue || 0,
-                balance: (r.totalRevenue || 0) - (r.totalPaid || 0),
-                orderCount: r.orderCount || 0
-            }
-        ]));
-        const activityMap = new Map(activityAgg.map((a: any) => [a._id?.toString(), { count: a.activityCount || 0, lastActivity: a.lastActivity }]));
+            clients = clients.map(c => {
+                const clientId = c._id.toString();
+                const bal = balanceMap.get(clientId) || { totalRev: 0, totalPaid: 0, count: 0 };
+                const act = activityMap.get(clientId) || { activityCount: 0, emailCount: 0, callCount: 0, smsCount: 0, lastActivity: null };
+                const rep = userMap.get(c.salesPerson?.toString());
 
-        // Enrich clients with stats
-        const enrichedClients = clients.map((c: any) => {
-            const clientId = c._id?.toString();
-            const balData = balanceMap.get(clientId) || { revenue: 0, balance: 0, orderCount: 0 };
-            const activityData = activityMap.get(clientId) || { count: 0, lastActivity: null };
-
-            return {
-                ...c,
-                totalRevenue: c.totalRevenue !== undefined ? c.totalRevenue : balData.revenue,
-                balance: balData.balance,
-                orderCount: balData.orderCount,
-                activityCount: activityData.count,
-                lastActivity: activityData.lastActivity
-            };
-        });
+                return {
+                    ...c,
+                    totalRevenue: c.totalRevenue !== undefined ? c.totalRevenue : bal.totalRev,
+                    balance: (bal.totalRev || 0) - (bal.totalPaid || 0),
+                    orderCount: bal.count,
+                    activityCount: act.activityCount,
+                    emailCount: act.emailCount,
+                    callCount: act.callCount,
+                    smsCount: act.smsCount,
+                    lastActivity: act.lastActivity,
+                    salesPerson: rep || null
+                };
+            });
+        }
 
         return NextResponse.json({
-            clients: enrichedClients,
+            clients,
             total,
             page,
             totalPages: Math.ceil(total / limit)
         });
     } catch (error: any) {
+        console.error("GET Clients Error:", error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
@@ -235,10 +217,25 @@ export async function POST(request: Request) {
         await dbConnect();
         const body = await request.json();
 
+        // 1. Generate a manual string ID if not present (since schema uses String for _id)
+        if (!body._id) {
+            body._id = 'CL-' + Math.random().toString(36).substring(2, 9).toUpperCase();
+        }
+
+        // 2. Format notes if it's a string (from UI)
+        if (typeof body.notes === 'string') {
+            if (body.notes.trim()) {
+                body.notes = [{ note: body.notes.trim() }];
+            } else {
+                body.notes = [];
+            }
+        }
+
         const newClient = await Client.create(body);
 
         return NextResponse.json(newClient);
     } catch (error: any) {
+        console.error('Add client error:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "RebelX CRM - Google Voice Auto Dialer",
+  "version": "1.0.0",
+  "description": "Auto-clicks the Call button in Google Voice when opened from RebelX CRM",
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://voice.google.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://voice.google.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}

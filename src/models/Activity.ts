@@ -12,6 +12,12 @@ const ActivitySchema = new mongoose.Schema({
         required: true
     },
     comments: String,
+    metadata: {
+        phoneNumber: String,
+        duration: String,
+        googleVoiceLink: String,
+        recordingAvailable: Boolean
+    },
     createdBy: {
         type: String,
         ref: 'RXHQUsers'
@@ -21,5 +27,8 @@ const ActivitySchema = new mongoose.Schema({
         default: Date.now
     }
 });
+
+ActivitySchema.index({ client: 1 });
+ActivitySchema.index({ createdAt: -1 });
 
 export default mongoose.models.Activity || mongoose.model('Activity', ActivitySchema);

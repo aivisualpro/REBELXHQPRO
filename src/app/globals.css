@@ -35,6 +35,23 @@ body {
 @layer base {
   * {
     border-color: var(--border);
+    border-radius: 0px !important;
+  }
+
+  table {
+    width: 100%;
+  }
+
+  td {
+    font-family: var(--font-inter), sans-serif;
+    font-size: 10px;
+    font-weight: 500;
+    text-align: left;
+    color: #2E2E2E;
+  }
+
+  th {
+    text-align: left;
   }
 }
 
