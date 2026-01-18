@@ -142,7 +142,7 @@ export default function CRMSettingsPage() {
                     const res = await fetch('/api/clients/import-notes', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ data: results.data })
+                        body: JSON.stringify({ notes: results.data })
                     });
                     
                     if (res.ok) {

@@ -7,7 +7,7 @@ import {
   Plus, Search, ListFilter, HelpCircle, Plug, Settings, 
   Phone, PhoneCall, Hourglass, 
   Eye, Briefcase, Send,
-  PanelLeftClose, PanelLeftOpen
+  PanelLeftClose, PanelLeftOpen, StickyNote
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -213,6 +213,7 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
           {[
             { name: 'Conversations', icon: MessageSquare, href: '/crm/conversations' },
             { name: 'Tasks', icon: ListTodo, href: '/crm/tasks' },
+            { name: 'Notes', icon: StickyNote, href: '/crm/notes' },
             { name: 'Reports', icon: BarChart3, href: '/crm/reports' },
           ].map((item) => (
             <Link key={item.name} href={item.href} className="block" title={isSidebarCollapsed ? item.name : ""}>
