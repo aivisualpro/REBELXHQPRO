@@ -313,19 +313,19 @@ export default function RecipesPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-48px)] bg-white relative">
+    <div className="flex flex-col h-[calc(100vh-48px)] bg-background transition-colors duration-300 relative">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100 bg-slate-50/50">
+      <div className="flex items-center justify-between px-4 h-11 border-b border-border bg-secondary/50 transition-colors">
         <div className="flex items-center space-x-4">
-          <h1 className="text-sm font-bold text-slate-900 uppercase tracking-tighter">Recipes</h1>
+          <h1 className="text-sm font-bold text-foreground uppercase tracking-tighter shrink-0">Recipes</h1>
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
             <input
               type="text"
               placeholder="Search Recipes..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 pr-3 py-1.5 w-64 bg-white border border-slate-200 text-[11px] focus:outline-none focus:ring-1 focus:ring-black/5 transition-all placeholder:text-slate-400 rounded-sm"
+              className="pl-8 pr-3 h-8 w-64 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
             />
           </div>
         </div>
@@ -333,27 +333,27 @@ export default function RecipesPage() {
         <div className="flex items-center space-x-2">
           {/* Filters */}
           <div className="relative">
-            <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+            <Filter className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
             <input
               type="text"
               placeholder="Filter SKU..."
               value={skuFilter}
               onChange={(e) => setSkuFilter(e.target.value)}
-              className="pl-7 pr-3 py-1.5 w-32 bg-white border border-slate-200 text-[11px] focus:outline-none focus:ring-1 focus:ring-black/5 transition-all placeholder:text-slate-400 rounded-sm"
+              className="pl-6 pr-3 h-8 w-32 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
             />
           </div>
           <div className="relative">
-            <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+            <Filter className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
             <input
               type="text"
               placeholder="Filter Creator..."
               value={createdByFilter}
               onChange={(e) => setCreatedByFilter(e.target.value)}
-              className="pl-7 pr-3 py-1.5 w-32 bg-white border border-slate-200 text-[11px] focus:outline-none focus:ring-1 focus:ring-black/5 transition-all placeholder:text-slate-400 rounded-sm"
+              className="pl-6 pr-3 h-8 w-32 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
             />
           </div>
 
-          <div className="w-px h-4 bg-slate-200 mx-1"></div>
+          <div className="w-px h-6 bg-border mx-1"></div>
 
           {/* Actions */}
           {session?.user?.email === 'adeel@grassrootsharvest.com' && (
@@ -362,31 +362,32 @@ export default function RecipesPage() {
               <input type="file" accept=".csv" className="hidden" ref={importLineItemsRef} onChange={(e) => handleImport(e, '/api/recipes/import-lineitems', 'Line Items')} />
               <input type="file" accept=".csv" className="hidden" ref={importStepsRef} onChange={(e) => handleImport(e, '/api/recipes/import-steps', 'Steps')} />
 
-              <button onClick={() => importRecipeRef.current?.click()} className="h-[28px] px-2 border border-slate-200 text-slate-600 hover:text-black hover:bg-slate-50 transition-colors rounded-sm flex items-center space-x-1 bg-white" title="Import Recipes">
+              <button onClick={() => importRecipeRef.current?.click()} className="h-8 px-2 border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors rounded flex items-center space-x-1 bg-card shadow-sm cursor-pointer" title="Import Recipes">
                 <Upload className="w-3 h-3" />
                 <span className="hidden xl:inline text-[10px] font-bold uppercase tracking-wider">Recipes</span>
               </button>
-              <button onClick={() => importLineItemsRef.current?.click()} className="h-[28px] px-2 border border-slate-200 text-slate-600 hover:text-black hover:bg-slate-50 transition-colors rounded-sm flex items-center space-x-1 bg-white" title="Import Line Items">
+              <button onClick={() => importLineItemsRef.current?.click()} className="h-8 px-2 border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors rounded flex items-center space-x-1 bg-card shadow-sm cursor-pointer" title="Import Line Items">
                 <Upload className="w-3 h-3" />
                 <span className="hidden xl:inline text-[10px] font-bold uppercase tracking-wider">Items</span>
               </button>
-              <button onClick={() => importStepsRef.current?.click()} className="h-[28px] px-2 border border-slate-200 text-slate-600 hover:text-black hover:bg-slate-50 transition-colors rounded-sm flex items-center space-x-1 bg-white" title="Import Steps">
+              <button onClick={() => importStepsRef.current?.click()} className="h-8 px-2 border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors rounded flex items-center space-x-1 bg-card shadow-sm cursor-pointer" title="Import Steps">
                 <Upload className="w-3 h-3" />
                 <span className="hidden xl:inline text-[10px] font-bold uppercase tracking-wider">Steps</span>
               </button>
             </>
           )}
 
-          <button onClick={() => openModal('create')} className="h-[28px] px-3 bg-black text-white hover:bg-slate-800 transition-colors rounded-sm flex items-center space-x-1.5 shadow-sm ml-1">
+          <button onClick={() => openModal('create')} className="h-8 px-3 bg-primary text-black hover:opacity-90 transition-all rounded shadow-md flex items-center space-x-1.5 ml-1 cursor-pointer">
             <Plus className="w-3 h-3" />
-            <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-wider">New</span>
+            <span className="hidden sm:inline text-[10px] font-black uppercase tracking-widest">New</span>
           </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto">
-        <table className="w-full border-collapse text-left">
-          <thead className="sticky top-0 bg-slate-50 z-10 border-b border-slate-100">
+      <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
+        <div className="min-w-full px-2 py-2">
+            <table className="w-full text-left border-separate border-spacing-0 relative z-0">
+          <thead className="sticky top-0 bg-secondary/80 z-10 border-b border-border backdrop-blur-md transition-colors">
             <tr>
               {[
                 { key: 'name', label: 'Name' },
@@ -399,20 +400,20 @@ export default function RecipesPage() {
                 <th
                   key={col.key}
                   onClick={() => handleSort(col.key)}
-                  className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors border-r border-slate-100 last:border-0"
+                  className="px-4 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary transition-colors border-r border-border last:border-0"
                 >
-                  <div className="flex items-center space-x-1">
+                  <div className="flex items-center space-x-1.5">
                     <span>{col.label}</span>
-                    <ArrowUpDown className={cn("w-2 h-2", sortBy === col.key ? "text-black" : "text-slate-200")} />
+                    <ArrowUpDown className={cn("w-2.5 h-2.5", sortBy === col.key ? "text-foreground" : "text-muted-foreground")} />
                   </div>
                 </th>
               ))}
-              <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest text-center border-r border-slate-100">Items</th>
-               <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest text-center border-r border-slate-100">Steps</th>
-              <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest text-right">Actions</th>
+              <th className="px-4 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-center border-r border-border min-w-[60px]">Items</th>
+               <th className="px-4 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-center border-r border-border min-w-[60px]">Steps</th>
+              <th className="px-4 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-border bg-background/50">
             {loading ? (
               <tr><td colSpan={9} className="px-4 py-12 text-center text-xs text-slate-400">Loading Recipes...</td></tr>
             ) : recipes.length === 0 ? (
@@ -420,41 +421,41 @@ export default function RecipesPage() {
             ) : recipes.map(recipe => (
               <tr
                 key={recipe._id}
-                className="hover:bg-slate-50 transition-colors group cursor-pointer"
+                className="hover:bg-secondary/40 hover:scale-[1.002] hover:shadow-md transition-all duration-200 group relative z-0 hover:z-10 bg-background cursor-pointer"
                 onClick={() => router.push(`/warehouse/recipes/${recipe._id}`)}
               >
-                <td className="px-2 py-1.5 text-[10px] font-bold text-slate-900 whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]">{recipe.name}</td>
-                <td className="px-2 py-1.5 text-[10px] text-slate-600 truncate max-w-[150px]">{renderSku(recipe.sku)}</td>
-                <td className="px-2 py-1.5 text-[10px] text-slate-600 font-mono">{recipe.qty}</td>
-                <td className="px-2 py-1.5 text-[8px] text-slate-500 uppercase font-bold">{recipe.uom}</td>
-                <td className="px-2 py-1.5 text-[10px] text-slate-500 font-mono">{new Date(recipe.createdAt).toLocaleDateString()}</td>
-                <td className="px-2 py-1.5 text-[10px] text-slate-500">
+                <td className="px-4 py-2 text-[11px] font-bold text-foreground whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px] border-r border-border">{recipe.name}</td>
+                <td className="px-4 py-2 text-[11px] text-foreground truncate max-w-[150px] border-r border-border font-medium">{renderSku(recipe.sku)}</td>
+                <td className="px-4 py-2 text-[11px] text-foreground font-mono border-r border-border">{recipe.qty}</td>
+                <td className="px-4 py-2 text-[10px] text-muted-foreground uppercase font-black tracking-widest border-r border-border">{recipe.uom}</td>
+                <td className="px-4 py-2 text-[11px] text-muted-foreground font-mono border-r border-border">{new Date(recipe.createdAt).toLocaleDateString()}</td>
+                <td className="px-4 py-2 text-[11px] text-foreground border-r border-border">
                   {recipe.createdBy ? `${recipe.createdBy.firstName} ${recipe.createdBy.lastName}` : '-'}
                 </td>
-                <td className="px-2 py-1.5 text-center text-[10px] font-bold text-slate-600 border-l border-slate-50">{recipe.lineItems?.length || 0}</td>
-                <td className="px-2 py-1.5 text-center text-[10px] font-bold text-slate-600 border-l border-slate-50">{recipe.steps?.length || 0}</td>
-                <td className="px-2 py-1.5 text-right" onClick={e => e.stopPropagation()}>
+                <td className="px-4 py-2 text-center text-[11px] font-bold text-muted-foreground border-r border-border">{recipe.lineItems?.length || 0}</td>
+                <td className="px-4 py-2 text-center text-[11px] font-bold text-muted-foreground border-r border-border">{recipe.steps?.length || 0}</td>
+                <td className="px-4 py-2 text-right" onClick={e => e.stopPropagation()}>
                   <div className="flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={() => openModal('edit', recipe)}
-                      className="p-1 hover:bg-slate-200 rounded text-slate-400 hover:text-blue-600 transition-colors"
+                      className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded transition-colors"
                       title="Edit Details"
                     >
-                      <Edit2 className="w-3 h-3" />
+                      <Edit2 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => openModal('copy', recipe)}
-                      className="p-1 hover:bg-slate-200 rounded text-slate-400 hover:text-green-600 transition-colors"
+                      className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded transition-colors"
                       title="Copy Recipe"
                     >
-                      <Copy className="w-3 h-3" />
+                      <Copy className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleDelete(recipe._id)}
-                      className="p-1 hover:bg-slate-200 rounded text-slate-400 hover:text-red-500 transition-colors"
+                      className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
                       title="Delete"
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </td>
@@ -463,47 +464,50 @@ export default function RecipesPage() {
           </tbody>
         </table>
       </div>
+      </div>
 
-      <Pagination
-        currentPage={page}
-        totalPages={totalPages}
-        onPageChange={setPage}
-        totalItems={totalItems}
-        itemsPerPage={20}
-        itemName="Recipes"
-      />
+      <div className="border-t border-border bg-background transition-colors duration-300">
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          totalItems={totalItems}
+          itemsPerPage={20}
+          itemName="Recipes"
+        />
+      </div>
 
       {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md animate-in fade-in zoom-in-95 duration-200">
-            <div className="px-4 py-3 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 rounded-t-lg">
-              <h3 className="font-bold text-sm text-slate-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-background w-full max-w-md animate-in fade-in zoom-in duration-200 border border-border shadow-2xl rounded overflow-hidden">
+            <div className="px-6 py-4 border-b border-border flex justify-between items-center bg-secondary/50">
+              <h3 className="text-sm font-black uppercase tracking-widest text-foreground">
                 {modalMode === 'create' ? 'New Recipe' : modalMode === 'edit' ? 'Edit Recipe' : 'Copy Recipe'}
               </h3>
-              <button onClick={() => setIsModalOpen(false)}><X className="w-4 h-4 text-slate-400 hover:text-black" /></button>
+              <button onClick={() => setIsModalOpen(false)} className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"><X className="w-5 h-5" /></button>
             </div>
-            <div className="p-4 space-y-4">
+            <div className="p-6 space-y-4">
               {selectedRecipe && (modalMode === 'edit' || modalMode === 'copy') && (
-                <div className="bg-slate-50 p-3 rounded-md border border-slate-100 mb-2">
-                  <p className="text-xs text-slate-600">
-                    {modalMode === 'copy' ? 'Copying' : 'Contains'} <span className="font-bold">{selectedRecipe.lineItems?.length || 0}</span> Line Items and <span className="font-bold">{selectedRecipe.steps?.length || 0}</span> Steps.
+                <div className="bg-secondary/40 p-4 rounded border border-border mb-2">
+                  <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
+                    {modalMode === 'copy' ? 'Copying' : 'Contains'} <span className="text-foreground font-black">{selectedRecipe.lineItems?.length || 0}</span> Line Items and <span className="text-foreground font-black">{selectedRecipe.steps?.length || 0}</span> Steps.
                     {modalMode === 'edit' && " (To edit items, click on the recipe row)"}
                   </p>
                 </div>
               )}
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Recipe Name</label>
+                <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">Recipe Name</label>
                 <input
                   type="text"
-                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-sm focus:outline-none focus:border-black/20"
+                  className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 text-foreground font-medium"
                   placeholder="e.g. Chocolate Cake"
                   value={formData.name}
                   onChange={e => setFormData({ ...formData, name: e.target.value })}
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">product SKU {modalMode === 'copy' && '(Select New)'}</label>
+                <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">product SKU {modalMode === 'copy' && '(Select New)'}</label>
                 <SearchableSelect
                   options={skus.map(s => ({ value: s._id, label: s.name }))}
                   value={formData.sku}
@@ -513,18 +517,18 @@ export default function RecipesPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Yield Quantity</label>
+                  <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">Yield Quantity</label>
                   <input
                     type="number"
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-sm focus:outline-none focus:border-black/20"
+                    className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 text-foreground font-mono"
                     value={formData.qty}
                     onChange={e => setFormData({ ...formData, qty: parseFloat(e.target.value) })}
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">UOM</label>
+                  <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">UOM</label>
                   <select
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-sm focus:outline-none focus:border-black/20"
+                    className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 text-foreground uppercase font-black"
                     value={formData.uom}
                     onChange={e => setFormData({ ...formData, uom: e.target.value })}
                   >
@@ -533,11 +537,11 @@ export default function RecipesPage() {
                 </div>
               </div>
             </div>
-            <div className="px-4 py-3 bg-slate-50 border-t border-slate-100 flex justify-end rounded-b-lg">
+            <div className="px-6 py-4 bg-secondary/50 border-t border-border flex justify-end">
               <button
                 onClick={handleSaveRecipe}
                 disabled={saving}
-                className="px-4 py-2 bg-black text-white text-xs font-bold uppercase tracking-wider rounded-sm hover:bg-slate-800 transition-colors disabled:opacity-50"
+                className="px-8 h-10 bg-primary text-black text-[11px] font-black uppercase tracking-widest rounded hover:opacity-90 transition-all shadow-md disabled:opacity-50 cursor-pointer"
               >
                 {saving ? 'Saving...' : (modalMode === 'create' ? 'Create Recipe' : modalMode === 'edit' ? 'Save Changes' : 'Copy Recipe')}
               </button>

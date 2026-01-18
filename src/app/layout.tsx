@@ -23,7 +23,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.variable}`}>
-      <body className="antialiased overflow-hidden bg-white">
+      <body className="antialiased overflow-hidden bg-background tracking-tight">
         <Providers>
           <MainLayout>
             {children}

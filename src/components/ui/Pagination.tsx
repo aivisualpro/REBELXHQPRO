@@ -36,16 +36,16 @@ export function Pagination({
     };
 
     return (
-        <div className="flex items-center justify-between p-0 bg-white">
-            <div className="text-[10px] text-slate-500 font-medium">
-                Showing <span className="text-black">{totalItems > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}</span> to <span className="text-black">{Math.min(currentPage * itemsPerPage, totalItems)}</span> of <span className="text-black">{totalItems}</span> {itemName}
+        <div className="flex items-center justify-between p-0 bg-transparent">
+            <div className="text-[10px] text-muted-foreground font-medium">
+                Showing <span className="text-foreground">{totalItems > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}</span> to <span className="text-foreground">{Math.min(currentPage * itemsPerPage, totalItems)}</span> of <span className="text-foreground">{totalItems}</span> {itemName}
             </div>
 
             <div className="flex items-center space-x-2">
                 <button
                     disabled={currentPage === 1}
                     onClick={() => onPageChange(Math.max(1, currentPage - 1))}
-                    className="p-1.5 text-slate-400 hover:text-black hover:bg-slate-200 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+                    className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-30 disabled:hover:bg-transparent transition-all cursor-pointer"
                 >
                     <ChevronLeft className="w-4 h-4" />
                 </button>
@@ -64,8 +64,8 @@ export function Pagination({
                                 key={p}
                                 onClick={() => onPageChange(p)}
                                 className={cn(
-                                    "w-6 h-6 flex items-center justify-center text-[10px] font-bold rounded-sm transition-colors",
-                                    currentPage === p ? "bg-black text-white" : "text-slate-500 hover:bg-slate-200"
+                                    "w-6 h-6 flex items-center justify-center text-[10px] font-bold rounded-sm transition-colors cursor-pointer",
+                                    currentPage === p ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary"
                                 )}
                             >
                                 {p}
@@ -74,8 +74,8 @@ export function Pagination({
                     })()}
                 </div>
 
-                <div className="flex items-center space-x-1 ml-2 border-l border-slate-200 pl-2">
-                    <span className="text-[10px] text-slate-400">Go to</span>
+                <div className="flex items-center space-x-1 ml-2 border-l border-border pl-2">
+                    <span className="text-[10px] text-muted-foreground">Go to</span>
                     <input
                         type="number"
                         min={1}
@@ -83,14 +83,14 @@ export function Pagination({
                         value={goToPage}
                         onChange={(e) => setGoToPage(e.target.value)}
                         onKeyDown={handleGoToPage}
-                        className="w-8 h-6 text-center text-[10px] bg-white border border-slate-200 focus:outline-none focus:border-black transition-colors"
+                        className="w-8 h-6 text-center text-[10px] bg-background border border-border text-foreground focus:outline-none focus:border-primary transition-colors"
                     />
                 </div>
 
                 <button
                     disabled={currentPage === totalPages}
                     onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
-                    className="p-1.5 text-slate-400 hover:text-black hover:bg-slate-200 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+                    className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-30 disabled:hover:bg-transparent transition-all cursor-pointer"
                 >
                     <ChevronRight className="w-4 h-4" />
                 </button>

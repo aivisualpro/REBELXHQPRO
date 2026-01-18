@@ -256,7 +256,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                     <h2 className="text-[11px] font-black uppercase tracking-widest text-slate-900">
                         {initialData?._id ? `Edit ${formData.contactType}` : `Add New ${formData.contactType}`}
                     </h2>
-                    <button onClick={onClose} className="text-slate-400 hover:text-black transition-colors">
+                    <button onClick={onClose} className="text-slate-400 hover:text-black transition-colors cursor-pointer">
                         <X className="w-4 h-4" />
                     </button>
                 </div>
@@ -439,7 +439,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                                 <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center">
                                     <Mail className="w-3 h-3 mr-2 text-blue-500" /> Emails
                                 </h3>
-                                <button type="button" onClick={() => addField('emails')} className="text-blue-600 hover:text-blue-700">
+                                <button type="button" onClick={() => addField('emails')} className="text-blue-600 hover:text-blue-700 cursor-pointer">
                                     <Plus className="w-3.5 h-3.5" />
                                 </button>
                             </div>
@@ -456,7 +456,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                                         }}
                                         className="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 text-xs focus:outline-none focus:border-black transition-colors"
                                     />
-                                    <button type="button" onClick={() => removeField('emails', idx)} className="p-1.5 text-slate-300 hover:text-red-500 transition-colors">
+                                    <button type="button" onClick={() => removeField('emails', idx)} className="p-1.5 text-slate-300 hover:text-red-500 transition-colors cursor-pointer">
                                         <Trash2 className="w-3.5 h-3.5" />
                                     </button>
                                 </div>
@@ -469,7 +469,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                                 <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center">
                                     <Phone className="w-3 h-3 mr-2 text-emerald-500" /> Phones
                                 </h3>
-                                <button type="button" onClick={() => addField('phones')} className="text-blue-600 hover:text-blue-700">
+                                <button type="button" onClick={() => addField('phones')} className="text-blue-600 hover:text-blue-700 cursor-pointer">
                                     <Plus className="w-3.5 h-3.5" />
                                 </button>
                             </div>
@@ -487,7 +487,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                                         }}
                                         className="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 text-xs focus:outline-none focus:border-black transition-colors"
                                     />
-                                    <button type="button" onClick={() => removeField('phones', idx)} className="p-1.5 text-slate-300 hover:text-red-500 transition-colors">
+                                    <button type="button" onClick={() => removeField('phones', idx)} className="p-1.5 text-slate-300 hover:text-red-500 transition-colors cursor-pointer">
                                         <Trash2 className="w-3.5 h-3.5" />
                                     </button>
                                 </div>
@@ -503,7 +503,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                                 <MapPin className="w-4 h-4" />
                                 <h3 className="text-[10px] font-black uppercase tracking-[0.2em]">Geographic Locations</h3>
                             </div>
-                            <button type="button" onClick={() => addField('addresses')} className="flex items-center space-x-1.5 text-[9px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-700">
+                            <button type="button" onClick={() => addField('addresses')} className="flex items-center space-x-1.5 text-[9px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-700 cursor-pointer">
                                 <Plus className="w-3 h-3" />
                                 <span>Add Location</span>
                             </button>
@@ -514,7 +514,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                                     <button 
                                         type="button" 
                                         onClick={() => removeField('addresses', idx)} 
-                                        className="absolute top-2 right-2 p-1.5 text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                                        className="absolute top-2 right-2 p-1.5 text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
                                     >
                                         <Trash2 className="w-3.5 h-3.5" />
                                     </button>
@@ -726,7 +726,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                     <button
                         type="button"
                         onClick={onClose}
-                        className="px-6 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-900 transition-colors"
+                        className="px-6 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-900 transition-colors cursor-pointer"
                     >
                         Discard Changes
                     </button>
@@ -740,7 +740,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                                 const form = document.getElementById('client-modal-form') as HTMLFormElement;
                                 if (form) form.requestSubmit();
                             }}
-                            className="px-10 py-2.5 bg-black text-white text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-slate-800 transition-all disabled:opacity-50 flex items-center space-x-2 shadow-lg"
+                            className="px-10 py-2.5 bg-[#FFEF5F] text-black text-[10px] font-bold uppercase tracking-[0.2em] hover:opacity-90 transition-all disabled:opacity-50 flex items-center space-x-2 shadow-lg cursor-pointer"
                         >
                             {isSubmitting ? (
                                 <>

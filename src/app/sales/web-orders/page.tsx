@@ -204,43 +204,36 @@ export default function WebOrdersPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-48px)] bg-white">
+    <div className="flex flex-col h-[calc(100vh-48px)] bg-background transition-colors duration-300">
       {syncStatus.isSyncing && (
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2 flex items-center justify-between text-white animate-in slide-in-from-top duration-300 shadow-lg">
+        <div className="bg-primary px-4 py-2 flex items-center justify-between text-primary-foreground animate-in slide-in-from-top duration-300 shadow-lg">
           <div className="flex items-center space-x-4 flex-1 min-w-0">
             <Loader2 className="w-4 h-4 animate-spin shrink-0" />
             
             {/* Fetching Phase Display */}
             {syncStatus.fetchingPhase ? (
               <>
-                <div className="bg-amber-500/80 px-2.5 py-0.5 rounded-full shrink-0">
+                <div className="bg-black/20 px-2.5 py-0.5 rounded-full shrink-0">
                   <span className="text-[10px] font-black uppercase tracking-wider">Fetching</span>
                 </div>
-                <div className="h-4 w-px bg-blue-400/50 shrink-0" />
+                <div className="h-4 w-px bg-primary-foreground/30 shrink-0" />
                 <div className="flex items-center space-x-3 min-w-0">
-                  <span className="px-2 py-0.5 bg-white/20 rounded text-[10px] font-black uppercase tracking-wider shrink-0">
+                  <span className="px-2 py-0.5 bg-black/10 rounded text-[10px] font-black uppercase tracking-wider shrink-0">
                     {syncStatus.fetchingSite}
                   </span>
-                  <span className="text-[10px] font-bold shrink-0">
+                  <span className="text-[10px] font-bold shrink-0 text-primary-foreground/80">
                     Page {syncStatus.fetchingPage}
                   </span>
-                  <div className="h-4 w-px bg-blue-400/50 shrink-0" />
-                  <span className="text-[11px] font-black font-mono bg-emerald-500/80 px-2 py-0.5 rounded shrink-0">
+                  <div className="h-4 w-px bg-primary-foreground/30 shrink-0" />
+                  <span className="text-[11px] font-black font-mono bg-black/20 px-2 py-0.5 rounded shrink-0">
                     {syncStatus.fetchingFound} orders found
                   </span>
-                </div>
-                <div className="flex-1 flex items-center justify-center">
-                  <div className="flex space-x-1">
-                    <div className="w-1.5 h-1.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <div className="w-1.5 h-1.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <div className="w-1.5 h-1.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                  </div>
                 </div>
               </>
             ) : (
               <>
                 {/* Syncing Phase - Progress percentage */}
-                <div className="bg-blue-500/50 px-2 py-0.5 rounded-full shrink-0">
+                <div className="bg-black/20 px-2 py-0.5 rounded-full shrink-0">
                   <span className="text-[11px] font-black font-mono">
                     {syncStatus.total > 0 ? `${Math.round((syncStatus.progress / syncStatus.total) * 100)}%` : '0%'}
                   </span>
@@ -249,43 +242,26 @@ export default function WebOrdersPage() {
                 {/* Current order details */}
                 {syncStatus.currentOrderNumber ? (
                   <>
-                    <div className="h-4 w-px bg-blue-400/50 shrink-0" />
+                    <div className="h-4 w-px bg-primary-foreground/30 shrink-0" />
                     <div className="flex items-center space-x-3 min-w-0">
                       <span className="text-[10px] font-black uppercase tracking-wider shrink-0">Order #{syncStatus.currentOrderNumber}</span>
-                      <span className="text-[9px] text-blue-200 font-medium truncate max-w-[100px]">{syncStatus.currentOrderCustomer}</span>
-                      <span className="text-[9px] text-blue-300 font-mono shrink-0">
-                        {syncStatus.currentOrderDate ? new Date(syncStatus.currentOrderDate).toLocaleDateString() : ''}
-                      </span>
-                      <span className="text-[10px] font-black font-mono bg-white/20 px-1.5 py-0.5 rounded shrink-0">
+                      <span className="text-[9px] text-primary-foreground/70 font-medium truncate max-w-[100px]">{syncStatus.currentOrderCustomer}</span>
+                      <span className="text-[10px] font-black font-mono bg-black/10 px-1.5 py-0.5 rounded shrink-0">
                         ${syncStatus.currentOrderTotal?.toFixed(2)}
                       </span>
                     </div>
-                    <div className="h-4 w-px bg-blue-400/50 shrink-0" />
-                    <span className="px-2 py-0.5 bg-blue-500/40 rounded text-[8px] font-black uppercase tracking-widest shrink-0">
-                      {syncStatus.currentSite}
-                    </span>
                   </>
                 ) : (
-                  <span className="text-[10px] font-bold text-blue-100 truncate">
+                  <span className="text-[10px] font-bold text-primary-foreground/80 truncate">
                     {syncStatus.currentStep || syncStatus.debug?.lastLog || 'Initializing...'}
                   </span>
-                )}
-                
-                {/* Progress bar */}
-                {syncStatus.total > 0 && (
-                  <div className="flex-1 max-w-[200px] bg-blue-400/30 h-1.5 rounded-full overflow-hidden">
-                    <div 
-                      className="bg-white h-full transition-all duration-300 rounded-full" 
-                      style={{ width: `${(syncStatus.progress / syncStatus.total) * 100}%` }}
-                    />
-                  </div>
                 )}
               </>
             )}
           </div>
           
           {/* Counter */}
-          <div className="text-[10px] font-mono font-bold bg-blue-500/30 px-2 py-1 rounded shrink-0">
+          <div className="text-[10px] font-mono font-bold bg-black/10 px-2 py-1 rounded shrink-0 border border-black/5">
             {syncStatus.fetchingPhase 
               ? `Scanning ${syncStatus.fetchingSite}...`
               : `${syncStatus.progress} / ${syncStatus.total}`
@@ -295,10 +271,10 @@ export default function WebOrdersPage() {
       )}
 
       {/* Action Bar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100 bg-slate-50/50">
+      <div className="flex items-center justify-between px-4 h-11 border-b border-border bg-secondary/50 transition-colors">
         <div className="flex items-center space-x-4">
-          <h1 className="text-sm font-bold text-slate-900 uppercase tracking-tighter flex items-center space-x-2">
-            <ShoppingBag className="w-4 h-4" />
+          <h1 className="text-sm font-bold text-foreground uppercase tracking-tighter flex items-center space-x-2">
+            <ShoppingBag className="w-4 h-4 text-primary" />
             <span>Web Orders</span>
           </h1>
           <div className="relative">
@@ -308,7 +284,7 @@ export default function WebOrdersPage() {
               placeholder="Search Order#, Customer, Email..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 pr-3 py-1.5 w-72 bg-white border border-slate-200 text-[11px] focus:outline-none focus:ring-1 focus:ring-black/5 transition-all placeholder:text-slate-400"
+              className="pl-8 pr-3 h-8 w-72 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
             />
           </div>
         </div>
@@ -326,7 +302,7 @@ export default function WebOrdersPage() {
             ]}
             selectedValues={selectedWebsites}
             onChange={setSelectedWebsites}
-            className="h-[30px]"
+            className="h-8"
           />
 
           <MultiSelectFilter
@@ -343,11 +319,11 @@ export default function WebOrdersPage() {
             ]}
             selectedValues={selectedStatuses}
             onChange={setSelectedStatuses}
-            className="h-[30px]"
+            className="h-8"
           />
 
-          <div className="flex items-center space-x-1 border border-slate-200 bg-white px-3 h-[30px] rounded-sm">
-            <Calendar className="w-3 h-3 text-slate-400" />
+          <div className="flex items-center space-x-1 border border-border bg-card px-3 h-8 rounded">
+            <Calendar className="w-3 h-3 text-muted-foreground" />
             <input
               type="date"
               className="text-[10px] outline-none max-w-[90px] bg-transparent"
@@ -363,12 +339,12 @@ export default function WebOrdersPage() {
             />
           </div>
 
-          <div className="w-px h-6 bg-slate-200 mx-2" />
+          <div className="w-px h-6 bg-border mx-2" />
 
           <button
             onClick={() => handleSync(false)}
             disabled={syncStatus.isSyncing}
-            className="h-[30px] px-3 bg-black text-white hover:bg-slate-800 transition-colors shadow-sm flex items-center space-x-2 rounded-sm disabled:opacity-50"
+            className="h-8 px-3 bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-md flex items-center space-x-2 rounded cursor-pointer disabled:opacity-50"
             title="Incremental Sync - Only changed orders"
           >
             {syncStatus.isSyncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
@@ -378,19 +354,20 @@ export default function WebOrdersPage() {
           <button
             onClick={() => handleSync(true)}
             disabled={syncStatus.isSyncing}
-            className="h-[30px] px-3 bg-amber-500 text-white hover:bg-amber-600 transition-colors shadow-sm flex items-center space-x-2 rounded-sm disabled:opacity-50"
+            className="h-8 px-3 bg-card border border-border text-foreground hover:bg-secondary transition-all shadow-sm flex items-center space-x-2 rounded cursor-pointer disabled:opacity-50"
             title="Full Sync - All orders from scratch"
           >
-            <Globe className="w-3.5 h-3.5" />
+            <Globe className="w-3.5 h-3.5 text-muted-foreground" />
             <span className="text-[10px] font-bold uppercase tracking-wider">Full</span>
           </button>
         </div>
       </div>
 
       {/* Table */}
-      <div className="flex-1 overflow-auto">
-        <table className="w-full border-collapse text-left">
-          <thead className="sticky top-0 bg-slate-50 z-10 border-b border-slate-100">
+      <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
+        <div className="min-w-full px-2 py-2">
+            <table className="w-full text-left border-separate border-spacing-0 relative z-0">
+          <thead className="sticky top-0 bg-secondary/80 z-10 border-b border-border backdrop-blur-md transition-colors">
             <tr>
               {[
                 { key: 'number', label: 'Order #' },
@@ -403,7 +380,7 @@ export default function WebOrdersPage() {
               ].map(col => (
                 <th
                   key={col.key}
-                  className="border-r border-slate-100 last:border-0"
+                  className="border-r border-border last:border-0"
                 >
                   <TableColumnHeader
                     column={col}
@@ -414,14 +391,18 @@ export default function WebOrdersPage() {
                       setSortBy(key);
                       setSortOrder(dir);
                     }}
+                    onFilter={(key) => {
+                      toast(`Filtering by ${col.label} implementation pending`);
+                    }}
+                    className="text-muted-foreground"
                   />
                 </th>
               ))}
-              <th className="font-bold text-slate-500 uppercase tracking-widest text-center">Items</th>
-              <th className="font-bold text-slate-500 uppercase tracking-widest">Location</th>
+              <th className="px-4 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-center border-r border-border">Items</th>
+               <th className="px-4 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Location</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-50">
+          <tbody className="divide-y divide-border bg-background/50">
             {loading ? (
               <tr><td colSpan={9} className="px-3 py-12 text-center text-[10px] text-slate-400">Loading Web Orders...</td></tr>
             ) : orders.length === 0 ? (
@@ -430,67 +411,67 @@ export default function WebOrdersPage() {
               <tr
                 key={order._id}
                 onClick={() => router.push(`/sales/web-orders/${order._id}`)}
-                className="hover:bg-slate-50 transition-colors group cursor-pointer"
+                className="hover:bg-secondary/40 hover:scale-[1.002] hover:shadow-md transition-all duration-200 group relative z-0 hover:z-10 bg-background"
               >
-                <td className="">
+                <td className="px-3 py-1.5 border-r border-border">
                   <div className="flex flex-col">
-                    <span className="font-black text-slate-900 font-mono tracking-tighter">#{order.number}</span>
-                    <span className="font-mono">WC-{order.webId}</span>
+                    <span className="font-black text-foreground font-mono tracking-tighter">#{order.number}</span>
+                    <span className="font-mono text-[9px] text-muted-foreground">WC-{order.webId}</span>
                   </div>
                 </td>
-                <td className="">
+                <td className="px-3 py-1.5 border-r border-border text-center">
                   <span className={cn(
-                    "px-2 py-0.5 rounded-full text-[8px] font-black text-white uppercase tracking-widest shadow-sm",
+                    "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest shadow-sm border border-black/5",
                     getWebsiteColor(order.website)
                   )}>
                     {order.website}
                   </span>
                 </td>
-                <td className="">
+                <td className="px-3 py-1.5 border-r border-border">
                   <div className="flex items-center space-x-2">
-                    <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                      <User className="w-3 h-3 text-slate-400" />
+                    <div className="w-5 h-5 rounded bg-secondary flex items-center justify-center shrink-0">
+                      <User className="w-2.5 h-2.5 text-muted-foreground" />
                     </div>
-                    <div className="flex flex-col">
-                      <span className="font-bold text-slate-700">{order.billing?.firstName} {order.billing?.lastName}</span>
-                      <span className="truncate max-w-[120px]">{order.billing?.email}</span>
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-bold text-foreground text-[10px] truncate">{order.billing?.firstName} {order.billing?.lastName}</span>
+                      <span className="truncate max-w-[120px] text-[9px] text-muted-foreground">{order.billing?.email}</span>
                     </div>
                   </div>
                 </td>
-                <td className="">
+                <td className="px-3 py-1.5 border-r border-border text-center">
                   <span className={cn(
-                    "px-2 py-0.5 rounded-[3px] text-[8px] font-black uppercase tracking-wider border",
-                    getStatusColor(order.status)
+                    "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border",
+                    getStatusColor(order.status).replace('bg-', 'bg-').replace('text-', 'text-')
                   )}>
                     {order.status}
                   </span>
                 </td>
-                <td className="font-mono">
+                <td className="px-3 py-1.5 border-r border-border font-mono text-[10px] text-muted-foreground">
                   {order.dateCreated ? new Date(order.dateCreated).toLocaleDateString() : '-'}
                 </td>
-                <td className="">
+                <td className="px-3 py-1.5 border-r border-border">
                   <div className="flex flex-col">
-                    <span className="font-black text-slate-900 font-mono">${order.total?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    <span className="font-black text-foreground font-mono text-[10px]">${order.total?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                     {order.shippingTotal > 0 && (
-                      <span className="flex items-center space-x-0.5">
+                      <span className="flex items-center space-x-0.5 text-[9px] text-muted-foreground">
                         <Truck className="w-2.5 h-2.5" />
                         <span>+${order.shippingTotal?.toFixed(2)}</span>
                       </span>
                     )}
                   </div>
                 </td>
-                <td className="">
-                  <div className="flex items-center space-x-1.5">
-                    <CreditCard className="w-3 h-3 text-slate-300" />
+                <td className="px-3 py-1.5 border-r border-border">
+                  <div className="flex items-center space-x-1.5 text-[10px] text-muted-foreground">
+                    <CreditCard className="w-3 h-3 opacity-50" />
                     <span className="truncate max-w-[80px]">{order.paymentMethodTitle || '-'}</span>
                   </div>
                 </td>
-                <td className="px-3 py-2 text-center">
-                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-100 text-[9px] font-black text-slate-600">
+                <td className="px-3 py-1.5 border-r border-border text-center">
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-secondary text-[9px] font-black text-foreground/70">
                     {order.lineItems?.length || 0}
                   </span>
                 </td>
-                <td className="px-3 py-2 text-[9px] text-slate-500 truncate max-w-[100px]">
+                <td className="px-3 py-1.5 text-[9px] text-muted-foreground truncate max-w-[100px]">
                   {order.billing?.city}, {order.billing?.state}
                 </td>
               </tr>
@@ -498,15 +479,18 @@ export default function WebOrdersPage() {
           </tbody>
         </table>
       </div>
+    </div>
 
-      <Pagination
-        currentPage={page}
-        totalPages={totalPages}
-        onPageChange={setPage}
-        totalItems={totalOrders}
-        itemsPerPage={20}
-        itemName="Orders"
-      />
+      <div className="border-t border-border bg-background transition-colors duration-300">
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          totalItems={totalOrders}
+          itemsPerPage={20}
+          itemName="Orders"
+        />
+      </div>
     </div>
   );
 }

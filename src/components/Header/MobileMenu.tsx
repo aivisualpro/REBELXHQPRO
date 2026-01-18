@@ -5,7 +5,7 @@ import { Menu, X, ChevronRight } from 'lucide-react';
 import { MENU_ITEMS } from '@/constants/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
-import { useSession } from 'next-auth/react';
+import { useSession, signOut } from 'next-auth/react';
 
 export const MobileMenu = () => {
     const { data: session } = useSession();
@@ -23,7 +23,7 @@ export const MobileMenu = () => {
         <div className="lg:hidden flex items-center">
             <button
                 onClick={() => setIsOpen(true)}
-                className="p-2 text-gray-400 hover:text-white transition-colors"
+                className="p-2 text-muted hover:text-foreground transition-colors"
             >
                 <Menu className="w-6 h-6" />
             </button>
@@ -46,13 +46,13 @@ export const MobileMenu = () => {
                             animate={{ x: 0 }}
                             exit={{ x: '100%' }}
                             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                            className="fixed top-0 right-0 w-80 h-full bg-white shadow-2xl z-50 flex flex-col"
+                            className="fixed top-0 right-0 w-80 h-full bg-card shadow-2xl z-50 flex flex-col"
                         >
-                            <div className="flex items-center justify-between p-6 border-bottom">
-                                <span className="font-bold text-lg text-primary">Menu</span>
+                            <div className="flex items-center justify-between p-6 border-b border-border">
+                                <span className="font-bold text-lg text-foreground">Menu</span>
                                 <button
                                     onClick={() => setIsOpen(false)}
-                                    className="p-2 -mr-2 text-muted hover:text-primary"
+                                    className="p-2 -mr-2 text-muted hover:text-foreground"
                                 >
                                     <X className="w-5 h-5" />
                                 </button>
@@ -63,9 +63,9 @@ export const MobileMenu = () => {
                                     <div key={menu.title} className="px-4">
                                         <button
                                             onClick={() => setExpandedMenu(expandedMenu === menu.title ? null : menu.title)}
-                                            className="w-full flex items-center justify-between p-4 rounded-xl hover:bg-slate-50 transition-colors group"
+                                            className="w-full flex items-center justify-between p-4 rounded-xl hover:bg-secondary transition-colors group"
                                         >
-                                            <div className="flex items-center space-x-3 text-muted group-hover:text-primary">
+                                            <div className="flex items-center space-x-3 text-muted group-hover:text-foreground">
                                                 <menu.icon className="w-5 h-5" />
                                                 <span className="font-medium">{menu.title}</span>
                                             </div>
@@ -85,7 +85,7 @@ export const MobileMenu = () => {
                                                             key={item.href}
                                                             href={item.href}
                                                             onClick={() => setIsOpen(false)}
-                                                            className="block p-3 text-sm text-muted hover:text-primary transition-colors"
+                                                            className="block p-3 text-sm text-muted hover:text-foreground transition-colors"
                                                         >
                                                             {item.title}
                                                         </Link>
@@ -98,7 +98,10 @@ export const MobileMenu = () => {
                             </div>
 
                             <div className="p-6 border-t border-border">
-                                <button className="w-full bg-primary text-white p-4 rounded-xl font-medium shadow-lg shadow-slate-200">
+                                <button 
+                                    onClick={() => signOut({ callbackUrl: '/login' })}
+                                    className="w-full bg-[#FFEF5F] text-black p-4 rounded-xl font-black uppercase tracking-widest shadow-lg shadow-slate-200 hover:opacity-90 transition-all"
+                                >
                                     Logout
                                 </button>
                             </div>

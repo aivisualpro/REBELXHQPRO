@@ -149,20 +149,22 @@ export function GmailEmailView({ initialLabel }: GmailEmailViewProps) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full bg-background transition-colors duration-300">
         {/* Gmail Header Controls */}
-        <div className="flex items-center justify-between px-6 py-1.5 border-b border-slate-100 bg-[#FAFAFA]">
-            <div className="flex-1" /> {/* Spacer */}
+        <div className="flex items-center justify-between px-6 h-11 border-b border-border bg-secondary/50 transition-colors">
+            <h1 className="text-sm font-bold text-foreground uppercase tracking-tighter shrink-0">
+                {initialLabel === 'INBOX' ? unreadCount > 0 ? `Inbox (${unreadCount})` : 'Inbox' : 'Sent'}
+            </h1>
             <div className="flex items-center space-x-6">
                 <button 
                     onClick={() => setIsComposeOpen(true)}
-                    className="flex items-center space-x-2 px-3 py-1.5 bg-black text-white text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all rounded-sm"
+                    className="flex items-center space-x-2 px-3 h-8 bg-primary text-black text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-all rounded shadow-sm cursor-pointer"
                 >
                     <Plus className="w-3 h-3" />
                     <span>Compose</span>
                 </button>
                 
-                <div className="flex items-center space-x-4 text-slate-400">
+                <div className="flex items-center space-x-4 text-muted-foreground">
                     <span className="text-[10px] font-bold">
                         {emails.length > 0 ? `${(currentPage - 1) * emailsPerPage + 1}-${Math.min(currentPage * emailsPerPage, totalEstimated)} of ${totalEstimated}` : '0-0 of 0'}
                     </span>
@@ -174,7 +176,7 @@ export function GmailEmailView({ initialLabel }: GmailEmailViewProps) {
                                 setCurrentPage(newPage);
                                 fetchEmails(newPage);
                             }}
-                            className="p-1 hover:text-black transition-colors disabled:opacity-30"
+                            className="p-1 hover:text-foreground transition-colors disabled:opacity-30 cursor-pointer"
                         >
                             <ChevronLeft className="w-4 h-4" />
                         </button>
@@ -185,7 +187,7 @@ export function GmailEmailView({ initialLabel }: GmailEmailViewProps) {
                                 setCurrentPage(newPage);
                                 fetchEmails(newPage);
                             }}
-                            className="p-1 hover:text-black transition-colors disabled:opacity-30"
+                            className="p-1 hover:text-foreground transition-colors disabled:opacity-30 cursor-pointer"
                         >
                             <ChevronRight className="w-4 h-4" />
                         </button>
@@ -195,24 +197,24 @@ export function GmailEmailView({ initialLabel }: GmailEmailViewProps) {
         </div>
 
         {/* Gmail List */}
-        <div className="flex-1 overflow-y-auto divide-y divide-slate-50 relative min-h-[400px]">
+        <div className="flex-1 overflow-y-auto divide-y divide-border/50 relative min-h-[400px]">
             {loading && (
-                <div className="absolute inset-0 bg-white/50 z-10 flex items-center justify-center backdrop-blur-[1px]">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black"></div>
+                <div className="absolute inset-0 bg-background/50 z-10 flex items-center justify-center backdrop-blur-[1px]">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
                 </div>
             )}
             
             {emails.map((email: any) => (
-                <div key={email.id} className="border-b border-slate-50 last:border-0">
-                    <div 
+                <div key={email.id} className="border-b border-border/30 last:border-0">
+                        <div 
                         onClick={() => {
                             setExpandedEmailId(expandedEmailId === email.id ? null : email.id);
                             if (!email.isRead && initialLabel === 'INBOX') toggleReadStatus(email.id, false);
                         }}
                         className={cn(
-                            "flex items-center px-4 hover:shadow-sm transition-all group cursor-pointer gap-3",
-                            email.isRead ? "bg-white" : "bg-blue-50/10",
-                            expandedEmailId === email.id && "bg-blue-50/30"
+                            "flex items-center px-4 h-12 hover:bg-secondary/40 transition-all group cursor-pointer gap-3",
+                            email.isRead ? "bg-background" : "bg-primary/5",
+                            expandedEmailId === email.id && "bg-secondary"
                         )}
                     >
                         <div className="shrink-0 text-slate-300 hover:text-slate-600 cursor-pointer p-1">
@@ -220,19 +222,19 @@ export function GmailEmailView({ initialLabel }: GmailEmailViewProps) {
                         </div>
                         <div className={cn(
                             "w-48 shrink-0 text-[14px] truncate ml-1",
-                            email.isRead ? "font-normal text-slate-700" : "font-black text-slate-900"
+                            email.isRead ? "font-normal text-muted" : "font-black text-foreground"
                         )}>
                             {initialLabel === 'INBOX' ? email.sender : `To: ${email.recipient || 'Unknown'}`}
                         </div>
                         <div className="flex-1 min-w-0 flex items-baseline text-[14px] truncate pr-4">
                              <span className={cn(
                                 "truncate shrink-0 max-w-[400px]", 
-                                email.isRead ? "font-normal text-slate-700" : "font-black text-slate-900"
+                                email.isRead ? "font-normal text-muted" : "font-black text-foreground"
                              )}>
                                 {email.subject}
                              </span>
-                             <span className="text-slate-400 mx-1 shrink-0">-</span>
-                             <span className="text-slate-500 truncate font-normal">
+                             <span className="text-muted/50 mx-1 shrink-0">-</span>
+                             <span className="text-muted/70 truncate font-normal">
                                 {email.snippet}
                              </span>
                         </div>
@@ -242,16 +244,16 @@ export function GmailEmailView({ initialLabel }: GmailEmailViewProps) {
                             )}
                             <span className={cn(
                                 "text-[12px] group-hover:hidden",
-                                email.isRead ? "font-normal text-slate-500" : "font-black text-slate-900"
+                                email.isRead ? "font-normal text-muted" : "font-black text-foreground"
                             )}>
                                 {new Date(email.timestamp).toDateString() === new Date().toDateString() ? email.time : email.date}
                             </span>
                             <div className="hidden group-hover:flex items-center justify-end space-x-1">
-                                <button onClick={(e) => { e.stopPropagation(); handleDelete(email.id); }} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded">
+                                <button onClick={(e) => { e.stopPropagation(); handleDelete(email.id); }} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded cursor-pointer">
                                     <Trash2 className="w-4 h-4" />
                                 </button>
                                 {initialLabel === 'INBOX' && (
-                                    <button onClick={(e) => { e.stopPropagation(); toggleReadStatus(email.id, email.isRead); }} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded">
+                                    <button onClick={(e) => { e.stopPropagation(); toggleReadStatus(email.id, email.isRead); }} className="p-1.5 text-muted hover:text-accent hover:bg-accent/10 rounded cursor-pointer">
                                         {email.isRead ? <MailOpen className="w-4 h-4" /> : <MailCheck className="w-4 h-4" />}
                                     </button>
                                 )}
@@ -260,27 +262,27 @@ export function GmailEmailView({ initialLabel }: GmailEmailViewProps) {
                     </div>
 
                     {expandedEmailId === email.id && (
-                        <div className="px-16 py-8 bg-white border-y border-slate-100 animate-in slide-in-from-top-2 duration-200">
+                        <div className="px-16 py-8 bg-card/50 border-y border-border transition-colors duration-300">
                              <div className="flex items-center justify-between mb-8">
                                 <div className="flex items-center space-x-4">
-                                    <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center">
-                                        <User className="w-5 h-5 text-slate-400" />
+                                    <div className="w-10 h-10 bg-secondary rounded-full flex items-center justify-center border border-border">
+                                        <User className="w-5 h-5 text-muted" />
                                     </div>
                                     <div>
                                         <div className="flex items-center space-x-2">
-                                            <span className="text-sm font-black text-slate-900">{email.sender}</span>
-                                            <span className="text-xs text-slate-400 font-medium tracking-wider">&lt;{email.senderEmail || ''}&gt;</span>
+                                            <span className="text-sm font-black text-foreground">{email.sender}</span>
+                                            <span className="text-xs text-muted font-medium tracking-wider">&lt;{email.senderEmail || ''}&gt;</span>
                                         </div>
                                         <div className="flex items-center space-x-2 mt-0.5">
-                                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">to {initialLabel === 'INBOX' ? 'me' : email.recipient}</span>
+                                            <span className="text-[10px] text-muted/80 font-bold uppercase tracking-widest">to {initialLabel === 'INBOX' ? 'me' : email.recipient}</span>
                                         </div>
                                     </div>
                                 </div>
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{email.date} ({email.time})</span>
+                                <span className="text-[10px] font-bold text-muted uppercase tracking-widest">{email.date} ({email.time})</span>
                             </div>
                             <div className="space-y-6">
-                                <h3 className="text-lg font-black text-slate-900">{email.subject}</h3>
-                                <div className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap font-medium">
+                                <h3 className="text-lg font-black text-foreground">{email.subject}</h3>
+                                <div className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap font-medium">
                                     {email.body}
                                 </div>
 
@@ -321,29 +323,29 @@ export function GmailEmailView({ initialLabel }: GmailEmailViewProps) {
 
         {/* Compose Modal */}
         {isComposeOpen && (
-            <div className="fixed bottom-0 right-12 w-[540px] bg-white border border-slate-200 shadow-2xl z-[1001] animate-in slide-in-from-bottom-5 duration-300">
+            <div className="fixed bottom-0 right-12 w-[540px] bg-card border border-border shadow-2xl z-[1001] animate-in slide-in-from-bottom-5 duration-300">
                 <div className="bg-[#1A1A1A] text-white px-4 py-2.5 flex items-center justify-between">
                     <span className="text-[11px] font-black uppercase tracking-[0.2em]">New message</span>
                     <div className="flex items-center space-x-3">
-                         <button className="hover:text-slate-300 transition-colors"><MoreHorizontal className="w-4 h-4" /></button>
-                         <button onClick={() => setIsComposeOpen(false)} className="hover:text-slate-300 transition-colors"><X className="w-4 h-4" /></button>
+                         <button className="hover:text-slate-300 transition-colors cursor-pointer"><MoreHorizontal className="w-4 h-4" /></button>
+                         <button onClick={() => setIsComposeOpen(false)} className="hover:text-slate-300 transition-colors cursor-pointer"><X className="w-4 h-4" /></button>
                     </div>
                 </div>
                 <div className="p-0">
-                    {composeError && <p className="text-xs text-red-600 font-medium bg-red-50 p-4 border-b border-red-100">{composeError}</p>}
-                    <div className="px-4 border-b border-slate-100">
-                        <input type="text" placeholder="Recipients" className="w-full text-sm py-3 focus:outline-none placeholder:text-slate-400 font-medium" value={composeData.to} onChange={(e) => setComposeData({...composeData, to: e.target.value})} />
+                    {composeError && <p className="text-xs text-red-400 font-medium bg-red-500/10 p-4 border-b border-red-500/20">{composeError}</p>}
+                    <div className="px-4 border-b border-border">
+                        <input type="text" placeholder="Recipients" className="w-full text-sm py-3 bg-transparent focus:outline-none placeholder:text-muted font-medium text-foreground" value={composeData.to} onChange={(e) => setComposeData({...composeData, to: e.target.value})} />
                     </div>
-                    <div className="px-4 border-b border-slate-100">
-                        <input type="text" placeholder="Subject" className="w-full text-sm py-3 focus:outline-none placeholder:text-slate-400 font-medium" value={composeData.subject} onChange={(e) => setComposeData({...composeData, subject: e.target.value})} />
+                    <div className="px-4 border-b border-border">
+                        <input type="text" placeholder="Subject" className="w-full text-sm py-3 bg-transparent focus:outline-none placeholder:text-muted font-medium text-foreground" value={composeData.subject} onChange={(e) => setComposeData({...composeData, subject: e.target.value})} />
                     </div>
                     <div className="px-4">
-                        <textarea placeholder="Message" rows={12} className="w-full text-sm py-4 focus:outline-none resize-none placeholder:text-slate-400 font-medium leading-relaxed" value={composeData.body} onChange={(e) => setComposeData({...composeData, body: e.target.value})} />
+                        <textarea placeholder="Message" rows={12} className="w-full text-sm py-4 bg-transparent focus:outline-none resize-none placeholder:text-muted font-medium text-foreground leading-relaxed" value={composeData.body} onChange={(e) => setComposeData({...composeData, body: e.target.value})} />
                     </div>
 
                     {/* Attachment List */}
                     {attachments.length > 0 && (
-                        <div className="px-4 py-2 border-t border-slate-50 flex flex-wrap gap-2 bg-slate-50/50">
+                        <div className="px-4 py-2 border-t border-border flex flex-wrap gap-2 bg-secondary/50">
                             {attachments.map((file, idx) => (
                                 <div key={idx} className="flex items-center space-x-2 bg-white border border-slate-200 px-2 py-1 rounded text-[10px] font-bold text-slate-600">
                                     <Paperclip className="w-3 h-3" />
@@ -357,9 +359,9 @@ export function GmailEmailView({ initialLabel }: GmailEmailViewProps) {
                     )}
                     
                     {/* Toolbar & Send */}
-                    <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 bg-white">
+                    <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-card">
                         <div className="flex items-center space-x-1">
-                            <button onClick={handleCompose} className="flex items-center space-x-3 px-8 py-2.5 bg-black text-white text-[11px] font-black uppercase tracking-[0.15em] hover:bg-slate-800 transition-all mr-4">
+                            <button onClick={handleCompose} className="flex items-center space-x-3 px-8 h-10 bg-primary text-black text-[11px] font-black uppercase tracking-[0.15em] hover:opacity-90 transition-all mr-4 cursor-pointer rounded shadow-sm">
                                 <span>Send</span>
                                 <Send className="w-3.5 h-3.5" />
                             </button>
@@ -374,28 +376,28 @@ export function GmailEmailView({ initialLabel }: GmailEmailViewProps) {
 
                                 <button 
                                     onClick={() => attachmentInputRef.current?.click()}
-                                    className="p-2 hover:bg-slate-50 hover:text-black transition-all rounded-sm"
+                                    className="p-2 hover:bg-slate-50 hover:text-black transition-all rounded-sm cursor-pointer"
                                     title="Attach files"
                                 >
                                     <Paperclip className="w-4 h-4" />
                                 </button>
                                 <button 
                                     onClick={() => toast.success('Link feature coming soon')}
-                                    className="p-2 hover:bg-slate-50 hover:text-black transition-all rounded-sm"
+                                    className="p-2 hover:bg-slate-50 hover:text-black transition-all rounded-sm cursor-pointer"
                                     title="Insert link"
                                 >
                                     <LinkIcon className="w-4 h-4" />
                                 </button>
                                 <button 
                                     onClick={() => toast.success('Emoji picker coming soon')}
-                                    className="p-2 hover:bg-slate-50 hover:text-black transition-all rounded-sm"
+                                    className="p-2 hover:bg-slate-50 hover:text-black transition-all rounded-sm cursor-pointer"
                                     title="Insert emoji"
                                 >
                                     <Smile className="w-4 h-4" />
                                 </button>
                                 <button 
                                     onClick={() => imageInputRef.current?.click()}
-                                    className="p-2 hover:bg-slate-50 hover:text-black transition-all rounded-sm"
+                                    className="p-2 hover:bg-slate-50 hover:text-black transition-all rounded-sm cursor-pointer"
                                     title="Insert photo"
                                 >
                                     <ImageIcon className="w-4 h-4" />
@@ -404,9 +406,9 @@ export function GmailEmailView({ initialLabel }: GmailEmailViewProps) {
                         </div>
                         
                         <div className="flex items-center space-x-2">
-                             <button onClick={() => { setIsComposeOpen(false); setAttachments([]); }} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all rounded-sm">
+                              <button onClick={() => { setIsComposeOpen(false); setAttachments([]); }} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all rounded-sm cursor-pointer">
                                 <Trash2 className="w-4 h-4" />
-                             </button>
+                              </button>
                         </div>
                     </div>
                 </div>

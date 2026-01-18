@@ -160,19 +160,19 @@ export default function VendorsPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-48px)] bg-white">
+    <div className="flex flex-col h-[calc(100vh-48px)] bg-background transition-colors duration-300">
       {/* Action Bar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100 bg-slate-50/50">
+      <div className="flex items-center justify-between px-4 h-11 border-b border-border bg-secondary/50 transition-colors">
         <div className="flex items-center space-x-4">
-          <h1 className="text-sm font-bold text-slate-900 uppercase tracking-tighter">Vendors</h1>
+          <h1 className="text-sm font-bold text-foreground uppercase tracking-tighter">Vendors</h1>
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
             <input
               type="text"
               placeholder="Search Name, Email, Phone..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 pr-3 py-1.5 w-64 bg-white border border-slate-200 text-[11px] focus:outline-none focus:ring-1 focus:ring-black/5 transition-all placeholder:text-slate-400"
+              className="pl-8 pr-3 h-8 w-64 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
             />
           </div>
         </div>
@@ -184,7 +184,7 @@ export default function VendorsPage() {
             options={cityOptions}
             selectedValues={selectedCities}
             onChange={setSelectedCities}
-            className="h-[30px]"
+            className="h-8"
           />
           <MultiSelectFilter
             label="State"
@@ -192,7 +192,7 @@ export default function VendorsPage() {
             options={stateOptions}
             selectedValues={selectedStates}
             onChange={setSelectedStates}
-            className="h-[30px]"
+            className="h-8"
           />
           <MultiSelectFilter
             label="Status"
@@ -200,7 +200,7 @@ export default function VendorsPage() {
             options={statusOptions}
             selectedValues={selectedStatuses}
             onChange={setSelectedStatuses}
-            className="h-[30px]"
+            className="h-8"
           />
 
           <div className="w-px h-6 bg-slate-200 mx-2" />
@@ -215,7 +215,7 @@ export default function VendorsPage() {
 
           <button
             onClick={() => importInputRef.current?.click()}
-            className="h-[30px] px-3 text-slate-600 hover:text-black hover:bg-slate-200 transition-colors rounded-sm flex items-center space-x-1 border border-slate-200 bg-white shadow-sm"
+            className="h-8 px-3 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors rounded flex items-center space-x-1 border border-border bg-card shadow-sm cursor-pointer"
             title="Import Vendors"
           >
             <Upload className="w-4 h-4" />
@@ -224,7 +224,7 @@ export default function VendorsPage() {
 
           <button
             onClick={() => {/* TODO: Add Modal */ }}
-            className="h-[30px] w-[30px] bg-black text-white hover:bg-slate-800 transition-colors shadow-sm flex items-center justify-center rounded-sm"
+            className="h-8 w-8 bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-md flex items-center justify-center rounded cursor-pointer"
             title="Add Vendor"
           >
             <Plus className="w-4 h-4" />
@@ -232,9 +232,10 @@ export default function VendorsPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto">
-        <table className="w-full border-collapse text-left">
-          <thead className="sticky top-0 bg-slate-50 z-10 border-b border-slate-100">
+      <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
+        <div className="min-w-full px-2 py-2">
+          <table className="w-full text-left border-separate border-spacing-0 relative z-0">
+          <thead className="sticky top-0 bg-secondary/80 z-10 border-b border-border backdrop-blur-md transition-colors">
             <tr>
               {[
                 { key: 'name', label: 'Company Name' },
@@ -249,49 +250,49 @@ export default function VendorsPage() {
                 <th
                   key={col.key}
                   onClick={() => handleSort(col.key)}
-                  className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors border-r border-slate-100 last:border-0"
+                  className="px-2 py-2 text-[8px] font-bold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary transition-colors border-r border-border last:border-0"
                 >
                   <div className="flex items-center space-x-1">
                     <span>{col.label}</span>
-                    <ArrowUpDown className={cn("w-2 h-2", sortBy === col.key ? "text-black" : "text-slate-200")} />
+                    <ArrowUpDown className={cn("w-2 h-2", sortBy === col.key ? "text-foreground" : "text-muted-foreground/30")} />
                   </div>
                 </th>
               ))}
-              <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest text-right">Actions</th>
+               <th className="px-2 py-2 text-[8px] font-bold text-muted-foreground uppercase tracking-widest text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-border bg-background/50">
             {loading ? (
-              <tr><td colSpan={9} className="px-2 py-4 text-center text-[10px] text-slate-400">Loading Vendors...</td></tr>
+              <tr><td colSpan={9} className="px-2 py-4 text-center text-[10px] text-muted-foreground italic tracking-tight">Loading Vendors...</td></tr>
             ) : error ? (
-              <tr><td colSpan={9} className="px-2 py-4 text-center text-red-500 text-[10px] font-bold">{error}</td></tr>
+              <tr><td colSpan={9} className="px-2 py-4 text-center text-destructive text-[10px] font-bold">{error}</td></tr>
             ) : vendors.length === 0 ? (
-              <tr><td colSpan={9} className="px-2 py-4 text-center text-[10px] text-slate-400 uppercase font-bold tracking-tighter opacity-50">No Vendors found</td></tr>
+              <tr><td colSpan={9} className="px-2 py-4 text-center text-[10px] text-muted-foreground uppercase font-medium tracking-tighter opacity-50">No Vendors found</td></tr>
             ) : vendors.map(vendor => (
-              <tr key={vendor._id} className="hover:bg-slate-50 transition-colors group">
-                <td className="px-2 py-1.5 text-[10px] font-bold text-slate-900 tracking-tight">{vendor.name}</td>
-                <td className="px-2 py-1.5 text-[10px] text-slate-600 truncate max-w-[200px]" title={vendor.address}>{vendor.address || '-'}</td>
-                <td className="px-2 py-1.5 text-[10px] text-slate-600 font-mono tracking-tighter">{vendor.phone || '-'}</td>
-                <td className="px-2 py-1.5 text-[10px] text-slate-600 truncate max-w-[150px]"><a href={`mailto:${vendor.email}`} className="hover:underline">{vendor.email || '-'}</a></td>
-                <td className="px-2 py-1.5 text-[10px] text-slate-600 font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[100px]">{vendor.contactName || '-'}</td>
-                <td className="px-2 py-1.5 text-[8px] text-slate-500 uppercase font-bold">{vendor.paymentTerms || '-'}</td>
-                <td className="px-2 py-1.5 text-[10px] text-slate-600 truncate max-w-[100px]">{vendor.carrierPreference || '-'}</td>
+              <tr key={vendor._id} className="hover:bg-secondary/40 hover:scale-[1.002] hover:shadow-md transition-all duration-200 group relative z-0 hover:z-10 bg-background">
+                <td className="px-2 py-1.5 text-[10px] font-bold text-foreground tracking-tight">{vendor.name}</td>
+                <td className="px-2 py-1.5 text-[10px] text-muted-foreground truncate max-w-[200px]" title={vendor.address}>{vendor.address || '-'}</td>
+                <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono tracking-tighter">{vendor.phone || '-'}</td>
+                <td className="px-2 py-1.5 text-[10px] text-muted-foreground truncate max-w-[150px]"><a href={`mailto:${vendor.email}`} className="hover:underline">{vendor.email || '-'}</a></td>
+                <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[100px]">{vendor.contactName || '-'}</td>
+                <td className="px-2 py-1.5 text-[8px] text-muted-foreground uppercase font-bold">{vendor.paymentTerms || '-'}</td>
+                <td className="px-2 py-1.5 text-[10px] text-muted-foreground truncate max-w-[100px]">{vendor.carrierPreference || '-'}</td>
                 <td className="px-2 py-1.5">
                   <span className={cn(
-                    "px-1.5 py-0.5 rounded-[2px] text-[8px] font-bold uppercase",
-                    vendor.status === 'Active' ? "bg-green-100 text-green-700" :
-                      vendor.status === 'Inactive' ? "bg-red-100 text-red-700" :
-                        "bg-slate-100 text-slate-600"
+                    "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider",
+                    vendor.status === 'Active' ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" :
+                    vendor.status === 'Inactive' ? "bg-destructive/10 text-destructive border border-destructive/20" :
+                    "bg-muted text-muted-foreground border border-border"
                   )}>
                     {vendor.status || 'Active'}
                   </span>
                 </td>
                 <td className="px-2 py-1.5 text-right">
                   <div className="flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button className="p-1 hover:bg-slate-200 rounded text-slate-400 hover:text-blue-600">
+                    <button className="p-1 hover:bg-secondary rounded text-muted-foreground hover:text-primary transition-colors cursor-pointer">
                       <Pencil className="w-3 h-3" />
                     </button>
-                    <button className="p-1 hover:bg-slate-200 rounded text-slate-400 hover:text-red-600">
+                    <button className="p-1 hover:bg-destructive/10 rounded text-muted-foreground hover:text-destructive transition-colors cursor-pointer">
                       <Trash2 className="w-3 h-3" />
                     </button>
                   </div>
@@ -301,15 +302,18 @@ export default function VendorsPage() {
           </tbody>
         </table>
       </div>
+    </div>
 
-      <Pagination
-        currentPage={page}
-        totalPages={totalPages}
-        onPageChange={setPage}
-        totalItems={totalVendors}
-        itemsPerPage={20}
-        itemName="Vendors"
-      />
+      <div className="border-t border-border bg-background transition-colors duration-300">
+        <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            totalItems={totalVendors}
+            itemsPerPage={20}
+            itemName="Vendors"
+        />
+      </div>
     </div>
   );
 }

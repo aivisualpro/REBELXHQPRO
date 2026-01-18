@@ -5,7 +5,8 @@ import {
   Plus, Search, MoreHorizontal, Mail, Phone, MapPin, 
   Calendar, DollarSign, ShoppingBag, ChevronLeft, ChevronRight,
   ArrowUpDown, User, Layers, Briefcase, Map as LucideMap, ChevronDown,
-  Truck, Upload, FileText, UserSquare2, SlidersHorizontal
+  Truck, Upload, FileText, UserSquare2, SlidersHorizontal, 
+  Send, X, Trash2, Paperclip, Loader2
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -42,16 +43,16 @@ const formatCompactedCurrency = (val: number) => {
 };
 
 const StatusBadge = ({ status }: { status: string }) => {
-    let colorClass = "bg-slate-100 text-slate-500"; // Default/Unknown
+    let colorClass = "text-slate-400 dark:text-slate-600 border-slate-200 dark:border-white/5"; 
     const s = status?.toLowerCase() || '';
     
-    if (s.includes('won') || s.includes('active')) colorClass = "bg-emerald-100 text-emerald-700";
-    else if (s.includes('potential') || s.includes('lead')) colorClass = "bg-blue-50 text-blue-600";
-    else if (s.includes('lost')) colorClass = "bg-red-50 text-red-600";
-    else if (s.includes('whitelabel')) colorClass = "bg-purple-50 text-purple-600";
+    if (s.includes('won') || s.includes('active')) colorClass = "text-emerald-600 dark:text-emerald-400/80 border-emerald-100 dark:border-emerald-400/20";
+    else if (s.includes('potential') || s.includes('lead')) colorClass = "text-blue-600 dark:text-blue-400/80 border-blue-100 dark:border-blue-400/20";
+    else if (s.includes('lost')) colorClass = "text-red-600 dark:text-red-400/80 border-red-100 dark:border-red-400/20";
+    else if (s.includes('whitelabel')) colorClass = "text-purple-600 dark:text-purple-400/80 border-purple-100 dark:border-purple-400/20";
     
     return (
-        <span className={cn("px-2 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider", colorClass)}>
+        <span className={cn("px-2 py-0.5 rounded-full text-[7px] font-black uppercase tracking-wider border bg-transparent inline-block", colorClass)}>
             {status || 'UNKNOWN'}
         </span>
     );
@@ -87,6 +88,10 @@ export default function ClientsPage() {
   const [maxRev, setMaxRev] = useState('');
   const [minBal, setMinBal] = useState('');
   const [maxBal, setMaxBal] = useState('');
+
+  const [isComposeOpen, setIsComposeOpen] = useState(false);
+  const [composeData, setComposeData] = useState({ to: '', subject: '', body: '' });
+  const [sendingEmail, setSendingEmail] = useState(false);
   
   // Refs for remote opening filters from header
   const repFilterRef = useRef<MultiSelectFilterRef>(null);
@@ -153,7 +158,7 @@ export default function ClientsPage() {
             search: debouncedSearch,
             sortBy,
             sortOrder,
-            minRevenue: minRev || '',
+            minRevenue: minRev || minRevenueSlab,
             maxRevenue: maxRev || '',
             minBalance: minBal || '',
             maxBalance: maxBal || ''
@@ -177,7 +182,7 @@ export default function ClientsPage() {
     } finally {
         setLoading(false);
     }
-  }, [page, limit, debouncedSearch, sortBy, sortOrder, selectedSalesReps, selectedStates, minRev, maxRev, minBal, maxBal]);
+  }, [page, limit, debouncedSearch, sortBy, sortOrder, selectedSalesReps, selectedStates, minRev, maxRev, minBal, maxBal, minRevenueSlab]);
 
   useEffect(() => {
     if (!settingsLoading) {
@@ -219,6 +224,97 @@ export default function ClientsPage() {
     }
   };
 
+  const initiateGoogleVoice = async (clientId: string, phoneNumber: string, type: 'calls' | 'messages') => {
+    if (!phoneNumber) {
+        toast.error('No phone number found');
+        return;
+    }
+
+    const width = 450;
+    const height = 650;
+    const left = (window.screen.width / 2) - (width / 2);
+    const top = (window.screen.height / 2) - (height / 2);
+    
+    const digitsOnly = phoneNumber.replace(/\D/g, '');
+    let e164;
+    if (phoneNumber.includes('+')) {
+        e164 = digitsOnly;
+    } else if (digitsOnly.startsWith('1') && digitsOnly.length === 11) {
+        e164 = digitsOnly;
+    } else if (digitsOnly.length === 10) {
+        e164 = '1' + digitsOnly;
+    } else {
+        e164 = digitsOnly;
+    }
+    
+    const url = type === 'calls' 
+        ? `https://voice.google.com/u/0/calls?a=nc,%2B${e164}`
+        : `https://voice.google.com/u/0/messages?number=%2B${e164}`;
+    
+    window.open(
+        url, 
+        'GoogleVoiceWindow', 
+        `width=${width},height=${height},left=${left},top=${top},menubar=no,status=no,toolbar=no`
+    );
+    
+    setTimeout(async () => {
+        const activityType = type === 'calls' ? 'Call' : 'Text';
+        const shouldLog = confirm(`Log this ${activityType} to CRM?\n\nClick OK to log, or Cancel to skip.`);
+        
+        if (shouldLog) {
+            const notes = prompt(`Any notes for this ${activityType}? (optional):`) || '';
+            try {
+                const res = await fetch('/api/crm/log-call', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        clientId,
+                        phoneNumber,
+                        type: activityType,
+                        notes
+                    })
+                });
+                
+                if (res.ok) {
+                    toast.success(`${activityType} logged to CRM!`);
+                    fetchClients();
+                }
+            } catch (err) {
+                toast.error('Failed to log activity');
+            }
+        }
+    }, 3000);
+  };
+
+  const handleSendEmail = async () => {
+    if (!composeData.to || !composeData.subject) {
+        toast.error('Please fill in recipient and subject');
+        return;
+    }
+    setSendingEmail(true);
+    try {
+        const res = await fetch('/api/gmail', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(composeData)
+        });
+        const data = await res.json();
+        if (res.ok) {
+            toast.success('Email sent successfully!');
+            setIsComposeOpen(false);
+            setComposeData({ to: '', subject: '', body: '' });
+            fetchClients();
+        } else {
+            toast.error(data.error || 'Failed to send email');
+        }
+    } catch (error) {
+        console.error('Send email error:', error);
+        toast.error('Failed to send email');
+    } finally {
+        setSendingEmail(false);
+    }
+  };
+
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
       // Placeholder for import logic
       const file = e.target.files?.[0];
@@ -233,7 +329,7 @@ export default function ClientsPage() {
     <div className="flex flex-col h-[calc(100vh-48px)] bg-slate-50/30 text-slate-600 font-sans">
       
       {/* Header / Action Bar */}
-      <div className="flex items-center justify-between px-4 py-1.5 border-b border-slate-100 bg-white sticky top-0 z-20 gap-4">
+      <div className="flex items-center justify-between px-4 h-11 border-b border-slate-100 bg-white sticky top-0 z-20 gap-4">
         
         {/* Left: Search (Title Removed) */}
         <div className="flex items-center space-x-6">
@@ -244,7 +340,7 @@ export default function ClientsPage() {
                     placeholder="Search clients..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="pl-9 pr-4 py-1.5 w-64 bg-slate-50 hover:bg-slate-100 focus:bg-white border border-transparent focus:border-blue-500 rounded text-sm transition-all focus:outline-none placeholder:text-slate-400"
+                    className="pl-9 pr-4 h-8 w-64 bg-slate-50 hover:bg-slate-100 focus:bg-white border border-transparent focus:border-blue-500 rounded text-sm transition-all focus:outline-none placeholder:text-slate-400"
                 />
             </div>
         </div>
@@ -254,15 +350,15 @@ export default function ClientsPage() {
             
             {/* Filter Group */}
             <div className="flex items-center space-x-2 mr-4">
-                 <button className="flex items-center space-x-1.5 px-3 py-1.5 text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded hover:bg-slate-50 hover:border-slate-300 transition-all uppercase tracking-wide">
+                  <button className="flex items-center space-x-1.5 px-3 h-8 text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded hover:bg-slate-50 hover:border-slate-300 transition-all uppercase tracking-wide cursor-pointer">
                     <MapPin className="w-3.5 h-3.5 text-slate-400" />
                     <span>City</span>
                 </button>
-                 <button className="flex items-center space-x-1.5 px-3 py-1.5 text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded hover:bg-slate-50 hover:border-slate-300 transition-all uppercase tracking-wide">
+                 <button className="flex items-center space-x-1.5 px-3 h-8 text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded hover:bg-slate-50 hover:border-slate-300 transition-all uppercase tracking-wide cursor-pointer">
                     <LucideMap className="w-3.5 h-3.5 text-slate-400" />
                     <span>State</span>
                 </button>
-                 <button className="flex items-center space-x-1.5 px-3 py-1.5 text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded hover:bg-slate-50 hover:border-slate-300 transition-all uppercase tracking-wide">
+                 <button className="flex items-center space-x-1.5 px-3 h-8 text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded hover:bg-slate-50 hover:border-slate-300 transition-all uppercase tracking-wide cursor-pointer">
                     <Truck className="w-3.5 h-3.5 text-slate-400" />
                     <span>Shipping</span>
                 </button>
@@ -302,14 +398,14 @@ export default function ClientsPage() {
             />
             <button 
                 onClick={() => fileInputRef.current?.click()}
-                className="p-2 text-blue-600 bg-blue-50 border border-blue-100 rounded hover:bg-blue-100 transition-all shadow-sm"
+                className="w-8 h-8 flex items-center justify-center text-blue-600 bg-blue-50 border border-blue-100 rounded hover:bg-blue-100 transition-all shadow-sm cursor-pointer"
                 title="Import CSV"
             >
                 <Upload className="w-4 h-4" />
             </button>
 
             <button 
-                className="p-2 text-slate-600 bg-white border border-slate-200 rounded hover:bg-slate-50 transition-all shadow-sm"
+                className="w-8 h-8 flex items-center justify-center text-slate-600 bg-white border border-slate-200 rounded hover:bg-slate-50 transition-all shadow-sm cursor-pointer"
                 title="Notes"
             >
                 <FileText className="w-4 h-4 text-slate-400" />
@@ -317,7 +413,7 @@ export default function ClientsPage() {
 
             <button 
                 onClick={() => setIsModalOpen(true)}
-                className="flex items-center justify-center w-8 h-8 bg-black text-white hover:bg-slate-800 rounded shadow-sm transition-all"
+                className="flex items-center justify-center w-8 h-8 bg-[#FFEF5F] text-black hover:opacity-90 rounded shadow-sm transition-all cursor-pointer"
             >
                 <Plus className="w-4 h-4" />
             </button>
@@ -332,10 +428,10 @@ export default function ClientsPage() {
       />
 
       {/* Table Content */}
-      <div className="flex-1 overflow-auto bg-white">
-        <div className="min-h-[600px] flex flex-col">
-            <table className="w-full border-collapse text-left">
-                <thead className="bg-[#FAFAFA] border-b border-slate-200 sticky top-0 z-10">
+      <div className="flex-1 overflow-x-hidden overflow-y-auto bg-background transition-colors duration-300 relative scrollbar-custom">
+        <div className="min-w-full px-2 py-2 flex flex-col">
+            <table className="w-full border-separate border-spacing-0 text-left relative z-0">
+                <thead className="bg-secondary/50 border-b border-border sticky top-0 z-10 backdrop-blur-sm transition-colors">
                     <tr>
                         {[
                             { key: 'name', label: 'name' },
@@ -351,9 +447,10 @@ export default function ClientsPage() {
                             <th 
                                 key={col.key} 
                                 className={cn(
-                                    "p-1 border-b border-slate-200 text-[10px]",
+                                    "p-1 border-b border-border text-[10px]",
                                     col.align || "text-left",
-                                    (col.key === 'contact' || col.key === 'phone') && "w-16 px-2"
+                                    (col.key === 'contact' || col.key === 'phone') && "w-16 px-2",
+                                    col.key === 'companyType' && "w-24 px-1"
                                 )}
                             >
                                 <TableColumnHeader
@@ -382,7 +479,7 @@ export default function ClientsPage() {
                             <tr 
                                 key={client._id} 
                                 onClick={() => router.push(`/crm/clients/${client._id}`)}
-                                className="hover:bg-slate-50 transition-colors group cursor-pointer"
+                                className="hover:bg-primary/5 hover:scale-[1.008] hover:shadow-md transition-all duration-200 group cursor-pointer relative z-0 hover:z-10"
                             >
                                 {/* NAME */}
                                 <td className="p-1">
@@ -390,53 +487,58 @@ export default function ClientsPage() {
                                         <div className="w-5 h-5 rounded bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 text-[8px] font-bold text-slate-500 uppercase">
                                             {client.name.substring(0, 2)}
                                         </div>
-                                        <span className="text-[10px] font-medium text-[#2E2E2E] leading-tight truncate max-w-[180px]">{client.name}</span>
+                                        <span className="text-[10px] font-medium text-foreground leading-tight truncate max-w-[180px]">{client.name}</span>
                                     </div>
                                 </td>
                                 
-                                {/* EMAIL (ICON ONLY) */}
-                                <td className="p-1 text-center">
-                                    {client.emails?.[0]?.value ? (
-                                         <div className="flex justify-center group-hover:text-blue-600 transition-colors" title={client.emails[0].value}>
-                                            <Mail className="w-3.5 h-3.5 text-slate-300" />
-                                         </div>
-                                    ) : (
-                                         <div className="flex justify-center">
-                                            <Mail className="w-3.5 h-3.5 text-slate-100" />
-                                         </div>
-                                    )}
-                                </td>
+                                  {/* EMAIL */}
+                                  <td className="p-1">
+                                      {client.emails?.[0]?.value && (
+                                          <button 
+                                              onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setComposeData({ to: client.emails[0].value || '', subject: '', body: '' });
+                                                  setIsComposeOpen(true);
+                                              }}
+                                              className="p-1.5 hover:bg-blue-50 dark:hover:bg-blue-900/40 text-slate-400 hover:text-blue-600 rounded-sm transition-colors group/edit"
+                                          >
+                                              <Mail className="w-3.5 h-3.5 group-hover/edit:scale-110 transition-transform" />
+                                          </button>
+                                      )}
+                                  </td>
 
-                                {/* PHONE (ICON ONLY) */}
-                                <td className="p-1 text-center">
-                                    {client.phones?.[0]?.value ? (
-                                         <div className="flex justify-center text-slate-300" title={client.phones[0].value}>
-                                            <Phone className="w-3.5 h-3.5" />
-                                         </div>
-                                    ) : (
-                                         <div className="flex justify-center text-slate-100">
-                                            <Phone className="w-3.5 h-3.5" />
-                                         </div>
-                                    )}
-                                </td>
+                                  {/* PHONE */}
+                                  <td className="p-1">
+                                      {client.phones?.[0]?.value && (
+                                          <button 
+                                              onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  initiateGoogleVoice(client._id, client.phones[0].value || '', 'calls');
+                                              }}
+                                              className="p-1.5 hover:bg-emerald-50 dark:hover:bg-emerald-900/40 text-slate-400 hover:text-emerald-600 rounded-sm transition-colors group/call"
+                                          >
+                                              <Phone className="w-3.5 h-3.5 group-hover/call:scale-110 transition-transform" />
+                                          </button>
+                                      )}
+                                  </td>
 
                                 {/* ADDRESS */}
                                 <td className="p-1">
                                     {client.addresses?.[0] ? (
-                                        <div className="flex items-center text-[10px] font-medium text-[#2E2E2E]">
+                                        <div className="flex items-center text-[10px] font-medium text-foreground opacity-60">
                                             <span className="truncate max-w-[150px]">{client.addresses[0].city}, {client.addresses[0].state}</span>
                                         </div>
                                     ) : (
-                                        <span className="text-[10px] text-slate-300">-</span>
+                                        <span className="text-[10px] text-muted-foreground/30">-</span>
                                     )}
                                 </td>
 
                                 {/* SALES REP */}
-                                <td className="p-1 text-[10px] font-medium text-[#2E2E2E]">
+                                <td className="p-1 text-[10px] font-medium text-foreground opacity-60">
                                     {client.salesPerson ? (
                                         <span className="truncate block max-w-[100px]">{client.salesPerson.firstName} {client.salesPerson.lastName}</span>
                                     ) : (
-                                        <span className="text-slate-300 italic">Unassigned</span>
+                                        <span className="text-muted-foreground/40 italic">Unassigned</span>
                                     )}
                                 </td>
 
@@ -449,7 +551,7 @@ export default function ClientsPage() {
                                 <td className="p-1 text-right">
                                     <span className={cn(
                                         "text-[10px] font-medium",
-                                        client.totalRevenue > 0 ? "text-[#2E2E2E]" : "text-slate-300"
+                                        client.totalRevenue > 0 ? "text-foreground font-bold" : "text-muted-foreground/40"
                                     )}>
                                         {formatCompactedCurrency(client.totalRevenue)}
                                     </span>
@@ -468,24 +570,30 @@ export default function ClientsPage() {
                                 {/* ACTIVITIES (Combined) */}
                                 <td className="p-1 text-center">
                                     <div className="flex items-center justify-center space-x-1">
-                                        <span className={cn(
-                                            "inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded text-[9px] font-black",
-                                            client.emailCount ? "bg-blue-50 text-blue-600" : "bg-slate-50 text-slate-300"
-                                        )} title="Emails">
-                                            {client.emailCount || 0}
-                                        </span>
-                                        <span className={cn(
-                                            "inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded text-[9px] font-black",
-                                            client.callCount ? "bg-emerald-50 text-emerald-600" : "bg-slate-50 text-slate-300"
-                                        )} title="Calls">
-                                            {client.callCount || 0}
-                                        </span>
-                                        <span className={cn(
-                                            "inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded text-[9px] font-black",
-                                            client.smsCount ? "bg-purple-50 text-purple-600" : "bg-slate-50 text-slate-300"
-                                        )} title="SMS">
-                                            {client.smsCount || 0}
-                                        </span>
+                                         <span className={cn(
+                                             "inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded-sm text-[10px] font-bold transition-all",
+                                             client.emailCount 
+                                                ? "bg-blue-500 text-white dark:bg-blue-500/80 dark:text-white shadow-sm" 
+                                                : "text-slate-300 dark:text-white/5"
+                                         )} title="Emails">
+                                             {client.emailCount || 0}
+                                         </span>
+                                         <span className={cn(
+                                             "inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded-sm text-[10px] font-bold transition-all",
+                                             client.callCount 
+                                                ? "bg-emerald-500 text-white dark:bg-emerald-500/80 dark:text-white shadow-sm" 
+                                                : "text-slate-300 dark:text-white/5"
+                                         )} title="Calls">
+                                             {client.callCount || 0}
+                                         </span>
+                                         <span className={cn(
+                                             "inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded-sm text-[10px] font-bold transition-all",
+                                             client.smsCount 
+                                                ? "bg-purple-500 text-white dark:bg-purple-500/80 dark:text-white shadow-sm" 
+                                                : "text-slate-300 dark:text-white/5"
+                                         )} title="SMS">
+                                             {client.smsCount || 0}
+                                         </span>
                                     </div>
                                 </td>
                             </tr>
@@ -501,7 +609,7 @@ export default function ClientsPage() {
       </div>
 
        {/* Pagination */}
-       <div className="px-4 py-1.5 border-t border-slate-200 bg-white">
+       <div className="border-t border-border bg-secondary/30 transition-colors duration-300">
             <Pagination
                 currentPage={page}
                 totalPages={totalPages}
@@ -511,6 +619,88 @@ export default function ClientsPage() {
                 itemName="clients"
             />
        </div>
+
+      {/* Compose Email Modal */}
+      {isComposeOpen && (
+                <div className="fixed bottom-0 right-12 w-[540px] bg-card border border-border shadow-2xl z-[1001] animate-in slide-in-from-bottom-5 duration-300 rounded-t-lg overflow-hidden">
+                    <div className="bg-[#1A1A1A] text-white px-4 py-2.5 flex items-center justify-between">
+                        <span className="text-[11px] font-black uppercase tracking-[0.2em]">New message</span>
+                        <button onClick={() => setIsComposeOpen(false)} className="hover:text-slate-300 transition-colors cursor-pointer">
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                    <div className="p-0">
+                        <div className="px-4 border-b border-border">
+                            <input 
+                                type="text" 
+                                placeholder="Recipients" 
+                                className="w-full text-sm py-3 bg-transparent focus:outline-none placeholder:text-muted font-medium text-foreground" 
+                                value={composeData.to} 
+                                onChange={(e) => setComposeData({...composeData, to: e.target.value})} 
+                            />
+                        </div>
+                        <div className="px-4 border-b border-border">
+                            <input 
+                                type="text" 
+                                placeholder="Subject" 
+                                className="w-full text-sm py-3 bg-transparent focus:outline-none placeholder:text-muted font-medium text-foreground" 
+                                value={composeData.subject} 
+                                onChange={(e) => setComposeData({...composeData, subject: e.target.value})} 
+                            />
+                        </div>
+                        <div className="px-4">
+                            <textarea 
+                                placeholder="Message" 
+                                rows={12} 
+                                className="w-full text-sm py-4 bg-transparent focus:outline-none resize-none placeholder:text-muted font-medium text-foreground leading-relaxed" 
+                                value={composeData.body} 
+                                onChange={(e) => setComposeData({...composeData, body: e.target.value})} 
+                            />
+                        </div>
+                        
+                        {/* Toolbar & Send */}
+                        <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-card">
+                            <div className="flex items-center space-x-1">
+                                <button 
+                                    onClick={handleSendEmail}
+                                    disabled={sendingEmail}
+                                    className="flex items-center space-x-3 px-8 py-2.5 bg-[#F9E137] text-black text-[11px] font-black uppercase tracking-[0.15em] hover:bg-[#EBD000] transition-all mr-4 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                                >
+                                    {sendingEmail ? (
+                                        <>
+                                            <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent animate-spin rounded-full" />
+                                            <span>Sending...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span>Send</span>
+                                            <Send className="w-3.5 h-3.5" />
+                                        </>
+                                    )}
+                                </button>
+                                
+                                <div className="flex items-center space-x-0.5 text-slate-500">
+                                    <button className="p-2 hover:bg-secondary/50 hover:text-foreground transition-all rounded-sm cursor-pointer" title="Attach files">
+                                        <Paperclip className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div className="flex items-center space-x-2">
+                                <button 
+                                    onClick={() => { 
+                                        setIsComposeOpen(false); 
+                                        setComposeData({ to: '', subject: '', body: '' }); 
+                                    }} 
+                                    className="p-2 text-muted hover:text-red-500 hover:bg-red-500/10 transition-all rounded-sm cursor-pointer"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
     </div>
   );

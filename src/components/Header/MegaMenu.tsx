@@ -30,7 +30,7 @@ export const MegaMenu = () => {
                         <Link
                             key={menu.title}
                             href={menu.title === 'CRM' ? '/crm/inbox' : href}
-                            className="text-sm font-medium text-gray-400 transition-colors hover:text-white h-full flex items-center"
+                            className="text-sm font-medium text-muted transition-colors hover:text-foreground h-full flex items-center cursor-pointer"
                         >
                             {menu.title}
                         </Link>
@@ -45,8 +45,8 @@ export const MegaMenu = () => {
                         onMouseLeave={() => setActiveMenu(null)}
                     >
                         <button className={cn(
-                            "flex items-center space-x-1 text-sm font-medium transition-colors hover:text-white",
-                            activeMenu === menu.title ? "text-white" : "text-gray-400"
+                            "flex items-center space-x-1 text-sm font-medium transition-colors hover:text-foreground cursor-pointer",
+                            activeMenu === menu.title ? "text-foreground" : "text-muted"
                         )}>
                             <span>{menu.title}</span>
                             <ChevronDown className={cn(
@@ -64,15 +64,15 @@ export const MegaMenu = () => {
                                     transition={{ duration: 0.15 }}
                                     className="absolute top-full left-0 pt-2 z-50"
                                 >
-                                    <div className="bg-white rounded-lg shadow-xl border border-slate-200 py-2 min-w-[200px]">
+                                    <div className="bg-card rounded-lg shadow-xl border border-border py-2 min-w-[200px]">
                                         {menu.items.map((item) => (
                                             <Link
                                                 key={item.href}
                                                 href={item.href}
-                                                className="flex items-center space-x-3 px-4 py-2.5 hover:bg-slate-50 transition-colors group"
+                                                className="flex items-center space-x-3 px-4 py-2.5 hover:bg-secondary transition-colors group cursor-pointer"
                                             >
-                                                <item.icon className="w-4 h-4 text-slate-400 group-hover:text-slate-700" />
-                                                <span className="text-sm font-medium text-slate-600 group-hover:text-slate-900">
+                                                <item.icon className="w-4 h-4 text-muted group-hover:text-foreground" />
+                                                <span className="text-sm font-medium text-muted group-hover:text-foreground">
                                                     {item.title}
                                                 </span>
                                             </Link>

@@ -426,18 +426,18 @@ export default function PurchaseOrdersPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-48px)] bg-white relative">
-      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100 bg-slate-50/50">
+    <div className="flex flex-col h-[calc(100vh-48px)] bg-background transition-colors duration-300 relative">
+      <div className="flex items-center justify-between px-4 h-11 border-b border-border bg-secondary/50">
         <div className="flex items-center space-x-4">
-          <h1 className="text-sm font-bold text-slate-900 uppercase tracking-tighter">Purchase Orders</h1>
+          <h1 className="text-sm font-bold text-foreground uppercase tracking-tighter shrink-0">Purchase Orders</h1>
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
             <input
               type="text"
               placeholder="Search PO# or Vendor..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 pr-3 py-1.5 w-64 bg-white border border-slate-200 text-[11px] focus:outline-none focus:ring-1 focus:ring-black/5 transition-all placeholder:text-slate-400"
+              className="pl-8 pr-3 h-8 w-64 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
             />
           </div>
         </div>
@@ -449,7 +449,7 @@ export default function PurchaseOrdersPage() {
             options={vendorOptions}
             selectedValues={selectedVendors}
             onChange={setSelectedVendors}
-            className="h-[30px]"
+            className="h-8"
           />
           <MultiSelectFilter
             label="Status"
@@ -457,27 +457,27 @@ export default function PurchaseOrdersPage() {
             options={statusOptions}
             selectedValues={selectedStatuses}
             onChange={setSelectedStatuses}
-            className="h-[30px]"
+            className="h-8"
           />
 
-          <div className="flex items-center space-x-1 border border-slate-200 bg-white px-3 h-[30px] rounded-sm">
-            <Calendar className="w-3 h-3 text-slate-400" />
+          <div className="flex items-center space-x-1 border border-border bg-background px-3 h-8 rounded">
+            <Calendar className="w-3 h-3 text-muted-foreground" />
             <input
               type="date"
-              className="text-[10px] outline-none max-w-[80px] bg-transparent"
+              className="text-[10px] outline-none max-w-[80px] bg-transparent text-foreground"
               value={dateRange.from}
               onChange={e => setDateRange({ ...dateRange, from: e.target.value })}
             />
-            <span className="text-slate-300">-</span>
+            <span className="text-muted-foreground/30">-</span>
             <input
               type="date"
-              className="text-[10px] outline-none max-w-[80px] bg-transparent"
+              className="text-[10px] outline-none max-w-[80px] bg-transparent text-foreground"
               value={dateRange.to}
               onChange={e => setDateRange({ ...dateRange, to: e.target.value })}
             />
           </div>
 
-          <div className="w-px h-6 bg-slate-200 mx-2" />
+          <div className="w-px h-6 bg-border mx-2" />
 
           <input
             type="file"
@@ -496,7 +496,7 @@ export default function PurchaseOrdersPage() {
 
           <button
             onClick={() => poInputRef.current?.click()}
-            className="h-[30px] px-3 border border-slate-200 text-slate-600 hover:text-black hover:bg-slate-50 transition-colors rounded-sm flex items-center space-x-1.5"
+            className="h-8 px-3 border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors rounded flex items-center space-x-1.5 bg-card shadow-sm cursor-pointer"
             title="Import Purchase Orders"
           >
             <Upload className="w-3.5 h-3.5" />
@@ -505,7 +505,7 @@ export default function PurchaseOrdersPage() {
 
           <button
             onClick={() => liInputRef.current?.click()}
-            className="h-[30px] px-3 border border-slate-200 text-slate-600 hover:text-black hover:bg-slate-50 transition-colors rounded-sm flex items-center space-x-1.5"
+            className="h-8 px-3 border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors rounded flex items-center space-x-1.5 bg-card shadow-sm cursor-pointer"
             title="Import Line Items"
           >
             <Upload className="w-3.5 h-3.5" />
@@ -514,7 +514,7 @@ export default function PurchaseOrdersPage() {
 
           <button
             onClick={openCreateModal}
-            className="h-[30px] w-[30px] bg-black text-white hover:bg-slate-800 transition-colors shadow-sm flex items-center justify-center rounded-sm"
+            className="h-8 w-8 bg-primary text-black hover:opacity-90 transition-all shadow-md flex items-center justify-center rounded cursor-pointer"
             title="Add PO"
           >
             <Plus className="w-4 h-4" />
@@ -522,9 +522,10 @@ export default function PurchaseOrdersPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto">
-        <table className="w-full border-collapse text-left">
-          <thead className="sticky top-0 bg-slate-50 z-10 border-b border-slate-100">
+      <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
+        <div className="min-w-full px-2 py-2">
+            <table className="w-full text-left border-separate border-spacing-0 relative z-0">
+          <thead className="sticky top-0 bg-secondary/80 z-10 border-b border-border backdrop-blur-md transition-colors">
             <tr>
               {[
                 { key: 'label', label: 'PO #' },
@@ -540,19 +541,19 @@ export default function PurchaseOrdersPage() {
                 <th
                   key={col.key}
                   onClick={() => handleSort(col.key)}
-                  className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors border-r border-slate-100 last:border-0"
+                  className="px-4 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary transition-colors border-r border-border last:border-0"
                 >
-                  <div className="flex items-center space-x-1">
+                  <div className="flex items-center space-x-1.5">
                     <span>{col.label}</span>
-                    <ArrowUpDown className={cn("w-2 h-2", sortBy === col.key ? "text-black" : "text-slate-200")} />
+                    <ArrowUpDown className={cn("w-2.5 h-2.5", sortBy === col.key ? "text-foreground" : "text-muted-foreground")} />
                   </div>
                 </th>
               ))}
-              <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest text-center border-l border-slate-100">Items</th>
-              <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest text-right">Actions</th>
+              <th className="px-4 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-center border-l border-border">Items</th>
+              <th className="px-4 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-border bg-background/50">
             {loading ? (
               <tr><td colSpan={11} className="px-4 py-12 text-center text-xs text-slate-400">Loading Orders...</td></tr>
             ) : error ? (
@@ -562,47 +563,47 @@ export default function PurchaseOrdersPage() {
             ) : orders.map(order => (
               <tr
                 key={order._id}
-                className="hover:bg-slate-50 transition-colors group cursor-pointer"
+                className="hover:bg-secondary/40 hover:scale-[1.002] hover:shadow-md transition-all duration-200 group relative z-0 hover:z-10 bg-background cursor-pointer"
                 onClick={() => router.push(`/warehouse/purchase-orders/${order._id}`)}
               >
-                <td className="px-4 py-2 text-[11px] font-bold text-slate-900 tracking-tight">{order.label || '-'}</td>
-                <td className="px-4 py-2 text-[11px] text-slate-600 font-medium">{renderVendor(order)}</td>
-                <td className="px-4 py-2 text-[10px] text-slate-500">{order.paymentTerms || '-'}</td>
-                <td className="px-4 py-2">
+                <td className="px-4 py-2 text-[11px] font-bold text-foreground tracking-tight border-r border-border">{order.label || '-'}</td>
+                <td className="px-4 py-2 text-[11px] text-foreground font-medium border-r border-border">{renderVendor(order)}</td>
+                <td className="px-4 py-2 text-[10px] text-muted-foreground border-r border-border">{order.paymentTerms || '-'}</td>
+                <td className="px-4 py-2 border-r border-border">
                   <span className={cn(
-                    "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
-                    order.status === 'Received' ? "bg-green-100 text-green-700" :
-                      order.status === 'Ordered' ? "bg-blue-100 text-blue-700" :
-                        order.status === 'Partial' ? "bg-yellow-100 text-yellow-700" :
-                          "bg-slate-100 text-slate-600"
+                    "px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest",
+                    order.status === 'Received' ? "bg-emerald-500/10 text-emerald-500" :
+                      order.status === 'Ordered' ? "bg-blue-500/10 text-blue-500" :
+                        order.status === 'Partial' ? "bg-amber-500/10 text-amber-500" :
+                          "bg-secondary text-muted-foreground"
                   )}>
                     {order.status}
                   </span>
                 </td>
-                <td className="px-4 py-2 text-[11px] text-slate-500">{formatDate(order.scheduledDelivery)}</td>
-                <td className="px-4 py-2 text-[11px] text-slate-500">{formatDate(order.receivedDate)}</td>
-                <td className="px-4 py-2 text-[11px] text-slate-500">{formatDate(order.createdAt)}</td>
-                <td className="px-4 py-2 text-[11px] text-slate-600">
+                <td className="px-4 py-2 text-[11px] text-muted-foreground border-r border-border">{formatDate(order.scheduledDelivery)}</td>
+                <td className="px-4 py-2 text-[11px] text-muted-foreground border-r border-border">{formatDate(order.receivedDate)}</td>
+                <td className="px-4 py-2 text-[11px] text-muted-foreground border-r border-border font-mono">{formatDate(order.createdAt)}</td>
+                <td className="px-4 py-2 text-[11px] text-foreground border-r border-border">
                   {order.createdBy ? `${order.createdBy.firstName} ${order.createdBy.lastName}` : '-'}
                 </td>
-                <td className="px-4 py-2 text-[11px] font-bold text-slate-900">
+                <td className="px-4 py-2 text-[11px] font-bold text-foreground border-r border-border">
                   {formatCurrency(calculateTotal(order))}
                 </td>
-                <td className="px-4 py-2 text-center text-[11px] font-bold text-slate-600 border-l border-slate-50">
+                <td className="px-4 py-2 text-center text-[11px] font-bold text-muted-foreground border-r border-border">
                   {order.lineItems?.length || 0}
                 </td>
-                <td className="px-4 py-2 text-center border-l border-slate-50">
-                  <div className="flex items-center justify-center space-x-1">
+                <td className="px-4 py-2 text-right">
+                  <div className="flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={(e) => handleEditClick(e, order)}
-                      className="p-1 text-slate-400 hover:text-blue-600 transition-colors relative z-20"
+                      className="p-1 text-muted-foreground hover:text-foreground hover:bg-secondary rounded transition-colors relative z-20"
                       title="Edit Order"
                     >
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={(e) => handleDeleteClick(e, order._id)}
-                      className="p-1 text-slate-400 hover:text-red-600 transition-colors relative z-20"
+                      className="p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors relative z-20"
                       title="Delete Order"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -614,18 +615,19 @@ export default function PurchaseOrdersPage() {
           </tbody>
         </table>
       </div>
+    </div>
 
       {/* Create / Edit Order Modal */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-4xl overflow-hidden animate-in fade-in zoom-in duration-200 border border-slate-200 flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50 shrink-0">
-              <h2 className="text-sm font-bold uppercase text-slate-900">{editingOrderId ? 'Edit Purchase Order' : 'Create Purchase Order'}</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-background w-full max-w-4xl overflow-hidden animate-in fade-in zoom-in duration-200 border border-border flex flex-col max-h-[90vh] rounded shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-secondary/50 shrink-0">
+              <h2 className="text-sm font-black uppercase tracking-widest text-foreground">{editingOrderId ? 'Edit Purchase Order' : 'Create Purchase Order'}</h2>
               <button
                 onClick={() => setIsCreateModalOpen(false)}
-                className="text-slate-400 hover:text-black transition-colors"
+                className="text-muted-foreground hover:text-foreground transition-colors"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
@@ -634,18 +636,18 @@ export default function PurchaseOrdersPage() {
                 {/* Header Info */}
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">PO Label <span className="text-red-500">*</span></label>
+                    <label className="text-[11px] font-black text-muted-foreground uppercase tracking-wider">PO Label <span className="text-red-500">*</span></label>
                     <input
                       type="text"
                       required
                       disabled
                       value={newOrder.label}
                       onChange={e => setNewOrder({ ...newOrder, label: e.target.value })}
-                      className="w-full px-3 py-2 border border-slate-200 rounded text-sm bg-slate-100 text-slate-500 cursor-not-allowed focus:outline-none"
+                      className="w-full px-3 py-2 border border-border rounded text-sm bg-secondary text-muted-foreground cursor-not-allowed focus:outline-none"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Vendor <span className="text-red-500">*</span></label>
+                    <label className="text-[11px] font-black text-muted-foreground uppercase tracking-wider">Vendor <span className="text-red-500">*</span></label>
                     <SearchableSelect
                       options={allVendors.map(v => ({ value: v._id, label: v.name }))}
                       value={newOrder.vendor}
@@ -655,44 +657,44 @@ export default function PurchaseOrdersPage() {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Status</label>
+                    <label className="text-[11px] font-black text-muted-foreground uppercase tracking-wider">Status</label>
                     <select
                       value={newOrder.status}
                       onChange={e => setNewOrder({ ...newOrder, status: e.target.value })}
-                      className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-black/10 bg-white"
+                      className="w-full px-3 py-2 border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 bg-background text-foreground"
                     >
                       <option value="Pending">Pending</option>
                       <option value="Received">Received</option>
                     </select>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Payment Terms</label>
+                    <label className="text-[11px] font-black text-muted-foreground uppercase tracking-wider">Payment Terms</label>
                     <input
                       type="text"
                       value={newOrder.paymentTerms}
                       onChange={e => setNewOrder({ ...newOrder, paymentTerms: e.target.value })}
-                      className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-black/10"
+                      className="w-full px-3 py-2 border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 bg-background text-foreground"
                       placeholder="e.g. Net 30"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Scheduled Delivery</label>
+                    <label className="text-[11px] font-black text-muted-foreground uppercase tracking-wider">Scheduled Delivery</label>
                     <input
                       type="date"
                       value={newOrder.scheduledDelivery}
                       onChange={e => setNewOrder({ ...newOrder, scheduledDelivery: e.target.value })}
-                      className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-black/10"
+            className="w-full px-3 py-2 border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 bg-background text-foreground"
                     />
                   </div>
                 </div>
 
-                <div className="border-t border-slate-100 pt-6">
+                <div className="border-t border-border pt-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Line Items</h3>
+                    <h3 className="text-[11px] font-black text-foreground uppercase tracking-widest">Line Items</h3>
                     <button
                       type="button"
                       onClick={addLineItem}
-                      className="flex items-center space-x-1 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[10px] font-bold uppercase transition-colors"
+                      className="flex items-center space-x-1 px-3 h-8 bg-secondary hover:bg-secondary/80 text-foreground rounded text-[10px] font-bold uppercase transition-colors shadow-sm cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>Add Item</span>
@@ -700,20 +702,20 @@ export default function PurchaseOrdersPage() {
                   </div>
 
                   {newLineItems.length === 0 ? (
-                    <div className="text-center py-8 bg-slate-50 rounded border border-dashed border-slate-200 text-slate-400 text-xs">
+                    <div className="text-center py-12 bg-secondary/20 rounded border border-dashed border-border text-muted-foreground text-[11px] font-bold uppercase tracking-widest">
                       No items added. Click "Add Item" to start.
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      <div className="grid grid-cols-12 gap-2 text-[10px] uppercase font-bold text-slate-400 px-2">
+                      <div className="grid grid-cols-12 gap-2 text-[9px] uppercase font-black text-muted-foreground tracking-widest px-2">
                         <div className="col-span-4">product / sku</div>
                         <div className="col-span-2">UOM</div>
                         <div className="col-span-2">Qty</div>
                         <div className="col-span-3">Unit Cost</div>
-                        <div className="col-span-1"></div>
+                        <div className="col-span-1 text-right">Action</div>
                       </div>
                       {newLineItems.map((item, index) => (
-                        <div key={item.id} className="grid grid-cols-12 gap-2 items-start bg-slate-50/50 p-2 rounded border border-slate-100">
+                        <div key={item.id} className="grid grid-cols-12 gap-2 items-start bg-secondary/20 p-2 rounded border border-border">
                           <div className="col-span-4">
                             <SearchableSelect
                               options={allSkus
@@ -741,19 +743,19 @@ export default function PurchaseOrdersPage() {
                               min="1"
                               value={item.qtyOrdered}
                               onChange={(e) => updateLineItem(item.id, 'qtyOrdered', parseInt(e.target.value) || 0)}
-                              className="w-full px-2 py-2 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-black/10"
+                              className="w-full px-2 py-2 border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 bg-background text-foreground"
                             />
                           </div>
                           <div className="col-span-3">
                             <div className="relative">
-                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">$</span>
                               <input
                                 type="number"
                                 min="0"
                                 step="0.00000001"
                                 value={item.cost}
                                 onChange={(e) => updateLineItem(item.id, 'cost', parseFloat(e.target.value) || 0)}
-                                className="w-full pl-5 pr-2 py-2 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-black/10"
+                                className="w-full pl-5 pr-2 py-2 border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 bg-background text-foreground font-mono"
                               />
                             </div>
                           </div>
@@ -761,7 +763,7 @@ export default function PurchaseOrdersPage() {
                             <button
                               type="button"
                               onClick={() => removeLineItem(item.id)}
-                              className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                              className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full transition-colors cursor-pointer"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -774,11 +776,11 @@ export default function PurchaseOrdersPage() {
               </form>
             </div>
 
-            <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-end shrink-0">
+            <div className="p-4 border-t border-border bg-secondary/50 flex justify-end shrink-0">
               <button
                 type="submit"
                 form="create-po-form"
-                className="px-6 py-2.5 bg-black text-white text-xs font-bold uppercase rounded hover:bg-slate-800 transition-colors"
+                className="px-8 h-10 bg-primary text-black text-[11px] font-black uppercase tracking-widest rounded hover:opacity-90 transition-all shadow-md cursor-pointer"
               >
                 {editingOrderId ? 'Save Changes' : 'Create Order'}
               </button>
@@ -818,14 +820,16 @@ export default function PurchaseOrdersPage() {
         </div>
       )}
 
-      <Pagination
-        currentPage={page}
-        totalPages={totalPages}
-        onPageChange={setPage}
-        totalItems={totalOrders}
-        itemsPerPage={20}
-        itemName="Orders"
-      />
+      <div className="border-t border-border bg-background transition-colors duration-300">
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          totalItems={totalOrders}
+          itemsPerPage={20}
+          itemName="Orders"
+        />
+      </div>
     </div>
   );
 }

@@ -341,39 +341,39 @@ export default function WebProductsPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-48px)] bg-white">
+    <div className="flex flex-col h-[calc(100vh-48px)] bg-background transition-colors duration-300 relative">
       {syncStatus.isSyncing && (
-        <div className="bg-blue-600 px-4 py-1.5 flex items-center justify-between text-white animate-in slide-in-from-top duration-300">
+        <div className="bg-primary px-4 h-10 flex items-center justify-between text-black animate-in slide-in-from-top duration-300 shadow-md relative z-[60]">
             <div className="flex items-center space-x-3 flex-1">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                <span className="text-[10px] font-bold uppercase tracking-wider">{syncStatus.currentStep}</span>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span className="text-[10px] font-black uppercase tracking-widest">{syncStatus.currentStep}</span>
                 {syncStatus.total > 0 && (
-                    <div className="flex-1 max-w-xs bg-blue-400 h-1 rounded-full overflow-hidden mx-4">
+                    <div className="flex-1 max-w-sm bg-black/10 h-1.5 rounded-full overflow-hidden mx-6">
                         <div 
-                            className="bg-white h-full transition-all duration-500" 
+                            className="bg-black h-full transition-all duration-500" 
                             style={{ width: `${(syncStatus.progress / syncStatus.total) * 100}%` }}
                         />
                     </div>
                 )}
             </div>
-            <div className="text-[10px] font-mono font-bold">
+            <div className="text-[10px] font-black uppercase tracking-widest ml-4">
                 {syncStatus.total > 0 ? `${Math.round((syncStatus.progress / syncStatus.total) * 100)}% (${syncStatus.progress}/${syncStatus.total})` : 'Initializing...'}
             </div>
         </div>
       )}
 
       {/* Action Bar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100 bg-slate-50/50">
+      <div className="flex items-center justify-between px-4 h-11 border-b border-border bg-secondary/50 transition-colors">
         <div className="flex items-center space-x-4">
-          <h1 className="text-sm font-bold text-slate-900 uppercase tracking-tighter">Web Products</h1>
+          <h1 className="text-sm font-bold text-foreground uppercase tracking-tighter shrink-0">Web Products</h1>
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
             <input
               type="text"
               placeholder="Search Products..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 pr-3 py-1.5 w-64 bg-white border border-slate-200 text-[11px] focus:outline-none focus:ring-1 focus:ring-black/5 transition-all placeholder:text-slate-400"
+              className="pl-8 pr-3 h-8 w-64 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
             />
           </div>
         </div>
@@ -391,32 +391,32 @@ export default function WebProductsPage() {
             ]}
             selectedValues={selectedCategories}
             onChange={setSelectedCategories}
-            className="h-[30px]"
+            className="h-8"
           />
 
-          <div className="w-px h-6 bg-slate-200 mx-2" />
+          <div className="w-px h-6 bg-border mx-2" />
 
           <button
             onClick={() => handleSync(false)}
             disabled={syncStatus.isSyncing}
-            className="h-[30px] px-3 text-slate-600 hover:text-black hover:bg-slate-200 transition-colors rounded-sm flex items-center space-x-1 disabled:opacity-50 border border-slate-200 bg-white shadow-sm"
+            className="h-8 px-3 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors rounded flex items-center space-x-1.5 disabled:opacity-50 border border-border bg-card shadow-sm cursor-pointer"
             title="Incremental Sync - Only changed products"
           >
-            {syncStatus.isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4 text-blue-500" />}
-            <span className="text-[10px] font-bold uppercase">Sync</span>
+            {syncStatus.isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4 text-blue-500/70" />}
+            <span className="text-[10px] font-bold uppercase tracking-wider">Sync</span>
           </button>
           
           <button
             onClick={() => handleSync(true)}
             disabled={syncStatus.isSyncing}
-            className="h-[30px] px-3 text-slate-600 hover:text-amber-600 hover:bg-amber-50 transition-colors rounded-sm flex items-center space-x-1 disabled:opacity-50 border border-slate-200 bg-white shadow-sm"
+            className="h-8 px-3 text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 transition-colors rounded flex items-center space-x-1.5 disabled:opacity-50 border border-border bg-card shadow-sm cursor-pointer"
             title="Full Sync - All products from scratch"
           >
-            <Globe className="w-4 h-4 text-amber-500" />
-            <span className="text-[10px] font-bold uppercase">Full</span>
+            <Globe className="w-4 h-4 text-amber-500/70" />
+            <span className="text-[10px] font-bold uppercase tracking-wider">Full</span>
           </button>
 
-          <div className="w-px h-6 bg-slate-200 mx-1" />
+          <div className="w-px h-6 bg-border mx-1" />
 
           <input
             type="file"
@@ -427,29 +427,30 @@ export default function WebProductsPage() {
           />
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="h-[30px] px-3 bg-white text-slate-600 hover:text-black hover:bg-slate-100 transition-colors border border-slate-200 shadow-sm flex items-center space-x-2 rounded-sm"
+            className="h-8 px-3 bg-card text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors border border-border shadow-sm flex items-center space-x-2 rounded cursor-pointer"
             title="Import Products from CSV"
           >
-            <Upload className="w-3.5 h-3.5 text-blue-500" />
+            <Upload className="w-3.5 h-3.5 text-primary" />
             <span className="text-[10px] font-bold uppercase tracking-wider">Import CSV</span>
           </button>
 
           <button
             onClick={() => openModal()}
-            className="h-[30px] px-3 bg-black text-white hover:bg-slate-800 transition-colors shadow-sm flex items-center space-x-2 rounded-sm"
+            className="h-8 px-3 bg-primary text-black hover:opacity-90 transition-all shadow-md flex items-center space-x-2 rounded cursor-pointer"
             title="Add Product"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span className="text-[10px] font-bold uppercase tracking-wider">Add Product</span>
+            <span className="text-[10px] font-black uppercase tracking-widest">Add Product</span>
           </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto">
-        <table className="w-full border-collapse text-left">
-          <thead className="sticky top-0 bg-slate-50 z-10 border-b border-slate-100">
+      <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
+        <div className="min-w-full px-2 py-2">
+            <table className="w-full text-left border-separate border-spacing-0 relative z-0">
+          <thead className="sticky top-0 bg-secondary/80 z-10 border-b border-border backdrop-blur-md transition-colors">
             <tr>
-              <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest w-10">Img</th>
+              <th className="px-4 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest w-12 border-r border-border">Img</th>
               {[
                 { key: 'webId', label: 'Web ID' },
                 { key: '_id', label: 'SKU' },
@@ -464,17 +465,17 @@ export default function WebProductsPage() {
                 <th
                   key={col.key}
                   onClick={() => handleSort(col.key)}
-                  className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors border-r border-slate-100 last:border-0 whitespace-nowrap"
+                  className="px-4 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary transition-colors border-r border-border last:border-0 whitespace-nowrap"
                 >
-                  <div className="flex items-center space-x-1">
+                  <div className="flex items-center space-x-1.5">
                     <span>{col.label}</span>
-                    <ArrowUpDown className={cn("w-2 h-2", sortBy === col.key ? "text-black" : "text-slate-200")} />
+                    <ArrowUpDown className={cn("w-2.5 h-2.5", sortBy === col.key ? "text-foreground" : "text-muted-foreground")} />
                   </div>
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-border bg-background/50">
             {loading ? (
               <tr><td colSpan={11} className="px-2 py-12 text-center text-[10px] text-slate-400">Loading Web Products...</td></tr>
             ) : error ? (
@@ -484,11 +485,11 @@ export default function WebProductsPage() {
             ) : skus.map(product => (
               <tr 
                 key={product._id} 
-                className="hover:bg-slate-50 transition-colors group cursor-pointer"
+                className="hover:bg-secondary/40 hover:scale-[1.002] hover:shadow-md transition-all duration-200 group relative z-0 hover:z-10 bg-background cursor-pointer"
                 onClick={() => router.push(`/warehouse/web-products/${product._id}`)}
               >
-                <td className="px-2 py-0.5">
-                  <div className="w-6 h-6 rounded bg-slate-100 overflow-hidden relative">
+                <td className="px-4 py-1.5 border-r border-border">
+                  <div className="w-7 h-7 rounded bg-secondary overflow-hidden relative border border-border">
                     <img 
                         src={product.image || globalSettings?.missingSkuImage || '/sku-placeholder.png'} 
                         alt="" 
@@ -496,53 +497,53 @@ export default function WebProductsPage() {
                     />
                   </div>
                 </td>
-                <td className="px-2 py-0.5 text-[9px] text-slate-600 font-mono italic">{product.webId || '-'}</td>
-                <td className="px-2 py-0.5 max-w-[200px]">
+                <td className="px-4 py-1.5 text-[9px] text-muted-foreground font-mono italic border-r border-border">{product.webId || '-'}</td>
+                <td className="px-4 py-1.5 max-w-[200px] border-r border-border">
                   <div className="flex flex-col leading-tight">
-                    <span className="text-[9px] text-slate-900 font-bold truncate">{product.name}</span>
+                    <span className="text-[10px] text-foreground font-bold truncate">{product.name}</span>
                   </div>
                 </td>
-                <td className="px-2 py-0.5 whitespace-nowrap">
+                <td className="px-4 py-1.5 whitespace-nowrap border-r border-border">
                   <span className={cn(
                     "px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter shadow-sm",
-                    product.website?.includes('KING') ? "bg-amber-100 text-amber-700 border border-amber-200" :
-                    product.website?.includes('GRASS') ? "bg-emerald-100 text-emerald-700 border border-emerald-200" :
-                    product.website?.includes('GRHK') ? "bg-blue-100 text-blue-700 border border-blue-200" :
-                    product.website?.includes('REBEL') ? "bg-purple-100 text-purple-700 border border-purple-200" :
-                    product.website?.includes('GUD') ? "bg-orange-100 text-orange-700 border border-orange-200" :
-                    "bg-slate-100 text-slate-500"
+                    product.website?.includes('KING') ? "bg-orange-500/10 text-orange-500 border border-orange-500/20" :
+                    product.website?.includes('GRASS') ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" :
+                    product.website?.includes('GRHK') ? "bg-blue-500/10 text-blue-500 border border-blue-500/20" :
+                    product.website?.includes('REBEL') ? "bg-purple-500/10 text-purple-500 border border-purple-500/20" :
+                    product.website?.includes('GUD') ? "bg-amber-500/10 text-amber-500 border border-amber-500/20" :
+                    "bg-secondary text-muted-foreground"
                   )}>
                     {product.website || 'N/A'}
                   </span>
                 </td>
-                <td className="px-2 py-0.5 whitespace-nowrap">
-                    <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-[7px] font-black uppercase tracking-widest border border-slate-200">
+                <td className="px-4 py-1.5 whitespace-nowrap border-r border-border">
+                    <span className="px-1.5 py-0.5 bg-secondary text-muted-foreground rounded text-[7px] font-black uppercase tracking-widest border border-border">
                         {product.type || 'simple'}
                     </span>
                 </td>
-                <td className="px-2 py-0.5 text-[10px] text-slate-900 font-bold font-mono whitespace-nowrap">
+                <td className="px-4 py-1.5 text-[11px] text-foreground font-bold font-mono whitespace-nowrap border-r border-border">
                     ${(product.salePrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </td>
-                <td className="px-2 py-0.5">
+                <td className="px-4 py-1.5 border-r border-border">
                     <span className={cn(
-                        "text-[8px] font-black uppercase tracking-widest",
-                        product.status === 'publish' ? "text-emerald-500" : "text-slate-400"
+                        "text-[9px] font-black uppercase tracking-widest",
+                        product.status === 'publish' ? "text-emerald-500" : "text-muted-foreground"
                     )}>
                         {product.status}
                     </span>
                 </td>
-                <td className="px-2 py-0.5">
+                <td className="px-4 py-1.5 border-r border-border">
                     <span className={cn(
-                        "px-1.5 py-0.5 rounded-sm text-[8px] font-bold uppercase whitespace-nowrap",
-                        product.stockStatus === 'instock' ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+                        "px-1.5 py-0.5 rounded-sm text-[8px] font-black uppercase whitespace-nowrap tracking-widest",
+                        product.stockStatus === 'instock' ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" : "bg-destructive/10 text-destructive border border-destructive/20"
                     )}>
                         {product.stockStatus === 'instock' ? 'In Stock' : 'Out of Stock'}
                     </span>
                 </td>
-                <td className="px-2 py-0.5 text-[10px] font-bold text-slate-700 font-mono text-center">
+                <td className="px-4 py-1.5 text-[11px] font-bold text-foreground font-mono text-center border-r border-border">
                     {product.stockQuantity || 0}
                 </td>
-                <td className="px-2 py-0.5 text-[10px] font-bold text-emerald-600 font-mono text-center">
+                <td className="px-4 py-1.5 text-[11px] font-bold text-emerald-500 font-mono text-center">
                     {product.totalWebOrders || 0}
                 </td>
               </tr>
@@ -550,28 +551,31 @@ export default function WebProductsPage() {
           </tbody>
         </table>
       </div>
+    </div>
 
-      <Pagination
-        currentPage={page}
-        totalPages={totalPages}
-        onPageChange={setPage}
-        totalItems={totalSkus}
-        itemsPerPage={20}
-        itemName="Products"
-      />
+      <div className="border-t border-border bg-background transition-colors duration-300">
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          totalItems={totalSkus}
+          itemsPerPage={20}
+          itemName="Products"
+        />
+      </div>
 
       {/* Add/Edit Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white w-full max-w-2xl shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-background w-full max-w-2xl shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh] rounded border border-border">
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
-              <h2 className="text-sm font-black uppercase tracking-widest text-slate-900">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-secondary/50 shrink-0">
+              <h2 className="text-sm font-black uppercase tracking-widest text-foreground">
                 {editingSku ? 'Edit Product' : 'Add New Product'}
               </h2>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-black transition-colors"
+                className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -600,9 +604,9 @@ export default function WebProductsPage() {
 
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Category</label>
+                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Category</label>
                     <select
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:border-black focus:ring-0 transition-colors"
+                      className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground"
                       value={formData.category}
                       onChange={e => setFormData({ ...formData, category: e.target.value })}
                     >
@@ -615,9 +619,9 @@ export default function WebProductsPage() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Sub Category</label>
+                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Sub Category</label>
                     <select
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:border-black focus:ring-0 transition-colors"
+                      className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground"
                       value={formData.subCategory}
                       onChange={e => setFormData({ ...formData, subCategory: e.target.value })}
                     >
@@ -631,9 +635,9 @@ export default function WebProductsPage() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Material Type</label>
+                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Material Type</label>
                     <select
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:border-black focus:ring-0 transition-colors"
+                      className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground"
                       value={formData.materialType}
                       onChange={e => setFormData({ ...formData, materialType: e.target.value })}
                     >
@@ -650,10 +654,10 @@ export default function WebProductsPage() {
 
                 <div className="grid grid-cols-4 gap-4">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">UOM</label>
+                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">UOM</label>
                     <input
                       list="uom-options"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:border-black focus:ring-0 transition-colors"
+                      className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground"
                       value={formData.uom}
                       onChange={e => setFormData({ ...formData, uom: e.target.value })}
                       placeholder="Select or Type..."
@@ -670,23 +674,29 @@ export default function WebProductsPage() {
                 </div>
 
                 <div className="flex items-center space-x-6 pt-2">
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="w-4 h-4 text-black border-slate-300 rounded focus:ring-black"
-                      checked={formData.kitApplied}
-                      onChange={e => setFormData({ ...formData, kitApplied: e.target.checked })}
-                    />
-                    <span className="text-xs font-bold uppercase text-slate-600">Kit Applied</span>
+                  <label className="flex items-center space-x-2 cursor-pointer group">
+                    <div className="relative flex items-center">
+                      <input
+                        type="checkbox"
+                        className="peer h-4 w-4 cursor-pointer appearance-none rounded border border-border bg-background transition-all checked:bg-primary"
+                        checked={formData.kitApplied}
+                        onChange={e => setFormData({ ...formData, kitApplied: e.target.checked })}
+                      />
+                      <svg className="pointer-events-none absolute h-3 w-3 translate-x-[2px] text-black opacity-0 peer-checked:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                    </div>
+                    <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors">Kit Applied</span>
                   </label>
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="w-4 h-4 text-black border-slate-300 rounded focus:ring-black"
-                      checked={formData.isLotApplied}
-                      onChange={e => setFormData({ ...formData, isLotApplied: e.target.checked })}
-                    />
-                    <span className="text-xs font-bold uppercase text-slate-600">Lot Applied (Traceability)</span>
+                  <label className="flex items-center space-x-2 cursor-pointer group">
+                    <div className="relative flex items-center">
+                      <input
+                        type="checkbox"
+                        className="peer h-4 w-4 cursor-pointer appearance-none rounded border border-border bg-background transition-all checked:bg-primary"
+                        checked={formData.isLotApplied}
+                        onChange={e => setFormData({ ...formData, isLotApplied: e.target.checked })}
+                      />
+                      <svg className="pointer-events-none absolute h-3 w-3 translate-x-[2px] text-black opacity-0 peer-checked:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                    </div>
+                    <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors">Lot Applied (Traceability)</span>
                   </label>
                 </div>
 
@@ -694,11 +704,11 @@ export default function WebProductsPage() {
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 shrink-0 flex justify-end space-x-3">
+            <div className="px-6 py-4 border-t border-border bg-secondary/50 shrink-0 flex justify-end space-x-3">
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-black hover:bg-slate-100 transition-colors"
+                className="px-6 h-10 text-[11px] font-black uppercase tracking-widest text-muted-foreground hover:text-foreground hover:bg-secondary rounded transition-all cursor-pointer"
               >
                 Cancel
               </button>
@@ -706,9 +716,9 @@ export default function WebProductsPage() {
                 type="submit"
                 form="sku-form"
                 disabled={isSubmitting}
-                className="px-6 py-2.5 bg-black text-white text-xs font-bold uppercase tracking-wider hover:bg-slate-800 transition-colors disabled:opacity-50 flex items-center space-x-2"
+                className="px-8 h-10 bg-primary text-black text-[11px] font-black uppercase tracking-widest rounded hover:opacity-90 transition-all shadow-md disabled:opacity-50 flex items-center space-x-3 cursor-pointer"
               >
-                {isSubmitting && <Loader2 className="w-3 h-3 animate-spin" />}
+                {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
                 <span>{editingSku ? 'Save Changes' : 'Create Product'}</span>
               </button>
             </div>
@@ -716,7 +726,6 @@ export default function WebProductsPage() {
           </div>
         </div>
       )}
-
     </div>
   );
 }
@@ -724,7 +733,7 @@ export default function WebProductsPage() {
 // Helpers
 const FormInput = ({ label, value, onChange, type = "text", required = false, placeholder = "" }: { label: string, value: any, onChange: (val: any) => void, type?: string, required?: boolean, placeholder?: string }) => (
   <div className="space-y-1">
-    <label className="text-[10px] font-bold text-slate-500 uppercase">{label} {required && <span className="text-red-500">*</span>}</label>
+    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">{label} {required && <span className="text-destructive">*</span>}</label>
     <input
       type={type}
       required={required}
@@ -732,7 +741,7 @@ const FormInput = ({ label, value, onChange, type = "text", required = false, pl
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
       className={cn(
-        "w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:border-black focus:ring-0 transition-colors",
+        "w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground font-medium",
         label.includes('SKU') && required === false && "opacity-50 cursor-not-allowed"
       )}
     />

@@ -320,7 +320,7 @@ export default function DashboardPage() {
                                     className={cn(
                                         "px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all whitespace-nowrap",
                                         dateFilter === opt.key
-                                            ? "bg-blue-500 text-white shadow-lg shadow-blue-500/30"
+                                            ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30"
                                             : "bg-slate-800/60 text-slate-400 hover:bg-slate-700 hover:text-white border border-slate-700/50"
                                     )}
                                 >
@@ -365,10 +365,10 @@ export default function DashboardPage() {
                         {/* AI Chat Button */}
                         <button 
                             onClick={() => setIsChatOpen(true)}
-                            className="group flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-xl px-4 py-2 transition-all shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40"
+                            className="group flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl px-4 py-2 transition-all shadow-lg shadow-primary/20 hover:shadow-primary/40 cursor-pointer"
                         >
                             <Brain className="w-4 h-4" />
-                            <span className="font-bold text-xs">Ask AI</span>
+                            <span className="font-bold text-xs uppercase tracking-widest">Ask AI</span>
                         </button>
                     </div>
                 </div>

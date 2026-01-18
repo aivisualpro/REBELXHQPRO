@@ -134,10 +134,12 @@ export default function SettingsPage() {
                 
                 try {
                     toast.loading(`Importing ${totalRows} clients...`, { id: toastId });
+                    
+                    // The API expects { clients: [...] }, matched with crm/clients/page.tsx
                     const res = await fetch('/api/clients/import', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ data: results.data })
+                        body: JSON.stringify({ clients: results.data })
                     });
                     
                     if (res.ok) {
@@ -148,6 +150,7 @@ export default function SettingsPage() {
                         toast.error(err.error || 'Import failed', { id: toastId });
                     }
                 } catch (err) {
+                    console.error(err);
                     toast.error('Import failed', { id: toastId });
                 }
                 setImporting(false);

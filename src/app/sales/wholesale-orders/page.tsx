@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Search,
   Upload,
-  ArrowUpDown,
   Calendar,
   User,
   ShoppingCart,
@@ -18,14 +17,14 @@ import {
   Printer,
   Package,
   RefreshCw,
-  Loader2,
-  List // Adding List icon
+  Loader2
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { MultiSelectFilter } from '@/components/ui/filters/MultiSelectFilter';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { TableColumnHeader } from '@/components/ui/TableColumnHeader';
 import { Pagination } from '@/components/ui/Pagination';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal'; // Import Lot Modal
 
@@ -370,14 +369,7 @@ function SaleOrdersContent() {
     fetchOrders();
   }, [fetchOrders]);
 
-  const handleSort = (column: string) => {
-    if (sortBy === column) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(column);
-      setSortOrder('asc');
-    }
-  };
+
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>, endpoint: string, label: string) => {
     const file = e.target.files?.[0];
@@ -876,10 +868,10 @@ function SaleOrdersContent() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-48px)] bg-white relative">
-      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100 bg-slate-50/50">
+    <div className="flex flex-col h-[calc(100vh-48px)] bg-background relative transition-colors duration-300">
+      <div className="flex items-center justify-between px-4 h-11 border-b border-border bg-secondary/50 transition-colors">
         <div className="flex items-center space-x-4">
-          <h1 className="text-sm font-bold text-slate-900 uppercase tracking-tighter">Wholesale Orders</h1>
+          <h1 className="text-sm font-bold text-foreground uppercase tracking-tighter">Wholesale Orders</h1>
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
             <input
@@ -887,7 +879,7 @@ function SaleOrdersContent() {
               placeholder="Search Order#..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 pr-3 py-1.5 w-64 bg-white border border-slate-200 text-[11px] focus:outline-none focus:ring-1 focus:ring-black/5 transition-all placeholder:text-slate-400"
+              className="pl-8 pr-3 h-8 w-64 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
             />
           </div>
         </div>
@@ -899,7 +891,7 @@ function SaleOrdersContent() {
             options={clientOptions}
             selectedValues={selectedClients}
             onChange={setSelectedClients}
-            className="h-[30px]"
+            className="h-8"
           />
           <MultiSelectFilter
             label="Sales Rep"
@@ -907,7 +899,7 @@ function SaleOrdersContent() {
             options={salesRepOptions}
             selectedValues={selectedSalesReps}
             onChange={setSelectedSalesReps}
-            className="h-[30px]"
+            className="h-8"
           />
            <MultiSelectFilter
             label="SKU"
@@ -915,7 +907,7 @@ function SaleOrdersContent() {
             options={allSkus.map(s => ({ label: s.name, value: s._id }))}
             selectedValues={selectedSkus}
             onChange={setSelectedSkus}
-            className="h-[30px]"
+            className="h-8"
           />
           <MultiSelectFilter
             label="Status"
@@ -923,11 +915,11 @@ function SaleOrdersContent() {
             options={statusOptions}
             selectedValues={selectedStatuses}
             onChange={setSelectedStatuses}
-            className="h-[30px]"
+            className="h-8"
           />
 
-          <div className="flex items-center space-x-1 border border-slate-200 bg-white px-3 h-[30px] rounded-sm">
-            <Calendar className="w-3 h-3 text-slate-400" />
+          <div className="flex items-center space-x-1 border border-border bg-card px-3 h-8 rounded">
+            <Calendar className="w-3 h-3 text-muted-foreground" />
             <input
               type="date"
               className="text-[10px] outline-none max-w-[80px] bg-transparent"
@@ -943,7 +935,7 @@ function SaleOrdersContent() {
             />
           </div>
 
-          <div className="w-px h-6 bg-slate-200 mx-2" />
+          <div className="w-px h-6 bg-border mx-2" />
           
           <input
             type="file"
@@ -963,14 +955,14 @@ function SaleOrdersContent() {
           <div className="flex items-center space-x-2">
             <button
                 onClick={() => importOrdersRef.current?.click()}
-                className="h-[30px] w-[30px] bg-white border border-slate-200 text-slate-600 hover:text-black hover:bg-slate-50 transition-colors shadow-sm flex items-center justify-center rounded-none"
+                className="h-8 w-8 bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors shadow-sm flex items-center justify-center rounded"
                 title="Import Orders"
             >
                 <Upload className="w-4 h-4" />
             </button>
             <button
                 onClick={() => importLineItemsRef.current?.click()}
-                className="h-[30px] w-[30px] bg-white border border-slate-200 text-slate-600 hover:text-black hover:bg-slate-50 transition-colors shadow-sm flex items-center justify-center rounded-none"
+                className="h-8 w-8 bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors shadow-sm flex items-center justify-center rounded"
                 title="Import Line Items"
             >
                 <Upload className="w-4 h-4" />
@@ -979,7 +971,7 @@ function SaleOrdersContent() {
 
           <button
             onClick={openCreateModal}
-            className="h-[30px] w-[30px] bg-black text-white hover:bg-slate-800 transition-colors shadow-sm flex items-center justify-center rounded-none"
+            className="h-8 w-8 bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-md flex items-center justify-center rounded cursor-pointer"
             title="New Order"
           >
             <Plus className="w-4 h-4" />
@@ -989,7 +981,7 @@ function SaleOrdersContent() {
             <button
                 onClick={handleSyncCosts}
                 disabled={isSyncing}
-                className={cn("h-[30px] w-[30px] bg-white border border-slate-200 text-slate-600 hover:text-blue-600 hover:bg-slate-50 transition-colors shadow-sm flex items-center justify-center rounded-none", isSyncing && "animate-spin text-blue-600")}
+                className={cn("h-8 w-8 bg-card border border-border text-muted-foreground hover:text-primary hover:bg-secondary transition-colors shadow-sm flex items-center justify-center rounded", isSyncing && "animate-spin text-primary")}
                 title="Sync Costs"
             >
                 <RefreshCw className="w-4 h-4" />
@@ -1007,9 +999,10 @@ function SaleOrdersContent() {
 
       </div>
 
-      <div className="flex-1 overflow-auto">
-        <table className="w-full border-collapse text-left">
-          <thead className="sticky top-0 bg-slate-50 z-10 border-b border-slate-100">
+      <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
+        <div className="min-w-full px-2 py-2">
+            <table className="w-full text-left border-separate border-spacing-0 relative z-0">
+          <thead className="sticky top-0 bg-secondary/80 z-10 border-b border-border backdrop-blur-md transition-colors">
             <tr>
               {[
                 { key: 'label', label: 'Order #' },
@@ -1028,18 +1021,27 @@ function SaleOrdersContent() {
               ].map(col => (
                 <th
                   key={col.key}
-                  onClick={() => handleSort(col.key)}
-                  className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors border-r border-slate-100 last:border-0"
+                  className="border-r border-border last:border-0"
                 >
-                  <div className="flex items-center space-x-1">
-                    <span>{col.label}</span>
-                    <ArrowUpDown className={cn("w-2 h-2", sortBy === col.key ? "text-black" : "text-slate-200")} />
-                  </div>
+                  <TableColumnHeader
+                    column={col}
+                    title={col.label}
+                    currentSortBy={sortBy}
+                    currentSortOrder={sortOrder}
+                    onSort={(key, dir) => {
+                      setSortBy(key);
+                      setSortOrder(dir);
+                    }}
+                    onFilter={(_key) => {
+                        toast(`Filtering by ${col.label} implementation pending`);
+                    }}
+                    className="text-muted-foreground"
+                  />
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-border bg-background/50">
             {loading ? (
               <tr><td colSpan={12} className="px-4 py-12 text-center text-xs text-slate-400">Loading Orders...</td></tr>
             ) : error ? (
@@ -1061,48 +1063,48 @@ function SaleOrdersContent() {
                 return (
                   <tr
                     key={order._id}
-                    className="hover:bg-slate-50 transition-colors group cursor-pointer"
+                    className="hover:bg-secondary/40 hover:scale-[1.002] hover:shadow-md transition-all duration-200 group relative z-0 hover:z-10 bg-background"
                     onClick={() => router.push(`/sales/wholesale-orders/${order._id}`)}
                   >
-                    <td className="px-2 py-1.5 text-[10px] font-bold text-slate-900 tracking-tight font-mono whitespace-nowrap overflow-hidden text-ellipsis max-w-[100px] border-r border-slate-50">{order.label || '-'}</td>
-                    <td className="px-2 py-1.5 text-[10px] text-slate-500 font-mono border-r border-slate-50">{formatDate(order.createdAt)}</td>
-                    <td className="px-2 py-1.5 text-[10px] text-slate-600 font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px] border-r border-slate-50">{renderClient(order)}</td>
-                    <td className="px-2 py-1.5 text-[10px] text-slate-500 whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px] border-r border-slate-50">
+                    <td className="px-2 py-1.5 text-[10px] font-bold text-foreground tracking-tight font-mono whitespace-nowrap overflow-hidden text-ellipsis max-w-[100px] border-r border-border">{order.label || '-'}</td>
+                    <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono border-r border-border">{formatDate(order.createdAt)}</td>
+                    <td className="px-2 py-1.5 text-[10px] text-foreground font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px] border-r border-border">{renderClient(order)}</td>
+                    <td className="px-2 py-1.5 text-[10px] text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px] border-r border-border">
                         {typeof order.salesRep === 'object' && order.salesRep !== null 
                             ? `${order.salesRep.firstName} ${order.salesRep.lastName}` 
                             : (order.salesRep || '-')}
                     </td>
-                    <td className="px-2 py-1.5 text-[10px] text-slate-500 border-r border-slate-50">{order.paymentMethod || '-'}</td>
-                    <td className="px-2 py-1.5 border-r border-slate-50">
+                    <td className="px-2 py-1.5 text-[10px] text-muted-foreground border-r border-border">{order.paymentMethod || '-'}</td>
+                    <td className="px-2 py-1.5 border-r border-border text-center">
                       <span className={cn(
-                        "px-1.5 py-0.5 rounded-none text-[8px] font-bold uppercase",
-                        order.orderStatus === 'Shipped' ? "bg-green-100 text-green-700" :
-                        order.orderStatus === 'Completed' ? "bg-blue-100 text-blue-700" :
-                        order.orderStatus === 'Processing' ? "bg-orange-100 text-orange-700" :
-                        "bg-slate-100 text-slate-600"
+                        "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider",
+                        order.orderStatus === 'Shipped' ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" :
+                        order.orderStatus === 'Completed' ? "bg-blue-500/10 text-blue-500 border border-blue-500/20" :
+                        order.orderStatus === 'Processing' ? "bg-amber-500/10 text-amber-500 border border-amber-500/20" :
+                        "bg-muted text-muted-foreground border border-border"
                       )}>
                         {order.orderStatus}
                       </span>
                     </td>
-                    <td className="px-2 py-1.5 text-[10px] font-bold text-slate-900 font-mono text-right border-r border-slate-50">
+                    <td className="px-2 py-1.5 text-[10px] font-bold text-foreground font-mono text-right border-r border-border">
                       {formatCurrency(subtotal)}
                     </td>
-                    <td className="px-2 py-1.5 text-[10px] text-slate-500 font-mono text-right border-r border-slate-50">
+                    <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono text-right border-r border-border">
                         {formatCurrency(shipping)}
                     </td>
-                    <td className="px-2 py-1.5 text-[10px] text-slate-500 font-mono text-right border-r border-slate-50">
+                    <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono text-right border-r border-border">
                         {formatCurrency(discount)}
                     </td>
-                    <td className="px-2 py-1.5 text-[10px] font-black text-slate-900 bg-slate-50 font-mono text-right border-r border-slate-50">
+                    <td className="px-2 py-1.5 text-[10px] font-black text-foreground bg-secondary/10 font-mono text-right border-r border-border">
                         {formatCurrency(grandTotal)}
                     </td>
-                    <td className={cn("px-2 py-1.5 text-[10px] font-bold font-mono text-right border-r border-slate-50", balance > 0.01 ? "text-red-500" : "text-emerald-500")}>
+                    <td className={cn("px-2 py-1.5 text-[10px] font-bold font-mono text-right border-r border-border", balance > 0.01 ? "text-destructive" : "text-emerald-500")}>
                         {formatCurrency(balance)}
                     </td>
-                    <td className="px-2 py-1.5 text-[10px] text-slate-600 font-mono text-right border-r border-slate-50">
+                    <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono text-right border-r border-border">
                         {formatCurrency(cost)}
                     </td>
-                    <td className={cn("px-2 py-1.5 text-[10px] font-bold font-mono text-right", margin < 0 ? "text-red-500" : "text-green-600")}>
+                    <td className={cn("px-2 py-1.5 text-[10px] font-bold font-mono text-right", margin < 0 ? "text-destructive" : "text-emerald-500")}>
                         {formatCurrency(margin)}
                     </td>
                   </tr>
@@ -1111,15 +1113,18 @@ function SaleOrdersContent() {
           </tbody>
         </table>
       </div>
+     </div>
 
-      <Pagination
-        currentPage={page}
-        totalPages={totalPages}
-        onPageChange={setPage}
-        totalItems={totalOrders}
-        itemsPerPage={20}
-        itemName="Orders"
-      />
+      <div className="border-t border-border bg-background transition-colors duration-300">
+        <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            totalItems={totalOrders}
+            itemsPerPage={20}
+            itemName="Orders"
+        />
+      </div>
 
       {/* Create / Edit Order Modal */}
       {isCreateModalOpen && (

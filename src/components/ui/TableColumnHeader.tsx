@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowUp, ArrowDown, EyeOff, MoreHorizontal, Filter } from 'lucide-react';
+import { ArrowUp, ArrowDown, EyeOff, Filter, GripVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface TableColumnHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -83,8 +83,7 @@ export function TableColumnHeader({
   };
 
   return (
-    <div className={cn("flex items-center space-x-2 relative group", className)} {...props}>
-      <span className="text-[10px] font-medium text-[#2E2E2E] uppercase leading-[13.3px]">{title}</span>
+    <div className={cn("flex items-center space-x-1 relative group", className)} {...props}>
       {sortable && (
         <div className="relative">
           <button 
@@ -94,90 +93,86 @@ export function TableColumnHeader({
               setIsOpen(!isOpen);
             }}
             className={cn(
-                "h-4 w-4 p-0 hover:bg-slate-100 rounded-sm transition-colors focus:outline-none flex items-center justify-center",
-                isOpen ? "bg-slate-100" : ""
+                "h-5 w-5 p-0 hover:bg-secondary rounded-sm transition-colors focus:outline-none flex items-center justify-center cursor-pointer text-muted-foreground hover:text-foreground",
+                isOpen ? "bg-secondary text-foreground" : ""
             )}
           >
-            {isDesc ? (
-              <ArrowDown className="h-3 w-3 text-black" />
-            ) : isAsc ? (
-              <ArrowUp className="h-3 w-3 text-black" />
-            ) : (
-              <MoreHorizontal className="h-3 w-3 text-slate-300 hover:text-slate-500" />
-            )}
+            <GripVertical className="h-4 w-4" />
           </button>
 
           {isOpen && (
             <div 
                 ref={menuRef}
-                className="absolute right-0 top-full mt-1 w-48 bg-white border border-slate-200 shadow-xl z-50 rounded-sm py-1 animate-in fade-in zoom-in-95 duration-100 origin-top-right"
+                className="absolute left-0 top-full mt-1 w-48 bg-card border border-border shadow-xl z-50 rounded-sm py-1 animate-in fade-in zoom-in-95 duration-100 origin-top-left"
                 onClick={(e) => e.stopPropagation()}
             >
               <button 
                 onClick={() => { onSort?.(columnKey, 'asc'); setIsOpen(false); }}
-                className="w-full text-left px-3 py-2 text-[10px] text-slate-600 hover:bg-slate-50 hover:text-black flex items-center"
+                className="w-full text-left px-3 py-2 text-[10px] text-muted-foreground hover:bg-secondary hover:text-foreground flex items-center cursor-pointer transition-colors"
               >
-                <ArrowUp className="mr-2 h-3.5 w-3.5 text-slate-400" />
+                <ArrowUp className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
                 <span>Sort Ascending</span>
               </button>
               <button 
                 onClick={() => { onSort?.(columnKey, 'desc'); setIsOpen(false); }}
-                className="w-full text-left px-3 py-2 text-[10px] text-slate-600 hover:bg-slate-50 hover:text-black flex items-center"
+                className="w-full text-left px-3 py-2 text-[10px] text-muted-foreground hover:bg-secondary hover:text-foreground flex items-center cursor-pointer transition-colors"
               >
-                <ArrowDown className="mr-2 h-3.5 w-3.5 text-slate-400" />
+                <ArrowDown className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
                 <span>Sort Descending</span>
               </button>
               
-              <div className="h-px bg-slate-100 my-1" />
+              <div className="h-px bg-border my-1" />
               
               <button 
                 onClick={() => { onHide?.(columnKey); setIsOpen(false); }}
-                className="w-full text-left px-3 py-2 text-[10px] text-slate-600 hover:bg-slate-50 hover:text-black flex items-center"
+                className="w-full text-left px-3 py-2 text-[10px] text-muted-foreground hover:bg-secondary hover:text-foreground flex items-center cursor-pointer transition-colors"
               >
-                <EyeOff className="mr-2 h-3.5 w-3.5 text-slate-400" />
+                <EyeOff className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
                 <span>Hide Column</span>
               </button>
 
-              {onFilter && !isNumeric && (
-                <button 
+              {/* Show Filter option even if onFilter is missing, for UI demo, or handle conditionally */}
+               <button 
                   onClick={() => { onFilter?.(columnKey); setIsOpen(false); }}
-                  className="w-full text-left px-3 py-2 text-[10px] text-slate-600 hover:bg-slate-50 hover:text-black flex items-center transition-colors"
+                  className={cn(
+                    "w-full text-left px-3 py-2 text-[10px] text-muted-foreground hover:bg-secondary hover:text-foreground flex items-center transition-colors cursor-pointer",
+                    !onFilter && "opacity-50 cursor-not-allowed hidden" 
+                  )}
                 >
-                  <Filter className="mr-2 h-3.5 w-3.5 text-slate-400" />
+                  <Filter className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
                   <span>Filter by {title}</span>
                 </button>
-              )}
 
               {isNumeric && onNumericFilter && (
-                <div className="px-3 py-2 space-y-2 border-t border-slate-50 mt-1">
-                  <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Filter Range</div>
+                <div className="px-3 py-2 space-y-2 border-t border-border mt-1">
+                  <div className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Filter Range</div>
                   <div className="flex items-center space-x-2">
                     <input 
                       type="number" 
                       placeholder="Min"
                       value={localMin}
                       onChange={(e) => setLocalMin(e.target.value)}
-                      className="w-full px-2 py-1 bg-slate-50 border border-slate-100 rounded-sm text-[10px] focus:outline-none focus:border-black"
+                      className="w-full px-2 py-1 bg-secondary/50 border border-border rounded-sm text-[10px] focus:outline-none focus:border-primary text-foreground"
                     />
-                    <span className="text-slate-300">-</span>
+                    <span className="text-muted-foreground">-</span>
                     <input 
                       type="number" 
                       placeholder="Max"
                       value={localMax}
                       onChange={(e) => setLocalMax(e.target.value)}
-                      className="w-full px-2 py-1 bg-slate-50 border border-slate-100 rounded-sm text-[10px] focus:outline-none focus:border-black"
+                      className="w-full px-2 py-1 bg-secondary/50 border border-border rounded-sm text-[10px] focus:outline-none focus:border-primary text-foreground"
                     />
                   </div>
                   <div className="flex space-x-2 pt-1">
                     <button 
                       onClick={() => { setLocalMin(''); setLocalMax(''); onNumericFilter(columnKey, '', ''); setIsOpen(false); }}
-                      className="flex-1 px-2 py-1 text-[9px] font-bold text-slate-400 border border-slate-100 uppercase hover:bg-slate-50"
+                      className="flex-1 px-2 py-1 text-[9px] font-bold text-muted-foreground border border-border uppercase hover:bg-secondary cursor-pointer transition-colors"
                     >
                       Clear
                     </button>
                     <button 
                       onClick={handleNumericApply}
-                      className="flex-1 px-2 py-1 text-[9px] font-bold text-white bg-black uppercase hover:bg-slate-800"
+                      className="flex-1 px-2 py-1 text-[9px] font-bold text-black bg-[#FFEF5F] uppercase hover:opacity-90 cursor-pointer"
                     >
                       Apply
                     </button>
@@ -188,6 +183,10 @@ export function TableColumnHeader({
           )}
         </div>
       )}
+      <span className="text-[10px] font-medium text-foreground uppercase leading-[13.3px] select-none">{title}</span>
+      {/* Sort Indicator separated from menu trigger */}
+      {isAsc && <ArrowUp className="h-3 w-3 text-primary" />}
+      {isDesc && <ArrowDown className="h-3 w-3 text-primary" />}
     </div>
   );
 }

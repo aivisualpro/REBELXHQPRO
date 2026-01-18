@@ -162,9 +162,9 @@ export default function ProfilePage() {
                                 ) : (
                                     <button 
                                         onClick={() => setIsGoogleModalOpen(true)}
-                                        className="flex items-center space-x-2 px-4 py-2 bg-white text-slate-700 rounded-sm text-[10px] font-bold uppercase tracking-wider border border-slate-300 hover:bg-slate-50 hover:border-slate-400 transition-all w-full justify-center group"
+                                        className="flex items-center space-x-2 px-4 py-2 bg-[#FFEF5F] text-black rounded-sm text-[10px] font-black uppercase tracking-wider border border-transparent hover:opacity-90 transition-all w-full justify-center group"
                                     >
-                                         <Globe className="w-3 h-3 text-slate-400 group-hover:text-blue-500 transition-colors" />
+                                         <Globe className="w-3 h-3 text-black group-hover:scale-110 transition-transform" />
                                         <span>CONNECT GOOGLE</span>
                                     </button>
                                 )}

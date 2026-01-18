@@ -395,38 +395,37 @@ export default function TasksPage() {
     };
 
     return (
-        <div className="flex flex-col h-[calc(100vh-40px)] bg-slate-100 overflow-hidden">
+        <div className="flex flex-col h-[calc(100vh-48px)] bg-background transition-colors duration-300 overflow-hidden">
             {/* Header / Action Bar */}
-            <div className="flex items-center justify-between px-4 py-1.5 border-b border-slate-200 bg-white sticky top-0 z-20 gap-4">
+            <div className="flex items-center justify-between px-4 h-11 border-b border-border bg-secondary/50 sticky top-0 z-20 gap-4 transition-colors">
                 
                 {/* Left: Search */}
                 <div className="flex items-center space-x-6">
                     <div className="relative group">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                         <input 
                             type="text" 
                             placeholder="Search tasks by client..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            className="pl-9 pr-4 py-1.5 w-64 bg-slate-50 hover:bg-slate-100 focus:bg-white border border-transparent focus:border-blue-500 rounded text-sm transition-all focus:outline-none placeholder:text-slate-400"
+                            className="pl-9 pr-4 h-8 w-64 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
                         />
                     </div>
                 </div>
 
-                {/* Right: Actions */}
                 <div className="flex items-center space-x-2">
                     <button
                         onClick={handleAutoGenerate}
                         disabled={generating}
-                        className="flex items-center space-x-1.5 px-3 py-1.5 text-[11px] font-bold text-orange-600 bg-orange-50 border border-orange-100 rounded hover:bg-orange-100 transition-all uppercase tracking-wide disabled:opacity-50"
+                        className="flex items-center space-x-1.5 px-3 h-8 text-[11px] font-bold text-primary-foreground bg-primary border border-primary/20 rounded hover:opacity-90 transition-all uppercase tracking-wide disabled:opacity-50 shadow-sm cursor-pointer"
                     >
                         {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
                         <span>Auto-Generate</span>
                     </button>
-
+                    
                     <button
                         onClick={() => setIsNewTaskModalOpen(true)}
-                        className="flex items-center justify-center h-8 px-4 bg-black text-white text-[11px] font-bold uppercase hover:bg-slate-800 rounded shadow-sm transition-all"
+                        className="flex items-center justify-center h-8 px-4 bg-card border border-border text-foreground text-[11px] font-bold uppercase hover:bg-secondary rounded shadow-sm transition-all cursor-pointer"
                     >
                         <Plus className="w-3.5 h-3.5 mr-1.5" />
                         <span>New Task</span>
@@ -445,20 +444,20 @@ export default function TasksPage() {
                             <div
                                 key={column.id}
                                 className={cn(
-                                    "flex flex-col w-[360px] bg-white border shadow-sm h-full transition-all",
-                                    dragOverColumn === column.id && "ring-2 ring-blue-400 ring-offset-2"
+                                    "flex flex-col w-[360px] bg-secondary/30 border border-border shadow-sm h-full transition-all rounded-lg overflow-hidden",
+                                    dragOverColumn === column.id && "ring-2 ring-primary ring-offset-2"
                                 )}
                                 onDragOver={(e) => handleDragOver(e, column.id)}
                                 onDragLeave={handleDragLeave}
                                 onDrop={(e) => handleDrop(e, column.id)}
                             >
                                 {/* Column Header */}
-                                <div className={cn("px-4 py-3 border-b flex items-center justify-between shrink-0", column.bgColor)}>
+                                <div className={cn("px-4 py-3 border-b border-border flex items-center justify-between shrink-0 bg-background/50")}>
                                     <div className="flex items-center space-x-2">
                                         <span className={column.color}>{column.icon}</span>
-                                        <span className={cn("text-xs font-black uppercase tracking-wider", column.color)}>{column.label}</span>
+                                        <span className={cn("text-xs font-black uppercase tracking-wider text-foreground")}>{column.label}</span>
                                     </div>
-                                    <span className={cn("text-sm font-black", column.color)}>{getStatusCount(column.id)}</span>
+                                    <span className={cn("text-sm font-black text-muted-foreground/50")}>{getStatusCount(column.id)}</span>
                                 </div>
 
                                 {/* Column Content */}
@@ -479,10 +478,10 @@ export default function TasksPage() {
                                                 onDragEnd={handleDragEnd}
                                                 onClick={() => openTaskModal(task)}
                                                 className={cn(
-                                                    "bg-white border border-l-4 p-3 cursor-grab active:cursor-grabbing hover:shadow-md transition-all group",
+                                                    "bg-background border border-border border-l-4 p-3 cursor-grab active:cursor-grabbing hover:shadow-lg transition-all group rounded hover:scale-[1.02] transform transition-transform duration-200",
                                                     priorityColors[task.priority],
                                                     draggedTask?._id === task._id && "opacity-50 scale-95",
-                                                    isOverdue(task) && "bg-red-50/50"
+                                                    isOverdue(task) && "bg-destructive/5"
                                                 )}
                                             >
                                                 {/* Task Header */}
@@ -503,7 +502,7 @@ export default function TasksPage() {
                                                 </div>
 
                                                 {/* Client Name */}
-                                                <div className="text-sm font-bold text-slate-800 mb-2 truncate">
+                                                <div className="text-sm font-bold text-foreground mb-2 truncate">
                                                     {task.clientInfo?.name || 'Unknown Client'}
                                                 </div>
 
@@ -521,7 +520,7 @@ export default function TasksPage() {
                                                 )}
 
                                                 {/* Footer */}
-                                                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                                                <div className="flex items-center justify-between pt-2 border-t border-border">
                                                     <div className="flex items-center space-x-1">
                                                         <Calendar className="w-3 h-3 text-slate-400" />
                                                         <span className={cn(
@@ -584,20 +583,20 @@ export default function TasksPage() {
 
                         <div className="p-6 space-y-4">
                             {/* Client Info */}
-                            <div className="flex items-center space-x-3 p-3 bg-slate-50 border border-slate-100">
-                                <div className="w-12 h-12 bg-slate-200 flex items-center justify-center text-sm font-black text-slate-600">
+                            <div className="flex items-center space-x-3 p-3 bg-secondary/30 border border-border rounded">
+                                <div className="w-12 h-12 bg-secondary flex items-center justify-center text-sm font-black text-muted-foreground rounded">
                                     {selectedTask.clientInfo?.name?.charAt(0) || '?'}
                                 </div>
                                 <div className="flex-1">
-                                    <div className="text-sm font-bold text-slate-900">{selectedTask.clientInfo?.name || 'Unknown'}</div>
-                                    <div className="flex items-center space-x-3 text-[11px] text-slate-500 mt-1">
+                                    <div className="text-sm font-bold text-foreground">{selectedTask.clientInfo?.name || 'Unknown'}</div>
+                                    <div className="flex items-center space-x-3 text-[11px] text-muted-foreground mt-1">
                                         {selectedTask.clientInfo?.phones?.[0]?.value && (
-                                            <a href={`tel:${selectedTask.clientInfo.phones[0].value}`} className="flex items-center hover:text-blue-600">
+                                            <a href={`tel:${selectedTask.clientInfo.phones[0].value}`} className="flex items-center hover:text-primary">
                                                 <Phone className="w-3 h-3 mr-1" />{selectedTask.clientInfo.phones[0].value}
                                             </a>
                                         )}
                                         {selectedTask.clientInfo?.emails?.[0]?.value && (
-                                            <a href={`mailto:${selectedTask.clientInfo.emails[0].value}`} className="flex items-center hover:text-blue-600">
+                                            <a href={`mailto:${selectedTask.clientInfo.emails[0].value}`} className="flex items-center hover:text-primary">
                                                 <Mail className="w-3 h-3 mr-1" />{selectedTask.clientInfo.emails[0].value}
                                             </a>
                                         )}
@@ -605,7 +604,7 @@ export default function TasksPage() {
                                 </div>
                                 <button
                                     onClick={() => router.push(`/crm/clients/${selectedTask.client}`)}
-                                    className="px-3 py-1.5 bg-black text-white text-[10px] font-bold uppercase hover:bg-slate-800"
+                                    className="px-3 py-1.5 bg-primary text-black text-[10px] font-bold uppercase hover:opacity-90 rounded cursor-pointer"
                                 >
                                     View Profile
                                 </button>

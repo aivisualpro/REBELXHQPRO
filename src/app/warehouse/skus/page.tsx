@@ -253,11 +253,10 @@ export default function SkusPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-48px)] bg-white">
-      {/* Action Bar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100 bg-slate-50/50">
+    <div className="flex flex-col h-[calc(100vh-48px)] bg-background transition-colors duration-300">
+      <div className="flex items-center justify-between px-4 h-11 border-b border-border bg-secondary/50 transition-colors">
         <div className="flex items-center space-x-4">
-          <h1 className="text-sm font-bold text-slate-900 uppercase tracking-tighter">SKUs</h1>
+          <h1 className="text-sm font-bold text-foreground uppercase tracking-tighter">SKUs</h1>
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
             <input
@@ -265,7 +264,7 @@ export default function SkusPage() {
               placeholder="Search SKUs..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 pr-3 py-1.5 w-64 bg-white border border-slate-200 text-[11px] focus:outline-none focus:ring-1 focus:ring-black/5 transition-all placeholder:text-slate-400"
+              className="pl-8 pr-3 h-8 w-64 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
             />
           </div>
         </div>
@@ -277,7 +276,7 @@ export default function SkusPage() {
             options={Array.from(new Set(skus.map(s => s.category).filter(Boolean))).map(c => ({ label: c, value: c }))}
             selectedValues={selectedCategories}
             onChange={setSelectedCategories}
-            className="h-[30px]"
+            className="h-8"
           />
           <MultiSelectFilter
             label="Sub Cat"
@@ -285,7 +284,7 @@ export default function SkusPage() {
             options={Array.from(new Set(skus.map(s => s.subCategory).filter(Boolean))).map(c => ({ label: c, value: c }))}
             selectedValues={selectedSubCategories}
             onChange={setSelectedSubCategories}
-            className="h-[30px]"
+            className="h-8"
           />
           <MultiSelectFilter
             label="Material"
@@ -293,10 +292,10 @@ export default function SkusPage() {
             options={Array.from(new Set(skus.map(s => s.materialType).filter(Boolean))).map(c => ({ label: c, value: c }))}
             selectedValues={selectedMaterialTypes}
             onChange={setSelectedMaterialTypes}
-            className="h-[30px]"
+            className="h-8"
           />
 
-          <div className="w-px h-6 bg-slate-200 mx-2" />
+          <div className="w-px h-6 bg-border mx-2" />
 
           <input
             type="file"
@@ -314,7 +313,7 @@ export default function SkusPage() {
           />
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="h-[30px] px-3 text-slate-600 hover:text-black hover:bg-slate-200 transition-colors rounded-sm flex items-center space-x-1 border border-slate-200 bg-white shadow-sm"
+            className="h-8 px-3 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors rounded flex items-center space-x-1 border border-border bg-card shadow-sm cursor-pointer"
             title="Import SKUs"
           >
             <Upload className="w-4 h-4" />
@@ -322,7 +321,7 @@ export default function SkusPage() {
           </button>
           <button
             onClick={() => variancesInputRef.current?.click()}
-            className="h-[30px] px-3 text-slate-600 hover:text-black hover:bg-slate-200 transition-colors rounded-sm flex items-center space-x-1 border border-slate-200 bg-white shadow-sm"
+            className="h-8 px-3 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors rounded flex items-center space-x-1 border border-border bg-card shadow-sm cursor-pointer"
             title="Import Variances"
           >
             <Upload className="w-4 h-4" />
@@ -331,7 +330,7 @@ export default function SkusPage() {
 
           <button
             onClick={() => openModal()}
-            className="h-[30px] w-[30px] bg-black text-white hover:bg-slate-800 transition-colors shadow-sm flex items-center justify-center rounded-sm"
+            className="h-8 w-8 bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-md flex items-center justify-center rounded cursor-pointer"
             title="Add SKU"
           >
             <Plus className="w-4 h-4" />
@@ -339,9 +338,10 @@ export default function SkusPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto">
-        <table className="w-full border-collapse text-left">
-          <thead className="sticky top-0 bg-slate-50 z-10 border-b border-slate-100">
+      <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
+        <div className="min-w-full px-2 py-2">
+          <table className="w-full text-left border-separate border-spacing-0 relative z-0">
+          <thead className="sticky top-0 bg-secondary/80 z-10 border-b border-border backdrop-blur-md transition-colors">
             <tr>
               <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest w-10">Img</th>
               {[
@@ -362,17 +362,17 @@ export default function SkusPage() {
                 <th
                   key={col.key}
                   onClick={() => handleSort(col.key)}
-                  className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors border-r border-slate-100 last:border-0 whitespace-nowrap"
+                  className="px-2 py-2 text-[8px] font-bold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary transition-colors border-r border-border last:border-0 whitespace-nowrap"
                 >
                   <div className="flex items-center space-x-1">
                     <span>{col.label}</span>
-                    <ArrowUpDown className={cn("w-2 h-2", sortBy === col.key ? "text-black" : "text-slate-200")} />
+                    <ArrowUpDown className={cn("w-2 h-2", sortBy === col.key ? "text-foreground" : "text-muted-foreground")} />
                   </div>
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-border bg-background/50">
             {loading ? (
               <tr><td colSpan={14} className="px-2 py-12 text-center text-[10px] text-slate-400">Loading SKUs...</td></tr>
             ) : error ? (
@@ -382,11 +382,11 @@ export default function SkusPage() {
             ) : skus.map(sku => (
               <tr 
                 key={sku._id} 
-                className="hover:bg-slate-50 transition-colors group cursor-pointer"
+                className="hover:bg-secondary/40 hover:scale-[1.002] hover:shadow-md transition-all duration-200 group relative z-0 hover:z-10 bg-background"
                 onClick={() => router.push(`/warehouse/skus/${sku._id}`)}
               >
-                <td className="px-2 py-0.5">
-                  <div className="w-6 h-6 rounded bg-slate-100 overflow-hidden relative">
+                <td className="px-2 py-1 border-r border-border">
+                  <div className="w-6 h-6 rounded bg-secondary overflow-hidden relative border border-border">
                     <img 
                         src={sku.image || globalSettings?.missingSkuImage || '/sku-placeholder.png'} 
                         alt="" 
@@ -401,11 +401,11 @@ export default function SkusPage() {
                     />
                   </div>
                 </td>
-                <td className="px-2 py-0.5 text-[9px] text-slate-600 font-medium hover:text-blue-600 transition-colors truncate max-w-[150px]">
+                <td className="px-2 py-1 text-[9px] text-foreground font-medium border-r border-border whitespace-nowrap">
                   <div className="flex items-center space-x-1.5">
                     {sku.tier ? (
                       <span className={cn(
-                        "flex-shrink-0 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-black text-white shadow-sm",
+                        "flex-shrink-0 w-4 h-4 rounded flex items-center justify-center text-[9px] font-black text-white shadow-sm",
                         sku.tier === 1 ? "bg-emerald-500" :
                         sku.tier === 2 ? "bg-blue-500" :
                         "bg-orange-500"
@@ -416,32 +416,42 @@ export default function SkusPage() {
                     <span className="truncate">{sku.name}</span>
                   </div>
                 </td>
-                <td className="px-2 py-0.5 text-[8px] uppercase font-bold text-slate-500">{sku.category}</td>
-                <td className="px-2 py-0.5 text-[8px] uppercase font-bold text-slate-500">{sku.subCategory}</td>
-                <td className="px-2 py-0.5 text-[8px] uppercase font-bold text-slate-500">{sku.materialType}</td>
-                <td className="px-2 py-0.5 text-[9px] text-slate-600 font-mono">${(sku.salePrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
-                <td className="px-2 py-0.5 text-[9px] text-slate-600 font-mono">${(sku.avgCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
-                <td className="px-2 py-0.5 text-[9px] font-bold text-slate-700">{Math.round(sku.currentStock || 0)}</td>
-                <td className="px-2 py-0.5 text-[9px] text-slate-500">{sku.reOrderPoint}</td>
-                <td className="px-2 py-0.5 text-[9px] text-slate-500">{sku.orderUpto}</td>
-                <td className="px-2 py-0.5 text-[9px] text-emerald-600 font-mono">${(sku.revenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
-                <td className="px-2 py-0.5 text-[9px] text-slate-500 font-mono">${(sku.cogs || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
-                <td className="px-2 py-0.5 text-[9px] text-slate-500 font-mono">${(sku.cogm || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
-                <td className="px-2 py-0.5 text-[9px] font-bold text-black font-mono">${(sku.grossProfit || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
+                <td className="px-2 py-1 text-[8px] uppercase font-bold text-muted-foreground border-r border-border">{sku.category}</td>
+                <td className="px-2 py-1 text-[8px] uppercase font-bold text-muted-foreground border-r border-border">{sku.subCategory}</td>
+                <td className="px-2 py-1 text-[8px] uppercase font-bold text-muted-foreground border-r border-border">{sku.materialType}</td>
+                <td className="px-2 py-1 text-[9px] text-muted-foreground font-mono border-r border-border text-right">${(sku.salePrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td className="px-2 py-1 text-[9px] text-muted-foreground font-mono border-r border-border text-right">${(sku.avgCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td className="px-2 py-1 text-[9px] font-bold text-foreground border-r border-border text-center">
+                  <span className={cn(
+                    "px-1.5 py-0.5 rounded text-[10px] font-bold",
+                    (sku.currentStock || 0) <= (sku.reOrderPoint || 0) ? "bg-destructive/10 text-destructive border border-destructive/20" : "text-foreground"
+                  )}>
+                    {Math.round(sku.currentStock || 0)}
+                  </span>
+                </td>
+                <td className="px-2 py-1 text-[9px] text-muted-foreground border-r border-border text-center">{sku.reOrderPoint}</td>
+                <td className="px-2 py-1 text-[9px] text-muted-foreground border-r border-border text-center">{sku.orderUpto}</td>
+                <td className="px-2 py-1 text-[9px] text-emerald-600 font-mono border-r border-border text-right">${(sku.revenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td className="px-2 py-1 text-[9px] text-muted-foreground font-mono border-r border-border text-right">${(sku.cogs || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td className="px-2 py-1 text-[9px] text-muted-foreground font-mono border-r border-border text-right">${(sku.cogm || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td className="px-2 py-1 text-[9px] font-black text-foreground font-mono text-right">${(sku.grossProfit || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+    </div>
 
-      <Pagination
-        currentPage={page}
-        totalPages={totalPages}
-        onPageChange={setPage}
-        totalItems={totalSkus}
-        itemsPerPage={20}
-        itemName="SKUs"
-      />
+      <div className="border-t border-border bg-background transition-colors duration-300">
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          totalItems={totalSkus}
+          itemsPerPage={20}
+          itemName="SKUs"
+        />
+      </div>
 
       {/* Add/Edit Modal */}
       {isModalOpen && (
@@ -577,7 +587,7 @@ export default function SkusPage() {
                 type="submit"
                 form="sku-form"
                 disabled={isSubmitting}
-                className="px-6 py-2.5 bg-black text-white text-xs font-bold uppercase tracking-wider hover:bg-slate-800 transition-colors disabled:opacity-50 flex items-center space-x-2"
+                className="px-6 py-2.5 bg-primary text-primary-foreground text-xs font-bold uppercase tracking-wider hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center space-x-2 cursor-pointer"
               >
                 {isSubmitting && <Loader2 className="w-3 h-3 animate-spin" />}
                 <span>{editingSku ? 'Save Changes' : 'Create SKU'}</span>
