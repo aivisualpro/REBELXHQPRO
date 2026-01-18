@@ -1,5 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Search, X } from 'lucide-react';
+'use client';
+
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { ChevronDown, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Option {
@@ -30,34 +33,39 @@ export function SearchableSelect({
 }: SearchableSelectProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState('');
-    const [openDirection, setOpenDirection] = useState<'down' | 'up'>('down');
+    const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
     const containerRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
-    const dropdownRef = useRef<HTMLDivElement>(null);
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true); // eslint-disable-line react-hooks/set-state-in-effect
+    }, []);
 
     const selectedOption = options.find(o => o.value === value);
 
-    // Check available space and set dropdown direction
-    useEffect(() => {
+    // Calculate dropdown position
+    useLayoutEffect(() => {
         if (isOpen && containerRef.current) {
             const rect = containerRef.current.getBoundingClientRect();
-            const spaceBelow = window.innerHeight - rect.bottom;
-            const spaceAbove = rect.top;
-            const dropdownHeight = 260; // max-h-60 = 15rem = 240px + some padding
-            
-            // If not enough space below but more space above, open upward
-            if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
-                setOpenDirection('up');
-            } else {
-                setOpenDirection('down');
-            }
+            setDropdownPos({
+                top: rect.bottom + 4,
+                left: rect.left,
+                width: rect.width
+            });
         }
     }, [isOpen]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+                // Check if click is inside the portal dropdown
+                const dropdown = document.getElementById('searchable-select-dropdown');
+                if (dropdown && dropdown.contains(event.target as Node)) {
+                    return;
+                }
                 setIsOpen(false);
+                setSearch('');
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
@@ -68,9 +76,6 @@ export function SearchableSelect({
         if (isOpen && inputRef.current) {
             inputRef.current.focus();
         }
-        if (!isOpen) {
-            setSearch('');
-        }
     }, [isOpen]);
 
     const filteredOptions = options.filter(option =>
@@ -79,18 +84,88 @@ export function SearchableSelect({
 
     const showCreate = creatable && search && !filteredOptions.some(o => o.label.toLowerCase() === search.toLowerCase());
 
+    const handleSelect = (val: string) => {
+        onChange(val);
+        setIsOpen(false);
+        setSearch('');
+    };
+
+    const dropdownContent = (
+        <div 
+            id="searchable-select-dropdown"
+            style={{
+                position: 'fixed',
+                top: dropdownPos.top,
+                left: dropdownPos.left,
+                width: dropdownPos.width,
+                zIndex: 99999
+            }}
+            className="rounded-md shadow-2xl max-h-80 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100 border-2 border-border"
+        >
+            {/* Solid background wrapper to prevent bleed-through */}
+            <div className="bg-card dark:bg-zinc-900 flex flex-col h-full">
+                <div className="p-2 border-b border-border bg-muted sticky top-0">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <input
+                            ref={inputRef}
+                            type="text"
+                            className="w-full pl-9 pr-3 py-2.5 text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring text-foreground placeholder:text-muted-foreground transition-all"
+                            placeholder="Search clients..."
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            onClick={e => e.stopPropagation()}
+                        />
+                </div>
+            </div>
+            <div className="overflow-auto flex-1">
+                {filteredOptions.length === 0 && !showCreate ? (
+                    <div className="px-4 py-6 text-sm text-muted-foreground text-center">No results found</div>
+                ) : (
+                    <div className="p-1">
+                        {filteredOptions.map(option => (
+                            <div
+                                key={option.value}
+                                className={cn(
+                                    "px-3 py-2.5 text-sm cursor-pointer rounded-md hover:bg-[#FFEF5F] hover:text-black transition-colors text-foreground",
+                                    option.value === value && "bg-[#FFEF5F] text-black font-medium"
+                                )}
+                                onClick={() => handleSelect(option.value)}
+                            >
+                                {option.label}
+                            </div>
+                        ))}
+                        {showCreate && (
+                            <div
+                                className="px-3 py-2.5 text-sm cursor-pointer rounded-md hover:bg-accent hover:text-accent-foreground transition-colors text-primary font-medium border-t border-border mt-1 pt-2"
+                                onClick={() => handleSelect(search)}
+                            >
+                                Create &quot;{search}&quot;
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+            </div>
+        </div>
+    );
+
     return (
         <div className={cn("relative", className)} ref={containerRef}>
             <div
                 className={cn(
-                    "w-full px-3 py-2 border border-slate-200 rounded text-sm bg-white flex items-center justify-between cursor-pointer focus-within:ring-1 focus-within:ring-black/10 transition-shadow",
-                    !selectedOption && !value ? "text-slate-400" : "text-slate-900",
+                    "w-full px-3 py-2.5 border border-input rounded-md text-sm bg-background flex items-center justify-between cursor-pointer focus-within:ring-2 focus-within:ring-ring transition-all hover:border-ring/50",
+                    !selectedOption && !value ? "text-muted-foreground" : "text-foreground",
+                    isOpen && "ring-2 ring-ring border-ring",
                     triggerClassName
                 )}
-                onClick={() => setIsOpen(!isOpen)}
+                onClick={() => {
+                    setIsOpen(!isOpen);
+                    if (!isOpen) setSearch('');
+                }}
             >
                 <span className="truncate">{selectedOption ? selectedOption.label : (creatable && value ? value : placeholder)}</span>
-                <ChevronDown className={cn("w-4 h-4 text-slate-400 ml-2 shrink-0 transition-transform", isOpen && "rotate-180")} />
+                <ChevronDown className={cn("w-4 h-4 text-muted-foreground ml-2 shrink-0 transition-transform duration-200", isOpen && "rotate-180")} />
             </div>
 
             {required && (
@@ -104,64 +179,7 @@ export function SearchableSelect({
                 />
             )}
 
-            {isOpen && (
-                <div 
-                    ref={dropdownRef}
-                    className={cn(
-                        "absolute z-50 w-full bg-white border border-slate-100 rounded-md shadow-lg max-h-60 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100",
-                        openDirection === 'down' ? "mt-1 top-full" : "mb-1 bottom-full"
-                    )}
-                >
-                    <div className="p-2 border-b border-slate-50 relative">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                        <input
-                            ref={inputRef}
-                            type="text"
-                            className="w-full pl-8 pr-2 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-sm focus:outline-none focus:border-black/20"
-                            placeholder="Search or type new..."
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
-                            onClick={e => e.stopPropagation()}
-                        />
-                    </div>
-                    <div className="overflow-auto flex-1 p-1">
-                        {filteredOptions.length === 0 && !showCreate ? (
-                            <div className="px-3 py-2 text-xs text-slate-400 text-center">No results found</div>
-                        ) : (
-                            <>
-                                {filteredOptions.map(option => (
-                                    <div
-                                        key={option.value}
-                                        className={cn(
-                                            "px-3 py-2 text-xs cursor-pointer rounded-sm hover:bg-slate-50 transition-colors",
-                                            option.value === value && "bg-slate-50 font-bold text-black"
-                                        )}
-                                        onClick={() => {
-                                            onChange(option.value);
-                                            setIsOpen(false);
-                                            setSearch('');
-                                        }}
-                                    >
-                                        {option.label}
-                                    </div>
-                                ))}
-                                {showCreate && (
-                                    <div
-                                        className="px-3 py-2 text-xs cursor-pointer rounded-sm hover:bg-slate-50 transition-colors text-blue-600 font-medium border-t border-slate-50 mt-1"
-                                        onClick={() => {
-                                            onChange(search);
-                                            setIsOpen(false);
-                                            setSearch('');
-                                        }}
-                                    >
-                                        Create "{search}"
-                                    </div>
-                                )}
-                            </>
-                        )}
-                    </div>
-                </div>
-            )}
+            {mounted && isOpen && createPortal(dropdownContent, document.body)}
         </div>
     );
 }

@@ -37,8 +37,15 @@ import {
     Reply,
     Forward,
     Eye,
-    EyeOff
+    EyeOff,
+    StickyNote
 } from 'lucide-react';
+import Link from 'next/link';
+import { GmailEmailView } from '@/components/crm/GmailEmailView';
+import CallsView from '@/components/crm/CallsView';
+import SMSView from '@/components/crm/SMSView';
+import NotesView from '@/components/crm/NotesView';
+import OrdersView from '@/components/crm/OrdersView';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -125,7 +132,11 @@ export default function ClientDashboardPage() {
     const [activities, setActivities] = useState<ActivityItem[]>([]);
     const [orders, setOrders] = useState<OrderItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'Emails' | 'Calls' | 'SMS' | 'Orders'>('Emails');
+    const [activeTab, setActiveTab] = useState<'Emails' | 'Calls' | 'SMS' | 'Notes' | 'Orders'>('Emails');
+    
+    // Notes state
+    const [clientNotes, setClientNotes] = useState<{ _id: string; note: string; createdAt: string; createdBy: string }[]>([]);
+    const [loadingNotes, setLoadingNotes] = useState(false);
     
     // Pagination
     const [activitiesPage, setActivitiesPage] = useState(1);
@@ -401,6 +412,29 @@ export default function ClientDashboardPage() {
         }
     }, [activeTab, client?.emails]);
 
+    // Fetch notes when Notes tab is active
+    const fetchClientNotes = async () => {
+        if (!id) return;
+        setLoadingNotes(true);
+        try {
+            const res = await fetch(`/api/clients/${id}`);
+            if (res.ok) {
+                const data = await res.json();
+                setClientNotes(data.client?.notes || []);
+            }
+        } catch (error) {
+            console.error('Failed to fetch notes:', error);
+        } finally {
+            setLoadingNotes(false);
+        }
+    };
+
+    useEffect(() => {
+        if (activeTab === 'Notes' && id) {
+            fetchClientNotes();
+        }
+    }, [activeTab, id]);
+
     const getActivityIcon = (type: string) => {
         switch (type) {
             case 'Call': return <PhoneCall className="w-3.5 h-3.5 text-blue-500" />;
@@ -432,15 +466,15 @@ export default function ClientDashboardPage() {
     };
 
     if (loading) return (
-        <div className="flex items-center justify-center h-screen bg-white">
+        <div className="flex items-center justify-center h-screen bg-background">
             <LoadingSpinner size="lg" message="Loading Client Dashboard" />
         </div>
     );
 
     if (!client) return (
-        <div className="flex flex-col items-center justify-center h-screen bg-slate-50">
-            <h2 className="text-xl font-bold text-slate-800">Client Not Found</h2>
-            <button onClick={() => router.back()} className="mt-4 px-4 py-2 bg-black text-white text-sm font-medium">Go Back</button>
+        <div className="flex flex-col items-center justify-center h-screen bg-background">
+            <h2 className="text-xl font-bold text-foreground">Client Not Found</h2>
+            <button onClick={() => router.back()} className="mt-4 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded">Go Back</button>
         </div>
     );
 
@@ -449,29 +483,29 @@ export default function ClientDashboardPage() {
 
     return (
         <>
-            <div className="flex flex-col h-[calc(100vh-40px)] overflow-hidden bg-white">
+            <div className="flex flex-col h-[calc(100vh-40px)] overflow-hidden bg-background">
             {/* Shell Layer 1: Route Header */}
-            <div className="sticky top-0 z-[50] bg-white border-b border-slate-200 px-4 flex items-center space-x-2 shrink-0 h-14 shadow-sm">
+            <div className="sticky top-0 z-[50] bg-card border-b border-border px-4 flex items-center space-x-2 shrink-0 h-11 shadow-sm">
                 <button 
                     onClick={() => router.back()} 
-                    className="w-9 h-9 bg-black flex items-center justify-center text-white hover:bg-slate-800 transition-colors shrink-0"
+                    className="w-9 h-9 bg-primary flex items-center justify-center text-primary-foreground hover:bg-primary/90 transition-colors shrink-0 rounded"
                 >
                     <ArrowLeft className="w-4 h-4" />
                 </button>
 
                 <button 
                     onClick={() => setIsEditModalOpen(true)}
-                    className="w-9 h-9 bg-black flex items-center justify-center text-white hover:bg-slate-800 transition-colors shrink-0"
+                    className="w-9 h-9 bg-primary flex items-center justify-center text-primary-foreground hover:bg-primary/90 transition-colors shrink-0 rounded"
                 >
                     <Edit className="w-4 h-4" />
                 </button>
 
                 <div className="flex-1 max-w-sm relative group h-9">
-                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 group-focus-within:text-blue-500 transition-colors" />
+                    <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 group-focus-within:text-primary transition-colors" />
                     <input 
                         type="text" 
                         placeholder={`Search ${activeTab.toLowerCase()}...`}
-                        className="w-full h-full pl-9 pr-4 bg-slate-50 border border-slate-100 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white focus:border-blue-500 transition-all rounded-sm placeholder:text-slate-400 font-medium"
+                        className="w-full h-full pl-9 pr-4 bg-secondary/50 border border-transparent text-[11px] focus:outline-none focus:ring-1 focus:ring-ring focus:bg-background focus:border-ring transition-all rounded-md placeholder:text-muted-foreground font-medium text-foreground"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
@@ -482,6 +516,7 @@ export default function ClientDashboardPage() {
                         { id: 'Emails', icon: Mail, count: summary?.totalEmails },
                         { id: 'Calls', icon: Phone, count: summary?.totalCalls },
                         { id: 'SMS', icon: MessageSquare, count: summary?.totalSMS },
+                        { id: 'Notes', icon: StickyNote, count: clientNotes?.length },
                         { id: 'Orders', icon: ShoppingCart, count: summary?.totalOrders }
                     ].map(tab => (
                         <button
@@ -491,10 +526,10 @@ export default function ClientDashboardPage() {
                                 setSearchQuery(''); // Clear search when switching tabs
                             }}
                             className={cn(
-                                "flex items-center space-x-2 px-4 h-full text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm",
+                                "flex items-center space-x-2 px-4 h-full text-[10px] font-bold uppercase tracking-widest transition-all rounded-md",
                                 activeTab === tab.id
-                                    ? "bg-slate-100 text-slate-900 shadow-sm"
-                                    : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+                                    ? "bg-[#FFEF5F] text-black shadow-sm"
+                                    : "text-muted-foreground hover:text-foreground hover:bg-secondary"
                             )}
                         >
                             <tab.icon className="w-3.5 h-3.5" />
@@ -502,7 +537,7 @@ export default function ClientDashboardPage() {
                             {tab.count !== undefined && (
                                 <span className={cn(
                                     "px-1.5 py-0.5 text-[9px] rounded-sm font-mono",
-                                    activeTab === tab.id ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-500"
+                                    activeTab === tab.id ? "bg-black text-white" : "bg-secondary text-muted-foreground"
                                 )}>
                                     {tab.count}
                                 </span>
@@ -513,9 +548,9 @@ export default function ClientDashboardPage() {
             </div>
 
             {/* Shell Layer 2: Main Content Split */}
-            <div className="flex-1 flex overflow-hidden min-h-0 bg-white">
+            <div className="flex-1 flex overflow-hidden min-h-0 bg-background">
                 {/* Left Column (30%) - Client Details */}
-                <aside className="w-[30%] h-full overflow-y-auto border-r border-slate-100 bg-white shrink-0 scrollbar-custom">
+                <aside className="w-[30%] h-full overflow-y-auto border-r border-border bg-card shrink-0 scrollbar-custom">
                     <div className="p-6 space-y-8">
                         
                         {/* Profile Header */}
@@ -751,422 +786,27 @@ export default function ClientDashboardPage() {
                 </aside>
 
                 {/* Right Column: Activity/Orders Table */}
-                <main className="flex-1 h-full overflow-y-auto bg-white relative scrollbar-custom">
-
-                    {/* Floating Compose Button for Emails Tab */}
-                    {activeTab === 'Emails' && (
-                        <button 
-                            onClick={() => {
-                                if (!client?.emails?.length) {
-                                    toast.error("No email addresses found for this client");
-                                    return;
-                                }
-                                setComposeData({ to: client.emails[0].value, subject: '', body: '' });
-                                setIsComposeOpen(true);
-                            }}
-                            className="fixed bottom-6 right-6 z-[60] w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center shadow-xl hover:bg-blue-700 hover:scale-110 transition-all group"
-                            title="Compose Email"
-                        >
-                            <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
-                        </button>
-                    )}
-
-                    {/* Floating Create Order Button for Orders Tab */}
-                    {activeTab === 'Orders' && (
-                        <button 
-                            onClick={() => router.push(`/sales/wholesale-orders?createFor=${id}`)}
-                            className="fixed bottom-6 right-6 z-[60] w-10 h-10 bg-emerald-600 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-emerald-700 hover:scale-110 transition-all group"
-                            title="Create New Order"
-                        >
-                            <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
-                        </button>
-                    )}
-
-
-                    {/* Table Content */}
-                    {activeTab !== 'Orders' ? (
-                    <table className="w-full text-left border-collapse">
-                        <thead className={cn(
-                            "sticky top-0 z-[20] bg-slate-50/90 backdrop-blur-sm border-b border-slate-100",
-                            activeTab === 'Emails' && "hidden"
-                        )}>
-                            {activeTab === 'Emails' ? (
-                                <tr></tr>
-                            ) : (
-                                <tr>
-                                    <th className="px-4 py-3 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Date</th>
-                                    <th className="px-4 py-3 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Type</th>
-                                    <th className="px-4 py-3 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Comments</th>
-                                    <th className="px-4 py-3 text-[9px] font-bold text-slate-400 uppercase tracking-widest">By</th>
-                                </tr>
-                            )}
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {activeTab === 'Emails' ? (
-                                loadingGmail ? (
-                                    <tr>
-                                        <td colSpan={4} className="px-4 py-12 text-center text-slate-400 text-xs">
-                                            <div className="flex flex-col items-center space-y-3">
-                                                <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
-                                                <span className="font-medium tracking-wide">Syncing Workspace Correspondence...</span>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ) : gmailEmails.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={4} className="px-4 py-16 text-center text-slate-400 text-sm">
-                                            <div className="flex flex-col items-center space-y-2 italic">
-                                                <span>No external correspondence matched</span>
-                                                <span className="text-[10px] text-slate-300 font-normal">Checked for: {client.emails?.map(e => e.value).join(', ')}</span>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ) : filteredEmails.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={4} className="px-4 py-16 text-center text-slate-400 text-sm">
-                                            <div className="flex flex-col items-center space-y-2 italic">
-                                                <span>No results match your search</span>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ) : filteredEmails.map((email) => {
-                                    const isSent = email.labelIds?.includes('SENT');
-                                    const isUnread = !email.isRead && !isSent;
-                                    
-                                    // Extract recipient name from "Name <email>" format
-                                    const getRecipientName = (recipient: string) => {
-                                        if (!recipient) return 'Unknown';
-                                        const namePart = recipient.split('<')[0].trim().replace(/"/g, '');
-                                        // If no name part (just email), try to get name from email
-                                        if (!namePart || namePart === recipient) {
-                                            const emailMatch = recipient.match(/<([^>]+)>/) || [null, recipient];
-                                            const emailAddr = emailMatch[1] || recipient;
-                                            // Return first part of email as fallback name
-                                            return emailAddr.split('@')[0];
-                                        }
-                                        return namePart;
-                                    };
-                                    
-                                    return (
-                                        <React.Fragment key={email.id}>
-                                            <tr 
-                                                className={cn(
-                                                    "hover:bg-slate-50 transition-colors group cursor-pointer border-l-2",
-                                                    isUnread ? "bg-white border-l-blue-600 shadow-sm" : "bg-slate-50/10 border-l-transparent",
-                                                    expandedEmailId === email.id && "bg-blue-50/30"
-                                                )}
-                                                onClick={(e) => {
-                                                    // Don't trigger if clicking star or trash
-                                                    const target = e.target as HTMLElement;
-                                                    if (target.closest('.action-btn')) return;
-                                                    
-                                                    setExpandedEmailId(expandedEmailId === email.id ? null : email.id);
-                                                    if (isUnread) handleGmailAction(email.id, 'READ');
-                                                }}
-                                            >
-                                                <td className="px-2 py-0">
-                                                    <div className="flex items-center space-x-2 min-w-[140px] py-3">
-                                                        {isSent ? <Send className="w-3 h-3 text-blue-500/50" /> : <Inbox className="w-3 h-3 text-purple-500/50" />}
-                                                        <span className={cn(
-                                                            "text-xs truncate max-w-[140px]",
-                                                            isUnread ? "font-black text-slate-900" : "font-medium text-slate-600"
-                                                        )}>
-                                                            {isSent ? getRecipientName(email.recipient) : email.sender}
-                                                        </span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-2 py-0">
-                                                    <div className="flex items-center space-x-2 text-xs py-3">
-                                                        <span className={cn(
-                                                            "truncate max-w-[300px]",
-                                                            isUnread ? "font-bold text-slate-900" : "font-medium text-slate-700"
-                                                        )}>
-                                                            {email.subject}
-                                                        </span>
-                                                        <span className="text-slate-400 font-normal truncate max-w-[200px]">
-                                                            - {email.snippet}
-                                                        </span>
-                                                        {email.hasAttachments && (
-                                                            <Paperclip className="w-3 h-3 text-slate-400 shrink-0" />
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td className="px-2 py-0 text-right">
-                                                    <div className="flex items-center justify-end space-x-3 py-3">
-                                                        <span className={cn(
-                                                            "text-[9px] whitespace-nowrap uppercase tracking-tighter",
-                                                            isUnread ? "font-bold text-blue-600" : "font-medium text-slate-400"
-                                                        )}>
-                                                            {email.date}
-                                                        </span>
-                                                        <button 
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleGmailAction(email.id, 'TRASH');
-                                                            }}
-                                                            className="action-btn opacity-0 group-hover:opacity-100 p-1 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded transition-all"
-                                                        >
-                                                            <Trash2 className="w-3 h-3" />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                            
-                                            {/* Expanded Email Content */}
-                                            {expandedEmailId === email.id && (
-                                                <tr>
-                                                    <td colSpan={4} className="p-0">
-                                                        <div className="px-16 py-8 bg-white border-y border-slate-100 animate-in slide-in-from-top-2 duration-200">
-                                                            <div className="flex items-center justify-between mb-8">
-                                                                <div className="flex items-center space-x-4">
-                                                                    <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center">
-                                                                        <User className="w-5 h-5 text-slate-400" />
-                                                                    </div>
-                                                                    <div>
-                                                                        <div className="flex items-center space-x-2">
-                                                                            <span className="text-sm font-black text-slate-900">{email.sender}</span>
-                                                                            <span className="text-xs text-slate-400 font-medium tracking-wider">&lt;{email.senderEmail || ''}&gt;</span>
-                                                                        </div>
-                                                                        <div className="flex items-center space-x-2 mt-0.5">
-                                                                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">to {isSent ? getRecipientName(email.recipient) : 'me'}</span>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{email.date} ({email.time})</span>
-                                                            </div>
-                                                            <div className="space-y-6">
-                                                                <h3 className="text-lg font-black text-slate-900">{email.subject}</h3>
-                                                                <div className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap font-medium">
-                                                                    {email.body || <span className="text-slate-400 italic">No plain text content available</span>}
-                                                                </div>
-
-                                                                {email.attachments?.length > 0 && (
-                                                                    <div className="pt-8 border-t border-slate-50">
-                                                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Attachments ({email.attachments.length})</p>
-                                                                        <div className="flex flex-wrap gap-3">
-                                                                            {email.attachments.map((att: any) => (
-                                                                                <div 
-                                                                                    key={att.id} 
-                                                                                    className="group relative flex items-center space-x-3 p-3 bg-slate-50 hover:bg-slate-100 transition-all border border-slate-100 min-w-[200px] cursor-pointer"
-                                                                                >
-                                                                                    <div className="p-2 bg-white border border-slate-200">
-                                                                                        <Paperclip className="w-4 h-4 text-slate-400" />
-                                                                                    </div>
-                                                                                    <div className="flex-1 min-w-0">
-                                                                                        <p className="text-[11px] font-black text-slate-900 truncate">{att.filename}</p>
-                                                                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{(att.size / 1024).toFixed(1)} KB</p>
-                                                                                    </div>
-                                                                                </div>
-                                                                            ))}
-                                                                        </div>
-                                                                    </div>
-                                                                )}
-
-
-                                                                {/* Reply & Forward Actions */}
-                                                                <div className="pt-6 border-t border-slate-100 flex items-center space-x-3">
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            const replyTo = isSent ? email.recipient : (email.senderEmail || email.sender);
-                                                                            const quotedBody = "\n\n---------- Original Message ----------\nFrom: " + email.sender + " <" + (email.senderEmail || '') + ">\nDate: " + email.date + " " + email.time + "\nSubject: " + email.subject + "\nTo: " + email.recipient + "\n\n" + (email.body || '');
-                                                                            setComposeData({
-                                                                                to: replyTo,
-                                                                                subject: email.subject?.startsWith('Re:') ? email.subject : 'Re: ' + email.subject,
-                                                                                body: quotedBody
-                                                                            });
-                                                                            setIsComposeOpen(true);
-                                                                        }}
-                                                                        className="flex items-center space-x-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm"
-                                                                    >
-                                                                        <Reply className="w-3.5 h-3.5" />
-                                                                        <span>Reply</span>
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            const forwardBody = "\n\n---------- Forwarded Message ----------\nFrom: " + email.sender + " <" + (email.senderEmail || '') + ">\nDate: " + email.date + " " + email.time + "\nSubject: " + email.subject + "\nTo: " + email.recipient + "\n\n" + (email.body || '');
-                                                                            setComposeData({
-                                                                                to: '',
-                                                                                subject: email.subject?.startsWith('Fwd:') ? email.subject : 'Fwd: ' + email.subject,
-                                                                                body: forwardBody
-                                                                            });
-                                                                            setIsComposeOpen(true);
-                                                                        }}
-                                                                        className="flex items-center space-x-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm"
-                                                                    >
-                                                                        <Forward className="w-3.5 h-3.5" />
-                                                                        <span>Forward</span>
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-
-                                                </tr>
-                                            )}
-                                        </React.Fragment>
-                                    );
-                                })
-
-                            ) : (
-                                activities.filter(a => {
-                                    if (activeTab === 'Calls') return a.type === 'Call';
-                                    if (activeTab === 'SMS') return a.type === 'Text';
-                                    return false;
-                                }).length === 0 ? (
-                                    <tr>
-                                        <td colSpan={4} className="px-4 py-12 text-center text-slate-400 text-sm italic">
-                                            No {activeTab.toLowerCase()} recorded yet
-                                        </td>
-                                    </tr>
-                                ) : activities.filter(a => {
-                                    if (activeTab === 'Calls') return a.type === 'Call';
-                                    if (activeTab === 'SMS') return a.type === 'Text';
-                                    return false;
-                                }).map((act) => (
-                                    <tr key={act._id} className="hover:bg-slate-50/50 transition-colors group">
-                                        <td className="px-4 py-3 text-[11px] text-slate-500 font-mono whitespace-nowrap">
-                                            {formatDate(act.createdAt)}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <div className="flex items-center space-x-2">
-                                                {getActivityIcon(act.type)}
-                                                <span className="text-[10px] uppercase font-bold text-slate-600">{act.type}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3 text-xs text-slate-700 max-w-sm">
-                                            <div className="space-y-1">
-                                                <div className="truncate">{act.comments || '-'}</div>
-                                                {act.metadata?.duration && (
-                                                    <div className="text-[10px] text-emerald-600 font-medium">
-                                                        Duration: {act.metadata.duration}
-                                                    </div>
-                                                )}
-                                                {act.metadata?.googleVoiceLink && (
-                                                    <a 
-                                                        href={act.metadata.googleVoiceLink}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-[10px] text-blue-600 hover:text-blue-800 font-medium flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                    >
-                                                        <span>View in Google Voice</span>
-                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                                        </svg>
-                                                    </a>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3 text-[11px] text-slate-500">
-                                            {act.createdByName || 'Unknown'}
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                    ) : (
-                        <table className="w-full text-left border-collapse">
-                            <thead className="sticky top-0 z-[20] bg-slate-50/90 backdrop-blur-sm border-b border-slate-100">
-                                <tr>
-                                    <th className="px-2 py-2 text-[8px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100">Order #</th>
-                                    <th className="px-2 py-2 text-[8px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100">Date</th>
-                                    <th className="px-2 py-2 text-[8px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100">Sales Rep</th>
-                                    <th className="px-2 py-2 text-[8px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100">Method</th>
-                                    <th className="px-2 py-2 text-[8px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100">Status</th>
-                                    <th className="px-2 py-2 text-[8px] font-bold text-slate-400 uppercase tracking-widest text-right border-r border-slate-100">Subtotal</th>
-                                    <th className="px-2 py-2 text-[8px] font-bold text-slate-400 uppercase tracking-widest text-right border-r border-slate-100">Shipping</th>
-                                    <th className="px-2 py-2 text-[8px] font-bold text-slate-400 uppercase tracking-widest text-right border-r border-slate-100">Discount</th>
-                                    <th className="px-2 py-2 text-[8px] font-bold text-slate-400 uppercase tracking-widest text-right border-r border-slate-100 bg-slate-50">Grand Total</th>
-                                    <th className="px-2 py-2 text-[8px] font-bold text-slate-400 uppercase tracking-widest text-right border-r border-slate-100">Cost</th>
-                                    <th className="px-2 py-2 text-[8px] font-bold text-slate-400 uppercase tracking-widest text-right">Margin</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50">
-                                {orders.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={11} className="px-4 py-12 text-center text-slate-400 text-sm">
-                                            No wholesale orders yet
-                                        </td>
-                                    </tr>
-                                ) : orders.map((order) => {
-                                    const lineTotal = (order.lineItems || []).reduce((s, li) => s + ((li.qtyShipped || 0) * (li.price || 0)), 0);
-                                    const grandTotal = lineTotal + (order.shippingCost || 0) + (order.tax || 0) - (order.discount || 0);
-                                    const cost = (order.lineItems || []).reduce((s, li) => s + ((li.qtyShipped || 0) * (li.cost || 0)), 0);
-                                    const margin = grandTotal - cost;
-                                    
-                                    return (
-                                        <tr 
-                                            key={order._id} 
-                                            className="hover:bg-slate-50/50 transition-colors group cursor-pointer"
-                                            onClick={() => router.push(`/sales/wholesale-orders/${order._id}`)}
-                                        >
-                                            <td className="px-2 py-1.5 text-[10px] font-bold text-slate-900 tracking-tight font-mono whitespace-nowrap overflow-hidden text-ellipsis max-w-[100px] border-r border-slate-50">
-                                                {order.label || order._id.substring(0, 8)}
-                                            </td>
-                                            <td className="px-2 py-1.5 text-[10px] text-slate-500 font-mono whitespace-nowrap border-r border-slate-50">
-                                                {formatDate(order.createdAt)}
-                                            </td>
-                                            <td className="px-2 py-1.5 text-[10px] text-slate-500 whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px] border-r border-slate-50">
-                                                {typeof order.salesRep === 'object' && order.salesRep !== null 
-                                                    ? `${(order.salesRep as any).firstName} ${(order.salesRep as any).lastName}` 
-                                                    : (order.salesRep || '-')}
-                                            </td>
-                                            <td className="px-2 py-1.5 text-[10px] text-slate-500 border-r border-slate-50">
-                                                {order.paymentMethod || '-'}
-                                            </td>
-                                            <td className="px-2 py-1.5 border-r border-slate-50">
-                                                <span className={cn(
-                                                    "px-1.5 py-0.5 text-[8px] font-bold uppercase",
-                                                    order.orderStatus === 'Shipped' ? "bg-green-100 text-green-700" :
-                                                    order.orderStatus === 'Completed' ? "bg-blue-100 text-blue-700" :
-                                                    order.orderStatus === 'Processing' ? "bg-orange-100 text-orange-700" :
-                                                    order.orderStatus === 'Pending' ? "bg-amber-100 text-amber-700" :
-                                                    order.orderStatus === 'Cancelled' ? "bg-red-100 text-red-700" :
-                                                    "bg-slate-100 text-slate-600"
-                                                )}>
-                                                    {order.orderStatus || 'Unknown'}
-                                                </span>
-                                            </td>
-                                            <td className="px-2 py-1.5 text-[10px] font-bold text-slate-900 font-mono text-right border-r border-slate-50">
-                                                {formatCurrency(lineTotal)}
-                                            </td>
-                                            <td className="px-2 py-1.5 text-[10px] text-slate-500 font-mono text-right border-r border-slate-50">
-                                                {formatCurrency(order.shippingCost || 0)}
-                                            </td>
-                                            <td className="px-2 py-1.5 text-[10px] text-slate-500 font-mono text-right border-r border-slate-50">
-                                                {formatCurrency(order.discount || 0)}
-                                            </td>
-                                            <td className="px-2 py-1.5 text-[10px] font-black text-slate-900 bg-slate-50 font-mono text-right border-r border-slate-50">
-                                                {formatCurrency(grandTotal)}
-                                            </td>
-                                            <td className="px-2 py-1.5 text-[10px] text-slate-600 font-mono text-right border-r border-slate-50">
-                                                {formatCurrency(cost)}
-                                            </td>
-                                            <td className={cn("px-2 py-1.5 text-[10px] font-bold font-mono text-right", margin < 0 ? "text-red-500" : "text-green-600")}>
-                                                {formatCurrency(margin)}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    )}
-
-                    {/* Load More Indicator */}
-                    <div ref={loadMoreRef} className="h-16 flex items-center justify-center">
-                        {((activeTab !== 'Orders' && hasMoreActivities) || (activeTab === 'Orders' && hasMoreOrders)) && (
-                            <div className="flex items-center space-x-2 text-slate-400">
-                                {isLoadingMore ? (
-                                    <>
-                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                        <span className="text-[10px] font-medium">Loading more...</span>
-                                    </>
-                                ) : (
-                                    <span className="text-[10px] font-medium">Scroll for more</span>
-                                )}
+                <main className="flex-1 h-full overflow-hidden bg-background relative flex flex-col">
+                    <div className="flex-1 h-full relative">
+                        {activeTab === 'Emails' && (
+                            <div className="h-full">
+                                <GmailEmailView 
+                                    initialLabel="INBOX" 
+                                    forcedClientEmails={client?.emails?.map(e => e.value) || []} 
+                                />
                             </div>
+                        )}
+                         {activeTab === 'Calls' && id && (
+                             <CallsView clientId={id as string} />
+                        )}
+                        {activeTab === 'SMS' && id && (
+                             <SMSView clientId={id as string} />
+                        )}
+                        {activeTab === 'Notes' && id && (
+                            <NotesView clientId={id as string} />
+                        )}
+                        {activeTab === 'Orders' && id && (
+                            <OrdersView clientId={id as string} />
                         )}
                     </div>
                 </main>

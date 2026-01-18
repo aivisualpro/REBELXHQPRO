@@ -11,12 +11,13 @@ import toast from 'react-hot-toast';
 
 interface GmailEmailViewProps {
     initialLabel: 'INBOX' | 'SENT';
+    forcedClientEmails?: string[]; // Optional prop to force filtering by specific client emails
 }
 
-export function GmailEmailView({ initialLabel }: GmailEmailViewProps) {
+export function GmailEmailView({ initialLabel, forcedClientEmails }: GmailEmailViewProps) {
   const { data: session } = useSession();
   const [emails, setEmails] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Start with loading true
   const [expandedEmailId, setExpandedEmailId] = useState<string | null>(null);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [composeData, setComposeData] = useState({ to: '', subject: '', body: '' });
@@ -32,6 +33,56 @@ export function GmailEmailView({ initialLabel }: GmailEmailViewProps) {
   const imageInputRef = React.useRef<HTMLInputElement>(null);
   const emailsPerPage = 50;
 
+  // Filter settings
+  const [filterByClients, setFilterByClients] = useState(false);
+  const [clientEmails, setClientEmails] = useState<string[]>([]);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+
+  // Fetch settings and client emails on mount
+  useEffect(() => {
+    const loadFilterSettings = async () => {
+      try {
+        if (forcedClientEmails && forcedClientEmails.length > 0) {
+            // Use forced client emails if provided
+            setFilterByClients(true);
+            setClientEmails(forcedClientEmails);
+            setSettingsLoaded(true);
+            console.log('Using forced client emails:', forcedClientEmails);
+            return;
+        }
+
+        // Fetch CRM settings
+        const settingsRes = await fetch('/api/settings');
+        if (settingsRes.ok) {
+          const settingsData = await settingsRes.json();
+          const filterEnabled = settingsData.crmFilterEmailsByClients === true;
+          setFilterByClients(filterEnabled);
+          
+          // If filtering is enabled, fetch all client emails
+          if (filterEnabled) {
+            const clientsRes = await fetch('/api/clients?limit=10000');
+            if (clientsRes.ok) {
+              const clientsData = await clientsRes.json();
+              const allEmails: string[] = [];
+              clientsData.clients?.forEach((client: any) => {
+                client.emails?.forEach((e: any) => {
+                  if (e.value) allEmails.push(e.value.toLowerCase().trim());
+                });
+              });
+              setClientEmails(allEmails);
+              console.log('Loaded client emails for filtering:', allEmails.length);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading filter settings:', error);
+      } finally {
+        setSettingsLoaded(true);
+      }
+    };
+    loadFilterSettings();
+  }, [forcedClientEmails]);
+
   const fetchEmails = useCallback(async (page: number) => {
     setLoading(true);
     try {
@@ -40,9 +91,48 @@ export function GmailEmailView({ initialLabel }: GmailEmailViewProps) {
         const data = await res.json();
         
         if (data.emails) {
-            setEmails(data.emails);
-            setTotalEstimated(data.resultSizeEstimate || 0);
-            setUnreadCount(data.unreadCount || 0);
+            let filteredEmails = data.emails;
+            
+            // Filter emails if setting is enabled and we have client emails
+            if (filterByClients && clientEmails.length > 0) {
+              console.log('Filtering emails by', clientEmails.length, 'client emails:', clientEmails.slice(0, 5));
+              filteredEmails = data.emails.filter((email: any) => {
+                // Get sender email (already extracted by API)
+                const senderEmail = (email.senderEmail || '').toLowerCase().trim();
+                
+                // Get all recipients (to, cc, bcc may contain multiple emails)
+                const allRecipients = [
+                  email.recipient || '',
+                  email.cc || '',
+                  email.bcc || ''
+                ].join(' ').toLowerCase();
+                
+                // Check if sender matches any client email
+                const senderMatch = clientEmails.some(ce => senderEmail.includes(ce) || ce.includes(senderEmail));
+                
+                // Check if any recipient matches any client email
+                const recipientMatch = clientEmails.some(ce => allRecipients.includes(ce));
+                
+                if (senderMatch || recipientMatch) {
+                  console.log('Match found:', email.subject, '- sender:', senderEmail, '- recipients:', allRecipients.substring(0, 50));
+                }
+                
+                return senderMatch || recipientMatch;
+              });
+              console.log('Filtered from', data.emails.length, 'to', filteredEmails.length, 'emails');
+            }
+            
+            setEmails(filteredEmails);
+            setTotalEstimated(filterByClients ? filteredEmails.length : (data.resultSizeEstimate || 0));
+            
+            // Calculate unread count based on filtered emails if filtering is enabled
+            if (filterByClients && clientEmails.length > 0) {
+              const filteredUnread = filteredEmails.filter((e: any) => !e.isRead).length;
+              setUnreadCount(filteredUnread);
+            } else {
+              setUnreadCount(data.unreadCount || 0);
+            }
+            
             if (data.nextPageToken) {
                 setTokensByPage(prev => ({ ...prev, [page + 1]: data.nextPageToken }));
                 setNextPageToken(data.nextPageToken);
@@ -56,13 +146,15 @@ export function GmailEmailView({ initialLabel }: GmailEmailViewProps) {
     } finally {
         setLoading(false);
     }
-  }, [initialLabel, tokensByPage]);
+  }, [initialLabel, tokensByPage, filterByClients, clientEmails]);
 
+  // Only fetch emails AFTER settings are loaded
   useEffect(() => {
+    if (!settingsLoaded) return;
     fetchEmails(1);
     setCurrentPage(1);
     setTokensByPage({ 1: null });
-  }, [initialLabel]);
+  }, [initialLabel, settingsLoaded, filterByClients, clientEmails]);
 
   const handleCompose = async () => {
     setComposeError(null);
@@ -224,7 +316,10 @@ export function GmailEmailView({ initialLabel }: GmailEmailViewProps) {
                             "w-48 shrink-0 text-[14px] truncate ml-1",
                             email.isRead ? "font-normal text-muted" : "font-black text-foreground"
                         )}>
-                            {initialLabel === 'INBOX' ? email.sender : `To: ${email.recipient || 'Unknown'}`}
+                            {initialLabel === 'INBOX' 
+                                ? email.sender 
+                                : (email.recipient || 'Unknown').split(',')[0].replace(/<.*>/, '').replace(/"/g, '').trim() || (email.recipient || 'Unknown').split(',')[0]
+                            }
                         </div>
                         <div className="flex-1 min-w-0 flex items-baseline text-[14px] truncate pr-4">
                              <span className={cn(
@@ -314,8 +409,8 @@ export function GmailEmailView({ initialLabel }: GmailEmailViewProps) {
                 </div>
             ))}
             
-            {(!loading && emails.length === 0) && (
-                <div className="py-20 text-center text-slate-400 font-mono text-xs uppercase tracking-widest">
+            {(!loading && settingsLoaded && emails.length === 0) && (
+                <div className="py-20 text-center text-muted-foreground font-mono text-xs uppercase tracking-widest">
                     No messages found in {initialLabel.toLowerCase()}
                 </div>
             )}

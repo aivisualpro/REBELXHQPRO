@@ -60,7 +60,6 @@ const StatusBadge = ({ status }: { status: string }) => {
 
 export default function ClientsPage() {
   const router = useRouter();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [minRevenueSlab, setMinRevenueSlab] = useState('20');
@@ -123,6 +122,7 @@ export default function ClientsPage() {
             
             const uData = await uRes.json();
             if (uData.users) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 setSalesRepOptions(uData.users.map((u: any) => ({ label: `${u.firstName} ${u.lastName}`, value: u._id })));
             }
             
@@ -182,7 +182,7 @@ export default function ClientsPage() {
     } finally {
         setLoading(false);
     }
-  }, [page, limit, debouncedSearch, sortBy, sortOrder, selectedSalesReps, selectedStates, minRev, maxRev, minBal, maxBal, minRevenueSlab]);
+  }, [page, limit, debouncedSearch, sortBy, sortOrder, selectedSalesReps, selectedStates, selectedCompanyTypes, minRev, maxRev, minBal, maxBal, minRevenueSlab]);
 
   useEffect(() => {
     if (!settingsLoading) {
@@ -315,32 +315,24 @@ export default function ClientsPage() {
     }
   };
 
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-      // Placeholder for import logic
-      const file = e.target.files?.[0];
-      if (file) {
-          toast.success("Import feature ready (Backend needed)");
-      }
-      // Reset
-      if (fileInputRef.current) fileInputRef.current.value = '';
-  };
+
 
   return (
-    <div className="flex flex-col h-[calc(100vh-48px)] bg-slate-50/30 text-slate-600 font-sans">
+    <div className="flex flex-col h-[calc(100vh-48px)] bg-background text-foreground font-sans">
       
       {/* Header / Action Bar */}
-      <div className="flex items-center justify-between px-4 h-11 border-b border-slate-100 bg-white sticky top-0 z-20 gap-4">
+      <div className="flex items-center justify-between px-4 h-11 border-b border-border bg-card sticky top-0 z-20 gap-4">
         
         {/* Left: Search (Title Removed) */}
         <div className="flex items-center space-x-6">
             <div className="relative group">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                 <input 
                     type="text" 
                     placeholder="Search clients..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="pl-9 pr-4 h-8 w-64 bg-slate-50 hover:bg-slate-100 focus:bg-white border border-transparent focus:border-blue-500 rounded text-sm transition-all focus:outline-none placeholder:text-slate-400"
+                    className="pl-9 pr-4 h-8 w-64 bg-secondary/50 hover:bg-secondary focus:bg-background border border-transparent focus:border-primary rounded text-sm transition-all focus:outline-none placeholder:text-muted-foreground text-foreground"
                 />
             </div>
         </div>
@@ -350,16 +342,16 @@ export default function ClientsPage() {
             
             {/* Filter Group */}
             <div className="flex items-center space-x-2 mr-4">
-                  <button className="flex items-center space-x-1.5 px-3 h-8 text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded hover:bg-slate-50 hover:border-slate-300 transition-all uppercase tracking-wide cursor-pointer">
-                    <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                  <button className="flex items-center space-x-1.5 px-3 h-8 text-[11px] font-bold text-muted-foreground bg-card border border-border rounded hover:bg-secondary transition-all uppercase tracking-wide cursor-pointer">
+                    <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
                     <span>City</span>
                 </button>
-                 <button className="flex items-center space-x-1.5 px-3 h-8 text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded hover:bg-slate-50 hover:border-slate-300 transition-all uppercase tracking-wide cursor-pointer">
-                    <LucideMap className="w-3.5 h-3.5 text-slate-400" />
+                 <button className="flex items-center space-x-1.5 px-3 h-8 text-[11px] font-bold text-muted-foreground bg-card border border-border rounded hover:bg-secondary transition-all uppercase tracking-wide cursor-pointer">
+                    <LucideMap className="w-3.5 h-3.5 text-muted-foreground" />
                     <span>State</span>
                 </button>
-                 <button className="flex items-center space-x-1.5 px-3 h-8 text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded hover:bg-slate-50 hover:border-slate-300 transition-all uppercase tracking-wide cursor-pointer">
-                    <Truck className="w-3.5 h-3.5 text-slate-400" />
+                 <button className="flex items-center space-x-1.5 px-3 h-8 text-[11px] font-bold text-muted-foreground bg-card border border-border rounded hover:bg-secondary transition-all uppercase tracking-wide cursor-pointer">
+                    <Truck className="w-3.5 h-3.5 text-muted-foreground" />
                     <span>Shipping</span>
                 </button>
             </div>
@@ -386,31 +378,9 @@ export default function ClientsPage() {
                 </div>
             </div>
 
-            <div className="w-px h-6 bg-slate-200" />
+            <div className="w-px h-6 bg-border" />
 
             {/* Actions Group */}
-            <input
-                type="file"
-                accept=".csv"
-                className="hidden"
-                ref={fileInputRef}
-                onChange={handleImport}
-            />
-            <button 
-                onClick={() => fileInputRef.current?.click()}
-                className="w-8 h-8 flex items-center justify-center text-blue-600 bg-blue-50 border border-blue-100 rounded hover:bg-blue-100 transition-all shadow-sm cursor-pointer"
-                title="Import CSV"
-            >
-                <Upload className="w-4 h-4" />
-            </button>
-
-            <button 
-                className="w-8 h-8 flex items-center justify-center text-slate-600 bg-white border border-slate-200 rounded hover:bg-slate-50 transition-all shadow-sm cursor-pointer"
-                title="Notes"
-            >
-                <FileText className="w-4 h-4 text-slate-400" />
-            </button>
-
             <button 
                 onClick={() => setIsModalOpen(true)}
                 className="flex items-center justify-center w-8 h-8 bg-[#FFEF5F] text-black hover:opacity-90 rounded shadow-sm transition-all cursor-pointer"
@@ -443,6 +413,7 @@ export default function ClientsPage() {
                             { key: 'totalRevenue', label: '$ Revenue', align: 'text-right' },
                             { key: 'balance', label: '$ Balance', align: 'text-right' },
                             { key: 'emailCount', label: 'Activities', align: 'text-center' },
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         ].map((col: any) => (
                             <th 
                                 key={col.key} 

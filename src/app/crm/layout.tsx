@@ -44,13 +44,59 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
 
   const fetchUnreadCount = React.useCallback(async () => {
     try {
-        const res = await fetch('/api/gmail?label=INBOX&limit=1');
-        const data = await res.json();
-        if (typeof data.unreadCount === 'number') {
+        // First, check if filtering is enabled
+        const settingsRes = await fetch('/api/settings');
+        const settings = await settingsRes.json();
+        const filterEnabled = settings.crmFilterEmailsByClients === true;
+        
+        if (filterEnabled) {
+          // Fetch client emails and filtered inbox emails
+          const [clientsRes, gmailRes] = await Promise.all([
+            fetch('/api/clients?limit=10000'),
+            fetch('/api/gmail?label=INBOX')
+          ]);
+          
+          const clientsData = await clientsRes.json();
+          const gmailData = await gmailRes.json();
+          
+          // Extract all client emails
+          const clientEmails: string[] = [];
+          clientsData.clients?.forEach((client: any) => {
+            client.emails?.forEach((e: any) => {
+              if (e.value) clientEmails.push(e.value.toLowerCase().trim());
+            });
+          });
+          
+          // Filter emails by client emails and count unread
+          if (gmailData.emails && clientEmails.length > 0) {
+            const filteredUnread = gmailData.emails.filter((email: any) => {
+              const senderEmail = (email.senderEmail || '').toLowerCase().trim();
+              const allRecipients = [
+                email.recipient || '',
+                email.cc || '',
+                email.bcc || ''
+              ].join(' ').toLowerCase();
+              
+              const senderMatch = clientEmails.some(ce => senderEmail.includes(ce) || ce.includes(senderEmail));
+              const recipientMatch = clientEmails.some(ce => allRecipients.includes(ce));
+              
+              return (senderMatch || recipientMatch) && !email.isRead;
+            }).length;
+            
+            setUnreadCount(filteredUnread);
+          } else {
+            setUnreadCount(0);
+          }
+        } else {
+          // Use standard Gmail unread count
+          const res = await fetch('/api/gmail?label=INBOX&limit=1');
+          const data = await res.json();
+          if (typeof data.unreadCount === 'number') {
             setUnreadCount(data.unreadCount);
+          }
         }
     } catch (e) {
-        console.error("Failed to fetch unread count");
+        console.error("Failed to fetch unread count", e);
     }
   }, []);
 

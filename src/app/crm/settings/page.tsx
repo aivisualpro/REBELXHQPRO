@@ -6,7 +6,10 @@ import {
     Upload,
     Users,
     FileText,
-    DollarSign
+    DollarSign,
+    Mail,
+    ToggleLeft,
+    ToggleRight
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Papa from 'papaparse';
@@ -31,7 +34,8 @@ export default function CRMSettingsPage() {
         twoFactor: true,
         filterDataFrom: '', 
         missingSkuImage: '',
-        crmMinRevenueSlab: '20'
+        crmMinRevenueSlab: '20',
+        crmFilterEmailsByClients: false
     });
 
     React.useEffect(() => {
@@ -249,7 +253,6 @@ export default function CRMSettingsPage() {
                     </div>
 
                     {/* Row 3: Threshold */}
-                    {/* Row 3: Threshold */}
                     <div className="p-6 bg-card border border-border flex items-center justify-between rounded-lg">
                         <div className="flex items-center space-x-4">
                             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -272,6 +275,31 @@ export default function CRMSettingsPage() {
                                 min="0"
                             />
                         </div>
+                    </div>
+
+                    {/* Row 4: Filter Emails by Clients/Leads */}
+                    <div className="p-6 bg-card border border-border flex items-center justify-between rounded-lg">
+                        <div className="flex items-center space-x-4">
+                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                <Mail className="w-5 h-5 text-primary" />
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-medium text-foreground">Filter Emails by Clients/Leads</h4>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                    Only show emails matching client/lead email addresses in Inbox and Sent
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => setSettings({...settings, crmFilterEmailsByClients: !settings.crmFilterEmailsByClients})}
+                            className="p-1 hover:bg-secondary rounded transition-colors"
+                        >
+                            {settings.crmFilterEmailsByClients ? (
+                                <ToggleRight className="w-10 h-10 text-primary" />
+                            ) : (
+                                <ToggleLeft className="w-10 h-10 text-muted-foreground" />
+                            )}
+                        </button>
                     </div>
 
                 </div>
