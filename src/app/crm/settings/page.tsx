@@ -168,12 +168,13 @@ export default function CRMSettingsPage() {
     return (
         <div className="flex flex-col h-full bg-background">
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100 bg-white shrink-0">
-                <h1 className="text-sm font-bold uppercase text-slate-900">CRM Settings</h1>
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card shrink-0">
+                <h1 className="text-sm font-bold uppercase text-foreground">CRM Settings</h1>
                 <button
                     onClick={handleSave}
                     disabled={saving}
-                    className="flex items-center space-x-2 px-4 py-1.5 bg-black text-white rounded text-xs font-bold hover:bg-slate-800 transition-colors disabled:opacity-50"
+                    className="flex items-center space-x-2 px-4 py-1.5 bg-primary text-primary-foreground rounded text-xs font-bold hover:bg-primary/90 transition-colors disabled:opacity-50"
                 >
                     <Save className="w-3.5 h-3.5" />
                     <span>{saving ? 'Saving...' : 'Save Changes'}</span>
@@ -200,13 +201,14 @@ export default function CRMSettingsPage() {
                     />
 
                     {/* Row 1: Import Clients */}
-                    <div className="p-6 bg-white border-b border-sidebar-border flex items-center justify-between">
+                    {/* Row 1: Import Clients */}
+                    <div className="p-6 bg-card border border-border flex items-center justify-between rounded-lg">
                         <div className="flex items-center space-x-4">
-                            <div className="w-10 h-10 rounded-full bg-sidebar-accent/10 flex items-center justify-center shrink-0">
-                                <Users className="w-5 h-5 text-sidebar-primary" />
+                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                <Users className="w-5 h-5 text-primary" />
                             </div>
                             <div>
-                                <h4 className="text-sm font-medium text-sidebar-foreground">Import Clients (CSV)</h4>
+                                <h4 className="text-sm font-medium text-foreground">Import Clients (CSV)</h4>
                                 <p className="text-xs text-muted-foreground mt-0.5">
                                     Columns: name, email, phone, address, city, state
                                 </p>
@@ -223,13 +225,14 @@ export default function CRMSettingsPage() {
                     </div>
 
                     {/* Row 2: Import Client Notes */}
-                    <div className="p-6 bg-white border-b border-sidebar-border flex items-center justify-between">
+                    {/* Row 2: Import Client Notes */}
+                    <div className="p-6 bg-card border border-border flex items-center justify-between rounded-lg">
                          <div className="flex items-center space-x-4">
-                            <div className="w-10 h-10 rounded-full bg-sidebar-accent/10 flex items-center justify-center shrink-0">
-                                <FileText className="w-5 h-5 text-sidebar-primary" />
+                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                <FileText className="w-5 h-5 text-primary" />
                             </div>
                             <div>
-                                <h4 className="text-sm font-medium text-sidebar-foreground">Import Client Notes (CSV)</h4>
+                                <h4 className="text-sm font-medium text-foreground">Import Client Notes (CSV)</h4>
                                 <p className="text-xs text-muted-foreground mt-0.5">
                                     Columns: clientId, note, createdAt (optional)
                                 </p>
@@ -246,13 +249,14 @@ export default function CRMSettingsPage() {
                     </div>
 
                     {/* Row 3: Threshold */}
-                    <div className="p-6 bg-white border-b border-sidebar-border flex items-center justify-between">
+                    {/* Row 3: Threshold */}
+                    <div className="p-6 bg-card border border-border flex items-center justify-between rounded-lg">
                         <div className="flex items-center space-x-4">
-                            <div className="w-10 h-10 rounded-full bg-sidebar-accent/10 flex items-center justify-center shrink-0">
-                                <DollarSign className="w-5 h-5 text-sidebar-primary" />
+                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                <DollarSign className="w-5 h-5 text-primary" />
                             </div>
                             <div>
-                                <h4 className="text-sm font-medium text-sidebar-foreground">Lead to Client Threshold</h4>
+                                <h4 className="text-sm font-medium text-foreground">Lead to Client Threshold</h4>
                                 <p className="text-xs text-muted-foreground mt-0.5">
                                     Revenue amount to convert Lead to Client
                                 </p>
@@ -264,7 +268,7 @@ export default function CRMSettingsPage() {
                                 type="number" 
                                 value={settings.crmMinRevenueSlab}
                                 onChange={e => setSettings({...settings, crmMinRevenueSlab: e.target.value})}
-                                className="w-full pl-8 pr-3 py-1.5 bg-background border border-input rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                                className="w-full pl-8 pr-3 py-1.5 bg-background border border-input rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary text-foreground"
                                 min="0"
                             />
                         </div>

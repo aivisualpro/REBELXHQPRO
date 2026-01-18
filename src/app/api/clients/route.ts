@@ -3,6 +3,7 @@ import dbConnect from '@/lib/mongoose';
 import Client from '@/models/Client';
 import SaleOrder from '@/models/SaleOrder';
 import Activity from '@/models/Activity';
+import Setting from '@/models/Setting';
 import mongoose from 'mongoose';
 
 export const dynamic = 'force-dynamic';
@@ -27,10 +28,26 @@ export async function GET(request: Request) {
         const city = searchParams.get('city');
         const state = searchParams.get('state');
         const defaultShippingTerms = searchParams.get('defaultShippingTerms');
-        const minRevenue = searchParams.get('minRevenue') ? parseFloat(searchParams.get('minRevenue')!) : null;
-        const maxRevenue = searchParams.get('maxRevenue') ? parseFloat(searchParams.get('maxRevenue')!) : null;
+        let minRevenue = searchParams.get('minRevenue') ? parseFloat(searchParams.get('minRevenue')!) : null;
+        let maxRevenue = searchParams.get('maxRevenue') ? parseFloat(searchParams.get('maxRevenue')!) : null;
         const minBalance = searchParams.get('minBalance') ? parseFloat(searchParams.get('minBalance')!) : null;
         const maxBalance = searchParams.get('maxBalance') ? parseFloat(searchParams.get('maxBalance')!) : null;
+
+        // Fetch dynamic threshold setting
+        const thresholdSetting = await Setting.findOne({ key: 'crmMinRevenueSlab' });
+        const threshold = thresholdSetting ? parseFloat(thresholdSetting.value) : 20;
+
+        // Apply business logic defaults if not manually overridden
+        // If query strictly asks for 'Client', enforce minRevenue >= threshold
+        const isClientQuery = (contactStatus === 'Client' || contactType === 'Client');
+        const isLeadQuery = (contactStatus === 'Lead' || contactType === 'Lead');
+
+        if (isClientQuery && minRevenue === null) {
+            minRevenue = threshold;
+        }
+        if (isLeadQuery && maxRevenue === null) {
+            maxRevenue = threshold;
+        }
 
         let query: any = {};
 

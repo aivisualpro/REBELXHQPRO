@@ -12,35 +12,26 @@ import {
     MapPin,
     DollarSign,
     Clock,
-    Layout,
-    Calendar,
-    Filter,
-    ListFilter,
-    Image as ImageIcon,
-    Layers,
-    Upload,
-    Users,
-    ShoppingCart,
-    Warehouse,
     BarChart3,
     HelpCircle,
-    FileText
+    Calendar,
+    Filter,
+    Image as ImageIcon,
+    Layers,
+    ShoppingCart,
+    Warehouse
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
-import Papa from 'papaparse';
 
 type Tab = 'general' | 'localization' | 'crm' | 'notifications' | 'security' | 'dataFilter' | 'modules';
-type ModuleSubTab = 'crm' | 'sales' | 'warehouse' | 'reports' | 'help';
+type ModuleSubTab = 'sales' | 'warehouse' | 'reports' | 'help';
 
 export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState<Tab>('general');
-    const [moduleSubTab, setModuleSubTab] = useState<ModuleSubTab>('crm');
+    const [moduleSubTab, setModuleSubTab] = useState<ModuleSubTab>('sales');
     const [saving, setSaving] = useState(false);
     const [loading, setLoading] = useState(true);
-    const [importing, setImporting] = useState(false);
-    const importClientsRef = React.useRef<HTMLInputElement>(null);
-    const importNotesRef = React.useRef<HTMLInputElement>(null);
 
     const [settings, setSettings] = useState({
         companyName: 'RebelX Headquarters',
@@ -90,6 +81,7 @@ export default function SettingsPage() {
                 toast.error('Failed to save settings');
             }
         } catch (error) {
+            console.error("Error saving settings", error);
             toast.error('Error saving settings');
         } finally {
             setSaving(false);
@@ -106,99 +98,13 @@ export default function SettingsPage() {
     ];
 
     const moduleSubTabs = [
-        { id: 'crm', label: 'CRM', icon: Users },
         { id: 'sales', label: 'Sales', icon: ShoppingCart },
         { id: 'warehouse', label: 'Warehouse', icon: Warehouse },
         { id: 'reports', label: 'Reports', icon: BarChart3 },
         { id: 'help', label: 'Help', icon: HelpCircle },
     ];
 
-    const handleImportClients = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        e.target.value = '';
-        
-        setImporting(true);
-        const toastId = toast.loading('Parsing file...');
-        
-        Papa.parse(file, {
-            header: true,
-            skipEmptyLines: true,
-            complete: async (results) => {
-                const totalRows = results.data.length;
-                if (totalRows === 0) {
-                    toast.error('No data found in file', { id: toastId });
-                    setImporting(false);
-                    return;
-                }
-                
-                try {
-                    toast.loading(`Importing ${totalRows} clients...`, { id: toastId });
-                    
-                    // The API expects { clients: [...] }, matched with crm/clients/page.tsx
-                    const res = await fetch('/api/clients/import', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ clients: results.data })
-                    });
-                    
-                    if (res.ok) {
-                        const data = await res.json();
-                        toast.success(`Successfully imported ${data.count || totalRows} clients`, { id: toastId });
-                    } else {
-                        const err = await res.json();
-                        toast.error(err.error || 'Import failed', { id: toastId });
-                    }
-                } catch (err) {
-                    console.error(err);
-                    toast.error('Import failed', { id: toastId });
-                }
-                setImporting(false);
-            }
-        });
-    };
 
-    const handleImportNotes = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        e.target.value = '';
-        
-        setImporting(true);
-        const toastId = toast.loading('Parsing notes file...');
-        
-        Papa.parse(file, {
-            header: true,
-            skipEmptyLines: true,
-            complete: async (results) => {
-                const totalRows = results.data.length;
-                if (totalRows === 0) {
-                    toast.error('No data found in file', { id: toastId });
-                    setImporting(false);
-                    return;
-                }
-                
-                try {
-                    toast.loading(`Importing ${totalRows} notes...`, { id: toastId });
-                    const res = await fetch('/api/clients/import-notes', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ data: results.data })
-                    });
-                    
-                    if (res.ok) {
-                        const data = await res.json();
-                        toast.success(`Successfully imported ${data.count || totalRows} notes`, { id: toastId });
-                    } else {
-                        const err = await res.json();
-                        toast.error(err.error || 'Import failed', { id: toastId });
-                    }
-                } catch (err) {
-                    toast.error('Import failed', { id: toastId });
-                }
-                setImporting(false);
-            }
-        });
-    };
 
     if (loading) {
         return <div className="p-8">Loading settings...</div>;
@@ -526,113 +432,7 @@ export default function SettingsPage() {
                                     })}
                                 </div>
 
-                                {/* Hidden file inputs */}
-                                <input
-                                    ref={importClientsRef}
-                                    type="file"
-                                    accept=".csv"
-                                    className="hidden"
-                                    onChange={handleImportClients}
-                                />
-                                <input
-                                    ref={importNotesRef}
-                                    type="file"
-                                    accept=".csv"
-                                    className="hidden"
-                                    onChange={handleImportNotes}
-                                />
 
-                                {/* CRM Module Settings */}
-                                {moduleSubTab === 'crm' && (
-                                    <div className="space-y-6 animate-in fade-in duration-200">
-                                        <div className="space-y-4">
-                                            <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">CRM Data Import</h2>
-                                            
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                {/* Import Clients */}
-                                                <div className="p-5 border border-slate-200 rounded-lg hover:border-slate-300 transition-colors group">
-                                                    <div className="flex items-start space-x-4">
-                                                        <div className="w-12 h-12 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 group-hover:bg-blue-100 transition-colors">
-                                                            <Users className="w-6 h-6 text-blue-600" />
-                                                        </div>
-                                                        <div className="flex-1">
-                                                            <h4 className="text-sm font-bold text-slate-900">Import Clients</h4>
-                                                            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                                                                Upload a CSV file containing client records. Columns should include: name, email, phone, address, city, state.
-                                                            </p>
-                                                            <button
-                                                                onClick={() => importClientsRef.current?.click()}
-                                                                disabled={importing}
-                                                                className="mt-3 flex items-center space-x-2 px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded hover:bg-blue-700 transition-colors disabled:opacity-50"
-                                                            >
-                                                                <Upload className="w-3.5 h-3.5" />
-                                                                <span>{importing ? 'Importing...' : 'Upload CSV'}</span>
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                {/* Import Client Notes */}
-                                                <div className="p-5 border border-slate-200 rounded-lg hover:border-slate-300 transition-colors group">
-                                                    <div className="flex items-start space-x-4">
-                                                        <div className="w-12 h-12 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0 group-hover:bg-emerald-100 transition-colors">
-                                                            <FileText className="w-6 h-6 text-emerald-600" />
-                                                        </div>
-                                                        <div className="flex-1">
-                                                            <h4 className="text-sm font-bold text-slate-900">Import Client Notes</h4>
-                                                            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                                                                Upload a CSV file containing client notes. Columns should include: clientId, note, createdAt (optional).
-                                                            </p>
-                                                            <button
-                                                                onClick={() => importNotesRef.current?.click()}
-                                                                disabled={importing}
-                                                                className="mt-3 flex items-center space-x-2 px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded hover:bg-emerald-700 transition-colors disabled:opacity-50"
-                                                            >
-                                                                <Upload className="w-3.5 h-3.5" />
-                                                                <span>{importing ? 'Importing...' : 'Upload CSV'}</span>
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* CRM Business Logic Section */}
-                                        <div className="space-y-4 mt-6">
-                                            <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">CRM Business Logic</h2>
-                                            
-                                            <div className="p-4 border border-amber-200 bg-amber-50 rounded-lg flex items-start space-x-4">
-                                                <div className="shrink-0 mt-0.5">
-                                                    <DollarSign className="w-5 h-5 text-amber-600" />
-                                                </div>
-                                                <div>
-                                                    <h4 className="text-sm font-bold text-amber-800">Revenue Threshold (Slab)</h4>
-                                                    <p className="text-xs text-amber-700 mt-1">
-                                                        Records with lifetime revenue BELOW this amount are classified as <strong>Leads</strong>. 
-                                                        Records at or ABOVE this amount are classified as <strong>Clients</strong>.
-                                                    </p>
-                                                </div>
-                                            </div>
-
-                                            <div className="space-y-1.5">
-                                                <label className="text-xs font-bold text-slate-700">Lead to Client Threshold ($)</label>
-                                                <div className="relative max-w-[200px]">
-                                                    <DollarSign className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-                                                    <input 
-                                                        type="number" 
-                                                        value={settings.crmMinRevenueSlab}
-                                                        onChange={e => setSettings({...settings, crmMinRevenueSlab: e.target.value})}
-                                                        className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-black/10"
-                                                        min="0"
-                                                    />
-                                                </div>
-                                                <p className="text-[10px] text-slate-500">
-                                                    Default is $20. Any change will immediately reflect across the CRM dashboard.
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
 
                                 {/* Sales Module Settings */}
                                 {moduleSubTab === 'sales' && (
@@ -680,6 +480,7 @@ export default function SettingsPage() {
                                                                                 throw new Error('Upload failed');
                                                                             }
                                                                         } catch (err) {
+                                                                            console.error(err);
                                                                             toast.error('Failed to upload', { id: toastId });
                                                                         }
                                                                     }} />
@@ -688,7 +489,7 @@ export default function SettingsPage() {
                                                         </div>
                                                         <div className="flex-1">
                                                             <p className="text-xs text-slate-500 leading-relaxed">
-                                                                This image will be displayed whenever a SKU's primary image is missing or fails to load.
+                                                                This image will be displayed whenever a SKU&apos;s primary image is missing or fails to load.
                                                             </p>
                                                             {settings.missingSkuImage && (
                                                                 <button 
