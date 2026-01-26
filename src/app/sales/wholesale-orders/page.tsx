@@ -220,7 +220,7 @@ function SaleOrdersContent() {
     const fetchResources = async () => {
       try {
         // Clients
-        const res = await fetch('/api/clients?limit=1000');
+        const res = await fetch('/api/clients?limit=5000');
         if (res.ok) {
           const data = await res.json();
           const clients_list = data.clients || [];
@@ -564,14 +564,7 @@ function SaleOrdersContent() {
       toast.error('Address is required');
       return;
     }
-    if (!newOrder.city) {
-      toast.error('City is required');
-      return;
-    }
-    if (!newOrder.state) {
-      toast.error('State is required');
-      return;
-    }
+
     if (newLineItems.length === 0) {
       toast.error('At least 1 line item is required');
       return;
@@ -1141,9 +1134,8 @@ function SaleOrdersContent() {
         />
       </div>
 
-      {/* Create / Edit Order Modal */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-8">
           <div className="bg-white rounded-none shadow-2xl w-full max-w-4xl overflow-hidden animate-in fade-in zoom-in duration-200 border border-slate-200 flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50 shrink-0">
               <h2 className="text-sm font-bold uppercase text-slate-900">{editingOrderId ? 'Edit Sale Order' : 'Create Sale Order'}</h2>
@@ -1241,7 +1233,7 @@ function SaleOrdersContent() {
                                 className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-black/10"
                                 />
                             </div>
-                             <div className="col-span-3 grid grid-cols-3 gap-4">
+                             <div className="col-span-3">
                                 <div className="space-y-1.5">
                                     <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Address <span className="text-red-500">*</span></label>
                                     <input
@@ -1249,25 +1241,7 @@ function SaleOrdersContent() {
                                     value={newOrder.shippingAddress}
                                     onChange={e => setNewOrder({ ...newOrder, shippingAddress: e.target.value })}
                                     className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-black/10"
-                                    placeholder="Street Address"
-                                    />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">City <span className="text-red-500">*</span></label>
-                                    <input
-                                    type="text"
-                                    value={newOrder.city}
-                                    onChange={e => setNewOrder({ ...newOrder, city: e.target.value })}
-                                    className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-black/10"
-                                    />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">State <span className="text-red-500">*</span></label>
-                                    <input
-                                    type="text"
-                                    value={newOrder.state}
-                                    onChange={e => setNewOrder({ ...newOrder, state: e.target.value })}
-                                    className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-black/10"
+                                    placeholder="Street Address, City, State, Zip"
                                     />
                                 </div>
                             </div>

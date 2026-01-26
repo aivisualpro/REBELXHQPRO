@@ -162,9 +162,6 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
 
           {[
             { name: 'Sent', icon: Send, href: '/crm/sent' },
-            { name: 'Calls', icon: Phone, href: '/crm/calls' },
-            { name: 'SMS', icon: MessageSquare, href: '/crm/sms' },
-            { name: 'Opportunities', icon: Trophy, href: '/crm/opportunities' },
           ].map((item) => (
             <Link key={item.name} href={item.href} className="block" title={isSidebarCollapsed ? item.name : ""}>
                 <div className={cn(

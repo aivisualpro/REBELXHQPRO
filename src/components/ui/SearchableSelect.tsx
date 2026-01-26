@@ -33,10 +33,11 @@ export function SearchableSelect({
 }: SearchableSelectProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState('');
-    const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
+    const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number; bottom?: number }>({ top: 0, left: 0, width: 0 });
     const containerRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const [mounted, setMounted] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         setMounted(true); // eslint-disable-line react-hooks/set-state-in-effect
@@ -48,22 +49,70 @@ export function SearchableSelect({
     useLayoutEffect(() => {
         if (isOpen && containerRef.current) {
             const rect = containerRef.current.getBoundingClientRect();
-            setDropdownPos({
-                top: rect.bottom + 4,
-                left: rect.left,
-                width: rect.width
-            });
+            const windowHeight = window.innerHeight;
+            const dropdownHeight = 300; // Approximate max height (header + max-h-60)
+            const spaceBelow = windowHeight - rect.bottom;
+            const spaceAbove = rect.top;
+
+            let top = rect.bottom + 4;
+            const left = rect.left;
+            const width = rect.width;
+
+            // Flip to top if not enough space below and more space above
+            if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
+                // We don't know the exact height until render, but we can set bottom-aligned or estimate
+                // Since we use fixed positioning with `top`, we need to calculate `top`.
+                // However, without exact height, `top` is hard.
+                // Better approach: render it invisible first? No, too slow.
+                // We'll use the estimated max height OR we can use `bottom` prop in style if we change logic.
+                // But let's try to just check if we should go UP.
+                // If we go UP, `top` should be `rect.top - height`.
+                // Since height is dynamic, we can set `bottom: windowHeight - rect.top + 4` and `top: auto`
+                // Let's pass `placement: 'top' | 'bottom'` to state or just coordinates.
+                // Actually, let's change the style object to support bottom.
+                
+                // For now, let's assume we can change the `dropdownPos` state structure or just use `top`.
+                // If we use `bottom`, we need to update the interface of `dropdownPos` indirectly by using `style` prop more flexibly.
+                // Let's assume we can set `top` to `auto` and `bottom`.
+            }
+            
+            // Re-evaluating: To support `bottom` positioning, I should update the state to store `style` object or `top/bottom`.
+            // Current state: { top: number, left: number, width: number }
+            
+            // Simplified "Open from Top" logic requested by user:
+            // "should open from the top so that we can see the list properly"
+            // If I just set the Z-index really high, it might be visible over others, but if off screen, it's bad.
+            // Let's implement the Flip.
+            
+            const shouldFlip = spaceBelow < 320 && spaceAbove > 320; // 320px buffer
+            
+            if (shouldFlip) {
+                // If flipping, we want the bottom of the dropdown to be at rect.top - 4
+                 setDropdownPos({
+                    top: -1, // signal to use bottom
+                    bottom: windowHeight - rect.top + 4,
+                    left: rect.left,
+                    width: rect.width
+                });
+            } else {
+                 setDropdownPos({
+                    top: rect.bottom + 4,
+                    bottom: undefined, 
+                    left: rect.left,
+                    width: rect.width
+                });
+            }
         }
     }, [isOpen]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-                // Check if click is inside the portal dropdown
-                const dropdown = document.getElementById('searchable-select-dropdown');
-                if (dropdown && dropdown.contains(event.target as Node)) {
-                    return;
-                }
+            if (
+                containerRef.current && 
+                !containerRef.current.contains(event.target as Node) &&
+                dropdownRef.current &&
+                !dropdownRef.current.contains(event.target as Node)
+            ) {
                 setIsOpen(false);
                 setSearch('');
             }
@@ -90,35 +139,39 @@ export function SearchableSelect({
         setSearch('');
     };
 
+    const dropdownId = `searchable-select-dropdown-${options.length}-${placeholder}`;
+
     const dropdownContent = (
         <div 
-            id="searchable-select-dropdown"
+            ref={dropdownRef}
+            id={dropdownId}
             style={{
                 position: 'fixed',
-                top: dropdownPos.top,
+                top: dropdownPos.top === -1 ? 'auto' : dropdownPos.top,
+                bottom: dropdownPos.bottom,
                 left: dropdownPos.left,
                 width: dropdownPos.width,
                 zIndex: 99999
             }}
-            className="rounded-md shadow-2xl max-h-80 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100 border-2 border-border"
+            className="rounded-md shadow-2xl border-2 border-border animate-in fade-in zoom-in-95 duration-100 bg-card dark:bg-zinc-900 flex flex-col"
+            onWheel={(e) => e.stopPropagation()}
         >
-            {/* Solid background wrapper to prevent bleed-through */}
-            <div className="bg-card dark:bg-zinc-900 flex flex-col h-full">
-                <div className="p-2 border-b border-border bg-muted sticky top-0">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <input
-                            ref={inputRef}
-                            type="text"
-                            className="w-full pl-9 pr-3 py-2.5 text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring text-foreground placeholder:text-muted-foreground transition-all"
-                            placeholder="Search clients..."
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
-                            onClick={e => e.stopPropagation()}
-                        />
+            <div className="p-2 border-b border-border bg-muted sticky top-0 shrink-0 z-10">
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <input
+                        ref={inputRef}
+                        type="text"
+                        className="w-full pl-9 pr-3 py-2.5 text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring text-foreground placeholder:text-muted-foreground transition-all"
+                        placeholder={placeholder === "Select..." ? "Search..." : `Search ${placeholder}...`}
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        onClick={e => e.stopPropagation()}
+                    />
                 </div>
             </div>
-            <div className="overflow-auto flex-1">
+            
+            <div className="max-h-60 overflow-y-auto scrollbar-custom bg-card dark:bg-zinc-900">
                 {filteredOptions.length === 0 && !showCreate ? (
                     <div className="px-4 py-6 text-sm text-muted-foreground text-center">No results found</div>
                 ) : (
@@ -145,7 +198,6 @@ export function SearchableSelect({
                         )}
                     </div>
                 )}
-            </div>
             </div>
         </div>
     );

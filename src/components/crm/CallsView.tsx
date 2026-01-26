@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { Pagination } from '@/components/ui/Pagination';
 import { MultiSelectFilter } from '@/components/ui/filters/MultiSelectFilter';
+import { useSession } from 'next-auth/react';
 
 interface Activity {
   _id: string;
@@ -60,10 +61,12 @@ export default function CallsView({ clientId }: CallsViewProps) {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Modal State
+    // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
+
+  const { data: session } = useSession();
 
   const initialFormState = {
     type: 'Call',
@@ -212,7 +215,8 @@ export default function CallsView({ clientId }: CallsViewProps) {
       setFormData({
         ...initialFormState,
         client: clientId || '', // Set default client if scoped
-        createdAt: new Date().toISOString().slice(0, 16)
+        createdAt: new Date().toISOString().slice(0, 16),
+        createdBy: (session?.user as any)?.id || ''
       });
     }
     setIsModalOpen(true);
@@ -467,14 +471,16 @@ export default function CallsView({ clientId }: CallsViewProps) {
                   type="datetime-local"
                   value={formData.createdAt}
                   onChange={(v) => setFormData({ ...formData, createdAt: v })}
+                  disabled
                 />
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-muted-foreground uppercase">Sales Rep</label>
                   <select
-                    className="w-full px-3 py-2 bg-secondary/50 border border-border text-sm focus:outline-none focus:border-primary focus:ring-0 transition-colors appearance-none text-foreground"
+                    className="w-full px-3 py-2 bg-secondary/50 border border-border text-sm focus:outline-none focus:border-primary focus:ring-0 transition-colors appearance-none text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
                     value={formData.createdBy}
                     onChange={(e) => setFormData({ ...formData, createdBy: e.target.value })}
+                    disabled
                   >
                     <option value="">Select Sales Person</option>
                     {users.map(u => (
@@ -516,7 +522,7 @@ export default function CallsView({ clientId }: CallsViewProps) {
 
 // Helpers
 
-const FormInput = ({ label, value, onChange, type = "text", required = false, placeholder = "" }: { label: string, value: any, onChange: (val: any) => void, type?: string, required?: boolean, placeholder?: string }) => (
+const FormInput = ({ label, value, onChange, type = "text", required = false, placeholder = "", disabled = false }: { label: string, value: any, onChange: (val: any) => void, type?: string, required?: boolean, placeholder?: string, disabled?: boolean }) => (
   <div className="space-y-1">
     <label className="text-[10px] font-bold text-muted-foreground uppercase">{label} {required && <span className="text-destructive">*</span>}</label>
     <input
@@ -525,7 +531,11 @@ const FormInput = ({ label, value, onChange, type = "text", required = false, pl
       value={value}
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full px-3 py-2 bg-secondary/50 border border-border text-sm focus:outline-none focus:border-foreground focus:ring-0 transition-colors text-foreground placeholder:text-muted-foreground"
+      disabled={disabled}
+      className={cn(
+        "w-full px-3 py-2 bg-secondary/50 border border-border text-sm focus:outline-none focus:border-foreground focus:ring-0 transition-colors text-foreground placeholder:text-muted-foreground",
+        disabled && "opacity-50 cursor-not-allowed"
+      )}
     />
   </div>
 );

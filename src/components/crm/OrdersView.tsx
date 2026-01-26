@@ -28,6 +28,10 @@ import { TableColumnHeader } from '@/components/ui/TableColumnHeader';
 import { Pagination } from '@/components/ui/Pagination';
 // import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal'; // Assuming not needed for view-only/basic edit or complex port
 
+import { SaleOrderModal } from '@/components/sales/SaleOrderModal';
+
+// ... (existing imports)
+
 
 interface LineItem {
   _id?: string;
@@ -65,7 +69,6 @@ interface SaleOrder {
   payments?: { paymentAmount: number }[];
 }
 
-
 interface OrdersViewProps {
     clientId?: string;
 }
@@ -95,15 +98,8 @@ export default function OrdersView({ clientId }: OrdersViewProps) {
   const [salesRepOptions, setSalesRepOptions] = useState<{ label: string; value: string }[]>([]);
   const [statusOptions, setStatusOptions] = useState<{ label: string; value: string }[]>([]);
 
-  // Create/Edit Modal State - Simplified: We will just link to the main page for editing/creating for now, or minimal impl.
-  // The user asked for "same" component.
-  // Implementing full Create/Edit modal here is complex due to dependent state (Lots, Items, etc).
-  // For a "View" inside Client, maybe we can just VIEW and direct user to main page for full edits?
-  // Let's implement READ-ONLY list first, or minimal actions.
-  // Actually, let's keep it view-heavy.
-
-  const [dateRangeOpen, setDateRangeOpen] = useState(false);
-
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Debounce search
   useEffect(() => {
@@ -193,7 +189,6 @@ export default function OrdersView({ clientId }: OrdersViewProps) {
   }, [fetchOrders]);
   
   const handleSort = (column: string) => {
-      // sort logic 
       if (sortBy === column) {
           setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
       } else {
@@ -205,7 +200,6 @@ export default function OrdersView({ clientId }: OrdersViewProps) {
   const handleHeaderSort = (column: any) => {
       handleSort(column.key);
   }
-
 
   return (
     <div className="flex flex-col h-full bg-background transition-colors duration-300">
@@ -259,11 +253,7 @@ export default function OrdersView({ clientId }: OrdersViewProps) {
 
             {/* Actions Group */}
             <button 
-                onClick={() => {
-                    // Navigate to create new order for this client
-                    const url = `/sales/wholesale-orders?createFor=${clientId || ''}`;
-                    router.push(url);
-                }}
+                onClick={() => setIsModalOpen(true)}
                 className="flex items-center justify-center w-8 h-8 bg-[#FFEF5F] text-black hover:opacity-90 rounded shadow-sm transition-all cursor-pointer"
                 title="Create Order"
             >
@@ -271,6 +261,13 @@ export default function OrdersView({ clientId }: OrdersViewProps) {
             </button>
         </div>
       </div>
+
+      <SaleOrderModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={fetchOrders}
+        initialClientId={clientId}
+      />
 
       {/* Table Content */}
       <div className="flex-1 overflow-x-hidden overflow-y-auto bg-background transition-colors duration-300 relative scrollbar-custom">
