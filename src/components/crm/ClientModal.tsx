@@ -80,6 +80,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
     const { data: session } = useSession();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [salesReps, setSalesReps] = useState<{ _id: string, firstName: string, lastName: string }[]>([]);
+    const [minRevenueSlab, setMinRevenueSlab] = useState(20);
     
     const [formData, setFormData] = useState({
         name: initialData?.name || '',
@@ -176,10 +177,32 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
     useEffect(() => {
         if (isOpen) {
             fetchSalesReps();
+            fetchSettings();
         }
     }, [isOpen]);
 
-    const [showCC, setShowCC] = useState(false);
+    const fetchSettings = async () => {
+        try {
+            const res = await fetch('/api/settings');
+            const data = await res.json();
+            if (data.crmMinRevenueSlab) {
+                setMinRevenueSlab(parseFloat(data.crmMinRevenueSlab));
+            }
+        } catch (e) {
+            console.error("Failed to load settings");
+        }
+    };
+
+    // Auto-determine contactType based on revenue for NEW entries
+    useEffect(() => {
+        if (!initialData?._id) {
+            const determinedType = (formData.forecastedAmount || 0) >= minRevenueSlab ? 'Client' : 'Lead';
+            if (formData.contactType !== determinedType) {
+                setFormData(prev => ({ ...prev, contactType: determinedType }));
+            }
+        }
+    }, [formData.forecastedAmount, minRevenueSlab, initialData?._id]);
+     const [showCC, setShowCC] = useState(false);
     const [showCVV, setShowCVV] = useState(false);
     
     const cardType = getCardType(formData.billing.ccNumber);
@@ -250,73 +273,63 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
 
     return (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white w-full max-w-4xl max-h-[90vh] shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col">
+            <div className="bg-card w-full max-w-4xl max-h-[90vh] shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col border border-border">
                 {/* Header */}
-                <div className="flex items-center justify-between px-6 py-3 border-b border-slate-100 sticky top-0 bg-white z-10">
-                    <h2 className="text-[11px] font-black uppercase tracking-widest text-slate-900">
+                <div className="flex items-center justify-between px-6 py-3 border-b border-border sticky top-0 bg-card z-10">
+                    <h2 className="text-[11px] font-black uppercase tracking-widest text-foreground">
                         {initialData?._id ? `Edit ${formData.contactType}` : `Add New ${formData.contactType}`}
                     </h2>
-                    <button onClick={onClose} className="text-slate-400 hover:text-black transition-colors cursor-pointer">
+                    <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
                         <X className="w-4 h-4" />
                     </button>
                 </div>
 
                 {/* Scrollable Form Area */}
-                <form id="client-modal-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8 space-y-10 scrollbar-custom bg-slate-50/30">
+                <form id="client-modal-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8 space-y-10 scrollbar-custom bg-secondary/30">
                     {/* Section 1: Identity & Classification */}
                     <div className="space-y-6">
-                        <div className="flex items-center space-x-3 text-slate-400">
+                        <div className="flex items-center space-x-3 text-muted-foreground">
                             <Briefcase className="w-4 h-4" />
                             <h3 className="text-[10px] font-black uppercase tracking-[0.2em]">Profile & Classification</h3>
                         </div>
                         <div className="grid grid-cols-6 gap-6">
                             <div className="col-span-4 space-y-1.5">
-                                <label className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">Company Name</label>
+                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">Company Name</label>
                                 <input
                                     required
                                     value={formData.name}
                                     onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                    className="w-full px-4 py-2 bg-white border border-slate-200 text-sm focus:outline-none focus:ring-1 focus:ring-black transition-all"
+                                    className="w-full px-4 py-2 bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary transition-all"
                                     placeholder="Acme Corporation"
                                 />
                             </div>
+                            {/* Contact Type is auto-determined based on revenue */}
                             <div className="col-span-2 space-y-1.5">
-                                <label className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">Contact Type</label>
-                                <select
-                                    value={formData.contactType}
-                                    onChange={e => setFormData({ ...formData, contactType: e.target.value as any })}
-                                    className="w-full px-4 py-2 bg-white border border-slate-200 text-sm focus:outline-none focus:ring-1 focus:ring-black transition-all cursor-pointer"
-                                >
-                                    <option value="Client">Client</option>
-                                    <option value="Lead">Lead</option>
-                                </select>
-                            </div>
-                            <div className="col-span-2 space-y-1.5">
-                                <label className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">Industry Style</label>
+                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">Industry Style</label>
                                 <select
                                     value={formData.companyType}
                                     onChange={e => setFormData({ ...formData, companyType: e.target.value })}
-                                    className="w-full px-4 py-2 bg-white border border-slate-200 text-sm focus:outline-none focus:ring-1 focus:ring-black transition-all cursor-pointer"
+                                    className="w-full px-4 py-2 bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary transition-all cursor-pointer"
                                 >
                                     {COMPANY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                                 </select>
                             </div>
                             <div className="col-span-2 space-y-1.5">
-                                <label className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">Pipeline Stage</label>
+                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">Pipeline Stage</label>
                                 <select
                                     value={formData.contactStatus}
                                     onChange={e => setFormData({ ...formData, contactStatus: e.target.value })}
-                                    className="w-full px-4 py-2 bg-white border border-slate-200 text-sm focus:outline-none focus:ring-1 focus:ring-black transition-all cursor-pointer"
+                                    className="w-full px-4 py-2 bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary transition-all cursor-pointer"
                                 >
                                     {CONTACT_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                                 </select>
                             </div>
                             <div className="col-span-2 space-y-1.5">
-                                <label className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">Assigned Representative</label>
+                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">Assigned Representative</label>
                                 <select
                                     value={formData.salesPerson}
                                     onChange={e => setFormData({ ...formData, salesPerson: e.target.value })}
-                                    className="w-full px-4 py-2 bg-white border border-slate-200 text-sm focus:outline-none focus:ring-1 focus:ring-black transition-all cursor-pointer"
+                                    className="w-full px-4 py-2 bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary transition-all cursor-pointer"
                                 >
                                     <option value="">Unassigned</option>
                                     {salesReps.map(r => (
@@ -329,50 +342,50 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
 
                     {/* Section 2: Business Intel */}
                     <div className="space-y-6">
-                        <div className="flex items-center space-x-3 text-slate-400">
+                        <div className="flex items-center space-x-3 text-muted-foreground">
                             <Globe className="w-4 h-4" />
                             <h3 className="text-[10px] font-black uppercase tracking-[0.2em]">Business Intelligence</h3>
                         </div>
                         <div className="grid grid-cols-3 gap-6">
                             <div className="space-y-1.5">
-                                <label className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter flex items-center">
+                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter flex items-center">
                                     <Globe className="w-2.5 h-2.5 mr-1" /> Website
                                 </label>
                                 <input
                                     value={formData.website}
                                     onChange={e => setFormData({ ...formData, website: e.target.value })}
-                                    className="w-full px-4 py-2 bg-white border border-slate-200 text-sm focus:outline-none focus:ring-1 focus:ring-black transition-all"
+                                    className="w-full px-4 py-2 bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary transition-all"
                                     placeholder="https://..."
                                 />
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter flex items-center">
+                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter flex items-center">
                                     <Facebook className="w-2.5 h-2.5 mr-1 text-blue-600" /> Facebook Page
                                 </label>
                                 <input
                                     value={formData.facebookPage}
                                     onChange={e => setFormData({ ...formData, facebookPage: e.target.value })}
-                                    className="w-full px-4 py-2 bg-white border border-slate-200 text-sm focus:outline-none focus:ring-1 focus:ring-black transition-all"
+                                    className="w-full px-4 py-2 bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary transition-all"
                                     placeholder="facebook.com/..."
                                 />
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter flex items-center">
+                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter flex items-center">
                                     <FileText className="w-2.5 h-2.5 mr-1" /> Industry Tag
                                 </label>
                                 <input
                                     value={formData.industry}
                                     onChange={e => setFormData({ ...formData, industry: e.target.value })}
-                                    className="w-full px-4 py-2 bg-white border border-slate-200 text-sm focus:outline-none focus:ring-1 focus:ring-black transition-all"
+                                    className="w-full px-4 py-2 bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary transition-all"
                                     placeholder="e.g. Technology"
                                 />
                             </div>
                             <div className="col-span-3 space-y-1.5">
-                                <label className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">Business Description</label>
+                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">Business Description</label>
                                     <textarea
                                     value={formData.description}
                                     onChange={e => setFormData({ ...formData, description: e.target.value })}
-                                    className="w-full px-4 py-2 bg-white border border-slate-200 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-black transition-all"
+                                    className="w-full px-4 py-2 bg-background border border-border text-foreground text-sm resize-none focus:outline-none focus:ring-1 focus:ring-primary transition-all"
                                     rows={5}
                                     placeholder="Core business focus and overview..."
                                 />
@@ -382,44 +395,44 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
 
                     {/* Section 3: Interaction & Forecasts */}
                     <div className="space-y-6">
-                        <div className="flex items-center space-x-3 text-slate-400">
+                        <div className="flex items-center space-x-3 text-muted-foreground">
                             <DollarSign className="w-4 h-4" />
                             <h3 className="text-[10px] font-black uppercase tracking-[0.2em]">Growth & Financials</h3>
                         </div>
                         <div className="grid grid-cols-4 gap-6">
                             <div className="space-y-1.5">
-                                <label className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">Forecasted Amount ($)</label>
+                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">Forecasted Amount($)</label>
                                 <input
                                     type="number"
                                     value={formData.forecastedAmount}
                                     onChange={e => setFormData({ ...formData, forecastedAmount: parseFloat(e.target.value) || 0 })}
-                                    className="w-full px-4 py-2 bg-white border border-slate-200 text-sm focus:outline-none focus:ring-1 focus:ring-black transition-all font-mono"
+                                    className="w-full px-4 py-2 bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary transition-all font-mono"
                                 />
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">Projected Close</label>
+                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">Projected Close</label>
                                 <input
                                     type="date"
                                     value={formData.projectedCloseDate}
                                     onChange={e => setFormData({ ...formData, projectedCloseDate: e.target.value })}
-                                    className="w-full px-4 py-2 bg-white border border-slate-200 text-sm focus:outline-none focus:ring-1 focus:ring-black transition-all"
+                                    className="w-full px-4 py-2 bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary transition-all"
                                 />
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">Shipping Terms</label>
+                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">Shipping Terms</label>
                                 <input
                                     value={formData.defaultShippingTerms}
                                     onChange={e => setFormData({ ...formData, defaultShippingTerms: e.target.value })}
-                                    className="w-full px-4 py-2 bg-white border border-slate-200 text-sm focus:outline-none focus:ring-1 focus:ring-black transition-all"
+                                    className="w-full px-4 py-2 bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary transition-all"
                                     placeholder="e.g. Free Shipping"
                                 />
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">Payment Method</label>
+                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">Payment Method</label>
                                 <input
                                     value={formData.defaultPaymentMethod}
                                     onChange={e => setFormData({ ...formData, defaultPaymentMethod: e.target.value })}
-                                    className="w-full px-4 py-2 bg-white border border-slate-200 text-sm focus:outline-none focus:ring-1 focus:ring-black transition-all"
+                                    className="w-full px-4 py-2 bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary transition-all"
                                     placeholder="e.g. Credit Card"
                                 />
                             </div>
@@ -428,7 +441,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
 
                     {/* Section 4: Contact Channels */}
                     <div className="space-y-6">
-                        <div className="flex items-center space-x-3 text-slate-400">
+                        <div className="flex items-center space-x-3 text-muted-foreground">
                             <Phone className="w-4 h-4" />
                             <h3 className="text-[10px] font-black uppercase tracking-[0.2em]">Contact Channels</h3>
                         </div>
@@ -436,7 +449,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                         {/* Emails */}
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">
-                                <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center">
+                                <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center">
                                     <Mail className="w-3 h-3 mr-2 text-blue-500" /> Emails
                                 </h3>
                                 <button type="button" onClick={() => addField('emails')} className="text-blue-600 hover:text-blue-700 cursor-pointer">
@@ -454,9 +467,9 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                                             newEmails[idx].value = e.target.value;
                                             setFormData({ ...formData, emails: newEmails });
                                         }}
-                                        className="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 text-xs focus:outline-none focus:border-black transition-colors"
+                                        className="flex-1 px-3 py-1.5 bg-secondary border border-border text-foreground text-xs focus:outline-none focus:border-primary transition-colors"
                                     />
-                                    <button type="button" onClick={() => removeField('emails', idx)} className="p-1.5 text-slate-300 hover:text-red-500 transition-colors cursor-pointer">
+                                    <button type="button" onClick={() => removeField('emails', idx)} className="p-1.5 text-muted-foreground/30 hover:text-red-500 transition-colors cursor-pointer">
                                         <Trash2 className="w-3.5 h-3.5" />
                                     </button>
                                 </div>
@@ -466,7 +479,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                         {/* Phones */}
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">
-                                <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center">
+                                <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center">
                                     <Phone className="w-3 h-3 mr-2 text-emerald-500" /> Phones
                                 </h3>
                                 <button type="button" onClick={() => addField('phones')} className="text-blue-600 hover:text-blue-700 cursor-pointer">
@@ -485,9 +498,9 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                                             newPhones[idx].value = formatted;
                                             setFormData({ ...formData, phones: newPhones });
                                         }}
-                                        className="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 text-xs focus:outline-none focus:border-black transition-colors"
+                                        className="flex-1 px-3 py-1.5 bg-secondary border border-border text-foreground text-xs focus:outline-none focus:border-primary transition-colors"
                                     />
-                                    <button type="button" onClick={() => removeField('phones', idx)} className="p-1.5 text-slate-300 hover:text-red-500 transition-colors cursor-pointer">
+                                    <button type="button" onClick={() => removeField('phones', idx)} className="p-1.5 text-muted-foreground/30 hover:text-red-500 transition-colors cursor-pointer">
                                         <Trash2 className="w-3.5 h-3.5" />
                                     </button>
                                 </div>
@@ -499,7 +512,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                     {/* Section 5: Locations */}
                     <div className="space-y-6">
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3 text-slate-400">
+                            <div className="flex items-center space-x-3 text-muted-foreground">
                                 <MapPin className="w-4 h-4" />
                                 <h3 className="text-[10px] font-black uppercase tracking-[0.2em]">Geographic Locations</h3>
                             </div>
@@ -510,11 +523,11 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                         </div>
                         <div className="grid grid-cols-2 gap-6">
                             {formData.addresses.map((address: any, idx: number) => (
-                                <div key={idx} className="p-4 bg-white border border-slate-200 rounded-sm space-y-3 relative group shadow-sm">
+                                <div key={idx} className="p-4 bg-card border border-border rounded-sm space-y-3 relative group shadow-sm">
                                     <button 
                                         type="button" 
                                         onClick={() => removeField('addresses', idx)} 
-                                        className="absolute top-2 right-2 p-1.5 text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
+                                        className="absolute top-2 right-2 p-1.5 text-muted-foreground/30 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
                                     >
                                         <Trash2 className="w-3.5 h-3.5" />
                                     </button>
@@ -526,7 +539,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                                             newAddrs[idx].street = e.target.value;
                                             setFormData({ ...formData, addresses: newAddrs });
                                         }}
-                                        className="w-full px-3 py-1.5 bg-slate-50 border border-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-black transition-all"
+                                        className="w-full px-3 py-1.5 bg-secondary border border-border text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-primary transition-all"
                                     />
                                     <div className="grid grid-cols-3 gap-2">
                                         <input
@@ -537,7 +550,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                                                 newAddrs[idx].city = e.target.value;
                                                 setFormData({ ...formData, addresses: newAddrs });
                                             }}
-                                            className="px-3 py-1.5 bg-slate-50 border border-slate-100 text-[10px] focus:outline-none focus:ring-1 focus:ring-black transition-all"
+                                            className="px-3 py-1.5 bg-secondary border border-border text-foreground text-[10px] focus:outline-none focus:ring-1 focus:ring-primary transition-all"
                                         />
                                         <input
                                             placeholder="State"
@@ -547,7 +560,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                                                 newAddrs[idx].state = e.target.value;
                                                 setFormData({ ...formData, addresses: newAddrs });
                                             }}
-                                            className="px-3 py-1.5 bg-slate-50 border border-slate-100 text-[10px] focus:outline-none focus:ring-1 focus:ring-black transition-all"
+                                            className="px-3 py-1.5 bg-secondary border border-border text-foreground text-[10px] focus:outline-none focus:ring-1 focus:ring-primary transition-all"
                                         />
                                         <input
                                             placeholder="ZIP"
@@ -557,7 +570,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                                                 newAddrs[idx].postalCode = e.target.value;
                                                 setFormData({ ...formData, addresses: newAddrs });
                                             }}
-                                            className="px-3 py-1.5 bg-slate-50 border border-slate-100 text-[10px] focus:outline-none focus:ring-1 focus:ring-black transition-all"
+                                            className="px-3 py-1.5 bg-secondary border border-border text-foreground text-[10px] focus:outline-none focus:ring-1 focus:ring-primary transition-all"
                                         />
                                     </div>
                                 </div>
@@ -568,7 +581,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                     {/* Section 6: billing Profile */}
                     <div className="space-y-6">
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3 text-slate-400">
+                            <div className="flex items-center space-x-3 text-muted-foreground">
                                 <CreditCard className="w-4 h-4" />
                                 <h3 className="text-[10px] font-black uppercase tracking-[0.2em]">Secure Billing Profile</h3>
                             </div>
@@ -598,17 +611,17 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
 
                             <div className="grid grid-cols-2 gap-8 relative z-10">
                                 <div className="space-y-1.5">
-                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Cardholder Name</label>
+                                    <label className="text-[9px] font-bold text-white/40 uppercase tracking-tighter">Cardholder Name</label>
                                     <input
                                         value={formData.billing.nameOnCard}
                                         autoComplete="cc-name"
                                         onChange={e => setFormData({ ...formData, billing: { ...formData.billing, nameOnCard: e.target.value.toUpperCase() } })}
-                                        className="w-full px-4 py-2.5 bg-slate-800/50 border border-slate-700/50 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-slate-600 font-medium"
+                                        className="w-full px-4 py-2.5 bg-black/20 border border-white/10 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-white/20 font-medium"
                                         placeholder="CHRIS JOHNSON"
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Encrypted Card Number</label>
+                                    <label className="text-[9px] font-bold text-white/40 uppercase tracking-tighter">Encrypted Card Number</label>
                                     <div className="relative">
                                         <input
                                             type={showCC ? "text" : "password"}
@@ -618,13 +631,13 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                                                 const formatted = formatCCNumber(e.target.value);
                                                 setFormData({ ...formData, billing: { ...formData.billing, ccNumber: formatted.slice(0, 19) } });
                                             }}
-                                            className="w-full pl-4 pr-10 py-2.5 bg-slate-800/50 border border-slate-700/50 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all font-mono tracking-widest"
+                                            className="w-full pl-4 pr-10 py-2.5 bg-black/20 border border-white/10 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all font-mono tracking-widest"
                                             placeholder="XXXX XXXX XXXX XXXX"
                                         />
                                         <button 
                                             type="button"
                                             onClick={() => setShowCC(!showCC)}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
                                         >
                                             {showCC ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                         </button>
@@ -634,7 +647,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
 
                             <div className="grid grid-cols-3 gap-8 relative z-10">
                                 <div className="space-y-1.5">
-                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Expiry Date</label>
+                                    <label className="text-[9px] font-bold text-white/40 uppercase tracking-tighter">Expiry Date</label>
                                     <input
                                         value={formData.billing.expirationDate}
                                         autoComplete="cc-exp"
@@ -642,61 +655,61 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                                             const formatted = formatExpiryDate(e.target.value);
                                             setFormData({ ...formData, billing: { ...formData.billing, expirationDate: formatted.slice(0, 5) } });
                                         }}
-                                        className="w-full px-4 py-2.5 bg-slate-800/50 border border-slate-700/50 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all font-mono"
+                                        className="w-full px-4 py-2.5 bg-black/20 border border-white/10 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all font-mono"
                                         placeholder="MM/YY"
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Security code (CVV)</label>
+                                    <label className="text-[9px] font-bold text-white/40 uppercase tracking-tighter">Security code (CVV)</label>
                                     <div className="relative">
                                         <input
                                             type={showCVV ? "text" : "password"}
                                             value={formData.billing.securityCode}
                                             autoComplete="cc-csc"
                                             onChange={e => setFormData({ ...formData, billing: { ...formData.billing, securityCode: e.target.value.replace(/\D/g, '').slice(0, 4) } })}
-                                            className="w-full pl-4 pr-10 py-2.5 bg-slate-800/50 border border-slate-700/50 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all font-mono"
+                                            className="w-full pl-4 pr-10 py-2.5 bg-black/20 border border-white/10 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all font-mono"
                                             placeholder="***"
                                         />
                                         <button 
                                             type="button"
                                             onClick={() => setShowCVV(!showCVV)}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
                                         >
                                             {showCVV ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                         </button>
                                     </div>
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Billing ZIP</label>
+                                    <label className="text-[9px] font-bold text-white/40 uppercase tracking-tighter">Billing ZIP</label>
                                     <input
                                         value={formData.billing.zipCode}
                                         autoComplete="postal-code"
                                         onChange={e => setFormData({ ...formData, billing: { ...formData.billing, zipCode: e.target.value.replace(/\D/g, '').slice(0, 5) } })}
-                                        className="w-full px-4 py-2.5 bg-slate-800/50 border border-slate-700/50 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all font-mono"
+                                        className="w-full px-4 py-2.5 bg-black/20 border border-white/10 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all font-mono"
                                         placeholder="00000"
                                     />
                                 </div>
                             </div>
 
                             {/* Industry Standard Badges */}
-                            <div className="pt-4 mt-4 border-t border-slate-800/50 flex items-center justify-between opacity-50 relative z-10">
+                            <div className="pt-4 mt-4 border-t border-white/5 flex items-center justify-between relative z-10">
                                 <div className="flex items-center space-x-4">
                                     <div className="flex flex-col">
                                         <div className="flex items-center space-x-1">
                                             <ShieldCheck className="w-2.5 h-2.5 text-blue-400" />
-                                            <span className="text-[8px] font-black uppercase text-slate-400">256-Bit SSL</span>
+                                            <span className="text-[8px] font-black uppercase text-white/40">256-Bit SSL</span>
                                         </div>
-                                        <span className="text-[7px] text-slate-600 font-medium">Military Grade Encryption</span>
+                                        <span className="text-[7px] text-white/20 font-medium">Military Grade Encryption</span>
                                     </div>
                                     <div className="flex flex-col">
                                         <div className="flex items-center space-x-1">
                                             <Lock className="w-2.5 h-2.5 text-emerald-400" />
-                                            <span className="text-[8px] font-black uppercase text-slate-400">PCI-DSS Compliant</span>
+                                            <span className="text-[8px] font-black uppercase text-white/40">PCI-DSS Compliant</span>
                                         </div>
-                                        <span className="text-[7px] text-slate-600 font-medium">Vault Storage Enabled</span>
+                                        <span className="text-[7px] text-white/20 font-medium">Vault Storage Enabled</span>
                                     </div>
                                 </div>
-                                <div className="text-[10px] text-white font-black italic tracking-tighter">
+                                <div className="text-[10px] text-white font-black italic tracking-tighter opacity-30">
                                     REBEL<span className="text-blue-500">X</span> SECURE
                                 </div>
                             </div>
@@ -705,7 +718,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
 
                     {/* Section 7: Notes */}
                     <div className="space-y-6">
-                        <div className="flex items-center space-x-3 text-slate-400">
+                        <div className="flex items-center space-x-3 text-muted-foreground">
                             <FileText className="w-4 h-4" />
                             <h3 className="text-[10px] font-black uppercase tracking-[0.2em]">Administrative Notes</h3>
                         </div>
@@ -714,7 +727,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                                 rows={3}
                                 value={formData.notes}
                                 onChange={e => setFormData({ ...formData, notes: e.target.value })}
-                                className="w-full px-4 py-3 bg-white border border-slate-200 text-sm focus:outline-none focus:ring-1 focus:ring-black transition-all resize-none shadow-sm"
+                                className="w-full px-4 py-3 bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary transition-all resize-none shadow-sm"
                                 placeholder="Add confidential internal notes here..."
                             />
                         </div>
@@ -722,11 +735,11 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                 </form>
 
                 {/* Footer Section */}
-                <div className="px-8 py-5 border-t border-slate-100 bg-white flex items-center justify-between shrink-0">
+                <div className="px-8 py-5 border-t border-border bg-card flex items-center justify-between shrink-0">
                     <button
                         type="button"
                         onClick={onClose}
-                        className="px-6 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-900 transition-colors cursor-pointer"
+                        className="px-6 py-2.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                     >
                         Discard Changes
                     </button>

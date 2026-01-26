@@ -46,7 +46,7 @@ export async function syncClientToAppSheet(clients: any | any[]) {
             'Website': clientObj.website || '',
             'Facebook Page': clientObj.facebookPage || '',
             'Industry': clientObj.industry || '',
-            'Forecasted Amount ': clientObj.forecastedAmount || 0,
+            'Forecasted Amount': clientObj.forecastedAmount || 0,
             'Interaction Count': clientObj.interactionCount || 0,
             'Created At': clientObj.createdAt ? new Date(clientObj.createdAt).toISOString() : '',
             'Last Note': lastNote,
