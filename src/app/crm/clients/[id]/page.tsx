@@ -615,7 +615,7 @@ export default function ClientDashboardPage() {
                                 </div>
                                 <div className="space-y-2">
                                     {client.phones?.map((p, idx) => (
-                                        <div key={idx} className="group flex flex-col">
+                                        <div key={idx} className="group flex items-center justify-between">
                                             <a 
                                                 href={`https://voice.google.com/u/0/calls?number=${p.value.replace(/\D/g, '')}&action=dial`} 
                                                 target="_blank"
@@ -624,6 +624,26 @@ export default function ClientDashboardPage() {
                                             >
                                                 {p.value}
                                             </a>
+                                            <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <a 
+                                                    href={`https://voice.google.com/u/0/calls?number=${p.value.replace(/\D/g, '')}`} 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer"
+                                                    className="p-1 hover:text-blue-600 cursor-pointer text-slate-400"
+                                                    title="Call"
+                                                >
+                                                    <Phone className="w-3 h-3" />
+                                                </a>
+                                                <a 
+                                                    href={`https://voice.google.com/u/0/messages?recipient=${p.value.replace(/\D/g, '')}`} 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer"
+                                                    className="p-1 hover:text-emerald-600 cursor-pointer text-slate-400"
+                                                    title="SMS"
+                                                >
+                                                    <MessageSquare className="w-3 h-3" />
+                                                </a>
+                                            </div>
                                         </div>
                                     )) || <span className="text-[10px] text-slate-400 italic">None</span>}
                                 </div>
@@ -638,7 +658,15 @@ export default function ClientDashboardPage() {
                                 <div className="space-y-2">
                                     {client.emails?.map((e, idx) => (
                                         <div key={idx} className="flex flex-col">
-                                            <a href={`mailto:${e.value}`} className="text-xs font-bold text-slate-700 hover:text-purple-600 transition-colors truncate">
+                                            <a 
+                                                href="#" 
+                                                onClick={(event) => {
+                                                    event.preventDefault();
+                                                    setComposeData(prev => ({ ...prev, to: e.value }));
+                                                    setIsComposeOpen(true);
+                                                }}
+                                                className="text-xs font-bold text-slate-700 hover:text-purple-600 transition-colors truncate"
+                                            >
                                                 {e.value}
                                             </a>
                                         </div>
@@ -797,10 +825,10 @@ export default function ClientDashboardPage() {
                             </div>
                         )}
                          {activeTab === 'Calls' && id && (
-                             <CallsView clientId={id as string} />
+                             <CallsView clientId={id as string} clientPhone={client.phones?.[0]?.value} />
                         )}
                         {activeTab === 'SMS' && id && (
-                             <SMSView clientId={id as string} />
+                             <SMSView clientId={id as string} clientPhone={client.phones?.[0]?.value} />
                         )}
                         {activeTab === 'Notes' && id && (
                             <NotesView clientId={id as string} />

@@ -35,9 +35,10 @@ interface Activity {
 
 interface CallsViewProps {
   clientId?: string; // Optional prop to filter by specific client
+  clientPhone?: string;
 }
 
-export default function CallsView({ clientId }: CallsViewProps) {
+export default function CallsView({ clientId, clientPhone }: CallsViewProps) {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -335,7 +336,13 @@ export default function CallsView({ clientId }: CallsViewProps) {
           )}
 
           <button
-            onClick={() => openModal()}
+            onClick={() => {
+                if (clientPhone) {
+                    const cleanPhone = clientPhone.replace(/\D/g, '');
+                    window.open(`https://voice.google.com/u/0/calls?number=${cleanPhone}`, '_blank');
+                }
+                openModal();
+            }}
             className="h-8 w-8 flex items-center justify-center bg-primary text-primary-foreground hover:bg-primary/90 transition-all rounded shadow-md cursor-pointer"
             title="Log New Call"
           >
