@@ -256,9 +256,9 @@ function SaleOrdersContent() {
   // Handle createFor URL parameter (auto-open modal with client pre-selected)
   useEffect(() => {
     const createForClientId = searchParams.get('createFor');
-    if (createForClientId && allClients.length > 0) {
-      const client: any = allClients.find(c => c._id === createForClientId);
-      if (client) {
+    if (createForClientId) {
+      
+      const initializeForClient = (client: any) => {
         // Get sales rep - handle both object and string formats
         let salesRepId = '';
         if (client.salesPerson) {
@@ -276,7 +276,7 @@ function SaleOrdersContent() {
         
         setNewOrder(prev => ({
           ...prev,
-          clientId: createForClientId,
+          clientId: client._id,
           salesRep: salesRepId,
           shippingAddress: mainAddress.street || '',
           city: mainAddress.city || '',
@@ -288,6 +288,21 @@ function SaleOrdersContent() {
         
         // Clear the URL parameter without navigation
         router.replace('/sales/wholesale-orders', { scroll: false });
+      };
+
+      // First try to find in loaded clients, otherwise fetch
+      const found = allClients.find(c => c._id === createForClientId);
+      if (found) {
+          initializeForClient(found);
+      } else {
+           fetch(`/api/clients/${createForClientId}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data && data._id) {
+                    initializeForClient(data);
+                }
+            })
+            .catch(err => console.error("Failed to fetch client for creation", err));
       }
     }
   }, [searchParams, allClients, router]);
