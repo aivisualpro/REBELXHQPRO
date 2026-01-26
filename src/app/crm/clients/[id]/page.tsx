@@ -292,6 +292,69 @@ export default function ClientDashboardPage() {
     const cardType = getCardType(client?.billing?.ccNumber || '');
     const cardTheme = getCardTheme(cardType);
 
+    const initiateGoogleVoice = async (clientId: string, phoneNumber: string, type: 'calls' | 'messages') => {
+        if (!phoneNumber) {
+            toast.error('No phone number found');
+            return;
+        }
+
+        const width = 450;
+        const height = 650;
+        const left = (window.screen.width / 2) - (width / 2);
+        const top = (window.screen.height / 2) - (height / 2);
+        
+        const digitsOnly = phoneNumber.replace(/\D/g, '');
+        let e164;
+        if (phoneNumber.includes('+')) {
+            e164 = digitsOnly;
+        } else if (digitsOnly.startsWith('1') && digitsOnly.length === 11) {
+            e164 = digitsOnly;
+        } else if (digitsOnly.length === 10) {
+            e164 = '1' + digitsOnly;
+        } else {
+            e164 = digitsOnly;
+        }
+        
+        const url = type === 'calls' 
+            ? `https://voice.google.com/u/0/calls?a=nc,%2B${e164}`
+            : `https://voice.google.com/u/0/messages?number=%2B${e164}`;
+        
+        window.open(
+            url, 
+            'GoogleVoiceWindow', 
+            `width=${width},height=${height},left=${left},top=${top},menubar=no,status=no,toolbar=no`
+        );
+        
+        setTimeout(async () => {
+            const activityType = type === 'calls' ? 'Call' : 'Text';
+            const shouldLog = confirm(`Log this ${activityType} to CRM?\n\nClick OK to log, or Cancel to skip.`);
+            
+            if (shouldLog) {
+                const notes = prompt(`Any notes for this ${activityType}? (optional):`) || '';
+                try {
+                    const res = await fetch('/api/crm/log-call', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            clientId,
+                            phoneNumber,
+                            type: activityType,
+                            notes
+                        })
+                    });
+                    
+                    if (res.ok) {
+                        toast.success(`${activityType} logged to CRM!`);
+                        // Refresh data
+                        fetchClientData(1, false);
+                    }
+                } catch (err) {
+                    toast.error('Failed to log activity');
+                }
+            }
+        }, 3000);
+    };
+
     const loadMoreRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -618,31 +681,29 @@ export default function ClientDashboardPage() {
                                         <div key={idx} className="group flex items-center justify-between">
                                             <a 
                                                 href={`https://voice.google.com/u/0/calls?number=${p.value.replace(/\D/g, '')}&action=dial`} 
-                                                target="_blank"
-                                                rel="noopener noreferrer"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    initiateGoogleVoice(client._id, p.value, 'calls');
+                                                }}
                                                 className="text-xs font-bold text-slate-700 hover:text-blue-600 transition-colors truncate"
                                             >
                                                 {p.value}
                                             </a>
                                             <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <a 
-                                                    href={`https://voice.google.com/u/0/calls?number=${p.value.replace(/\D/g, '')}`} 
-                                                    target="_blank" 
-                                                    rel="noopener noreferrer"
+                                                <button 
+                                                    onClick={() => initiateGoogleVoice(client._id, p.value, 'calls')} 
                                                     className="p-1 hover:text-blue-600 cursor-pointer text-slate-400"
                                                     title="Call"
                                                 >
                                                     <Phone className="w-3 h-3" />
-                                                </a>
-                                                <a 
-                                                    href={`https://voice.google.com/u/0/messages?recipient=${p.value.replace(/\D/g, '')}`} 
-                                                    target="_blank" 
-                                                    rel="noopener noreferrer"
+                                                </button>
+                                                <button 
+                                                    onClick={() => initiateGoogleVoice(client._id, p.value, 'messages')}
                                                     className="p-1 hover:text-emerald-600 cursor-pointer text-slate-400"
                                                     title="SMS"
                                                 >
                                                     <MessageSquare className="w-3 h-3" />
-                                                </a>
+                                                </button>
                                             </div>
                                         </div>
                                     )) || <span className="text-[10px] text-slate-400 italic">None</span>}
@@ -825,11 +886,19 @@ export default function ClientDashboardPage() {
                             </div>
                         )}
                          {activeTab === 'Calls' && id && (
-                             <CallsView clientId={id as string} clientPhone={client.phones?.[0]?.value} />
-                        )}
+                             <CallsView 
+                                clientId={id as string} 
+                                clientPhone={client.phones?.[0]?.value}
+                                onInitiateCall={() => initiateGoogleVoice(id as string, client.phones?.[0]?.value || '', 'calls')}
+                             />
+                         )}
                         {activeTab === 'SMS' && id && (
-                             <SMSView clientId={id as string} clientPhone={client.phones?.[0]?.value} />
-                        )}
+                             <SMSView 
+                                clientId={id as string} 
+                                clientPhone={client.phones?.[0]?.value}
+                                onInitiateSMS={() => initiateGoogleVoice(id as string, client.phones?.[0]?.value || '', 'messages')}
+                             />
+                         )}
                         {activeTab === 'Notes' && id && (
                             <NotesView clientId={id as string} />
                         )}

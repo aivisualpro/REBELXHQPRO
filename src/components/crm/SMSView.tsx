@@ -35,9 +35,10 @@ interface Activity {
 interface SMSViewProps {
   clientId?: string;
   clientPhone?: string;
+  onInitiateSMS?: () => void;
 }
 
-export default function SMSView({ clientId, clientPhone }: SMSViewProps) {
+export default function SMSView({ clientId, clientPhone, onInitiateSMS }: SMSViewProps) {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -327,11 +328,15 @@ export default function SMSView({ clientId, clientPhone }: SMSViewProps) {
 
           <button
             onClick={() => {
-                if (clientPhone) {
+                if (onInitiateSMS) {
+                    onInitiateSMS();
+                } else if (clientPhone) {
                     const cleanPhone = clientPhone.replace(/\D/g, '');
                     window.open(`https://voice.google.com/u/0/messages?recipient=${cleanPhone}`, '_blank');
+                    openModal();
+                } else {
+                    openModal();
                 }
-                openModal();
             }}
             className="h-8 w-8 flex items-center justify-center bg-primary text-primary-foreground hover:bg-primary/90 transition-all rounded shadow-md cursor-pointer"
             title="Log SMS"

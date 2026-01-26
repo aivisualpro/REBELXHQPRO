@@ -544,7 +544,12 @@ function SaleOrdersContent() {
         state: '',
         lockPrice: false
     });
-    setNewLineItems([]);
+    // Initialize with 3 empty items
+    setNewLineItems([
+        { id: Math.random().toString(), sku: '', qtyShipped: 1, price: 0, cost: 0, uom: 'Each', lotNumber: '' },
+        { id: Math.random().toString(), sku: '', qtyShipped: 1, price: 0, cost: 0, uom: 'Each', lotNumber: '' },
+        { id: Math.random().toString(), sku: '', qtyShipped: 1, price: 0, cost: 0, uom: 'Each', lotNumber: '' }
+    ]);
     setIsCreateModalOpen(true);
   };
 
@@ -1135,38 +1140,40 @@ function SaleOrdersContent() {
       </div>
 
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-8">
-          <div className="bg-white rounded-none shadow-2xl w-full max-w-4xl overflow-hidden animate-in fade-in zoom-in duration-200 border border-slate-200 flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50 shrink-0">
-              <h2 className="text-sm font-bold uppercase text-slate-900">{editingOrderId ? 'Edit Sale Order' : 'Create Sale Order'}</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-card rounded-lg shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200 border border-border">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-card shrink-0">
+              <h2 className="text-sm font-black uppercase tracking-widest text-foreground flex items-center gap-2">
+                {editingOrderId ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                {editingOrderId ? 'Edit Sale Order' : 'Create Sale Order'}
+              </h2>
               <button
                 onClick={() => setIsCreateModalOpen(false)}
-                className="text-slate-400 hover:text-black transition-colors"
+                className="text-muted-foreground hover:text-foreground transition-colors"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="flex-1 overflow-auto p-6">
+            <div className="flex-1 overflow-y-auto p-6 bg-card text-foreground">
               <form id="create-so-form" onSubmit={handleCreateOrUpdate}>
                 {/* Header Info */}
                 <div className="space-y-6">
-                    {/* Basic Info */}
                     <div>
-                        <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100">Order Details</h4>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Order Name/ID <span className="text-red-500">*</span></label>
+                        <h4 className="text-xs font-bold text-foreground uppercase tracking-wider mb-3 pb-1 border-b border-border">Order Details</h4>
+                        <div className="grid grid-cols-4 gap-4">
+                             <div className="space-y-1.5">
+                                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Order Name/ID <span className="text-destructive">*</span></label>
                                 <input
                                 type="text"
-                                required
-                                readOnly
                                 value={newOrder.label}
-                                className="w-full px-3 py-2 border border-slate-200 rounded text-sm bg-slate-100 text-slate-500 focus:outline-none cursor-not-allowed"
+                                onChange={e => setNewOrder({ ...newOrder, label: e.target.value })}
+                                className="w-full px-3 py-2 bg-secondary/50 border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/20 text-foreground font-mono dark:bg-secondary dark:text-foreground dark:border-white/10"
+                                placeholder="Auto-generated"
                                 />
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Client <span className="text-red-500">*</span></label>
+                                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Client <span className="text-destructive">*</span></label>
                                 <SearchableSelect
                                 options={allClients.map(c => ({ value: c._id, label: c.name }))}
                                 value={newOrder.clientId}
@@ -1177,7 +1184,7 @@ function SaleOrdersContent() {
                                 />
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Sales Rep <span className="text-red-500">*</span></label>
+                                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Sales Rep <span className="text-destructive">*</span></label>
                                 <SearchableSelect
                                     options={allUsers.map(u => ({ label: `${u.firstName} ${u.lastName}`, value: u._id }))}
                                     value={newOrder.salesRep}
@@ -1186,9 +1193,8 @@ function SaleOrdersContent() {
                                     className="w-full"
                                 />
                             </div>
-                            {/* Status is hidden and defaults to Pending */}
                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Payment Method</label>
+                                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Payment Method</label>
                                 <SearchableSelect
                                     options={PAYMENT_METHODS}
                                     value={newOrder.paymentMethod}
@@ -1200,12 +1206,12 @@ function SaleOrdersContent() {
                         </div>
                     </div>
 
-                    {/* Shipping Info */}
+                    {/* Shipping Details */}
                     <div>
-                        <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100">Shipping Details</h4>
-                        <div className="grid grid-cols-3 gap-4">
+                        <h4 className="text-xs font-bold text-foreground uppercase tracking-wider mb-3 pb-1 border-b border-border">Shipping Details</h4>
+                        <div className="grid grid-cols-4 gap-4 mb-4">
                              <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Shipping Method</label>
+                                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Shipping Method</label>
                                 <SearchableSelect
                                     options={SHIPPING_METHODS}
                                     value={newOrder.shippingMethod}
@@ -1215,32 +1221,32 @@ function SaleOrdersContent() {
                                     className="w-full"
                                 />
                             </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Tracking #</label>
+                             <div className="col-span-2 space-y-1.5">
+                                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Tracking #</label>
                                 <input
                                 type="text"
                                 value={newOrder.trackingNumber}
                                 onChange={e => setNewOrder({ ...newOrder, trackingNumber: e.target.value })}
-                                className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-black/10"
+                                className="w-full px-3 py-2 bg-secondary/50 border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/20 text-foreground dark:bg-secondary dark:text-foreground dark:border-white/10"
                                 />
                             </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Shipped Date</label>
+                             <div className="space-y-1.5">
+                                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Shipped Date</label>
                                 <input
                                 type="date"
                                 value={newOrder.shippedDate ? new Date(newOrder.shippedDate).toISOString().split('T')[0] : ''}
                                 onChange={e => setNewOrder({ ...newOrder, shippedDate: e.target.value })}
-                                className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-black/10"
+                                className="w-full px-3 py-2 bg-secondary/50 border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/20 text-foreground dark:bg-secondary dark:text-foreground dark:border-white/10"
                                 />
                             </div>
                              <div className="col-span-3">
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Address <span className="text-red-500">*</span></label>
+                                    <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Address <span className="text-destructive">*</span></label>
                                     <input
                                     type="text"
                                     value={newOrder.shippingAddress}
                                     onChange={e => setNewOrder({ ...newOrder, shippingAddress: e.target.value })}
-                                    className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-black/10"
+                                    className="w-full px-3 py-2 bg-secondary/50 border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/20 text-foreground dark:bg-secondary dark:text-foreground dark:border-white/10"
                                     placeholder="Street Address, City, State, Zip"
                                     />
                                 </div>
@@ -1250,12 +1256,12 @@ function SaleOrdersContent() {
 
                     {/* Financials */}
                     <div>
-                        <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100">Financials</h4>
+                        <h4 className="text-xs font-bold text-foreground uppercase tracking-wider mb-3 pb-1 border-b border-border">Financials</h4>
                         <div className="grid grid-cols-4 gap-4 items-end">
                              <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Shipping Cost</label>
+                                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Shipping Cost</label>
                                 <div className="relative">
-                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
+                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">$</span>
                                     <input
                                     type="number"
                                     min="0"
@@ -1263,15 +1269,15 @@ function SaleOrdersContent() {
                                     value={newOrder.shippingCost}
                                     onWheel={(e) => e.currentTarget.blur()}
                                     onChange={e => setNewOrder({ ...newOrder, shippingCost: e.target.value })}
-                                    className="w-full pl-5 pr-2 py-2 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-black/10"
+                                    className="w-full pl-5 pr-2 py-2 bg-secondary/50 border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/20 text-foreground"
                                     placeholder="0.00"
                                     />
                                 </div>
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Discount</label>
+                                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Discount</label>
                                 <div className="relative">
-                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
+                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">$</span>
                                     <input
                                     type="number"
                                     min="0"
@@ -1279,15 +1285,15 @@ function SaleOrdersContent() {
                                     value={newOrder.discount}
                                     onWheel={(e) => e.currentTarget.blur()}
                                     onChange={e => setNewOrder({ ...newOrder, discount: e.target.value })}
-                                    className="w-full pl-5 pr-2 py-2 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-black/10"
+                                    className="w-full pl-5 pr-2 py-2 bg-secondary/50 border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/20 text-foreground"
                                     placeholder="0.00"
                                     />
                                 </div>
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Tax</label>
+                                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Tax</label>
                                 <div className="relative">
-                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
+                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">$</span>
                                     <input
                                     type="number"
                                     min="0"
@@ -1295,14 +1301,14 @@ function SaleOrdersContent() {
                                     value={newOrder.tax}
                                     onWheel={(e) => e.currentTarget.blur()}
                                     onChange={e => setNewOrder({ ...newOrder, tax: e.target.value })}
-                                    className="w-full pl-5 pr-2 py-2 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-black/10"
+                                    className="w-full pl-5 pr-2 py-2 bg-secondary/50 border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/20 text-foreground"
                                     placeholder="0.00"
                                     />
                                 </div>
                             </div>
                             <div className="space-y-1.5 pb-2">
                                 <div className="flex items-center space-x-3">
-                                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">Lock Price</span>
+                                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Lock Price</span>
                                     <label className="relative inline-flex items-center cursor-pointer">
                                         <input 
                                             type="checkbox" 
@@ -1310,7 +1316,7 @@ function SaleOrdersContent() {
                                             checked={newOrder.lockPrice}
                                             onChange={e => setNewOrder({...newOrder, lockPrice: e.target.checked})}
                                         />
-                                        <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-black/20 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-black"></div>
+                                        <div className="w-9 h-5 bg-secondary peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/20 rounded-full peer dark:bg-muted peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
                                     </label>
                                 </div>
                             </div>
@@ -1318,14 +1324,14 @@ function SaleOrdersContent() {
                     </div>
                 </div>
 
-                <div className="border-t border-slate-100 pt-6">
+                <div className="border-t border-border pt-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Line Items <span className="text-red-500">*</span></h3>
+                    <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">Line Items <span className="text-destructive">*</span></h3>
                     <div className="flex items-center space-x-2">
                         <button
                         type="button"
                         onClick={addLineItem}
-                        className="flex items-center space-x-1 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-none text-[10px] font-bold uppercase transition-colors"
+                        className="flex items-center space-x-1 px-3 py-1.5 bg-secondary hover:bg-secondary/80 text-foreground rounded-none text-[10px] font-bold uppercase transition-colors"
                         >
                         <Plus className="w-3.5 h-3.5" />
                         <span>Add Item</span>
@@ -1334,37 +1340,37 @@ function SaleOrdersContent() {
                   </div>
 
                   {newLineItems.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 bg-slate-50 rounded-none border border-dashed border-slate-200 text-slate-400">
-                      <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm mb-3">
-                        <Package className="w-6 h-6 text-slate-300" />
+                    <div className="flex flex-col items-center justify-center py-12 bg-secondary/10 rounded-none border border-dashed border-border text-muted-foreground">
+                      <div className="w-12 h-12 bg-card rounded-full flex items-center justify-center shadow-sm mb-3">
+                        <Package className="w-6 h-6 text-muted-foreground" />
                       </div>
                       <p className="text-xs font-medium">No items added yet</p>
                       <button
                         type="button"
                         onClick={addLineItem}
-                        className="mt-3 text-xs font-bold text-blue-600 hover:underline"
+                        className="mt-3 text-xs font-bold text-primary hover:underline"
                       >
                         Add your first item
                       </button>
                     </div>
                   ) : (
-                    <div className="border border-slate-200 rounded-none">
-                      <table className="w-full text-left border-collapse border-b border-slate-200">
-                        <thead className="bg-slate-50 text-slate-500">
+                    <div className="border border-border rounded-none">
+                      <table className="w-full text-left border-collapse border-b border-border">
+                        <thead className="bg-secondary/50 text-muted-foreground">
                            <tr>
-                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[35%] border-r border-slate-200">Item / SKU</th>
-                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[15%] border-r border-slate-200">Lot #</th>
-                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[10%] border-r border-slate-200">UOM</th>
-                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[10%] border-r border-slate-200">Qty</th>
-                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[15%] border-r border-slate-200">Price</th>
-                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[10%] text-right border-r border-slate-200">Total</th>
-                              <th className="px-2 py-2 w-[5%] bg-white"></th>
+                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[35%] border-r border-border">Item / SKU</th>
+                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[15%] border-r border-border">Lot #</th>
+                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[10%] border-r border-border">UOM</th>
+                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[10%] border-r border-border">Qty</th>
+                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[15%] border-r border-border">Price</th>
+                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[10%] text-right border-r border-border">Total</th>
+                              <th className="px-2 py-2 w-[5%] bg-card"></th>
                            </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-200 bg-white">
+                        <tbody className="divide-y divide-border bg-card">
                           {newLineItems.map((item, index) => (
                             <tr key={item.id} className="group">
-                                <td className="p-0 border-r border-slate-200">
+                                <td className="p-0 border-r border-border text-foreground">
                                     <div className="w-full h-full">
                                         <SearchableSelect
                                             options={allSkus
@@ -1374,13 +1380,13 @@ function SaleOrdersContent() {
                                             value={item.sku}
                                             onChange={(val) => updateLineItem(item.id, 'sku', val)}
                                             placeholder="Select SKU"
-                                            className="w-full rounded-none border-none text-sm focus:ring-0"
+                                            className="w-full rounded-none border-none text-sm focus:ring-0 bg-transparent text-foreground"
                                         />
                                     </div>
                                 </td>
-                                <td className="p-0 border-r border-slate-200">
+                                <td className="p-0 border-r border-border">
                                     <div 
-                                        className="w-full h-[32px] px-2 flex items-center cursor-pointer hover:bg-slate-50 transition-colors"
+                                        className="w-full h-[32px] px-2 flex items-center cursor-pointer hover:bg-secondary/30 transition-colors"
                                         onClick={() => {
                                             if (!item.sku) {
                                                 toast.error("Select SKU first");
@@ -1391,34 +1397,34 @@ function SaleOrdersContent() {
                                             setIsLotModalOpen(true);
                                         }}
                                     >
-                                        <span className={cn("text-xs truncate block w-full", !item.lotNumber ? "text-slate-400 italic" : "text-slate-700 font-mono")}>
+                                        <span className={cn("text-xs truncate block w-full", !item.lotNumber ? "text-muted-foreground italic" : "text-foreground font-mono")}>
                                             {item.lotNumber || "Select"}
                                         </span>
                                     </div>
                                 </td>
-                                <td className="p-0 border-r border-slate-200">
+                                <td className="p-0 border-r border-border text-foreground">
                                      <SearchableSelect
                                         options={UOM_OPTIONS}
                                         value={item.uom}
                                         onChange={(val) => updateLineItem(item.id, 'uom', val)}
                                         placeholder="UOM"
                                         creatable
-                                        className="w-full rounded-none border-none focus:ring-0"
+                                        className="w-full rounded-none border-none focus:ring-0 bg-transparent text-foreground"
                                     />
                                 </td>
-                                <td className="p-0 border-r border-slate-200">
+                                <td className="p-0 border-r border-border">
                                     <input
                                       type="number"
                                       min="1"
                                       value={item.qtyShipped}
                                       onWheel={(e) => e.currentTarget.blur()}
                                       onChange={(e) => updateLineItem(item.id, 'qtyShipped', parseInt(e.target.value) || 0)}
-                                      className="w-full h-[32px] px-2 text-sm focus:outline-none focus:bg-blue-50/50 transition-colors font-mono rounded-none"
+                                      className="w-full h-[32px] px-2 text-sm focus:outline-none focus:bg-primary/5 transition-colors font-mono rounded-none bg-transparent text-foreground"
                                     />
                                 </td>
-                                <td className="p-0 border-r border-slate-200">
+                                <td className="p-0 border-r border-border">
                                     <div className="relative h-full w-full">
-                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
+                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">$</span>
                                         <input
                                           type="number"
                                           min="0"
@@ -1426,12 +1432,12 @@ function SaleOrdersContent() {
                                           value={item.price}
                                           onWheel={(e) => e.currentTarget.blur()}
                                           onChange={(e) => updateLineItem(item.id, 'price', parseFloat(e.target.value) || 0)}
-                                          className="w-full h-[32px] pl-5 pr-2 text-sm focus:outline-none focus:bg-blue-50/50 transition-colors font-mono text-right rounded-none"
+                                          className="w-full h-[32px] pl-5 pr-2 text-sm focus:outline-none focus:bg-primary/5 transition-colors font-mono text-right rounded-none bg-transparent text-foreground"
                                         />
                                     </div>
                                 </td>
-                                <td className="px-2 py-0 align-middle text-right border-r border-slate-200 bg-slate-50/30">
-                                    <span className="text-xs font-bold text-slate-700 font-mono">
+                                <td className="px-2 py-0 align-middle text-right border-r border-border bg-secondary/10">
+                                    <span className="text-xs font-bold text-foreground font-mono">
                                         {formatCurrency((item.qtyShipped || 0) * (item.price || 0))}
                                     </span>
                                 </td>
@@ -1439,7 +1445,7 @@ function SaleOrdersContent() {
                                     <button
                                       type="button"
                                       onClick={() => removeLineItem(item.id)}
-                                      className="w-full h-[32px] flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                      className="w-full h-[32px] flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                                       title="Remove Item"
                                     >
                                       <Trash2 className="w-4 h-4" />
@@ -1448,10 +1454,10 @@ function SaleOrdersContent() {
                             </tr>
                           ))}
                         </tbody>
-                        <tfoot className="bg-slate-50">
+                        <tfoot className="bg-secondary/50">
                             <tr>
-                                <td colSpan={5} className="px-2 py-2 text-[10px] font-bold text-slate-500 uppercase text-right tracking-wider border-r border-slate-200">Subtotal</td>
-                                <td className="px-2 py-2 text-xs font-black text-slate-900 font-mono text-right border-r border-slate-200">
+                                <td colSpan={5} className="px-2 py-2 text-[10px] font-bold text-muted-foreground uppercase text-right tracking-wider border-r border-border">Subtotal</td>
+                                <td className="px-2 py-2 text-xs font-black text-foreground font-mono text-right border-r border-border">
                                     {formatCurrency(newLineItems.reduce((sum, item) => sum + ((item.qtyShipped || 0) * (item.price || 0)), 0))}
                                 </td>
                                 <td></td>
@@ -1464,11 +1470,11 @@ function SaleOrdersContent() {
               </form>
             </div>
 
-            <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-end shrink-0">
+            <div className="p-4 border-t border-border bg-secondary/50 flex justify-end shrink-0">
               <button
                 type="submit"
                 form="create-so-form"
-                className="px-6 py-2.5 bg-black text-white text-xs font-bold uppercase rounded hover:bg-slate-800 transition-colors"
+                className="px-6 py-2.5 bg-primary text-primary-foreground text-xs font-bold uppercase rounded hover:bg-primary/90 transition-colors"
               >
                 {editingOrderId ? 'Save Changes' : 'Create Order'}
               </button>
