@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import SaleOrder from '@/models/SaleOrder';
 import Sku from '@/models/Sku';
-import Client from '@/models/Client'; // Assuming Client model exists
+import Client from '@/models/Client';
 import RXHQUsers from '@/models/User';
 import { applyDateFilter } from '@/lib/global-settings';
+import { syncOrderToAppSheet } from '@/lib/appsheet';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,13 +62,12 @@ export async function GET(request: Request) {
             if (toDate) query.createdAt.$lte = new Date(toDate);
         }
 
-        // Apply Global Date Filter if applicable (commented out if not needed, but good to have)
         query = await applyDateFilter(query, 'createdAt');
 
         const [total, orders] = await Promise.all([
             SaleOrder.countDocuments(query),
             SaleOrder.find(query)
-                .populate('clientId', 'name') // Changed from 'firstName lastName businessName' to match Client schema
+                .populate('clientId', 'name')
                 .populate('salesRep', 'firstName lastName')
                 .populate('lineItems.sku', 'name')
                 .sort({ [sortBy]: sortOrder as any })
@@ -92,7 +92,6 @@ export async function POST(request: Request) {
         await dbConnect();
         const body = await request.json();
         
-        // Ensure line items have calculated total if not provided
         if (body.lineItems && Array.isArray(body.lineItems)) {
             body.lineItems = body.lineItems.map((item: any) => ({
                 ...item,
@@ -100,9 +99,24 @@ export async function POST(request: Request) {
             }));
         }
 
-        const newItem = await SaleOrder.create(body);
+        const newItem: any = await SaleOrder.create(body);
+
+        const populatedOrder = await SaleOrder.findById(newItem._id)
+            .populate('clientId', 'name')
+            .populate('salesRep', 'firstName lastName')
+            .populate('lineItems.sku', 'name');
+
+        if (populatedOrder) {
+            try {
+                await syncOrderToAppSheet(populatedOrder);
+            } catch (syncError) {
+                console.error('Failed to sync order to AppSheet:', syncError);
+            }
+        }
+
         return NextResponse.json(newItem);
     } catch (error: any) {
+        console.error('Create order error:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

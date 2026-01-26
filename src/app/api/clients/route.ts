@@ -5,6 +5,7 @@ import SaleOrder from '@/models/SaleOrder';
 import Activity from '@/models/Activity';
 import Setting from '@/models/Setting';
 import mongoose from 'mongoose';
+import { syncClientToAppSheet } from '@/lib/appsheet';
 
 export const dynamic = 'force-dynamic';
 
@@ -261,6 +262,14 @@ export async function POST(request: Request) {
         }
 
         const newClient = await Client.create(body);
+
+        // Sync to AppSheet
+        try {
+            await syncClientToAppSheet(newClient);
+        } catch (syncError) {
+            console.error('Failed to sync to AppSheet:', syncError);
+            // We don't want to fail the main request if sync fails, but we should log it
+        }
 
         return NextResponse.json(newClient);
     } catch (error: any) {

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import SaleOrder from '@/models/SaleOrder';
 import Client from '@/models/Client';
+import { syncOrderToAppSheet } from '@/lib/appsheet';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,31 +20,22 @@ export async function POST(request: Request) {
 
         let count = 0;
         const clients = await Client.find({}).select('_id name').lean();
+        const ordersToSync = [];
 
         for (const row of data) {
-            // Mapping fields from CSV to Schema
-            // Expected CSV (based on usage request): 
-            // label/orderId, client, salesRep, discount, paymentMethod, orderStatus, shippedDate, shippingMethod, trackingNumber, shippingCost, tax, category, shippingAddress, city, state, lockPrice
-
-            // Mapping fields from CSV to Schema
-            // If row._id exists, it MUST be the mongodb _id.
-            
             const mongoId = row._id || row.id;
-            const label = row.label || row.orderId || row['Order ID']; // Label is semantic ID
+            const label = row.label || row.orderId || row['Order ID'];
             
-            // We need at least one identifier
             if (!mongoId && !label) continue;
 
             const clientNameOrId = row.clientId || row.client || row['Client Name'];
             let clientId = null;
 
             if (clientNameOrId) {
-                // Try to find by ID first
                 const exactClient = clients.find(c => c._id === clientNameOrId);
                 if (exactClient) {
                     clientId = exactClient._id;
                 } else {
-                    // Find by name (fuzzy or exact)
                      const foundClient = clients.find(c => 
                         c.name.toLowerCase() === clientNameOrId.toLowerCase() || 
                         c.name.toLowerCase().includes(clientNameOrId.toLowerCase())
@@ -75,9 +67,8 @@ export async function POST(request: Request) {
 
             if (label) updateData.label = label;
             if (clientId) updateData.clientId = clientId;
-            if (mongoId) updateData._id = mongoId; // Explicitly set _id if provided
+            if (mongoId) updateData._id = mongoId;
 
-            // Determine search filter
             let filter = {};
             if (mongoId) {
                 filter = { _id: mongoId };
@@ -85,13 +76,34 @@ export async function POST(request: Request) {
                 filter = { label: label };
             }
 
-            // Create or Update
-            await SaleOrder.findOneAndUpdate(
+            const updatedOrder = await SaleOrder.findOneAndUpdate(
                 filter,
                 { $set: updateData },
-                { upsert: true, new: true }
+                { upsert: true, new: true, lean: true }
             );
+
+            if (updatedOrder) {
+                ordersToSync.push(updatedOrder);
+            }
             count++;
+        }
+
+        // Sync to AppSheet (processing limited batch to avoid timeout)
+        if (ordersToSync.length > 0) {
+            // We'll sync them sequentially or in small batches
+            for (const order of ordersToSync) {
+                try {
+                    // Refetch with population for proper sync names
+                    const populated = await SaleOrder.findById(order._id)
+                        .populate('clientId', 'name')
+                        .populate('salesRep', 'firstName lastName')
+                        .populate('lineItems.sku', 'name');
+                    
+                    if (populated) await syncOrderToAppSheet(populated);
+                } catch (e) {
+                    console.error('Error syncing order during import:', e);
+                }
+            }
         }
 
         return NextResponse.json({ success: true, count });

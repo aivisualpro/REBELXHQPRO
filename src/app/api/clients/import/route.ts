@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import Client from '@/models/Client';
+import { syncClientToAppSheet } from '@/lib/appsheet';
 
 export async function POST(request: Request) {
     try {
@@ -11,6 +12,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Invalid data format' }, { status: 400 });
         }
 
+        const docsToSync: any[] = [];
         const operations = clients.map((row: any) => {
             // Map CSV row to Schema fields
 
@@ -82,6 +84,8 @@ export async function POST(request: Request) {
                 defaultPaymentMethod: row.defaultPaymentMethod
             };
 
+            docsToSync.push(doc);
+
             return {
                 updateOne: {
                     filter: { _id: clientId },
@@ -94,6 +98,13 @@ export async function POST(request: Request) {
         // Bulk write
         if (operations.length > 0) {
             await Client.bulkWrite(operations);
+            
+            // Sync to AppSheet
+            try {
+                await syncClientToAppSheet(docsToSync);
+            } catch (syncError) {
+                console.error('Failed to sync imported clients to AppSheet:', syncError);
+            }
         }
 
         return NextResponse.json({ message: 'Import successful', count: operations.length });
