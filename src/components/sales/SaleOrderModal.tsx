@@ -465,29 +465,47 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
                                 required
                                 readOnly
                                 value={newOrder.label}
-                                className="w-full px-3 py-2 border border-input rounded text-sm bg-muted text-muted-foreground focus:outline-none cursor-not-allowed"
+                                className="w-full h-[34px] px-3 border border-input rounded-md text-sm bg-secondary text-foreground focus:outline-none cursor-not-allowed"
                                 />
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Client <span className="text-destructive">*</span></label>
-                                <SearchableSelect
-                                options={allClients.map(c => ({ value: c._id, label: c.name }))}
-                                value={newOrder.clientId}
-                                onChange={handleClientChange}
-                                placeholder="Select Client..."
-                                required
-                                className="w-full"
-                                />
+                                {initialClientId ? (
+                                    <input
+                                        type="text"
+                                        readOnly
+                                        value={allClients.find(c => c._id === newOrder.clientId)?.name || 'Loading...'}
+                                        className="w-full h-[34px] px-3 border border-input rounded-md text-sm bg-secondary text-foreground focus:outline-none cursor-not-allowed"
+                                    />
+                                ) : (
+                                    <SearchableSelect
+                                        options={allClients.map(c => ({ value: c._id, label: c.name }))}
+                                        value={newOrder.clientId}
+                                        onChange={handleClientChange}
+                                        placeholder="Select Client..."
+                                        required
+                                        className="w-full"
+                                    />
+                                )}
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Sales Rep <span className="text-destructive">*</span></label>
-                                <SearchableSelect
-                                    options={allUsers.map(u => ({ label: `${u.firstName} ${u.lastName}`, value: u._id }))}
-                                    value={newOrder.salesRep}
-                                    onChange={(val) => setNewOrder({ ...newOrder, salesRep: val })}
-                                    placeholder="Select Rep..."
-                                    className="w-full"
-                                />
+                                {initialClientId ? (
+                                    <input
+                                        type="text"
+                                        readOnly
+                                        value={allUsers.find(u => u._id === newOrder.salesRep) ? `${allUsers.find(u => u._id === newOrder.salesRep)?.firstName} ${allUsers.find(u => u._id === newOrder.salesRep)?.lastName}` : 'Loading...'}
+                                        className="w-full h-[34px] px-3 border border-input rounded-md text-sm bg-secondary text-foreground focus:outline-none cursor-not-allowed"
+                                    />
+                                ) : (
+                                    <SearchableSelect
+                                        options={allUsers.map(u => ({ label: `${u.firstName} ${u.lastName}`, value: u._id }))}
+                                        value={newOrder.salesRep}
+                                        onChange={(val) => setNewOrder({ ...newOrder, salesRep: val })}
+                                        placeholder="Select Rep..."
+                                        className="w-full"
+                                    />
+                                )}
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Payment Method</label>
