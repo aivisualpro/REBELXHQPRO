@@ -472,22 +472,57 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">Shipping Terms</label>
-                                <input
+                                <select
                                     value={formData.defaultShippingTerms}
                                     onChange={e => setFormData({ ...formData, defaultShippingTerms: e.target.value })}
                                     className="w-full px-4 py-2 bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary transition-all"
-                                    placeholder="e.g. Free Shipping"
-                                />
+                                >
+                                    <option value="">Select Shipping Terms</option>
+                                    {[
+                                        'FedEx 2Day',
+                                        'Freight Via SAIA',
+                                        'Local Delivery',
+                                        'UPS 2nd Day Air',
+                                        'UPS 3 Day Select',
+                                        'UPS Ground',
+                                        'UPS Ground as Freight',
+                                        'UPS Next Day Air',
+                                        'USPS Ground Advantage',
+                                        'USPS Priority Mail',
+                                        'USPS Priority Mail Express',
+                                        'Will Call'
+                                    ].map(opt => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                    ))}
+                                </select>
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">Payment Method</label>
-                                <input
+                                <select
                                     value={formData.defaultPaymentMethod}
                                     onChange={e => setFormData({ ...formData, defaultPaymentMethod: e.target.value })}
                                     className="w-full px-4 py-2 bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary transition-all"
-                                    placeholder="e.g. Credit Card"
-                                />
+                                >
+                                    <option value="">Select Payment Method</option>
+                                    {[
+                                        'ACH',
+                                        'Auth Payment Link',
+                                        'Cash',
+                                        'CC#',
+                                        'Check By Mail',
+                                        'COD Check',
+                                        'Consignment',
+                                        'Credit Card',
+                                        'Dejavoo',
+                                        'Mobile Check Deposit',
+                                        'Net Terms',
+                                        'Nothing Due'
+                                    ].map(opt => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                    ))}
+                                </select>
                             </div>
+
                         </div>
                     </div>
 

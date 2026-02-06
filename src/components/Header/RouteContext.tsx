@@ -43,10 +43,9 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
     // Leads
     if (pathname === '/crm/leads') {
         return {
-            title: 'Leads',
-            actions: [
-                { label: 'Add', icon: Plus, href: '/crm/leads?createNew=true', variant: 'primary' },
-            ]
+            title: '', // Will be portaled
+            actions: [],
+            isPortal: true // Flag to identify portal mode
         };
     }
 

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Plus, Search, MoreHorizontal, Mail, Phone, MapPin, 
   Calendar, DollarSign, ShoppingBag, ChevronLeft, ChevronRight,
@@ -162,6 +163,7 @@ export default function LeadsPage() {
   const [draggedLead, setDraggedLead] = useState<Lead | null>(null);
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [headerPortalTarget, setHeaderPortalTarget] = useState<HTMLElement | null>(null);
   
   // Pagination & Sort
   const [page, setPage] = useState(1);
@@ -195,6 +197,12 @@ export default function LeadsPage() {
       { label: 'TX', value: 'TX' }, { label: 'CA', value: 'CA' }, { label: 'NY', value: 'NY' }, 
       { label: 'FL', value: 'FL' }, { label: 'IL', value: 'IL' }
   ]);
+
+  // Find header portal target
+  useEffect(() => {
+    const target = document.getElementById('header-portal-target');
+    if (target) setHeaderPortalTarget(target);
+  }, []);
 
   useEffect(() => {
     // Fetch Settings
@@ -511,72 +519,83 @@ export default function LeadsPage() {
     }
   };
 
+  const handleDeleteLead = async (leadId: string, leadName: string) => {
+    if (!confirm(`Are you sure you want to delete "${leadName}"? This action cannot be undone.`)) return;
+    
+    try {
+        const res = await fetch(`/api/clients/${leadId}`, { method: 'DELETE' });
+        if (res.ok) {
+            toast.success('Lead deleted successfully');
+            if (viewMode === 'table') fetchLeads();
+            else PIPELINE_STAGES.forEach(s => fetchPipelineStage(s.id, 1, false));
+        } else {
+            const err = await res.json();
+            toast.error(err.error || 'Failed to delete lead');
+        }
+    } catch (error) {
+        console.error('Delete error:', error);
+        toast.error('Failed to delete lead');
+    }
+  };
+
   return (
     <div className="flex flex-col h-[calc(100vh-48px)] bg-background text-foreground font-sans transition-colors duration-300">
       
-      {/* Header / Action Bar */}
-      <div className="flex items-center justify-between px-4 h-11 border-b border-border bg-card sticky top-0 z-20 gap-4 transition-colors duration-300">
-        
-        {/* Left: Search & View Toggle */}
-        <div className="flex items-center space-x-6">
-            <div className="relative group">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
-                <input 
-                    type="text" 
-                    placeholder="Search leads..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="pl-9 pr-4 h-8 w-64 bg-secondary hover:bg-secondary/80 focus:bg-card border border-border focus:border-accent rounded text-sm transition-all focus:outline-none placeholder:text-muted"
-                />
-            </div>
 
-            <div className="flex items-center bg-secondary p-0.5 rounded border border-border h-8">
-                <button 
-                    onClick={() => setViewMode('table')}
-                    className={cn(
-                        "flex items-center space-x-1 px-3 h-full rounded text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer",
-                        viewMode === 'table' ? "bg-[#FFEF5F] text-black shadow-sm" : "text-muted hover:text-foreground"
-                    )}
-                >
-                    <List className="w-3.5 h-3.5" />
-                    <span>Table</span>
-                </button>
-                <button 
-                    onClick={() => setViewMode('pipeline')}
-                    className={cn(
-                        "flex items-center space-x-1 px-3 h-full rounded text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer",
-                        viewMode === 'pipeline' ? "bg-[#FFEF5F] text-black shadow-sm" : "text-muted hover:text-foreground"
-                    )}
-                >
-                    <LayoutGrid className="w-3.5 h-3.5" />
-                    <span>Pipeline</span>
-                </button>
-            </div>
-        </div>
+      {/* Header Portal Content */}
+      {headerPortalTarget && createPortal(
+        <>
+          {/* Title */}
+          <h1 className="text-sm font-bold text-foreground uppercase tracking-tight mr-4">Leads</h1>
+          
+          {/* Search */}
+          <div className="relative group flex-1 max-w-xs">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+            <input 
+              type="text" 
+              placeholder="Search leads..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8 pr-3 h-7 w-full bg-secondary/50 hover:bg-secondary focus:bg-background border border-transparent focus:border-primary rounded text-xs transition-all focus:outline-none placeholder:text-muted-foreground text-foreground"
+            />
+          </div>
 
-        {/* Right: Filters & Actions */}
-        <div className="flex items-center space-x-2">
-            
-            {/* Filter Group */}
-            <div className="flex items-center space-x-2 mr-4">
-                 <button className="flex items-center space-x-1.5 px-3 h-8 text-[11px] font-bold text-foreground bg-card border border-border rounded hover:bg-secondary transition-all uppercase tracking-wide cursor-pointer text-center">
-                    <MapPin className="w-3.5 h-3.5 text-muted" />
-                    <span>City</span>
-                </button>
-                 <button className="flex items-center space-x-1.5 px-3 h-8 text-[11px] font-bold text-foreground bg-card border border-border rounded hover:bg-secondary transition-all uppercase tracking-wide cursor-pointer text-center">
-                    <LucideMap className="w-3.5 h-3.5 text-muted" />
-                    <span>State</span>
-                </button>
-                <button 
-                    onClick={() => setIsModalOpen(true)}
-                    className="h-8 w-8 flex items-center justify-center bg-primary text-primary-foreground hover:bg-primary/90 transition-all cursor-pointer shadow-md rounded"
-                    title="Add New Lead"
-                >
-                    <Plus className="w-4 h-4" />
-                </button>
-            </div>
-        </div>
-      </div>
+          {/* View Toggle */}
+          <div className="flex items-center bg-secondary/50 p-0.5 rounded border border-border h-7 ml-3">
+            <button 
+              onClick={() => setViewMode('table')}
+              className={cn(
+                "flex items-center space-x-1 px-2.5 h-full rounded text-[9px] font-bold uppercase tracking-wider transition-all cursor-pointer",
+                viewMode === 'table' ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <List className="w-3 h-3" />
+              <span>Table</span>
+            </button>
+            <button 
+              onClick={() => setViewMode('pipeline')}
+              className={cn(
+                "flex items-center space-x-1 px-2.5 h-full rounded text-[9px] font-bold uppercase tracking-wider transition-all cursor-pointer",
+                viewMode === 'pipeline' ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <LayoutGrid className="w-3 h-3" />
+              <span>Pipeline</span>
+            </button>
+          </div>
+
+          {/* Add Button */}
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="ml-3 flex items-center space-x-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm transition-all cursor-pointer"
+            title="Add New Lead"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Add</span>
+          </button>
+        </>,
+        headerPortalTarget
+      )}
 
       <ClientModal 
         isOpen={isModalOpen} 
@@ -646,8 +665,19 @@ export default function LeadsPage() {
                                                       {lead.name.substring(0, 2)}
                                                   </div>
                                                   <span className="text-[10px] font-medium text-foreground leading-[13.3px] truncate max-w-[200px]">{lead.name}</span>
+                                                  <button
+                                                      onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          handleDeleteLead(lead._id, lead.name);
+                                                      }}
+                                                      className="p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
+                                                      title="Delete Lead"
+                                                  >
+                                                      <Trash2 className="w-3 h-3" />
+                                                  </button>
                                               </div>
                                           </td>
+
                                           
                                           {/* EMAIL */}
                                           <td className="px-1 py-1">
