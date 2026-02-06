@@ -14,8 +14,59 @@ interface ClientModalProps {
     initialData?: any;
 }
 
-const COMPANY_TYPES = ['SHOP', 'DISTRO', 'VAPE STORE', 'POTENTIAL', 'WHL', 'MASTER DISTRO'];
-const CONTACT_STATUSES = ['Initial Contact', 'Sampling', 'New Prospect', 'Closed won', 'Closed lost', 'Uncategorized'];
+
+const CONTACT_STATUSES = [
+    'Sampling',
+    'New Prospect',
+    'Uncategorized',
+    'Closed Lost',
+    'Initial Contact',
+    'Closed Won',
+    'Committed',
+    'Consideration',
+    'Whitelabel'
+];
+
+const CONTACT_TYPES = [
+    'Potential Customer',
+    'Inactive Customer',
+    'Uncategorized',
+    'Current Customer'
+];
+
+const COMPANY_TYPES = [
+    'Smoke Shop',
+    'Vape Store',
+    'Shop',
+    'Broker/Jobber',
+    'Dispensary',
+    'Distro',
+    'Liquor Store',
+    'Manufacturer',
+    'Individual',
+    'Kratom Dispensary',
+    'Master Distro',
+    'Spa',
+    'Cbd Dispensary',
+    'Tobacco Shop',
+    'Pharmacy',
+    'Tattoo Shop',
+    'List',
+    'Amherst Client',
+    'Whole Saler',
+    'Online Retailer',
+    'Health Food Store',
+    'Kratom Dispensary/Distributor',
+    'Beer And Wine Bar',
+    'Kava/Kratom Bar',
+    'Kava Bar',
+    'Vape Empire',
+    'Sully\'S Client',
+    'Franchise',
+    'Gas Station',
+    'Market'
+];
+
 
 const formatPhoneNumber = (value: string) => {
     if (!value) return value;
@@ -84,9 +135,9 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
     
     const [formData, setFormData] = useState({
         name: initialData?.name || '',
-        contactType: initialData?.contactType || initialType,
-        companyType: initialData?.companyType || 'POTENTIAL',
-        contactStatus: initialData?.contactStatus || (initialType === 'Lead' ? 'Initial Contact' : 'Uncategorized'),
+        contactType: initialData?.contactType || 'Uncategorized',
+        companyType: initialData?.companyType || 'Shop',
+        contactStatus: initialData?.contactStatus || 'Uncategorized',
         salesPerson: initialData?.salesPerson || (session?.user as any)?.id || '',
         description: initialData?.description || '',
         website: initialData?.website || '',
@@ -127,9 +178,9 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
         if (isOpen) {
             setFormData({
                 name: initialData?.name || '',
-                contactType: initialData?.contactType || initialType,
-                companyType: initialData?.companyType || 'POTENTIAL',
-                contactStatus: initialData?.contactStatus || (initialType === 'Lead' ? 'Initial Contact' : 'Uncategorized'),
+                contactType: initialData?.contactType || 'Uncategorized',
+                companyType: initialData?.companyType || 'Shop',
+                contactStatus: initialData?.contactStatus || 'Uncategorized',
                 salesPerson: initialData?.salesPerson || (session?.user as any)?.id || '',
                 description: initialData?.description || '',
                 website: initialData?.website || '',
@@ -193,15 +244,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
         }
     };
 
-    // Auto-determine contactType based on revenue for NEW entries
-    useEffect(() => {
-        if (!initialData?._id) {
-            const determinedType = (formData.forecastedAmount || 0) >= minRevenueSlab ? 'Client' : 'Lead';
-            if (formData.contactType !== determinedType) {
-                setFormData(prev => ({ ...prev, contactType: determinedType }));
-            }
-        }
-    }, [formData.forecastedAmount, minRevenueSlab, initialData?._id]);
+
      const [showCC, setShowCC] = useState(false);
     const [showCVV, setShowCVV] = useState(false);
     
@@ -236,12 +279,12 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
             });
 
             if (res.ok) {
-                toast.success(`${formData.contactType} ${isEditing ? 'updated' : 'created'} successfully`);
+                toast.success(`Contact ${isEditing ? 'updated' : 'created'} successfully`);
                 onSuccess();
                 onClose();
             } else {
                 const err = await res.json();
-                toast.error(err.error || `Failed to ${isEditing ? 'update' : 'create'} ${formData.contactType.toLowerCase()}`);
+                toast.error(err.error || `Failed to ${isEditing ? 'update' : 'create'} contact`);
             }
         } catch (error) {
             console.error('Submit error:', error);
@@ -277,7 +320,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-3 border-b border-border sticky top-0 bg-card z-10">
                     <h2 className="text-[11px] font-black uppercase tracking-widest text-foreground">
-                        {initialData?._id ? `Edit ${formData.contactType}` : `Add New ${formData.contactType}`}
+                        {initialData?._id ? 'Edit Contact' : 'Add New Contact'}
                     </h2>
                     <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
                         <X className="w-4 h-4" />
@@ -293,7 +336,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                             <h3 className="text-[10px] font-black uppercase tracking-[0.2em]">Profile & Classification</h3>
                         </div>
                         <div className="grid grid-cols-6 gap-6">
-                            <div className="col-span-4 space-y-1.5">
+                            <div className="col-span-6 space-y-1.5">
                                 <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">Company Name</label>
                                 <input
                                     required
@@ -303,19 +346,8 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                                     placeholder="Acme Corporation"
                                 />
                             </div>
-                            {/* Contact Type is auto-determined based on revenue */}
                             <div className="col-span-2 space-y-1.5">
-                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">Industry Style</label>
-                                <select
-                                    value={formData.companyType}
-                                    onChange={e => setFormData({ ...formData, companyType: e.target.value })}
-                                    className="w-full px-4 py-2 bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary transition-all cursor-pointer"
-                                >
-                                    {COMPANY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                                </select>
-                            </div>
-                            <div className="col-span-2 space-y-1.5">
-                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">Pipeline Stage</label>
+                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">Contact Status</label>
                                 <select
                                     value={formData.contactStatus}
                                     onChange={e => setFormData({ ...formData, contactStatus: e.target.value })}
@@ -325,6 +357,26 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                                 </select>
                             </div>
                             <div className="col-span-2 space-y-1.5">
+                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">Contact Type</label>
+                                <select
+                                    value={formData.contactType}
+                                    onChange={e => setFormData({ ...formData, contactType: e.target.value })}
+                                    className="w-full px-4 py-2 bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary transition-all cursor-pointer"
+                                >
+                                    {CONTACT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                </select>
+                            </div>
+                            <div className="col-span-2 space-y-1.5">
+                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">Company Type</label>
+                                <select
+                                    value={formData.companyType}
+                                    onChange={e => setFormData({ ...formData, companyType: e.target.value })}
+                                    className="w-full px-4 py-2 bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary transition-all cursor-pointer"
+                                >
+                                    {COMPANY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                </select>
+                            </div>
+                            <div className="col-span-6 space-y-1.5">
                                 <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">Assigned Representative</label>
                                 <select
                                     value={formData.salesPerson}
@@ -761,7 +813,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                                     <span>Syncing...</span>
                                 </>
                             ) : (
-                                <span>{initialData?._id ? 'Apply Updates' : `Initialize ${formData.contactType}`}</span>
+                                <span>{initialData?._id ? 'Apply Updates' : 'Initialize Contact'}</span>
                             )}
                         </button>
                     </div>

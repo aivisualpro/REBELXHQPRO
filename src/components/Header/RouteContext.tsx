@@ -40,13 +40,21 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
         };
     }
 
+    // Leads
+    if (pathname === '/crm/leads') {
+        return {
+            title: 'Leads',
+            actions: [
+                { label: 'Add', icon: Plus, href: '/crm/leads?createNew=true', variant: 'primary' },
+            ]
+        };
+    }
+
     // Clients
     if (pathname === '/crm/clients') {
         return {
             title: 'Clients',
-            actions: [
-                { label: 'Add', icon: Plus, href: '/crm/clients?createNew=true', variant: 'primary' },
-            ]
+            actions: []
         };
     }
 
