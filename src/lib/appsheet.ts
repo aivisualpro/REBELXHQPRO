@@ -109,9 +109,12 @@ export async function syncOrderToAppSheet(order: any) {
     // Map Order to "Orders" table
     const orderObj = order.toObject ? order.toObject() : order;
     
-    let salesRepName = orderObj.salesRep;
+    // Use email for Sales Representative in AppSheet
+    let salesRepEmail = '';
     if (typeof orderObj.salesRep === 'object' && orderObj.salesRep !== null) {
-        salesRepName = `${orderObj.salesRep.firstName || ''} ${orderObj.salesRep.lastName || ''}`.trim();
+        salesRepEmail = orderObj.salesRep.email || '';
+    } else if (typeof orderObj.salesRep === 'string') {
+        salesRepEmail = orderObj.salesRep; // Fallback to ID/string if not populated
     }
 
     // Use legacyId for ClientID if client was imported, otherwise use ObjectId
@@ -126,7 +129,7 @@ export async function syncOrderToAppSheet(order: any) {
         'Order #': orderObj._id,
         'ClientID': clientIdForAppSheet,
         'TimeStamp': orderObj.createdAt ? new Date(orderObj.createdAt).toISOString() : '',
-        'Sales Representative': salesRepName || '',
+        'Sales Representative': salesRepEmail || '',
         'Discount': orderObj.discount || 0,
         'Payment Method': orderObj.paymentMethod || '',
         'Order Status': orderObj.orderStatus || '',

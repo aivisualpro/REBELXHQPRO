@@ -101,20 +101,28 @@ export async function POST(request: Request) {
 
         const newItem: any = await SaleOrder.create(body);
 
-        const populatedOrder = await SaleOrder.findById(newItem._id)
-            .populate('clientId', 'name legacyId')
-            .populate('salesRep', 'firstName lastName')
-            .populate('lineItems.sku', 'name legacyId');
+        // Return immediately to frontend - don't wait for populate or AppSheet sync
+        const response = NextResponse.json(newItem);
 
-        if (populatedOrder) {
+        // Fire-and-forget: Sync to AppSheet in background
+        // Using setImmediate pattern to not block the response
+        (async () => {
             try {
-                await syncOrderToAppSheet(populatedOrder);
-            } catch (syncError) {
-                console.error('Failed to sync order to AppSheet:', syncError);
-            }
-        }
+                const populatedOrder = await SaleOrder.findById(newItem._id)
+                    .populate('clientId', 'name legacyId')
+                    .populate('salesRep', 'firstName lastName email')
+                    .populate('lineItems.sku', 'name legacyId');
 
-        return NextResponse.json(newItem);
+                if (populatedOrder) {
+                    await syncOrderToAppSheet(populatedOrder);
+                    console.log('Order synced to AppSheet:', newItem._id);
+                }
+            } catch (syncError) {
+                console.error('Background AppSheet sync failed:', syncError);
+            }
+        })();
+
+        return response;
     } catch (error: any) {
         console.error('Create order error:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
