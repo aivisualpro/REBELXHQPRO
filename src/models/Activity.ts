@@ -7,7 +7,7 @@ const ActivitySchema = new mongoose.Schema({
         required: true
     },
     client: {
-        type: String, // Storing Client _id (which is a string from Client.ts)
+        type: mongoose.Schema.Types.ObjectId,
         ref: 'Client',
         required: true
     },

@@ -4,6 +4,7 @@ import Client from '@/models/Client';
 import Activity from '@/models/Activity';
 import SaleOrder from '@/models/SaleOrder';
 import RXHQUsers from '@/models/User';
+import mongoose from 'mongoose';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,11 +17,17 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
         const limit = parseInt(searchParams.get('limit') || '20');
         const tab = searchParams.get('tab') || 'activities';
 
-        // Fetch the client
-        const client = await Client.findById(id).lean();
+        // Find the client with polymorphic lookup
+        const clientQuery = mongoose.isValidObjectId(id) 
+            ? { $or: [{ _id: id }, { legacyId: id }] }
+            : { legacyId: id };
+            
+        const client = await Client.findOne(clientQuery).lean();
         if (!client) {
             return NextResponse.json({ error: 'Client not found' }, { status: 404 });
         }
+
+        const clientObjectId = client._id;
 
         // Fetch sales rep info if exists
         let salesRep = null;
@@ -28,18 +35,18 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
             salesRep = await RXHQUsers.findById(client.salesPerson, 'firstName lastName email').lean();
         }
 
-        // Fetch activities for this client (paginated)
-        const activitiesQuery = Activity.find({ client: id })
+        // Fetch activities for this client (paginated) using the native ObjectId
+        const activitiesQuery = Activity.find({ client: clientObjectId })
             .sort({ createdAt: -1 })
             .skip((page - 1) * limit)
             .limit(limit);
 
         const [activities, totalActivities, totalEmails, totalCalls, totalSMS] = await Promise.all([
             activitiesQuery.lean(),
-            Activity.countDocuments({ client: id }),
-            Activity.countDocuments({ client: id, type: 'Email' }),
-            Activity.countDocuments({ client: id, type: 'Call' }),
-            Activity.countDocuments({ client: id, type: 'Text' })
+            Activity.countDocuments({ client: clientObjectId }),
+            Activity.countDocuments({ client: clientObjectId, type: 'Email' }),
+            Activity.countDocuments({ client: clientObjectId, type: 'Call' }),
+            Activity.countDocuments({ client: clientObjectId, type: 'Text' })
         ]);
 
         // Fetch activity creators for name display
@@ -52,8 +59,8 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
             createdByName: creatorMap.get(a.createdBy?.toString()) || a.createdBy || 'Unknown'
         }));
 
-        // Fetch wholesale orders (SaleOrders) for this client (paginated)
-        const ordersQuery = SaleOrder.find({ clientId: id })
+        // Fetch wholesale orders (SaleOrders) for this client (paginated) using the native ObjectId
+        const ordersQuery = SaleOrder.find({ clientId: clientObjectId })
             .populate('salesRep', 'firstName lastName')
             .sort({ createdAt: -1 })
             .skip((page - 1) * limit)
@@ -61,11 +68,11 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 
         const [orders, totalOrders] = await Promise.all([
             ordersQuery.lean(),
-            SaleOrder.countDocuments({ clientId: id })
+            SaleOrder.countDocuments({ clientId: clientObjectId })
         ]);
 
         // Calculate summary stats
-        const allOrders = await SaleOrder.find({ clientId: id, orderStatus: { $ne: 'Cancelled' } }).lean();
+        const allOrders = await SaleOrder.find({ clientId: clientObjectId, orderStatus: { $ne: 'Cancelled' } }).lean();
         let totalRevenue = 0;
         let totalPaid = 0;
         
@@ -81,8 +88,8 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
         const totalBalance = totalRevenue - totalPaid;
 
         // Find last activity and last order dates
-        const lastActivity = await Activity.findOne({ client: id }).sort({ createdAt: -1 }).lean();
-        const lastOrder = await SaleOrder.findOne({ clientId: id, orderStatus: { $ne: 'Cancelled' } }).sort({ createdAt: -1 }).lean();
+        const lastActivity = await Activity.findOne({ client: clientObjectId }).sort({ createdAt: -1 }).lean();
+        const lastOrder = await SaleOrder.findOne({ clientId: clientObjectId, orderStatus: { $ne: 'Cancelled' } }).sort({ createdAt: -1 }).lean();
 
         return NextResponse.json({
             client: {
@@ -97,6 +104,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
                 totalEmails,
                 totalCalls,
                 totalSMS,
+                totalNotes: client.notes?.length || 0,
                 lastActivityDate: lastActivity?.createdAt || null,
                 lastOrderDate: lastOrder?.createdAt || null
             },

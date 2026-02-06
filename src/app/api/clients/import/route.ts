@@ -59,10 +59,10 @@ export async function POST(request: Request) {
                 zipCode: row.zipCode
             };
 
-            const clientId = row.clientid || 'CL-' + Math.random().toString(36).substring(2, 9).toUpperCase();
-
-            const doc = {
-                _id: clientId,
+            const legacyId = row.legacyId || row.clientid || 'CL-' + Math.random().toString(36).substring(2, 9).toUpperCase();
+            
+            const doc: any = {
+                legacyId,
                 name: row.name,
                 description: row.description,
                 salesPerson: row.salesPerson,
@@ -88,7 +88,7 @@ export async function POST(request: Request) {
 
             return {
                 updateOne: {
-                    filter: { _id: clientId },
+                    filter: { legacyId: legacyId },
                     update: { $set: doc },
                     upsert: true
                 }

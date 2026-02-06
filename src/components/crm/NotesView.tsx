@@ -18,9 +18,10 @@ interface Note {
 
 interface NotesViewProps {
     clientId?: string;
+    onNotesUpdate?: () => void;
 }
 
-export default function NotesView({ clientId }: NotesViewProps) {
+export default function NotesView({ clientId, onNotesUpdate }: NotesViewProps) {
     const [notes, setNotes] = useState<Note[]>([]);
     const [loading, setLoading] = useState(true);
     
@@ -89,6 +90,7 @@ export default function NotesView({ clientId }: NotesViewProps) {
             if (res.ok) {
                 toast.success('Note deleted');
                 fetchNotes();
+                if (onNotesUpdate) onNotesUpdate();
             } else {
                 toast.error('Failed to delete note');
             }
@@ -146,7 +148,10 @@ export default function NotesView({ clientId }: NotesViewProps) {
             <NoteModal 
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
-                onSuccess={fetchNotes}
+                onSuccess={() => {
+                    fetchNotes();
+                    if (onNotesUpdate) onNotesUpdate();
+                }}
                 clientId={clientId || editingNote?.clientId} // Use prop clientId for new notes if available
                 noteId={editingNote?.noteId}
                 initialNote={editingNote?.text}

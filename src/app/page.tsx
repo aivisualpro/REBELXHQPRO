@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 
 type DateFilterOption = 'thisMonth' | 'lastMonth' | 'last3Months' | 'thisYear';
 
@@ -69,6 +70,7 @@ const getDateRange = (filter: DateFilterOption) => {
 };
 
 export default function DashboardPage() {
+    const { data: session } = useSession();
     const router = useRouter();
     const [stats, setStats] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -292,20 +294,17 @@ export default function DashboardPage() {
 
             {/* Sticky Page Header */}
             <div className="flex-none z-40 bg-slate-900/80 backdrop-blur-md border-b border-white/5 shadow-2xl shadow-black/20">
-                <div className="max-w-[1800px] mx-auto px-6 py-3 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div className="max-w-[1800px] mx-auto p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     
                     {/* Brand & Filters */}
                     <div className="flex items-center gap-6">
                         <div className="flex items-center space-x-3">
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
-                                <Sparkles className="w-5 h-5 text-white" />
-                            </div>
                             <div>
                                 <h1 className="text-2xl font-black tracking-tight leading-none">
                                     REBELX <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">HQ PRO</span>
                                 </h1>
                                 <p className="text-slate-400 text-[10px] font-medium mt-0.5">
-                                    {getGreeting()}, Commander.
+                                    {getGreeting()}, {session?.user?.name || 'Commander'}.
                                 </p>
                             </div>
                         </div>
@@ -318,7 +317,7 @@ export default function DashboardPage() {
                                     key={opt.key}
                                     onClick={() => setDateFilter(opt.key)}
                                     className={cn(
-                                        "px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all whitespace-nowrap",
+                                        "h-9 px-3 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all whitespace-nowrap flex items-center justify-center",
                                         dateFilter === opt.key
                                             ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30"
                                             : "bg-slate-800/60 text-slate-400 hover:bg-slate-700 hover:text-white border border-slate-700/50"
@@ -333,16 +332,16 @@ export default function DashboardPage() {
                     {/* Stats & Actions */}
                     <div className="flex items-center gap-4">
                         {/* Business Health Score */}
-                        <div className="hidden md:flex items-center gap-3 bg-slate-800/50 border border-slate-700/50 rounded-xl pl-3 pr-4 py-1.5">
-                            <div className="relative w-10 h-10">
+                        <div className="hidden md:flex items-center gap-2 bg-slate-800/50 border border-slate-700/50 rounded-xl pl-2 pr-3 h-9">
+                            <div className="relative w-6 h-6">
                                 <svg className="w-full h-full -rotate-90">
-                                    <circle cx="20" cy="20" r="16" fill="none" stroke="currentColor" strokeWidth="3" className="text-slate-700" />
+                                    <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" className="text-slate-700" />
                                     <circle 
-                                        cx="20" cy="20" r="16" fill="none" 
+                                        cx="12" cy="12" r="10" fill="none" 
                                         stroke="url(#headerHealthGradient)" 
-                                        strokeWidth="3" 
+                                        strokeWidth="2" 
                                         strokeLinecap="round"
-                                        strokeDasharray={`${healthScore * 1} 100`}
+                                        strokeDasharray={`${healthScore * 0.628} 62.8`}
                                         className="transition-all duration-1000"
                                     />
                                     <defs>
@@ -353,19 +352,19 @@ export default function DashboardPage() {
                                     </defs>
                                 </svg>
                                 <div className="absolute inset-0 flex items-center justify-center">
-                                    <span className="text-[10px] font-black text-white">{loading ? '..' : healthScore}</span>
+                                    <span className="text-[8px] font-black text-white">{loading ? '..' : healthScore}</span>
                                 </div>
                             </div>
                             <div>
-                                <div className="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-0.5">Health</div>
-                                <div className="text-xs font-bold text-emerald-400 leading-none">Excellent</div>
+                                <div className="text-[7px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-0.5">Health</div>
+                                <div className="text-[10px] font-bold text-emerald-400 leading-none">Excellent</div>
                             </div>
                         </div>
 
                         {/* AI Chat Button */}
                         <button 
                             onClick={() => setIsChatOpen(true)}
-                            className="group flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl px-4 py-2 transition-all shadow-lg shadow-primary/20 hover:shadow-primary/40 cursor-pointer"
+                            className="group flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl px-4 h-9 transition-all shadow-lg shadow-primary/20 hover:shadow-primary/40 cursor-pointer"
                         >
                             <Brain className="w-4 h-4" />
                             <span className="font-bold text-xs uppercase tracking-widest">Ask AI</span>
@@ -376,7 +375,7 @@ export default function DashboardPage() {
 
             {/* Scrollable Main Content */}
             <div className="flex-1 overflow-y-auto overflow-x-hidden relative z-10 w-full">
-                <div className="max-w-[1800px] mx-auto px-6 lg:px-10 py-8">
+                <div className="max-w-[1800px] mx-auto p-4">
                     
                     {/* AI Neural Board */}
                     <section className="mb-10">

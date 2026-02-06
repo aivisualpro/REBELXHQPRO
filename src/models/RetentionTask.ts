@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const RetentionTaskSchema = new mongoose.Schema({
-    client: { type: String, ref: 'Client', required: true },
+    client: { type: mongoose.Schema.Types.ObjectId, ref: 'Client', required: true },
     type: { 
         type: String, 
         enum: ['Followup Call', 'Followup Email', 'Check-in', 'Re-engagement', 'Win-back', 'Feedback Request', 'Upsell Opportunity'], 

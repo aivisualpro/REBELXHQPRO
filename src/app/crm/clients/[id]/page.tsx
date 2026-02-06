@@ -116,6 +116,7 @@ interface Summary {
     totalEmails?: number;
     totalCalls?: number;
     totalSMS?: number;
+    totalNotes?: number;
     lastActivityDate: string | null;
     lastOrderDate: string | null;
 }
@@ -579,7 +580,7 @@ export default function ClientDashboardPage() {
                         { id: 'Emails', icon: Mail, count: summary?.totalEmails },
                         { id: 'Calls', icon: Phone, count: summary?.totalCalls },
                         { id: 'SMS', icon: MessageSquare, count: summary?.totalSMS },
-                        { id: 'Notes', icon: StickyNote, count: clientNotes?.length },
+                        { id: 'Notes', icon: StickyNote, count: summary?.totalNotes },
                         { id: 'Orders', icon: ShoppingCart, count: summary?.totalOrders }
                     ].map(tab => (
                         <button
@@ -900,7 +901,10 @@ export default function ClientDashboardPage() {
                              />
                          )}
                         {activeTab === 'Notes' && id && (
-                            <NotesView clientId={id as string} />
+                            <NotesView 
+                                clientId={id as string} 
+                                onNotesUpdate={() => fetchClientData(1, false)} 
+                            />
                         )}
                         {activeTab === 'Orders' && id && (
                             <OrdersView clientId={id as string} />

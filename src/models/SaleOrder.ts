@@ -4,7 +4,7 @@ import mongoose from 'mongoose';
 const SaleOrderSchema = new mongoose.Schema({
     _id: { type: String, default: () => new mongoose.Types.ObjectId().toString() },
     label: String, // Order ID/Label
-    clientId: { type: String, ref: 'Client' },
+    clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'Client' },
     salesRep: { type: String, ref: 'RXHQUsers' },
     discount: Number,
     paymentMethod: String,

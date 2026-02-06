@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const ClientSchema = new mongoose.Schema({
-    _id: { type: String, required: true }, // Mapped from clientid
+    legacyId: { type: String, required: true, unique: true }, // Mapped from clientid (old business ID)
     name: { type: String, required: true },
     description: String,
     salesPerson: { type: String, ref: 'RXHQUsers' },
@@ -66,4 +66,8 @@ ClientSchema.index({ 'phones.value': 1 });
 ClientSchema.index({ 'addresses.city': 1 });
 ClientSchema.index({ 'addresses.state': 1 });
 
-export default mongoose.models.Client || mongoose.model('Client', ClientSchema);
+if (mongoose.models.Client) {
+    delete mongoose.models.Client;
+}
+
+export default mongoose.model('Client', ClientSchema);

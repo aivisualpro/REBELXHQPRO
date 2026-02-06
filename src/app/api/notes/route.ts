@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import Client from '@/models/Client';
+import mongoose from 'mongoose';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,10 +15,21 @@ export async function GET(request: Request) {
         const limit = parseInt(searchParams.get('limit') || '20');
         const search = searchParams.get('search') || '';
 
+        const clientId = searchParams.get('clientId');
         const skip = (page - 1) * limit;
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const pipeline: any[] = [
+        const pipeline: any[] = [];
+
+        // If clientId is provided, filter the clients first
+        if (clientId) {
+            pipeline.push({
+                $match: mongoose.isValidObjectId(clientId)
+                    ? { $or: [{ _id: new mongoose.Types.ObjectId(clientId) }, { legacyId: clientId }] }
+                    : { legacyId: clientId }
+            });
+        }
+
+        pipeline.push(
             { $unwind: '$notes' },
             {
                 $lookup: {
@@ -35,7 +47,7 @@ export async function GET(request: Request) {
                     _id: 0,
                     clientId: '$_id',
                     clientName: '$name',
-                    noteId: '$notes._id', // Added noteId
+                    noteId: '$notes._id',
                     note: '$notes.note',
                     createdBy: {
                         $cond: {
@@ -47,7 +59,7 @@ export async function GET(request: Request) {
                     createdAt: '$notes.createdAt'
                 }
             }
-        ];
+        );
 
         if (search) {
             pipeline.push({

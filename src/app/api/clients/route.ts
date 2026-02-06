@@ -248,8 +248,16 @@ export async function POST(request: Request) {
         const body = await request.json();
 
         // 1. Generate a manual string ID if not present (since schema uses String for _id)
-        if (!body._id) {
-            body._id = 'CL-' + Math.random().toString(36).substring(2, 9).toUpperCase();
+        // 1. Map clientid to legacyId if present
+        if (!body.legacyId && (body.clientId || body.clientid || body._id)) {
+            body.legacyId = body.clientId || body.clientid || body._id;
+            delete body.clientId;
+            delete body.clientid;
+            delete body._id;
+        }
+        
+        if (!body.legacyId) {
+            body.legacyId = 'CL-' + Math.random().toString(36).substring(2, 9).toUpperCase();
         }
 
         // 2. Format notes if it's a string (from UI)
