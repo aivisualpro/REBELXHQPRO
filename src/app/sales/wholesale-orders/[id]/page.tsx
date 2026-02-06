@@ -124,6 +124,9 @@ export default function SaleOrderDetailPage() {
   const [isHeaderModalOpen, setIsHeaderModalOpen] = useState(false);
   const [editingHeader, setEditingHeader] = useState<any>(null);
 
+  // Delete Order State
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const fetchOrder = async () => {
       try {
           const res = await fetch(`/api/wholesale/orders/${params.id}`);
@@ -523,6 +526,33 @@ export default function SaleOrderDetailPage() {
                     >
                         <Pencil className="w-3.5 h-3.5" />
                         <span>Edit</span>
+                    </button>
+                    <button 
+                        onClick={async () => {
+                            if (!window.confirm('Are you sure you want to delete this order? This action cannot be undone.')) return;
+                            setIsDeleting(true);
+                            try {
+                                const res = await fetch(`/api/wholesale/orders/${order._id}`, {
+                                    method: 'DELETE'
+                                });
+                                if (res.ok) {
+                                    toast.success('Order deleted');
+                                    router.push('/sales/wholesale-orders');
+                                } else {
+                                    const data = await res.json();
+                                    toast.error(data.error || 'Failed to delete order');
+                                }
+                            } catch (e) {
+                                toast.error('Error deleting order');
+                            } finally {
+                                setIsDeleting(false);
+                            }
+                        }}
+                        disabled={isDeleting}
+                        className="flex items-center space-x-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded transition-all cursor-pointer border border-red-300 text-red-600 hover:text-white hover:bg-red-600 disabled:opacity-50"
+                    >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
                     </button>
                     <button 
                         onClick={() => router.back()} 
