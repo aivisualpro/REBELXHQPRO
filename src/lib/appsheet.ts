@@ -180,28 +180,57 @@ export async function syncOrderToAppSheet(order: any) {
         Rows: detailRows
     };
 
-    try {
-        // Sync Order
-        const orderRes = await fetch(`https://api.appsheet.com/api/v2/apps/${appId}/tables/Orders/Action`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'ApplicationAccessKey': accessKey },
-            body: JSON.stringify(orderPayload),
-        });
-        const orderResult = await orderRes.json();
-        console.log('AppSheet Order Sync Result:', orderResult);
+    // Helper function to fetch with timeout
+    const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs = 10000) => {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            const response = await fetch(url, { ...options, signal: controller.signal });
+            return response;
+        } finally {
+            clearTimeout(timeout);
+        }
+    };
 
-        // Sync Details
+    try {
+        // Run both API calls in PARALLEL for faster sync
+        const promises: Promise<any>[] = [];
+        
+        // Order sync promise
+        promises.push(
+            fetchWithTimeout(
+                `https://api.appsheet.com/api/v2/apps/${appId}/tables/Orders/Action`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'ApplicationAccessKey': accessKey },
+                    body: JSON.stringify(orderPayload),
+                }
+            ).then(res => res.json()).then(result => {
+                console.log('AppSheet Order Sync Result:', result);
+                return result;
+            })
+        );
+
+        // Order Details sync promise (only if there are line items)
         if (detailRows.length > 0) {
-            const detailRes = await fetch(`https://api.appsheet.com/api/v2/apps/${appId}/tables/Order Details/Action`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'ApplicationAccessKey': accessKey },
-                body: JSON.stringify(detailPayload),
-            });
-            const detailResult = await detailRes.json();
-            console.log('AppSheet Order Details Sync Result:', detailResult);
+            promises.push(
+                fetchWithTimeout(
+                    `https://api.appsheet.com/api/v2/apps/${appId}/tables/Order Details/Action`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'ApplicationAccessKey': accessKey },
+                        body: JSON.stringify(detailPayload),
+                    }
+                ).then(res => res.json()).then(result => {
+                    console.log('AppSheet Order Details Sync Result:', result);
+                    return result;
+                })
+            );
         }
 
-        return { orderResult, detailResult: detailRows.length > 0 ? true : false };
+        // Wait for all in parallel
+        const results = await Promise.all(promises);
+        return { orderResult: results[0], detailResult: results[1] || null };
     } catch (error) {
         console.error('AppSheet Order Sync Error:', error);
     }
