@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   Plus, Search, MoreHorizontal, Mail, Phone, MapPin, 
@@ -150,7 +150,7 @@ const StatusBadge = ({ status }: { status: string }) => {
     );
 };
 
-export default function LeadsPage() {
+function LeadsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const search = searchParams.get('search') || '';
@@ -1074,3 +1074,16 @@ const statusColors = {
     'Lost': 'bg-red-50 text-red-600',
     'Whitelabel': 'bg-purple-50 text-purple-600',
 };
+
+// Default export with Suspense wrapper to fix build error with useSearchParams
+export default function LeadsPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex items-center justify-center h-screen bg-background">
+                <div className="animate-pulse text-muted-foreground">Loading leads...</div>
+            </div>
+        }>
+            <LeadsPageContent />
+        </Suspense>
+    );
+}
