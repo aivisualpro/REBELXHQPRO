@@ -181,7 +181,7 @@ export async function syncOrderToAppSheet(order: any) {
     };
 
     // Helper function to fetch with timeout
-    const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs = 10000) => {
+    const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs = 30000) => {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), timeoutMs);
         try {

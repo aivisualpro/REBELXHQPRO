@@ -14,23 +14,46 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Invalid input' }, { status: 400 });
         }
 
+        // Debug: log column headers from the first row
+        if (skus.length > 0) {
+            console.log('SKU Import - Total rows received:', skus.length);
+            console.log('SKU Import - Column headers:', Object.keys(skus[0]));
+            console.log('SKU Import - First row sample:', JSON.stringify(skus[0]).substring(0, 500));
+        }
+
         const validSkus = skus
-            .filter((item: any) => item.name) // Valid rows need name at least
+            .filter((item: any) => item.name || item.Name || item['SKU Name'] || item['Product Name']) // Accept multiple column name variations
             .map((item: any) => {
+                // Normalize column names - accept common variations
+                const name = item.name || item.Name || item['SKU Name'] || item['Product Name'] || '';
+                
                 const doc: any = {
                     ...item,
-                    legacyId: item.legacyId || undefined,
+                    name, // Ensure normalized name is set
+                    legacyId: item.legacyId || item.LegacyId || item['Legacy ID'] || item['legacy_id'] || undefined,
+                    category: item.category || item.Category || undefined,
                     // Ensure booleans are correctly parsed if coming from CSV string
                     kitApplied: item.kitApplied === 'true' || item.kitApplied === true || item.kitApplied === 'TRUE' || item.kitApplied === '1',
                     isLotApplied: item.isLotApplied === 'true' || item.isLotApplied === true || item.isLotApplied === 'TRUE' || item.isLotApplied === '1',
-                    salePrice: Number(item.salePrice) || 0,
-                    orderUpto: Number(item.orderUpto) || 0,
-                    reOrderPoint: Number(item.reOrderPoint) || 0
+                    salePrice: Number(item.salePrice || item.SalePrice || item['Sale Price'] || 0) || 0,
+                    orderUpto: Number(item.orderUpto || item.OrderUpto || 0) || 0,
+                    reOrderPoint: Number(item.reOrderPoint || item.ReOrderPoint || 0) || 0
                 };
                 
-                // Remove _id from the update doc if present - we'll use it only for filtering
+                // Clean up duplicate/variant keys
                 delete doc._id;
-                delete doc.sku; // Also remove sku if present (it was previously used as _id)
+                delete doc.sku;
+                delete doc.Name;
+                delete doc['SKU Name'];
+                delete doc['Product Name'];
+                delete doc.LegacyId;
+                delete doc['Legacy ID'];
+                delete doc['legacy_id'];
+                delete doc.Category;
+                delete doc.SalePrice;
+                delete doc['Sale Price'];
+                delete doc.OrderUpto;
+                delete doc.ReOrderPoint;
                 
                 return {
                     original: item,
@@ -38,8 +61,14 @@ export async function POST(request: Request) {
                 };
             });
 
+        console.log('SKU Import - Valid rows after filtering:', validSkus.length);
+
         if (validSkus.length === 0) {
-            return NextResponse.json({ message: 'No valid SKUs to import', count: 0 });
+            return NextResponse.json({ 
+                message: 'No valid SKUs to import. Check CSV has a "name" column.', 
+                count: 0,
+                headers: skus.length > 0 ? Object.keys(skus[0]) : []
+            });
         }
 
         // Build operations - prioritize legacyId for matching
@@ -70,9 +99,21 @@ export async function POST(request: Request) {
 
         const result = await Sku.bulkWrite(operations);
 
+        console.log('SKU Import - bulkWrite result:', {
+            matchedCount: result.matchedCount,
+            modifiedCount: result.modifiedCount,
+            upsertedCount: result.upsertedCount,
+            operations: operations.length
+        });
+
         return NextResponse.json({ 
             message: 'Import completed', 
-            count: result.upsertedCount + result.modifiedCount 
+            count: result.upsertedCount + result.matchedCount,
+            details: {
+                new: result.upsertedCount,
+                updated: result.matchedCount,
+                changed: result.modifiedCount
+            }
         });
     } catch (error: any) {
         console.error('SKU Import Error:', error);

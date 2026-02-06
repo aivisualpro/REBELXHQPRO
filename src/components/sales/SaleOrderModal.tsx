@@ -442,7 +442,7 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-card w-full max-w-6xl rounded-none shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 border border-border flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted/50 shrink-0">
+            <div className="flex items-center justify-between px-6 py-2 border-b border-border bg-muted/50 shrink-0">
               <h2 className="text-sm font-bold uppercase text-foreground">{orderToEdit ? 'Edit Sale Order' : 'Create Sale Order'}</h2>
               <button
                 onClick={onClose}
@@ -452,7 +452,7 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
               </button>
             </div>
 
-            <div className="flex-1 overflow-auto p-6 scrollbar-custom bg-background">
+            <div className="flex-1 overflow-auto p-4 scrollbar-custom bg-background">
               <form id="create-so-form" onSubmit={handleSubmit}>
                 {/* Header Info */}
                 <div className="space-y-6">
@@ -467,7 +467,7 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
                                 required
                                 readOnly
                                 value={newOrder.label}
-                                className="w-full h-[34px] px-3 border border-input rounded-md text-sm bg-secondary text-foreground focus:outline-none cursor-not-allowed"
+                                className="w-full h-[34px] px-3 border border-input rounded-md text-sm bg-muted text-foreground focus:outline-none cursor-not-allowed"
                                 />
                             </div>
                             <div className="space-y-1.5">
@@ -477,7 +477,7 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
                                         type="text"
                                         readOnly
                                         value={allClients.find(c => c._id === newOrder.clientId)?.name || 'Loading...'}
-                                        className="w-full h-[34px] px-3 border border-input rounded-md text-sm bg-secondary text-foreground focus:outline-none cursor-not-allowed"
+                                        className="w-full h-[34px] px-3 border border-input rounded-md text-sm bg-muted text-foreground focus:outline-none cursor-not-allowed"
                                     />
                                 ) : (
                                     <SearchableSelect
@@ -497,7 +497,7 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
                                         type="text"
                                         readOnly
                                         value={allUsers.find(u => u._id === newOrder.salesRep) ? `${allUsers.find(u => u._id === newOrder.salesRep)?.firstName} ${allUsers.find(u => u._id === newOrder.salesRep)?.lastName}` : 'Loading...'}
-                                        className="w-full h-[34px] px-3 border border-input rounded-md text-sm bg-secondary text-foreground focus:outline-none cursor-not-allowed"
+                                        className="w-full h-[34px] px-3 border border-input rounded-md text-sm bg-muted text-foreground focus:outline-none cursor-not-allowed"
                                     />
                                 ) : (
                                     <SearchableSelect
@@ -517,6 +517,7 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
                                     onChange={(val) => setNewOrder({ ...newOrder, paymentMethod: val })}
                                     placeholder="Select Method..."
                                     className="w-full"
+                                    triggerClassName="py-[6px] bg-card"
                                 />
                             </div>
                             
@@ -537,7 +538,7 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
                     </div>
                 </div>
 
-                <div className="border-t border-border pt-6 mt-6">
+                <div className="border-t border-border pt-2 mt-2">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">Line Items <span className="text-destructive">*</span></h3>
                     <div className="flex items-center space-x-2">
@@ -569,7 +570,7 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
                   ) : (
                     <div className="border border-border rounded-none overflow-x-auto">
                       <table className="w-full text-left border-collapse border-b border-border min-w-[900px]">
-                        <thead className="bg-secondary/80 text-foreground">
+                        <thead className="bg-muted/50 text-foreground">
                            <tr>
                               <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[20%] border-r border-border">Item / SKU</th>
                               <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[20%] border-r border-border">Product Description</th>
@@ -595,6 +596,7 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
                                             onChange={(val) => updateLineItem(item.id, 'sku', val)}
                                             placeholder="Select SKU"
                                             className="w-full rounded-none border-none text-sm focus:ring-0"
+                                            triggerClassName="bg-transparent border-none rounded-none shadow-none ring-0 focus-within:ring-0 hover:border-none"
                                         />
                                     </div>
                                 </td>
@@ -604,7 +606,7 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
                                         value={item.productDescription}
                                         onChange={(e) => updateLineItem(item.id, 'productDescription', e.target.value)}
                                         placeholder="Product description..."
-                                        className="w-full h-[32px] px-2 text-xs focus:outline-none focus:bg-primary/5 transition-colors rounded-none bg-background text-foreground"
+                                        className="w-full h-[32px] px-2 text-xs focus:outline-none focus:bg-primary/5 transition-colors rounded-none bg-transparent text-foreground"
                                     />
                                 </td>
                                 <td className="p-0 border-r border-border">
@@ -633,6 +635,7 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
                                         placeholder="UOM"
                                         creatable
                                         className="w-full rounded-none border-none focus:ring-0"
+                                            triggerClassName="bg-transparent border-none rounded-none shadow-none ring-0 focus-within:ring-0 hover:border-none"
                                     />
                                 </td>
                                 <td className="p-0 border-r border-border">
@@ -677,13 +680,13 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
                             </tr>
                           ))}
                         </tbody>
-                        <tfoot className="bg-muted/50">
+                        <tfoot>
                             <tr>
-                                <td colSpan={5} className="px-2 py-2 text-[10px] font-bold text-muted-foreground uppercase text-right tracking-wider border-r border-border">Subtotal</td>
-                                <td className="px-2 py-2 text-xs font-black text-foreground font-mono text-right border-r border-border">
+                                <td colSpan={6} className="px-2 py-2 text-[10px] font-bold text-muted-foreground uppercase text-right tracking-wider bg-muted/50">Subtotal</td>
+                                <td className="px-2 py-2 text-xs font-black text-foreground font-mono text-right bg-muted/50">
                                     {newLineItems.reduce((sum, item) => sum + ((item.qtyShipped || 0) * (item.price || 0)), 0).toLocaleString(undefined, {style: 'currency', currency: 'USD'})}
                                 </td>
-                                <td></td>
+                                <td className="bg-card"></td>
                             </tr>
                         </tfoot>
                       </table>
@@ -693,7 +696,7 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
               </form>
             </div>
 
-            <div className="p-4 border-t border-border bg-muted/20 flex justify-end shrink-0">
+            <div className="px-4 py-2 border-t border-border bg-muted/20 flex justify-end shrink-0">
               <button
                 type="submit"
                 form="create-so-form"

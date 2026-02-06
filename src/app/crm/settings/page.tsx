@@ -9,7 +9,8 @@ import {
     DollarSign,
     Mail,
     ToggleLeft,
-    ToggleRight
+    ToggleRight,
+    Contact
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Papa from 'papaparse';
@@ -20,6 +21,7 @@ export default function CRMSettingsPage() {
     const [importing, setImporting] = useState(false);
     const importClientsRef = React.useRef<HTMLInputElement>(null);
     const importNotesRef = React.useRef<HTMLInputElement>(null);
+    const importContactsRef = React.useRef<HTMLInputElement>(null);
 
     const [settings, setSettings] = useState({
         companyName: 'RebelX Headquarters',
@@ -165,6 +167,49 @@ export default function CRMSettingsPage() {
         });
     };
 
+    const handleImportContacts = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        e.target.value = '';
+        
+        setImporting(true);
+        const toastId = toast.loading('Parsing contacts file...');
+        
+        Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: async (results) => {
+                const totalRows = results.data.length;
+                if (totalRows === 0) {
+                    toast.error('No data found in file', { id: toastId });
+                    setImporting(false);
+                    return;
+                }
+                
+                try {
+                    toast.loading(`Importing ${totalRows} contacts...`, { id: toastId });
+                    const res = await fetch('/api/clients/import-contacts', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ contacts: results.data })
+                    });
+                    
+                    if (res.ok) {
+                        const data = await res.json();
+                        toast.success(`Imported ${data.count} contacts (${data.skippedDuplicates} duplicates skipped)`, { id: toastId });
+                    } else {
+                        const err = await res.json();
+                        toast.error(err.error || 'Import failed', { id: toastId });
+                    }
+                } catch (err) {
+                    console.error(err);
+                    toast.error('Import failed', { id: toastId });
+                }
+                setImporting(false);
+            }
+        });
+    };
+
     if (loading) {
         return <div className="p-8">Loading settings...</div>;
     }
@@ -203,13 +248,20 @@ export default function CRMSettingsPage() {
                         className="hidden"
                         onChange={handleImportNotes}
                     />
+                    <input
+                        ref={importContactsRef}
+                        type="file"
+                        accept=".csv"
+                        className="hidden"
+                        onChange={handleImportContacts}
+                    />
 
                     {/* Row 1: Import Clients */}
                     {/* Row 1: Import Clients */}
                     <div className="p-6 bg-card border border-border flex items-center justify-between rounded-lg">
                         <div className="flex items-center space-x-4">
-                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                                <Users className="w-5 h-5 text-primary" />
+                            <div className="w-10 h-10 rounded-full bg-yellow-400 flex items-center justify-center shrink-0">
+                                <Users className="w-5 h-5 text-black" />
                             </div>
                             <div>
                                 <h4 className="text-sm font-medium text-foreground">Import Clients (CSV)</h4>
@@ -232,8 +284,8 @@ export default function CRMSettingsPage() {
                     {/* Row 2: Import Client Notes */}
                     <div className="p-6 bg-card border border-border flex items-center justify-between rounded-lg">
                          <div className="flex items-center space-x-4">
-                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                                <FileText className="w-5 h-5 text-primary" />
+                            <div className="w-10 h-10 rounded-full bg-yellow-400 flex items-center justify-center shrink-0">
+                                <FileText className="w-5 h-5 text-black" />
                             </div>
                             <div>
                                 <h4 className="text-sm font-medium text-foreground">Import Client Notes (CSV)</h4>
@@ -252,11 +304,34 @@ export default function CRMSettingsPage() {
                         </button>
                     </div>
 
+                    {/* Row 3: Import Client Contacts */}
+                    <div className="p-6 bg-card border border-border flex items-center justify-between rounded-lg">
+                         <div className="flex items-center space-x-4">
+                            <div className="w-10 h-10 rounded-full bg-yellow-400 flex items-center justify-center shrink-0">
+                                <Contact className="w-5 h-5 text-black" />
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-medium text-foreground">Import Client Contacts (CSV)</h4>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                    Columns: clientid, firstName, lastName, email, phone, phoneType, extension, role, status, address, city, state, zipCode, country, website, communicationPreference, followUpFrequency
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => importContactsRef.current?.click()}
+                            disabled={importing}
+                            className="flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground text-xs font-medium rounded hover:bg-primary/90 transition-colors disabled:opacity-50"
+                        >
+                            <Upload className="w-3.5 h-3.5" />
+                            <span>{importing ? 'Importing...' : 'Upload'}</span>
+                        </button>
+                    </div>
+
                     {/* Row 3: Threshold */}
                     <div className="p-6 bg-card border border-border flex items-center justify-between rounded-lg">
                         <div className="flex items-center space-x-4">
-                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                                <DollarSign className="w-5 h-5 text-primary" />
+                            <div className="w-10 h-10 rounded-full bg-yellow-400 flex items-center justify-center shrink-0">
+                                <DollarSign className="w-5 h-5 text-black" />
                             </div>
                             <div>
                                 <h4 className="text-sm font-medium text-foreground">Lead to Client Threshold</h4>
@@ -280,8 +355,8 @@ export default function CRMSettingsPage() {
                     {/* Row 4: Filter Emails by Clients/Leads */}
                     <div className="p-6 bg-card border border-border flex items-center justify-between rounded-lg">
                         <div className="flex items-center space-x-4">
-                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                                <Mail className="w-5 h-5 text-primary" />
+                            <div className="w-10 h-10 rounded-full bg-yellow-400 flex items-center justify-center shrink-0">
+                                <Mail className="w-5 h-5 text-black" />
                             </div>
                             <div>
                                 <h4 className="text-sm font-medium text-foreground">Filter Emails by Clients/Leads</h4>
@@ -292,13 +367,12 @@ export default function CRMSettingsPage() {
                         </div>
                         <button
                             onClick={() => setSettings({...settings, crmFilterEmailsByClients: !settings.crmFilterEmailsByClients})}
-                            className="p-1 hover:bg-secondary rounded transition-colors"
+                            className="relative w-12 h-6 rounded-sm transition-colors duration-200"
+                            style={{ backgroundColor: settings.crmFilterEmailsByClients ? '#facc15' : '#d1d5db' }}
                         >
-                            {settings.crmFilterEmailsByClients ? (
-                                <ToggleRight className="w-10 h-10 text-primary" />
-                            ) : (
-                                <ToggleLeft className="w-10 h-10 text-muted-foreground" />
-                            )}
+                            <span 
+                                className={`absolute top-0.5 w-5 h-5 rounded-sm transition-all duration-200 ${settings.crmFilterEmailsByClients ? 'left-[26px] bg-black' : 'left-0.5 bg-white'}`}
+                            />
                         </button>
                     </div>
 

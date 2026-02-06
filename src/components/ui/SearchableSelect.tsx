@@ -153,16 +153,16 @@ export function SearchableSelect({
                 width: dropdownPos.width,
                 zIndex: 99999
             }}
-            className="rounded-md shadow-2xl border-2 border-border animate-in fade-in zoom-in-95 duration-100 bg-card dark:bg-zinc-900 flex flex-col"
+            className="rounded-md shadow-2xl border border-border animate-in fade-in zoom-in-95 duration-100 bg-card dark:bg-zinc-900 flex flex-col"
             onWheel={(e) => e.stopPropagation()}
         >
-            <div className="p-2 border-b border-border bg-muted sticky top-0 shrink-0 z-10">
+            <div className="border-b border-border bg-muted sticky top-0 shrink-0 z-10">
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <input
                         ref={inputRef}
                         type="text"
-                        className="w-full pl-9 pr-3 py-2.5 text-sm bg-background border border-input rounded-md focus:outline-none focus:border-primary text-foreground placeholder:text-muted-foreground transition-all"
+                        className="w-full pl-9 pr-3 py-2 text-sm bg-background border-none rounded-md focus:outline-none text-foreground placeholder:text-muted-foreground transition-all"
                         placeholder={placeholder === "Select..." ? "Search..." : `Search ${placeholder}...`}
                         value={search}
                         onChange={e => setSearch(e.target.value)}

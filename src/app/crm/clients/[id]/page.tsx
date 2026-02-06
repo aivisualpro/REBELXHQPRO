@@ -38,7 +38,10 @@ import {
     Forward,
     Eye,
     EyeOff,
-    StickyNote
+    StickyNote,
+    Pencil,
+    Maximize2,
+    ChevronDown
 } from 'lucide-react';
 import Link from 'next/link';
 import { GmailEmailView } from '@/components/crm/GmailEmailView';
@@ -77,6 +80,25 @@ interface Client {
         securityCode?: string;
         zipCode?: string;
     };
+    contacts?: {
+        _id?: string;
+        firstName?: string;
+        lastName?: string;
+        email?: string;
+        phone?: string;
+        phoneType?: string;
+        extension?: string;
+        role?: string;
+        status?: string;
+        address?: string;
+        city?: string;
+        state?: string;
+        zipCode?: string;
+        country?: string;
+        website?: string;
+        communicationPreference?: string;
+        followUpFrequency?: string;
+    }[];
     createdAt?: string;
 }
 
@@ -123,6 +145,90 @@ interface Summary {
 
 const PAGE_SIZE = 20;
 
+const PHONE_TYPE_OPTIONS = ['Mobile', 'Work', 'Home', 'Office', 'Fax', 'Main', 'Direct', 'Other'];
+const ROLE_OPTIONS = ['Owner', 'Manager', 'Director', 'Purchaser', 'Buyer', 'Accounting', 'Sales', 'Operations', 'Marketing', 'IT', 'HR', 'Executive', 'Assistant', 'Receptionist', 'Contact', 'Other'];
+const COMM_PREF_OPTIONS = ['Email', 'Phone', 'Text', 'In-Person', 'Mail', 'Any'];
+const FOLLOW_UP_OPTIONS = ['Daily', 'Weekly', 'Bi-Weekly', 'Monthly', 'Quarterly', 'Semi-Annual', 'Annual', 'As Needed', 'None'];
+
+function formatPhoneInput(value: string): string {
+    const digits = value.replace(/\D/g, '').slice(0, 10);
+    if (digits.length === 0) return '';
+    if (digits.length <= 3) return `(${digits}`;
+    if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
+function SearchableDropdown({ label, value, onChange, options, placeholder }: {
+    label: string; value: string; onChange: (v: string) => void; options: string[]; placeholder?: string;
+}) {
+    const [open, setOpen] = useState(false);
+    const [search, setSearch] = useState('');
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    const filtered = options.filter(o => o.toLowerCase().includes(search.toLowerCase()));
+
+    return (
+        <div ref={ref} className="relative">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{label}</label>
+            <button
+                type="button"
+                onClick={() => { setOpen(!open); setSearch(''); }}
+                className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring flex items-center justify-between text-left"
+            >
+                <span className={value ? '' : 'text-muted-foreground'}>{value || placeholder || 'Select...'}</span>
+                <ChevronDown className="w-3 h-3 text-muted-foreground shrink-0" />
+            </button>
+            {open && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded shadow-lg z-50 max-h-48 flex flex-col">
+                    <div className="p-1.5 border-b border-border">
+                        <input
+                            autoFocus
+                            className="w-full px-2 py-1 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                            placeholder="Search..."
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                        />
+                    </div>
+                    <div className="overflow-y-auto flex-1">
+                        {filtered.length > 0 ? filtered.map(opt => (
+                            <button
+                                key={opt}
+                                type="button"
+                                onClick={() => { onChange(opt); setOpen(false); }}
+                                className={cn(
+                                    "w-full text-left px-3 py-1.5 text-xs hover:bg-muted transition-colors",
+                                    value === opt ? 'bg-primary/10 text-primary font-bold' : 'text-foreground'
+                                )}
+                            >
+                                {opt}
+                            </button>
+                        )) : (
+                            <div className="px-3 py-2 text-xs text-muted-foreground italic">No matches</div>
+                        )}
+                        {search && !options.includes(search) && (
+                            <button
+                                type="button"
+                                onClick={() => { onChange(search); setOpen(false); }}
+                                className="w-full text-left px-3 py-1.5 text-xs text-blue-600 hover:bg-blue-50 border-t border-border font-medium"
+                            >
+                                Use &quot;{search}&quot;
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
 export default function ClientDashboardPage() {
     const params = useParams();
     const router = useRouter();
@@ -160,6 +266,104 @@ export default function ClientDashboardPage() {
     const [billingPassword, setBillingPassword] = useState('');
     const [billingPasswordError, setBillingPasswordError] = useState('');
     const billingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Contact CRUD state
+    const [contactModalOpen, setContactModalOpen] = useState(false);
+    const [editingContactIdx, setEditingContactIdx] = useState<number | null>(null);
+    const [contactForm, setContactForm] = useState({
+        firstName: '', lastName: '', email: '', phone: '', phoneType: '', extension: '',
+        role: '', status: 'Active', address: '', city: '', state: '', zipCode: '', country: '',
+        website: '', communicationPreference: '', followUpFrequency: ''
+    });
+    const [savingContact, setSavingContact] = useState(false);
+    const [contactsExpanded, setContactsExpanded] = useState(false);
+    const [deleteContactIdx, setDeleteContactIdx] = useState<number | null>(null);
+
+    const openAddContact = () => {
+        setEditingContactIdx(null);
+        setContactForm({ firstName: '', lastName: '', email: '', phone: '', phoneType: '', extension: '', role: '', status: 'Active', address: '', city: '', state: '', zipCode: '', country: '', website: '', communicationPreference: '', followUpFrequency: '' });
+        setContactModalOpen(true);
+    };
+
+    const openEditContact = (idx: number) => {
+        const c = client?.contacts?.[idx];
+        if (!c) return;
+        setEditingContactIdx(idx);
+        setContactForm({
+            firstName: c.firstName || '', lastName: c.lastName || '', email: c.email || '',
+            phone: c.phone || '', phoneType: c.phoneType || '', extension: c.extension || '',
+            role: c.role || '', status: c.status || 'Active', address: c.address || '',
+            city: c.city || '', state: c.state || '', zipCode: c.zipCode || '',
+            country: c.country || '', website: c.website || '',
+            communicationPreference: c.communicationPreference || '', followUpFrequency: c.followUpFrequency || ''
+        });
+        setContactModalOpen(true);
+    };
+
+    const handleSaveContact = async () => {
+        if (!client) return;
+        setSavingContact(true);
+        const prevClient = { ...client };
+        try {
+            const contacts = [...(client.contacts || [])];
+            if (editingContactIdx !== null) {
+                contacts[editingContactIdx] = { ...contacts[editingContactIdx], ...contactForm };
+            } else {
+                contacts.push(contactForm as any);
+            }
+            // Optimistic update
+            setClient({ ...client, contacts });
+            setContactModalOpen(false);
+            toast.success(editingContactIdx !== null ? 'Contact updated' : 'Contact added');
+
+            // Background save
+            const res = await fetch(`/api/clients/${client._id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contacts })
+            });
+            if (!res.ok) {
+                setClient(prevClient);
+                toast.error('Failed to save contact — reverted');
+            }
+        } catch {
+            setClient(prevClient);
+            toast.error('Error saving contact — reverted');
+        } finally {
+            setSavingContact(false);
+        }
+    };
+
+    const handleDeleteContact = async (idx: number) => {
+        setDeleteContactIdx(idx);
+    };
+
+    const confirmDeleteContact = async () => {
+        if (!client || deleteContactIdx === null) return;
+        const prevClient = { ...client };
+        const contacts = [...(client.contacts || [])].filter((_, i) => i !== deleteContactIdx);
+
+        // Optimistic update
+        setClient({ ...client, contacts });
+        setDeleteContactIdx(null);
+        toast.success('Contact deleted');
+
+        // Background save
+        try {
+            const res = await fetch(`/api/clients/${client._id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contacts })
+            });
+            if (!res.ok) {
+                setClient(prevClient);
+                toast.error('Failed to delete — reverted');
+            }
+        } catch {
+            setClient(prevClient);
+            toast.error('Error deleting — reverted');
+        }
+    };
 
 
     const filteredEmails = useMemo(() => {
@@ -615,130 +819,218 @@ export default function ClientDashboardPage() {
             <div className="flex-1 flex overflow-hidden min-h-0 bg-background">
                 {/* Left Column (30%) - Client Details */}
                 <aside className="w-[30%] h-full overflow-y-auto border-r border-border bg-card shrink-0 scrollbar-custom">
-                    <div className="p-6 space-y-8">
+                    <div className="p-4 space-y-6">
                         
-                        {/* Profile Header */}
-                        <div className="flex flex-col items-center text-center space-y-3">
-                            <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-3xl shadow-lg">
-                                {client.name?.charAt(0) || '?'}
+                        {/* Client Info Section */}
+                        <div className="space-y-0">
+                            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2 pb-1 border-b border-border">Client Info</div>
+                            
+                            {/* Row 1: Name */}
+                            <div className="flex items-center py-2 border-b border-border/50">
+                                <span className="text-[11px] text-muted-foreground w-28 shrink-0">Name</span>
+                                <span className="text-[11px] font-bold text-foreground">{client.name}</span>
                             </div>
-                            <div className="space-y-1">
-                                <h1 className="text-lg font-black text-slate-900 leading-tight">{client.name}</h1>
-                            </div>
-                        </div>
 
-                        {/* Primary Address */}
-                        <div className="space-y-2">
-                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center space-x-2">
-                                <MapPin className="w-3 h-3" />
-                                <span>Address</span>
+                            {/* Row 2: Address */}
+                            <div className="flex items-start py-2 border-b border-border/50">
+                                <span className="text-[11px] text-muted-foreground w-28 shrink-0 pt-0.5">Address</span>
+                                <span className="text-[11px] text-foreground leading-relaxed">
+                                    {client.addresses?.[0]?.street || <span className="text-muted-foreground italic">No address</span>}
+                                </span>
                             </div>
-                            <div className="p-3 bg-slate-50 border border-slate-100 rounded-sm">
-                                {client.addresses && client.addresses.length > 0 ? (
-                                    <div className="text-xs text-slate-700 leading-relaxed">
-                                        <div className="font-bold text-slate-900 mb-1">{client.addresses[0].label || 'Primary'}</div>
-                                        <div>{client.addresses[0].street}</div>
-                                        <div>{[client.addresses[0].city, client.addresses[0].state, client.addresses[0].postalCode].filter(Boolean).join(', ')}</div>
-                                        {client.addresses[0].country && <div>{client.addresses[0].country}</div>}
-                                    </div>
-                                ) : (
-                                    <span className="text-xs text-slate-400 italic">No address provided</span>
-                                )}
-                            </div>
-                        </div>
 
-                        {/* Sales Rep */}
-                        <div className="space-y-2">
-                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center space-x-2">
-                                <User className="w-3 h-3" />
-                                <span>Sales Representative</span>
+                            {/* Row 2b: City */}
+                            <div className="flex items-center py-2 border-b border-border/50">
+                                <span className="text-[11px] text-muted-foreground w-28 shrink-0">City</span>
+                                <span className="text-[11px] text-foreground">{client.addresses?.[0]?.city || '-'}</span>
                             </div>
-                            <div className="flex items-center space-x-3 p-3 bg-blue-50/50 border border-blue-100/50 rounded-sm">
-                                <div className="w-10 h-10 bg-blue-600 flex items-center justify-center text-white font-bold text-sm rounded-sm overflow-hidden shrink-0">
-                                    {client.salesRepInfo?.image ? (
-                                        <img src={client.salesRepInfo.image} alt="" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <span>{client.salesRepInfo?.firstName?.charAt(0) || '?'}</span>
+
+                            {/* Row 2c: State */}
+                            <div className="flex items-center py-2 border-b border-border/50">
+                                <span className="text-[11px] text-muted-foreground w-28 shrink-0">State</span>
+                                <span className="text-[11px] text-foreground">{client.addresses?.[0]?.state || '-'}</span>
+                            </div>
+
+                            {/* Row 2d: Postal Code */}
+                            <div className="flex items-center py-2 border-b border-border/50">
+                                <span className="text-[11px] text-muted-foreground w-28 shrink-0">Postal Code</span>
+                                <span className="text-[11px] text-foreground">{client.addresses?.[0]?.postalCode || '-'}</span>
+                            </div>
+
+                            {/* Row 3: Sales Representative */}
+                            <div className="flex items-center py-2 border-b border-border/50">
+                                <span className="text-[11px] text-muted-foreground w-28 shrink-0">Sales Rep</span>
+                                <span className="text-[11px] font-bold text-foreground">
+                                    {client.salesRepInfo ? `${client.salesRepInfo.firstName} ${client.salesRepInfo.lastName}` : 'Unassigned'}
+                                </span>
+                            </div>
+
+                            {/* Row 4: Primary Phone */}
+                            <div className="flex items-center py-2 border-b border-border/50">
+                                <span className="text-[11px] text-muted-foreground w-28 shrink-0">Phone</span>
+                                <div className="flex items-center space-x-2">
+                                    <span className="text-[11px] font-bold text-foreground">
+                                        {client.phones?.[0]?.value || <span className="text-muted-foreground italic font-normal">None</span>}
+                                    </span>
+                                    {client.phones?.[0]?.value && (
+                                        <div className="flex items-center space-x-1">
+                                            <button 
+                                                onClick={() => initiateGoogleVoice(client._id, client.phones![0].value, 'calls')} 
+                                                className="p-1 rounded hover:bg-blue-100 text-blue-600 transition-colors" 
+                                                title="Call via Google Voice"
+                                            >
+                                                <Phone className="w-3 h-3" />
+                                            </button>
+                                            <button 
+                                                onClick={() => initiateGoogleVoice(client._id, client.phones![0].value, 'messages')} 
+                                                className="p-1 rounded hover:bg-emerald-100 text-emerald-600 transition-colors" 
+                                                title="SMS via Google Voice"
+                                            >
+                                                <MessageSquare className="w-3 h-3" />
+                                            </button>
+                                        </div>
                                     )}
                                 </div>
-                                <div>
-                                    <div className="text-xs font-bold text-slate-900">
-                                        {client.salesRepInfo ? `${client.salesRepInfo.firstName} ${client.salesRepInfo.lastName}` : 'Unassigned'}
+                            </div>
+
+                            {/* Row 5: Primary Email */}
+                            <div className="flex items-center py-2">
+                                <span className="text-[11px] text-muted-foreground w-28 shrink-0">Email</span>
+                                <div className="flex items-center space-x-2">
+                                    <span className="text-[11px] font-bold text-foreground truncate">
+                                        {client.emails?.[0]?.value || <span className="text-muted-foreground italic font-normal">None</span>}
+                                    </span>
+                                    {client.emails?.[0]?.value && (
+                                        <button 
+                                            onClick={() => {
+                                                setComposeData(prev => ({ ...prev, to: client.emails![0].value }));
+                                                setIsComposeOpen(true);
+                                            }} 
+                                            className="p-1 rounded hover:bg-purple-100 text-purple-600 transition-colors" 
+                                            title="Compose Email"
+                                        >
+                                            <Mail className="w-3 h-3" />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Contacts Section */}
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between pb-1 border-b border-border">
+                                <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Contacts</div>
+                                <div className="flex items-center space-x-1">
+                                    <button onClick={openAddContact} className="p-1 rounded bg-yellow-400 hover:bg-yellow-500 transition-colors" title="Add Contact">
+                                        <Plus className="w-3 h-3 text-black" />
+                                    </button>
+                                    <button onClick={() => setContactsExpanded(true)} className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" title="Expand Contacts">
+                                        <Maximize2 className="w-3 h-3" />
+                                    </button>
+                                </div>
+                            </div>
+                            {client.contacts && client.contacts.length > 0 ? (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-[10px]">
+                                        <thead>
+                                            <tr className="border-b border-border">
+                                                <th className="text-left py-1.5 px-1 font-bold text-muted-foreground uppercase tracking-wider">Name</th>
+                                                <th className="text-center py-1.5 px-1 font-bold text-muted-foreground uppercase tracking-wider">📞</th>
+                                                <th className="text-center py-1.5 px-1 font-bold text-muted-foreground uppercase tracking-wider">✉️</th>
+                                                <th className="text-left py-1.5 px-1 font-bold text-muted-foreground uppercase tracking-wider">Role</th>
+                                                <th className="text-right py-1.5 px-1 font-bold text-muted-foreground uppercase tracking-wider w-16"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {client.contacts.map((c, idx) => (
+                                                <tr key={c._id || idx} className="group border-b border-border/50 hover:bg-muted/50 transition-colors">
+                                                    <td className="py-1.5 px-1 text-foreground font-medium whitespace-nowrap">{[c.firstName, c.lastName].filter(Boolean).join(' ') || '-'}</td>
+                                                    <td className="py-1.5 px-1 text-center">
+                                                        {c.phone ? (
+                                                            <div className="flex items-center justify-center space-x-1">
+                                                                <button onClick={() => initiateGoogleVoice(client._id, c.phone!, 'calls')} className="p-0.5 rounded hover:bg-blue-100 text-blue-600 transition-colors" title={`Call ${c.phone}`}>
+                                                                    <Phone className="w-3 h-3" />
+                                                                </button>
+                                                                <button onClick={() => initiateGoogleVoice(client._id, c.phone!, 'messages')} className="p-0.5 rounded hover:bg-emerald-100 text-emerald-600 transition-colors" title={`SMS ${c.phone}`}>
+                                                                    <MessageSquare className="w-3 h-3" />
+                                                                </button>
+                                                            </div>
+                                                        ) : <span className="text-muted-foreground">-</span>}
+                                                    </td>
+                                                    <td className="py-1.5 px-1 text-center">
+                                                        {c.email ? (
+                                                            <button onClick={() => { setComposeData(prev => ({ ...prev, to: c.email! })); setIsComposeOpen(true); }} className="p-0.5 rounded hover:bg-purple-100 text-purple-600 transition-colors" title={`Email ${c.email}`}>
+                                                                <Mail className="w-3 h-3" />
+                                                            </button>
+                                                        ) : <span className="text-muted-foreground">-</span>}
+                                                    </td>
+                                                    <td className="py-1.5 px-1 text-foreground whitespace-nowrap">{c.role || '-'}</td>
+                                                    <td className="py-1.5 px-1 text-right">
+                                                        <div className="flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <button onClick={() => openEditContact(idx)} className="p-0.5 rounded hover:bg-blue-100 text-blue-600 transition-colors" title="Edit">
+                                                                <Pencil className="w-3 h-3" />
+                                                            </button>
+                                                            <button onClick={() => handleDeleteContact(idx)} className="p-0.5 rounded hover:bg-red-100 text-red-600 transition-colors" title="Delete">
+                                                                <Trash2 className="w-3 h-3" />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ) : (
+                                <p className="text-[11px] text-muted-foreground italic py-2">No contacts found</p>
+                            )}
+                        </div>
+
+                        {/* Business Description Section */}
+                        <div className="space-y-2">
+                            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest pb-1 border-b border-border">Business Description</div>
+                            <p className="text-[11px] text-foreground leading-relaxed italic">
+                                {client.description || 'No description provided'}
+                            </p>
+                            <div className="space-y-0 pt-1">
+                                {client.website && (
+                                    <div className="flex justify-between text-[11px] py-1.5 border-b border-border/50">
+                                        <span className="text-muted-foreground">Website</span>
+                                        <a href={client.website.startsWith('http') ? client.website : `https://${client.website}`} target="_blank" className="text-blue-600 font-bold truncate max-w-[160px] hover:underline">{client.website}</a>
                                     </div>
+                                )}
+                                {client.facebookPage && (
+                                    <div className="flex justify-between text-[11px] py-1.5 border-b border-border/50">
+                                        <span className="text-muted-foreground">Facebook</span>
+                                        <a href={client.facebookPage.startsWith('http') ? client.facebookPage : `https://${client.facebookPage}`} target="_blank" className="text-blue-600 font-bold truncate max-w-[160px] hover:underline">{client.facebookPage}</a>
+                                    </div>
+                                )}
+                                <div className="flex justify-between text-[11px] py-1.5 border-b border-border/50">
+                                    <span className="text-muted-foreground">Industry</span>
+                                    <span className="font-bold text-foreground">{client.industry || '-'}</span>
+                                </div>
+                                <div className="flex justify-between text-[11px] py-1.5 border-b border-border/50">
+                                    <span className="text-muted-foreground">Forecasted</span>
+                                    <span className="font-bold text-foreground">{formatCurrency(client.forecastedAmount || 0)}</span>
+                                </div>
+                                {client.projectedCloseDate && (
+                                    <div className="flex justify-between text-[11px] py-1.5 border-b border-border/50">
+                                        <span className="text-muted-foreground">Projected Close</span>
+                                        <span className="font-bold text-emerald-600">{formatDate(client.projectedCloseDate)}</span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between text-[11px] py-1.5 border-b border-border/50">
+                                    <span className="text-muted-foreground">Payment Terms</span>
+                                    <span className="font-bold text-foreground">{client.defaultPaymentMethod || '-'}</span>
+                                </div>
+                                <div className="flex justify-between text-[11px] py-1.5 border-b border-border/50">
+                                    <span className="text-muted-foreground">Shipping Terms</span>
+                                    <span className="font-bold text-foreground">{client.defaultShippingTerms || '-'}</span>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Contact Channels (2 Columns) */}
-                        <div className="grid grid-cols-2 gap-6">
-                            {/* Phones Column */}
-                            <div className="space-y-3">
-                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center space-x-2">
-                                    <Phone className="w-3 h-3" />
-                                    <span>Phones</span>
-                                </div>
-                                <div className="space-y-2">
-                                    {client.phones?.map((p, idx) => (
-                                        <div key={idx} className="group flex items-center justify-between">
-                                            <a 
-                                                href={`https://voice.google.com/u/0/calls?number=${p.value.replace(/\D/g, '')}&action=dial`} 
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    initiateGoogleVoice(client._id, p.value, 'calls');
-                                                }}
-                                                className="text-xs font-bold text-slate-700 hover:text-blue-600 transition-colors truncate"
-                                            >
-                                                {p.value}
-                                            </a>
-                                            <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button 
-                                                    onClick={() => initiateGoogleVoice(client._id, p.value, 'calls')} 
-                                                    className="p-1 hover:text-blue-600 cursor-pointer text-slate-400"
-                                                    title="Call"
-                                                >
-                                                    <Phone className="w-3 h-3" />
-                                                </button>
-                                                <button 
-                                                    onClick={() => initiateGoogleVoice(client._id, p.value, 'messages')}
-                                                    className="p-1 hover:text-emerald-600 cursor-pointer text-slate-400"
-                                                    title="SMS"
-                                                >
-                                                    <MessageSquare className="w-3 h-3" />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )) || <span className="text-[10px] text-slate-400 italic">None</span>}
-                                </div>
-                            </div>
-
-                            {/* Emails Column */}
-                            <div className="space-y-3">
-                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center space-x-2">
-                                    <Mail className="w-3 h-3" />
-                                    <span>Emails</span>
-                                </div>
-                                <div className="space-y-2">
-                                    {client.emails?.map((e, idx) => (
-                                        <div key={idx} className="flex flex-col">
-                                            <a 
-                                                href="#" 
-                                                onClick={(event) => {
-                                                    event.preventDefault();
-                                                    setComposeData(prev => ({ ...prev, to: e.value }));
-                                                    setIsComposeOpen(true);
-                                                }}
-                                                className="text-xs font-bold text-slate-700 hover:text-purple-600 transition-colors truncate"
-                                            >
-                                                {e.value}
-                                            </a>
-                                        </div>
-                                    )) || <span className="text-[10px] text-slate-400 italic">None</span>}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Billing Section (Object) */}
-                        <div className="space-y-3 pt-4 border-t border-slate-100">
+                        {/* Credit Card Section */}
+                        <div className="space-y-2">
                             <div className={cn("p-4 rounded-sm space-y-3 shadow-inner bg-gradient-to-br transition-all duration-500", cardTheme)}>
                                 <div className="flex items-center justify-between">
                                     <div className="w-8 h-5.5 bg-gradient-to-br from-yellow-200 via-yellow-400 to-yellow-600 rounded-sm relative overflow-hidden shadow-inner flex shrink-0">
@@ -804,69 +1096,6 @@ export default function ClientDashboardPage() {
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Rest of the Information */}
-                        <div className="space-y-4 pt-4 border-t border-slate-100">
-                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Metadata</div>
-                            <div className="grid grid-cols-1 gap-3">
-                                <div className="flex flex-col text-xs py-2 border-b border-slate-50">
-                                    <span className="text-slate-500 mb-1">Business Description</span>
-                                    <span className="text-slate-700 leading-relaxed italic">{client.description || 'No description provided'}</span>
-                                </div>
-                                <div className="flex justify-between text-xs py-1 border-b border-slate-50">
-                                    <span className="text-slate-500">Contact Status</span>
-                                    <span className="font-bold text-slate-800">{client.contactStatus || '-'}</span>
-                                </div>
-                                <div className="flex justify-between text-xs py-1 border-b border-slate-50">
-                                    <span className="text-slate-500">Company Type</span>
-                                    <span className="font-bold text-slate-800">{client.companyType || '-'}</span>
-                                </div>
-                                <div className="flex justify-between text-xs py-1 border-b border-slate-50">
-                                    <span className="text-slate-500">Industry</span>
-                                    <span className="font-bold text-slate-800">{client.industry || '-'}</span>
-                                </div>
-                                {client.website && (
-                                    <div className="flex justify-between text-xs py-1 border-b border-slate-50">
-                                        <span className="text-slate-500 uppercase font-black text-[8px] tracking-widest text-slate-400">Website</span>
-                                        <div className="flex items-center space-x-1 justify-end">
-                                            <Globe className="w-2.5 h-2.5 text-blue-500" />
-                                            <a href={client.website.startsWith('http') ? client.website : `https://${client.website}`} target="_blank" className="text-blue-600 font-bold truncate max-w-[150px]">{client.website}</a>
-                                        </div>
-                                    </div>
-                                )}
-                                {client.facebookPage && (
-                                    <div className="flex justify-between text-xs py-1 border-b border-slate-50">
-                                         <span className="text-slate-500 uppercase font-black text-[8px] tracking-widest text-slate-400">Facebook</span>
-                                        <div className="flex items-center space-x-1 justify-end">
-                                            <Facebook className="w-2.5 h-2.5 text-blue-600" />
-                                            <a href={client.facebookPage.startsWith('http') ? client.facebookPage : `https://${client.facebookPage}`} target="_blank" className="text-blue-600 font-bold truncate max-w-[150px]">{client.facebookPage}</a>
-                                        </div>
-                                    </div>
-                                )}
-                                <div className="flex justify-between text-xs py-1 border-b border-slate-50">
-                                    <span className="text-slate-500">Forecasted</span>
-                                    <span className="font-bold text-slate-900">{formatCurrency(client.forecastedAmount || 0)}</span>
-                                </div>
-                                {client.projectedCloseDate && (
-                                    <div className="flex justify-between text-xs py-1 border-b border-slate-50">
-                                        <span className="text-slate-500">Projected Close</span>
-                                        <span className="font-bold text-emerald-600">{formatDate(client.projectedCloseDate)}</span>
-                                    </div>
-                                )}
-                                <div className="flex justify-between text-xs py-1 border-b border-slate-50">
-                                    <span className="text-slate-500">Payment Terms</span>
-                                    <span className="font-bold text-slate-800">{client.defaultPaymentMethod || '-'}</span>
-                                </div>
-                                <div className="flex justify-between text-xs py-1 border-b border-slate-50">
-                                    <span className="text-slate-500">Shipping Terms</span>
-                                    <span className="font-bold text-slate-800">{client.defaultShippingTerms || '-'}</span>
-                                </div>
-                                <div className="flex justify-between text-xs py-1 border-b border-slate-50">
-                                    <span className="text-slate-500 uppercase font-black text-[8px] tracking-widest text-slate-400">Created At</span>
-                                    <span className="font-medium text-slate-600">{formatDate(client.createdAt || '')}</span>
                                 </div>
                             </div>
                         </div>
@@ -938,6 +1167,209 @@ export default function ClientDashboardPage() {
                 }}
                 initialData={client}
             />
+
+            {/* Expanded Contacts Modal */}
+            {contactsExpanded && client && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[1000] flex items-center justify-center p-6">
+                    <div className="bg-card border border-border rounded-lg shadow-2xl w-full max-w-7xl max-h-[85vh] flex flex-col">
+                        <div className="flex items-center justify-between px-5 py-3 border-b border-border">
+                            <div className="flex items-center space-x-3">
+                                <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Contacts — {client.name}</h3>
+                                <span className="text-[10px] text-yellow-800 bg-yellow-100 px-2 py-0.5 rounded-full font-bold">{client.contacts?.length || 0}</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <button onClick={openAddContact} className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold bg-yellow-400 hover:bg-yellow-500 text-black rounded transition-colors">
+                                    <Plus className="w-3.5 h-3.5" />
+                                    <span>Add Contact</span>
+                                </button>
+                                <button onClick={() => setContactsExpanded(false)} className="p-1.5 rounded transition-colors">
+                                    <X className="w-4 h-4 text-muted-foreground" />
+                                </button>
+                            </div>
+                        </div>
+                        <div className="flex-1 overflow-auto">
+                            {client.contacts && client.contacts.length > 0 ? (
+                                <table className="w-full text-xs">
+                                    <thead className="sticky top-0 bg-card z-10">
+                                        <tr className="border-b border-border">
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">First Name</th>
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">Last Name</th>
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">Role</th>
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">Phone</th>
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">Type</th>
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">Ext</th>
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">Email</th>
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">Address</th>
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">City</th>
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">State</th>
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">Zip</th>
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">Country</th>
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">Website</th>
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">Comm Pref</th>
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">Follow-Up</th>
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">Status</th>
+                                            <th className="text-right py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px] w-20">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {client.contacts.map((c, idx) => (
+                                            <tr key={c._id || idx} className="group border-b border-border/50 hover:bg-muted/50 transition-colors">
+                                                <td className="py-2 px-3 text-foreground font-medium whitespace-nowrap">{c.firstName || '-'}</td>
+                                                <td className="py-2 px-3 text-foreground font-medium whitespace-nowrap">{c.lastName || '-'}</td>
+                                                <td className="py-2 px-3 text-foreground whitespace-nowrap">{c.role || '-'}</td>
+                                                <td className="py-2 px-3 text-foreground whitespace-nowrap">
+                                                    <div className="flex items-center space-x-1.5">
+                                                        <span>{c.phone || '-'}</span>
+                                                        {c.phone && (
+                                                            <div className="flex items-center space-x-0.5">
+                                                                <button onClick={() => initiateGoogleVoice(client._id, c.phone!, 'calls')} className="p-0.5 rounded hover:bg-blue-100 text-blue-600 transition-colors" title={`Call ${c.phone}`}>
+                                                                    <Phone className="w-3 h-3" />
+                                                                </button>
+                                                                <button onClick={() => initiateGoogleVoice(client._id, c.phone!, 'messages')} className="p-0.5 rounded hover:bg-emerald-100 text-emerald-600 transition-colors" title={`SMS ${c.phone}`}>
+                                                                    <MessageSquare className="w-3 h-3" />
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="py-2 px-3 text-foreground whitespace-nowrap">{c.phoneType || '-'}</td>
+                                                <td className="py-2 px-3 text-foreground whitespace-nowrap">{c.extension || '-'}</td>
+                                                <td className="py-2 px-3 text-foreground whitespace-nowrap">
+                                                    <div className="flex items-center space-x-1.5">
+                                                        <span className="truncate max-w-[140px]">{c.email || '-'}</span>
+                                                        {c.email && (
+                                                            <button onClick={() => { setComposeData(prev => ({ ...prev, to: c.email! })); setIsComposeOpen(true); }} className="p-0.5 rounded hover:bg-purple-100 text-purple-600 transition-colors shrink-0" title={`Email ${c.email}`}>
+                                                                <Mail className="w-3 h-3" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="py-2 px-3 text-foreground whitespace-nowrap">{c.address || '-'}</td>
+                                                <td className="py-2 px-3 text-foreground whitespace-nowrap">{c.city || '-'}</td>
+                                                <td className="py-2 px-3 text-foreground whitespace-nowrap">{c.state || '-'}</td>
+                                                <td className="py-2 px-3 text-foreground whitespace-nowrap">{c.zipCode || '-'}</td>
+                                                <td className="py-2 px-3 text-foreground whitespace-nowrap">{c.country || '-'}</td>
+                                                <td className="py-2 px-3 text-foreground whitespace-nowrap">{c.website || '-'}</td>
+                                                <td className="py-2 px-3 text-foreground whitespace-nowrap">{c.communicationPreference || '-'}</td>
+                                                <td className="py-2 px-3 text-foreground whitespace-nowrap">{c.followUpFrequency || '-'}</td>
+                                                <td className="py-2 px-3">
+                                                    <span className={cn(
+                                                        "px-1.5 py-0.5 rounded-sm text-[9px] font-bold",
+                                                        c.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                                                    )}>
+                                                        {c.status || 'Active'}
+                                                    </span>
+                                                </td>
+                                                <td className="py-2 px-3 text-right">
+                                                    <div className="flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button onClick={() => openEditContact(idx)} className="p-1 rounded hover:bg-blue-100 text-blue-600 transition-colors" title="Edit">
+                                                            <Pencil className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button onClick={() => handleDeleteContact(idx)} className="p-1 rounded hover:bg-red-100 text-red-600 transition-colors" title="Delete">
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            ) : (
+                                <div className="flex items-center justify-center py-16">
+                                    <p className="text-sm text-muted-foreground italic">No contacts found. Click &quot;Add Contact&quot; to create one.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Contact Add/Edit Modal */}
+            {contactModalOpen && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[1001] flex items-center justify-center">
+                    <div className="bg-card border border-border rounded-lg shadow-2xl w-full max-w-md mx-4">
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                            <h3 className="text-sm font-bold text-foreground">{editingContactIdx !== null ? 'Edit Contact' : 'Add Contact'}</h3>
+                            <button onClick={() => setContactModalOpen(false)} className="p-1 rounded transition-colors">
+                                <X className="w-4 h-4 text-muted-foreground" />
+                            </button>
+                        </div>
+                        <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">First Name</label>
+                                    <input className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.firstName} onChange={e => setContactForm({...contactForm, firstName: e.target.value})} />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Last Name</label>
+                                    <input className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.lastName} onChange={e => setContactForm({...contactForm, lastName: e.target.value})} />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Email</label>
+                                <input type="email" className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.email} onChange={e => setContactForm({...contactForm, email: e.target.value})} />
+                            </div>
+                            <div className="grid grid-cols-3 gap-3">
+                                <div>
+                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Phone</label>
+                                    <input className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" placeholder="(000) 000-0000" value={contactForm.phone} onChange={e => setContactForm({...contactForm, phone: formatPhoneInput(e.target.value)})} />
+                                </div>
+                                <SearchableDropdown label="Phone Type" value={contactForm.phoneType} onChange={v => setContactForm({...contactForm, phoneType: v})} options={PHONE_TYPE_OPTIONS} placeholder="Select type..." />
+                                <div>
+                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Extension</label>
+                                    <input className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.extension} onChange={e => setContactForm({...contactForm, extension: e.target.value})} />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <SearchableDropdown label="Role" value={contactForm.role} onChange={v => setContactForm({...contactForm, role: v})} options={ROLE_OPTIONS} placeholder="Select role..." />
+                                <div>
+                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Status</label>
+                                    <select className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.status} onChange={e => setContactForm({...contactForm, status: e.target.value})}>
+                                        <option value="Active">Active</option>
+                                        <option value="Inactive">Inactive</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Address</label>
+                                <input className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.address} onChange={e => setContactForm({...contactForm, address: e.target.value})} />
+                            </div>
+                            <div className="grid grid-cols-4 gap-3">
+                                <div>
+                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">City</label>
+                                    <input className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.city} onChange={e => setContactForm({...contactForm, city: e.target.value})} />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">State</label>
+                                    <input className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.state} onChange={e => setContactForm({...contactForm, state: e.target.value})} />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Zip Code</label>
+                                    <input className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.zipCode} onChange={e => setContactForm({...contactForm, zipCode: e.target.value})} />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Country</label>
+                                    <input className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.country} onChange={e => setContactForm({...contactForm, country: e.target.value})} />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Website</label>
+                                <input className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.website} onChange={e => setContactForm({...contactForm, website: e.target.value})} />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <SearchableDropdown label="Communication Preference" value={contactForm.communicationPreference} onChange={v => setContactForm({...contactForm, communicationPreference: v})} options={COMM_PREF_OPTIONS} placeholder="Select preference..." />
+                                <SearchableDropdown label="Follow-Up Frequency" value={contactForm.followUpFrequency} onChange={v => setContactForm({...contactForm, followUpFrequency: v})} options={FOLLOW_UP_OPTIONS} placeholder="Select frequency..." />
+                            </div>
+                        </div>
+                        <div className="flex items-center justify-end space-x-2 px-4 py-3 border-t border-border">
+                            <button onClick={() => setContactModalOpen(false)} className="px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted rounded transition-colors">Cancel</button>
+                            <button onClick={handleSaveContact} disabled={savingContact} className="px-4 py-1.5 text-xs font-bold bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors disabled:opacity-50">
+                                {savingContact ? 'Saving...' : (editingContactIdx !== null ? 'Update' : 'Add')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Compose Email Modal */}
             {isComposeOpen && (
@@ -1088,6 +1520,28 @@ export default function ClientDashboardPage() {
                             <p className="text-[10px] text-slate-400 text-center">
                                 Details will auto-hide after 60 seconds
                             </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Contact Confirmation Modal */}
+            {deleteContactIdx !== null && client && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[1002] flex items-center justify-center">
+                    <div className="bg-card border border-border rounded-lg shadow-2xl w-full max-w-sm mx-4">
+                        <div className="px-5 py-4">
+                            <h3 className="text-sm font-bold text-foreground mb-2">Delete Contact</h3>
+                            <p className="text-xs text-muted-foreground">
+                                Are you sure you want to delete{' '}
+                                <span className="font-bold text-foreground">
+                                    {[client.contacts?.[deleteContactIdx]?.firstName, client.contacts?.[deleteContactIdx]?.lastName].filter(Boolean).join(' ') || 'this contact'}
+                                </span>
+                                ? This action cannot be undone.
+                            </p>
+                        </div>
+                        <div className="flex items-center justify-end space-x-2 px-5 py-3 border-t border-border">
+                            <button onClick={() => setDeleteContactIdx(null)} className="px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted rounded transition-colors">Cancel</button>
+                            <button onClick={confirmDeleteContact} className="px-4 py-1.5 text-xs font-bold bg-red-600 text-white rounded hover:bg-red-700 transition-colors">Delete</button>
                         </div>
                     </div>
                 </div>

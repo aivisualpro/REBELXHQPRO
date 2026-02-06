@@ -149,6 +149,13 @@ export default function SettingsPage() {
                         if (res.ok) {
                             const data = await res.json();
                             successCount += (data.count || 0);
+                            // Debug: log response data
+                            if (data.count === 0) {
+                                console.warn('Import returned 0 count. Response:', data);
+                                if (data.headers) {
+                                    console.warn('CSV Headers detected:', data.headers);
+                                }
+                            }
                         } else {
                             const err = await res.json();
                             errors.push(`Chunk ${i + 1}: ${err.error || 'Unknown error'}`);

@@ -40,6 +40,26 @@ const ClientSchema = new mongoose.Schema({
         label: String // e.g. 'Main', 'Secondary'
     }],
 
+    contacts: [{
+        firstName: String,
+        lastName: String,
+        email: String,
+        phone: String,
+        phoneType: String,
+        extension: String,
+        role: String,
+        status: { type: String, default: 'Active' },
+        address: String,
+        city: String,
+        state: String,
+        zipCode: String,
+        country: String,
+        website: String,
+        communicationPreference: String,
+        followUpFrequency: String,
+        createdAt: { type: Date, default: Date.now }
+    }],
+
     billing: {
         nameOnCard: String,
         ccNumber: String,
