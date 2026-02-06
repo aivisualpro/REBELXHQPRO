@@ -10,7 +10,8 @@ import {
     Mail,
     ToggleLeft,
     ToggleRight,
-    Contact
+    Contact,
+    Activity
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Papa from 'papaparse';
@@ -22,6 +23,7 @@ export default function CRMSettingsPage() {
     const importClientsRef = React.useRef<HTMLInputElement>(null);
     const importNotesRef = React.useRef<HTMLInputElement>(null);
     const importContactsRef = React.useRef<HTMLInputElement>(null);
+    const importActivitiesRef = React.useRef<HTMLInputElement>(null);
 
     const [settings, setSettings] = useState({
         companyName: 'RebelX Headquarters',
@@ -210,6 +212,49 @@ export default function CRMSettingsPage() {
         });
     };
 
+    const handleImportActivities = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        e.target.value = '';
+        
+        setImporting(true);
+        const toastId = toast.loading('Parsing activities file...');
+        
+        Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: async (results) => {
+                const totalRows = results.data.length;
+                if (totalRows === 0) {
+                    toast.error('No data found in file', { id: toastId });
+                    setImporting(false);
+                    return;
+                }
+                
+                try {
+                    toast.loading(`Importing ${totalRows} activities...`, { id: toastId });
+                    const res = await fetch('/api/clients/import-activities', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ activities: results.data })
+                    });
+                    
+                    if (res.ok) {
+                        const data = await res.json();
+                        toast.success(`Imported ${data.count} activities (${data.skippedDuplicates} duplicates skipped, ${data.missingClients} missing clients)`, { id: toastId });
+                    } else {
+                        const err = await res.json();
+                        toast.error(err.error || 'Import failed', { id: toastId });
+                    }
+                } catch (err) {
+                    console.error(err);
+                    toast.error('Import failed', { id: toastId });
+                }
+                setImporting(false);
+            }
+        });
+    };
+
     if (loading) {
         return <div className="p-8">Loading settings...</div>;
     }
@@ -254,6 +299,13 @@ export default function CRMSettingsPage() {
                         accept=".csv"
                         className="hidden"
                         onChange={handleImportContacts}
+                    />
+                    <input
+                        ref={importActivitiesRef}
+                        type="file"
+                        accept=".csv"
+                        className="hidden"
+                        onChange={handleImportActivities}
                     />
 
                     {/* Row 1: Import Clients */}
@@ -319,6 +371,29 @@ export default function CRMSettingsPage() {
                         </div>
                         <button
                             onClick={() => importContactsRef.current?.click()}
+                            disabled={importing}
+                            className="flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground text-xs font-medium rounded hover:bg-primary/90 transition-colors disabled:opacity-50"
+                        >
+                            <Upload className="w-3.5 h-3.5" />
+                            <span>{importing ? 'Importing...' : 'Upload'}</span>
+                        </button>
+                    </div>
+
+                    {/* Row 4: Import Activities */}
+                    <div className="p-6 bg-card border border-border flex items-center justify-between rounded-lg">
+                         <div className="flex items-center space-x-4">
+                            <div className="w-10 h-10 rounded-full bg-yellow-400 flex items-center justify-center shrink-0">
+                                <Activity className="w-5 h-5 text-black" />
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-medium text-foreground">Import Activities (CSV)</h4>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                    Columns: type, client (legacyId), comments, createdAt, createdBy
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => importActivitiesRef.current?.click()}
                             disabled={importing}
                             className="flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground text-xs font-medium rounded hover:bg-primary/90 transition-colors disabled:opacity-50"
                         >

@@ -220,15 +220,6 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
             </Link>
            </div>
 
-          {/* Contacts */}
-          <div title={isSidebarCollapsed ? "Contacts" : ""} className={cn(
-            "flex items-center rounded-md cursor-pointer transition-colors group",
-            isSidebarCollapsed ? "justify-center py-2.5 px-0" : "px-3 py-2 hover:bg-secondary"
-          )}>
-            <Users className={cn("w-5 h-5 group-hover:text-foreground transition-colors", !isSidebarCollapsed && "mr-3")} />
-            {!isSidebarCollapsed && <span className="text-[14px] font-medium group-hover:text-foreground transition-colors">Contacts</span>}
-          </div>
-
           {/* Workflows */}
           <div title={isSidebarCollapsed ? "Workflows" : ""} className={cn(
             "flex items-center rounded-md cursor-pointer transition-colors group",
@@ -242,9 +233,7 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           {[
-            { name: 'Conversations', icon: MessageSquare, href: '/crm/conversations' },
             { name: 'Tasks', icon: ListTodo, href: '/crm/tasks' },
-            { name: 'Notes', icon: StickyNote, href: '/crm/notes' },
             { name: 'Reports', icon: BarChart3, href: '/crm/reports' },
           ].map((item) => (
             <Link key={item.name} href={item.href} className="block" title={isSidebarCollapsed ? item.name : ""}>
