@@ -6,7 +6,8 @@ import {
   Calendar, DollarSign, ShoppingBag, ChevronLeft, ChevronRight,
   ArrowUpDown, User, Layers, Briefcase, Map as LucideMap, ChevronDown,
   Truck, Upload, FileText, UserSquare2, SlidersHorizontal, 
-  Send, X, Trash2, Paperclip, Loader2
+  Send, X, Trash2, Paperclip, Loader2,
+  Eye, Pencil
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -380,6 +381,29 @@ export default function ClientsPage() {
                                             {client.name.substring(0, 2)}
                                         </div>
                                         <span className="text-[10px] font-medium text-foreground leading-tight truncate max-w-[180px]">{client.name}</span>
+                                        <div className="flex items-center space-x-0.5 ml-auto opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                            <button
+                                                onClick={() => window.location.href = `/crm/clients/${client._id}`}
+                                                className="p-0.5 text-muted-foreground hover:text-blue-600 hover:bg-blue-100 rounded transition-colors cursor-pointer"
+                                                title="View"
+                                            >
+                                                <Eye className="w-3 h-3" />
+                                            </button>
+                                            <button
+                                                onClick={() => window.location.href = `/crm/clients/${client._id}`}
+                                                className="p-0.5 text-muted-foreground hover:text-amber-600 hover:bg-amber-100 rounded transition-colors cursor-pointer"
+                                                title="Edit"
+                                            >
+                                                <Pencil className="w-3 h-3" />
+                                            </button>
+                                            <button
+                                                onClick={() => { /* future delete */ }}
+                                                className="p-0.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors cursor-pointer"
+                                                title="Delete"
+                                            >
+                                                <Trash2 className="w-3 h-3" />
+                                            </button>
+                                        </div>
                                     </div>
                                 </td>
                                 

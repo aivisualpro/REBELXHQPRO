@@ -250,10 +250,10 @@ export function GmailEmailView({ initialLabel, forcedClientEmails }: GmailEmailV
             <div className="flex items-center space-x-6">
                 <button 
                     onClick={() => setIsComposeOpen(true)}
-                    className="flex items-center space-x-2 px-3 h-8 bg-primary text-black text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-all rounded shadow-sm cursor-pointer"
+                    className="p-1.5 bg-primary text-black rounded hover:opacity-90 transition-all cursor-pointer shadow-sm"
+                    title="Compose"
                 >
-                    <Plus className="w-3 h-3" />
-                    <span>Compose</span>
+                    <Plus className="w-4 h-4" />
                 </button>
                 
                 <div className="flex items-center space-x-4 text-muted-foreground">

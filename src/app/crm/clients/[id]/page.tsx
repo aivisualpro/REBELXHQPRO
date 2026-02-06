@@ -1192,23 +1192,23 @@ export default function ClientDashboardPage() {
                                 <table className="w-full text-xs">
                                     <thead className="sticky top-0 bg-card z-10">
                                         <tr className="border-b border-border">
-                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">First Name</th>
-                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">Last Name</th>
-                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">Role</th>
-                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">Phone</th>
-                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">Type</th>
-                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">Ext</th>
-                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">Email</th>
-                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">Address</th>
-                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">City</th>
-                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">State</th>
-                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">Zip</th>
-                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">Country</th>
-                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">Website</th>
-                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">Comm Pref</th>
-                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">Follow-Up</th>
-                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px]">Status</th>
-                                            <th className="text-right py-2.5 px-3 font-bold text-foreground/70 uppercase tracking-wider text-[10px] w-20">Actions</th>
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 tracking-wider text-[9px] whitespace-nowrap">First Name</th>
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 tracking-wider text-[9px] whitespace-nowrap">Last Name</th>
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 tracking-wider text-[9px] whitespace-nowrap">Role</th>
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 tracking-wider text-[9px] whitespace-nowrap">Phone</th>
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 tracking-wider text-[9px] whitespace-nowrap">Type</th>
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 tracking-wider text-[9px] whitespace-nowrap">Ext</th>
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 tracking-wider text-[9px] whitespace-nowrap">Email</th>
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 tracking-wider text-[9px] whitespace-nowrap">Address</th>
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 tracking-wider text-[9px] whitespace-nowrap">City</th>
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 tracking-wider text-[9px] whitespace-nowrap">State</th>
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 tracking-wider text-[9px] whitespace-nowrap">Zip</th>
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 tracking-wider text-[9px] whitespace-nowrap">Country</th>
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 tracking-wider text-[9px] whitespace-nowrap">Website</th>
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 tracking-wider text-[9px] whitespace-nowrap">Comm Pref</th>
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 tracking-wider text-[9px] whitespace-nowrap">Follow-Up</th>
+                                            <th className="text-left py-2.5 px-3 font-bold text-foreground/70 tracking-wider text-[9px] whitespace-nowrap">Status</th>
+                                            <th className="text-right py-2.5 px-3 font-bold text-foreground/70 tracking-wider text-[9px] whitespace-nowrap w-20">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>

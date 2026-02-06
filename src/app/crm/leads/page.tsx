@@ -7,7 +7,8 @@ import {
   Calendar, DollarSign, ShoppingBag, ChevronLeft, ChevronRight,
   ArrowUpDown, User, Layers, Briefcase, Map as LucideMap, ChevronDown,
   Truck, Upload, FileText, Activity, CheckCircle2, X,
-  List, LayoutGrid, GripVertical, MessageSquare, ExternalLink, Send, Trash2, Paperclip, Loader2
+  List, LayoutGrid, GripVertical, MessageSquare, ExternalLink, Send, Trash2, Paperclip, Loader2,
+  Eye, Pencil
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -647,8 +648,7 @@ function LeadsPageContent() {
                                   leads.map((lead) => (
                                       <tr 
                                           key={lead._id} 
-                                          className="group relative z-0 bg-background transition-colors duration-150 cursor-pointer"
-                                          onClick={() => router.push(`/crm/leads/${lead._id}`)}
+                                          className="group relative z-0 bg-background transition-colors duration-150"
                                       >
                                           {/* NAME */}
                                           <td className="p-1 border-r border-border group-hover:border-l-2 group-hover:border-l-primary transition-all">
@@ -657,16 +657,29 @@ function LeadsPageContent() {
                                                       {lead.name.substring(0, 2)}
                                                   </div>
                                                   <span className="text-[10px] font-medium text-foreground leading-tight truncate max-w-[180px]">{lead.name}</span>
-                                                  <button
-                                                      onClick={(e) => {
-                                                          e.stopPropagation();
-                                                          handleDeleteLead(lead._id, lead.name);
-                                                      }}
-                                                      className="p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
-                                                      title="Delete Lead"
-                                                  >
-                                                      <Trash2 className="w-3 h-3" />
-                                                  </button>
+                                                  <div className="flex items-center space-x-0.5 ml-auto opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                                      <button
+                                                          onClick={() => router.push(`/crm/leads/${lead._id}`)}
+                                                          className="p-0.5 text-muted-foreground hover:text-blue-600 hover:bg-blue-100 rounded transition-colors cursor-pointer"
+                                                          title="View"
+                                                      >
+                                                          <Eye className="w-3 h-3" />
+                                                      </button>
+                                                      <button
+                                                          onClick={() => router.push(`/crm/leads/${lead._id}`)}
+                                                          className="p-0.5 text-muted-foreground hover:text-amber-600 hover:bg-amber-100 rounded transition-colors cursor-pointer"
+                                                          title="Edit"
+                                                      >
+                                                          <Pencil className="w-3 h-3" />
+                                                      </button>
+                                                      <button
+                                                          onClick={() => handleDeleteLead(lead._id, lead.name)}
+                                                          className="p-0.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors cursor-pointer"
+                                                          title="Delete"
+                                                      >
+                                                          <Trash2 className="w-3 h-3" />
+                                                      </button>
+                                                  </div>
                                               </div>
                                           </td>
                                           
