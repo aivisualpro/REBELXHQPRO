@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import SaleOrder from '@/models/SaleOrder';
 import Sku from '@/models/Sku';
@@ -101,13 +101,11 @@ export async function POST(request: Request) {
 
         const newItem: any = await SaleOrder.create(body);
 
-        // Return immediately to frontend - don't wait for populate or AppSheet sync
-        const response = NextResponse.json(newItem);
-
-        // Fire-and-forget: Sync to AppSheet in background
-        // Using setImmediate pattern to not block the response
-        (async () => {
+        // Use Next.js after() for reliable background task execution in serverless
+        // This ensures AppSheet sync completes even after response is sent
+        after(async () => {
             try {
+                await dbConnect(); // Reconnect for background task
                 const populatedOrder = await SaleOrder.findById(newItem._id)
                     .populate('clientId', 'name legacyId')
                     .populate('salesRep', 'firstName lastName email')
@@ -115,14 +113,14 @@ export async function POST(request: Request) {
 
                 if (populatedOrder) {
                     await syncOrderToAppSheet(populatedOrder);
-                    console.log('Order synced to AppSheet:', newItem._id);
+                    console.log('✅ Order synced to AppSheet:', newItem._id);
                 }
             } catch (syncError) {
-                console.error('Background AppSheet sync failed:', syncError);
+                console.error('❌ Background AppSheet sync failed:', syncError);
             }
-        })();
+        });
 
-        return response;
+        return NextResponse.json(newItem);
     } catch (error: any) {
         console.error('Create order error:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
