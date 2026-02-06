@@ -140,8 +140,11 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
                      }
                      if (skusRes.ok) {
                          const data = await skusRes.json();
-                         // All SKUs available for wholesale orders
-                         setAllSkus(data.skus || []);
+                         // Only show "Finished Goods" category SKUs for wholesale orders
+                         const finishedGoods = (data.skus || []).filter((s: any) => 
+                             s.category && s.category.toLowerCase() === 'finished goods'
+                         );
+                         setAllSkus(finishedGoods);
                      }
                      if (usersRes.ok) {
                          const data = await usersRes.json();
