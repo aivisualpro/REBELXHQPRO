@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Search,
@@ -46,6 +46,14 @@ interface Sku {
 }
 
 export default function SkusPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-[calc(100vh-36px)]"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>}>
+      <SkusPageContent />
+    </Suspense>
+  );
+}
+
+function SkusPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [skus, setSkus] = useState<Sku[]>([]);
