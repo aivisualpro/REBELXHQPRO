@@ -206,7 +206,7 @@ export function SearchableSelect({
         <div className={cn("relative", className)} ref={containerRef}>
             <div
                 className={cn(
-                    "w-full px-3 py-2.5 border border-input rounded-md text-sm bg-background flex items-center justify-between cursor-pointer focus-within:ring-2 focus-within:ring-ring transition-all hover:border-ring/50",
+                    "w-full px-3 h-full border border-input rounded-md text-sm bg-background flex items-center justify-between cursor-pointer focus-within:ring-2 focus-within:ring-ring transition-all hover:border-ring/50",
                     !selectedOption && !value ? "text-muted-foreground" : "text-foreground",
                     isOpen && "ring-2 ring-ring border-ring",
                     triggerClassName

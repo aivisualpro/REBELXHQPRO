@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { createPortal } from 'react-dom';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { ArrowLeft, Package, Calendar, CreditCard, Truck, Plus, X, Trash2, Pencil, User, MapPin, DollarSign, List, RefreshCw } from 'lucide-react';
@@ -19,6 +20,7 @@ interface LineItem {
   price: number;
   total: number;
   cost?: number;
+  productDescription?: string;
 }
 
 interface Payment {
@@ -142,8 +144,15 @@ export default function SaleOrderDetailPage() {
       if (params.id) fetchOrder();
   }, [params.id]);
 
+  const [headerPortal, setHeaderPortal] = useState<HTMLElement | null>(null);
   useEffect(() => {
-      fetch('/api/skus?limit=1000')
+      // Find the portal target after mount
+      const target = document.getElementById('header-portal-target');
+      if (target) setHeaderPortal(target);
+  }, [loading]); // Retry when loading changes or on mount
+
+  useEffect(() => {
+      fetch('/api/skus?limit=5000')
           .then(res => res.json())
           .then(data => setAllSkus(data.skus || []))
           .catch(() => {});
@@ -479,43 +488,55 @@ export default function SaleOrderDetailPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-48px)] bg-white relative">
-        {/* Header Row: Breadcrumb + Back */}
-        <div className="flex items-center justify-between px-6 py-3 border-b border-slate-100 bg-slate-50/50 shrink-0">
-            <div className="flex items-center space-x-2 text-sm">
-                <button onClick={() => router.push('/sales/wholesale-orders')} className="text-slate-500 hover:text-black transition-colors">
-                    Wholesale Orders
-                </button>
-                <span className="text-slate-300">/</span>
-                <span className="font-bold text-slate-900">{order.label || order._id}</span>
-            </div>
-            <button 
-                onClick={() => {
-                    setEditingHeader({
-                        salesRep: typeof order.salesRep === 'object' && order.salesRep ? (order.salesRep as any)._id : order.salesRep,
-                        orderStatus: order.orderStatus,
-                        paymentMethod: order.paymentMethod,
-                        shippingMethod: order.shippingMethod,
-                        trackingNumber: order.trackingNumber,
-                        shippingCost: order.shippingCost,
-                        discount: order.discount,
-                        tax: order.tax,
-                        shippedDate: order.shippedDate ? new Date(order.shippedDate).toISOString().split('T')[0] : '',
-                        shippingAddress: order.shippingAddress,
-                        city: order.city,
-                        state: order.state
-                    });
-                    setIsHeaderModalOpen(true);
-                }}
-                className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold uppercase text-slate-500 hover:text-blue-600 hover:bg-slate-100 transition-colors mr-2 border border-slate-200 rounded-sm bg-white shadow-sm"
-            >
-                <Pencil className="w-3.5 h-3.5" />
-                <span>Edit</span>
-            </button>
-            <button onClick={() => router.back()} className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold uppercase text-slate-500 hover:text-black hover:bg-slate-100 transition-colors">
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Back</span>
-            </button>
-        </div>
+        {/* Header Portal Content */}
+        {headerPortal && order && createPortal(
+            <>
+                {/* Title */}
+                <div className="flex items-center space-x-2">
+                     <span className="text-slate-400 font-medium">/</span>
+                     <h1 className="text-sm font-bold text-foreground uppercase tracking-tight">
+                        Order #{order.label || order._id}
+                    </h1>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center space-x-2">
+                    <button 
+                        onClick={() => {
+                            setEditingHeader({
+                                salesRep: typeof order.salesRep === 'object' && order.salesRep ? (order.salesRep as any)._id : order.salesRep,
+                                orderStatus: order.orderStatus,
+                                paymentMethod: order.paymentMethod,
+                                shippingMethod: order.shippingMethod,
+                                trackingNumber: order.trackingNumber,
+                                shippingCost: order.shippingCost,
+                                discount: order.discount,
+                                tax: order.tax,
+                                shippedDate: order.shippedDate ? new Date(order.shippedDate).toISOString().split('T')[0] : '',
+                                shippingAddress: order.shippingAddress,
+                                city: order.city,
+                                state: order.state
+                            });
+                            setIsHeaderModalOpen(true);
+                        }}
+                        className="flex items-center space-x-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded transition-all cursor-pointer border border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
+                    >
+                        <Pencil className="w-3.5 h-3.5" />
+                        <span>Edit</span>
+                    </button>
+                    <button 
+                        onClick={() => router.back()} 
+                        className="flex items-center space-x-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded transition-all cursor-pointer border border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
+                    >
+                        <ArrowLeft className="w-3.5 h-3.5" />
+                        <span>Back</span>
+                    </button>
+                </div>
+            </>,
+            headerPortal
+        )}
+
+        {/* Removed inline Header Row */}
 
         <div className="flex flex-1 overflow-hidden">
             {/* Left Sidebar: Details (30%) */}
@@ -530,11 +551,11 @@ export default function SaleOrderDetailPage() {
                             getStatusColor(order.orderStatus)
                         )}
                     >
-                        <option value="Pending">Pending</option>
-                        <option value="Processing">Processing</option>
-                        <option value="Shipped">Shipped</option>
                         <option value="Completed">Completed</option>
-                        <option value="Cancelled">Cancelled</option>
+                        <option value="Issued">Issued</option>
+                        <option value="Pending Payment">Pending Payment</option>
+                        <option value="Shipping">Shipping</option>
+                        <option value="Picking">Picking</option>
                     </select>
                 </div>
 
@@ -732,7 +753,8 @@ export default function SaleOrderDetailPage() {
                                             <td colSpan={8} className="px-3 py-6 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">No line items</td>
                                         </tr>
                                     ) : order.lineItems.map(item => {
-                                        const skuName = typeof item.sku === 'object' ? item.sku?.name : allSkus.find(s => s._id === item.sku)?.name || item.sku;
+                                    const skuNameRaw = typeof item.sku === 'object' ? item.sku?.name : allSkus.find(s => s._id === item.sku)?.name || item.sku;
+                                    const skuName = (skuNameRaw && skuNameRaw !== item.sku) ? skuNameRaw : (item.productDescription || skuNameRaw);
                                         const lineTotal = (item.qtyShipped || 0) * (item.price || 0);
                                         const skuId = (item.sku && typeof item.sku === 'object') ? item.sku._id : item.sku;
 
@@ -891,7 +913,15 @@ export default function SaleOrderDetailPage() {
                         <div className="space-y-1.5">
                             <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">SKU</label>
                             <SearchableSelect
-                                options={allSkus.map(s => ({ value: s._id, label: s.name }))}
+                                options={(() => {
+                                    const opts = allSkus.map(s => ({ value: s._id, label: s.name }));
+                                    // Add current value if missing (Legacy ID support)
+                                    if (editingItem.sku && !allSkus.find(s => s._id === editingItem.sku)) {
+                                        const label = editingItem.productDescription || editingItem.name || `Legacy: ${editingItem.sku}`;
+                                        opts.push({ value: editingItem.sku, label });
+                                    }
+                                    return opts;
+                                })()}
                                 value={editingItem.sku}
                                 onChange={async (val) => {
                                     const sku = allSkus.find(s => s._id === val);
@@ -1076,11 +1106,11 @@ export default function SaleOrderDetailPage() {
                                     onChange={(e) => setEditingHeader({...editingHeader, orderStatus: e.target.value})}
                                     className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:outline-none bg-white"
                                 >
-                                    <option value="Pending">Pending</option>
-                                    <option value="Processing">Processing</option>
-                                    <option value="Shipped">Shipped</option>
                                     <option value="Completed">Completed</option>
-                                    <option value="Cancelled">Cancelled</option>
+                                    <option value="Issued">Issued</option>
+                                    <option value="Pending Payment">Pending Payment</option>
+                                    <option value="Shipping">Shipping</option>
+                                    <option value="Picking">Picking</option>
                                 </select>
                              </div>
                              <div className="space-y-1.5">

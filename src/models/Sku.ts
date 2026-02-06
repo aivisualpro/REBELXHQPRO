@@ -79,6 +79,7 @@ const SkuSchema = new mongoose.Schema({
     metaData: [mongoose.Schema.Types.Mixed],
     variances: [{
         _id: { type: String, default: () => new mongoose.Types.ObjectId().toString() },
+        legacyId: String, // Added as requested
         id: Number,
         name: String,
         website: String,

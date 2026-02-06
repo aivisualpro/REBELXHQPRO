@@ -11,7 +11,8 @@ import {
   Printer,
   RefreshCw,
   Loader2,
-  Package
+  Package,
+  Eye
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -41,6 +42,8 @@ interface ItemForm {
     uom: string;
     lotNumber: string;
     cost: number;
+    productDescription?: string;
+    _originalSkuLabel?: string; // To handle legacy display
 }
 
 interface SaleOrder {
@@ -165,7 +168,7 @@ function SaleOrdersContent() {
     clientId: '',
     salesRep: '',
     paymentMethod: '',
-    orderStatus: 'Pending',
+    orderStatus: 'Picking',
     shippedDate: '',
     shippingMethod: '',
     trackingNumber: '',
@@ -219,14 +222,12 @@ function SaleOrdersContent() {
           setClientOptions(clients_list.map((c: any) => ({ label: c.name, value: c._id })));
         }
 
-        // Skus (Filtered by Category: Finished Goods)
-        const sRes = await fetch('/api/skus?limit=1000');
+        // Skus (Fetch all, no limit/filter to ensure legacy/other categories appear)
+        const sRes = await fetch('/api/skus?limit=5000');
         if (sRes.ok) {
           const data = await sRes.json();
-          const filteredSkus = (data.skus || []).filter((s: any) => 
-            s.category && s.category.toLowerCase() === 'finished goods'
-          );
-          setAllSkus(filteredSkus);
+          // Do NOT filter by category, user needs to see all variants/types
+          setAllSkus(data.skus || []);
         }
 
         // Users (Sales Reps)
@@ -297,6 +298,26 @@ function SaleOrdersContent() {
       }
     }
   }, [searchParams, allClients, router]);
+
+  // Handle createNew URL parameter (from header Add button)
+  useEffect(() => {
+    const createNew = searchParams.get('createNew');
+    if (createNew === 'true') {
+      openCreateModal();
+      // Clear the URL parameter without navigation
+      router.replace('/sales/wholesale-orders', { scroll: false });
+    }
+  }, [searchParams, router]);
+
+  // Handle syncCosts URL parameter (from header Sync Costs button)
+  useEffect(() => {
+    const syncCosts = searchParams.get('syncCosts');
+    if (syncCosts === 'true') {
+      handleSyncCosts();
+      // Clear the URL parameter without navigation
+      router.replace('/sales/wholesale-orders', { scroll: false });
+    }
+  }, [searchParams, router]);
 
   // Generate Label
   useEffect(() => {
@@ -433,12 +454,14 @@ function SaleOrdersContent() {
 
     const items: ItemForm[] = (order.lineItems || []).map(item => ({
       id: Math.random().toString(),
-      sku: typeof item.sku === 'object' && item.sku ? item.sku._id : String(item.sku),
+      sku: typeof item.sku === 'object' && item.sku ? item.sku._id : (item.sku ? String(item.sku) : ''),
       qtyShipped: item.qtyShipped,
       price: item.price,
       cost: (item as any).cost || 0,
       uom: item.uom || 'Each',
-      lotNumber: item.lotNumber || ''
+      lotNumber: item.lotNumber || '',
+      productDescription: (item as any).productDescription,
+      _originalSkuLabel: typeof item.sku === 'object' && item.sku ? item.sku.name : ((item as any).productDescription || (item.sku ? String(item.sku) : ''))
     }));
     setNewLineItems(items);
 
@@ -452,7 +475,7 @@ function SaleOrdersContent() {
         clientId: '',
         salesRep: '',
         paymentMethod: '',
-        orderStatus: 'Pending',
+        orderStatus: 'Picking',
         shippedDate: '',
         shippingMethod: '',
         trackingNumber: '',
@@ -802,43 +825,7 @@ function SaleOrdersContent() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-48px)] bg-background relative transition-colors duration-300">
-      <div className="flex items-center justify-between px-4 h-11 border-b border-border bg-secondary/50 transition-colors">
-        <div className="flex items-center space-x-4">
-          <h1 className="text-sm font-bold text-foreground uppercase tracking-tighter">Wholesale Orders</h1>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={openCreateModal}
-            className="h-8 w-8 bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-md flex items-center justify-center rounded cursor-pointer"
-            title="New Order"
-          >
-            <Plus className="w-4 h-4" />
-          </button>
-          
-           <div className="flex items-center space-x-2">
-            <button
-                onClick={handleSyncCosts}
-                disabled={isSyncing}
-                className={cn("h-8 w-8 bg-card border border-border text-muted-foreground hover:text-primary hover:bg-secondary transition-colors shadow-sm flex items-center justify-center rounded", isSyncing && "animate-spin text-primary")}
-                title="Sync Costs"
-            >
-                <RefreshCw className="w-4 h-4" />
-            </button>
-            {syncStatus && (
-                <span className={cn(
-                    "text-[10px] font-bold text-blue-600 max-w-[600px]",
-                    syncStatus.startsWith('✓') ? "text-emerald-600" : "animate-pulse"
-                )}>
-                    {syncStatus}
-                </span>
-            )}
-           </div>
-        </div>
-
-      </div>
-
+    <div className="flex flex-col h-[calc(100vh-36px)] bg-background relative transition-colors duration-300">
       <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
         <div className="min-w-full px-2 py-2">
             <table className="w-full text-left border-separate border-spacing-0 relative z-0">
@@ -1029,10 +1016,29 @@ function SaleOrdersContent() {
                 return (
                   <tr
                     key={order._id}
-                    className="hover:bg-secondary/40 hover:scale-[1.002] hover:shadow-md transition-all duration-200 group relative z-0 hover:z-10 bg-background"
-                    onClick={() => router.push(`/sales/wholesale-orders/${order._id}`)}
+                    className="group relative z-0 bg-background transition-colors duration-150"
                   >
-                    <td className="px-2 py-1.5 text-[10px] font-bold text-foreground tracking-tight font-mono whitespace-nowrap overflow-hidden text-ellipsis max-w-[100px] border-r border-border">{order.label || '-'}</td>
+                    <td className="px-2 py-1.5 border-r border-border group-hover:border-l-2 group-hover:border-l-primary transition-all">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-[10px] font-bold text-foreground tracking-tight font-mono whitespace-nowrap overflow-hidden text-ellipsis max-w-[60px]">{order.label || '-'}</span>
+                        <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => router.push(`/sales/wholesale-orders/${order._id}`)}
+                            className="p-1 text-muted-foreground hover:text-primary hover:bg-secondary rounded transition-colors cursor-pointer"
+                            title="View Order"
+                          >
+                            <Eye className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={(e) => handleEditClick(e, order)}
+                            className="p-1 text-muted-foreground hover:text-primary hover:bg-secondary rounded transition-colors cursor-pointer"
+                            title="Edit Order"
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    </td>
                     <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono border-r border-border">{formatDate(order.createdAt)}</td>
                     <td className="px-2 py-1.5 text-[10px] text-foreground font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px] border-r border-border">{renderClient(order)}</td>
                     <td className="px-2 py-1.5 text-[10px] text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px] border-r border-border">
@@ -1096,46 +1102,32 @@ function SaleOrdersContent() {
 
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-card rounded-lg shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200 border border-border">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-card shrink-0">
-              <h2 className="text-sm font-black uppercase tracking-widest text-foreground flex items-center gap-2">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-7xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[95vh]">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-secondary/20 shrink-0">
+              <h2 className="text-sm font-bold uppercase text-foreground tracking-wider flex items-center gap-2">
                 {editingOrderId ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
                 {editingOrderId ? 'Edit Sale Order' : 'Create Sale Order'}
               </h2>
-              <button
-                onClick={() => setIsCreateModalOpen(false)}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
+              <button onClick={() => setIsCreateModalOpen(false)} className="text-muted-foreground hover:text-destructive transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 bg-card text-foreground">
-              <form id="create-so-form" onSubmit={handleCreateOrUpdate}>
+            <div className="flex-1 overflow-y-auto p-6">
+              <form id="create-so-form" onSubmit={handleCreateOrUpdate} className="space-y-8">
                 {/* Header Info */}
-                <div className="space-y-6">
-                    <div>
-                        <h4 className="text-xs font-bold text-foreground uppercase tracking-wider mb-3 pb-1 border-b border-border">Order Details</h4>
-                        <div className="grid grid-cols-4 gap-4">
-                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Order Name/ID <span className="text-destructive">*</span></label>
-                                <input
-                                type="text"
-                                value={newOrder.label}
-                                onChange={e => setNewOrder({ ...newOrder, label: e.target.value })}
-                                className="w-full px-3 py-2 bg-secondary/50 border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/20 text-foreground font-mono dark:bg-secondary dark:text-foreground dark:border-white/10"
-                                placeholder="Auto-generated"
-                                />
-                            </div>
+                <div className="grid grid-cols-12 gap-6">
+                    {/* Left Column */}
+                    <div className="col-span-8 space-y-6">
+                        <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1.5">
                                 <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Client <span className="text-destructive">*</span></label>
                                 <SearchableSelect
-                                options={allClients.map(c => ({ value: c._id, label: c.name }))}
-                                value={newOrder.clientId}
-                                onChange={handleClientChange}
-                                placeholder="Select Client..."
-                                required
-                                className="w-full"
+                                    options={allClients.map(c => ({ value: c._id, label: c.name }))}
+                                    value={newOrder.clientId}
+                                    onChange={handleClientChange}
+                                    placeholder="Select Client..."
+                                    className="w-full h-9 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-slate-900"
                                 />
                             </div>
                             <div className="space-y-1.5">
@@ -1145,9 +1137,12 @@ function SaleOrdersContent() {
                                     value={newOrder.salesRep}
                                     onChange={(val) => setNewOrder({ ...newOrder, salesRep: val })}
                                     placeholder="Select Rep..."
-                                    className="w-full"
+                                    className="w-full h-9 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-slate-900"
                                 />
                             </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-4">
                             <div className="space-y-1.5">
                                 <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Payment Method</label>
                                 <SearchableSelect
@@ -1155,11 +1150,47 @@ function SaleOrdersContent() {
                                     value={newOrder.paymentMethod}
                                     onChange={(val) => setNewOrder({ ...newOrder, paymentMethod: val })}
                                     placeholder="Select Method..."
-                                    className="w-full"
+                                    className="w-full h-9 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-slate-900"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Order Status</label>
+                                <SearchableSelect
+                                    options={statusOptions.length > 0 ? statusOptions : [{ label: 'Picking', value: 'Picking' }]}
+                                    value={newOrder.orderStatus}
+                                    onChange={(val) => setNewOrder({ ...newOrder, orderStatus: val })}
+                                    className="w-full h-9 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-slate-900"
+                                />
+                            </div>
+                             <div className="space-y-1.5">
+                                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Date</label>
+                                <input
+                                type="date"
+                                disabled
+                                className="w-full h-9 px-3 bg-slate-50 border border-slate-200 rounded text-xs text-slate-500 cursor-not-allowed"
+                                value={new Date().toISOString().split('T')[0]}
                                 />
                             </div>
                         </div>
                     </div>
+
+                    {/* Right Column (Label/Meta) */}
+                    <div className="col-span-4 bg-secondary/10 border border-border rounded p-4 space-y-4">
+                        <div className="flex flex-col items-center justify-center h-full space-y-2">
+                             <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Order Number (Auto)</div>
+                             <div className="text-3xl font-black text-primary">{newOrder.label || '---'}</div>
+                             <div className="flex items-center gap-2 mt-2">
+                                 <span className={cn("px-2 py-0.5 text-[10px] uppercase font-bold rounded border",
+                                     newOrder.orderStatus === 'Completed' ? "bg-emerald-100 text-emerald-700 border-emerald-200" :
+                                     newOrder.orderStatus === 'Pending Payment' ? "bg-amber-100 text-amber-700 border-amber-200" :
+                                     "bg-slate-100 text-slate-700 border-slate-200"
+                                 )}>
+                                     {newOrder.orderStatus}
+                                 </span>
+                             </div>
+                        </div>
+                    </div>
+                </div>
 
                     {/* Shipping Details */}
                     <div>
@@ -1173,7 +1204,7 @@ function SaleOrdersContent() {
                                     onChange={(val) => setNewOrder({ ...newOrder, shippingMethod: val })}
                                     creatable
                                     placeholder="Select Method..."
-                                    className="w-full"
+                                    className="w-full h-9 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-slate-900"
                                 />
                             </div>
                              <div className="col-span-2 space-y-1.5">
@@ -1182,7 +1213,7 @@ function SaleOrdersContent() {
                                 type="text"
                                 value={newOrder.trackingNumber}
                                 onChange={e => setNewOrder({ ...newOrder, trackingNumber: e.target.value })}
-                                className="w-full px-3 py-2 bg-secondary/50 border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/20 text-foreground dark:bg-secondary dark:text-foreground dark:border-white/10"
+                                className="w-full h-9 px-3 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-slate-900"
                                 />
                             </div>
                              <div className="space-y-1.5">
@@ -1191,7 +1222,7 @@ function SaleOrdersContent() {
                                 type="date"
                                 value={newOrder.shippedDate ? new Date(newOrder.shippedDate).toISOString().split('T')[0] : ''}
                                 onChange={e => setNewOrder({ ...newOrder, shippedDate: e.target.value })}
-                                className="w-full px-3 py-2 bg-secondary/50 border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/20 text-foreground dark:bg-secondary dark:text-foreground dark:border-white/10"
+                                className="w-full h-9 px-3 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-slate-900"
                                 />
                             </div>
                              <div className="col-span-3">
@@ -1201,7 +1232,7 @@ function SaleOrdersContent() {
                                     type="text"
                                     value={newOrder.shippingAddress}
                                     onChange={e => setNewOrder({ ...newOrder, shippingAddress: e.target.value })}
-                                    className="w-full px-3 py-2 bg-secondary/50 border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/20 text-foreground dark:bg-secondary dark:text-foreground dark:border-white/10"
+                                    className="w-full h-9 px-3 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-slate-900"
                                     placeholder="Street Address, City, State, Zip"
                                     />
                                 </div>
@@ -1224,7 +1255,7 @@ function SaleOrdersContent() {
                                     value={newOrder.shippingCost}
                                     onWheel={(e) => e.currentTarget.blur()}
                                     onChange={e => setNewOrder({ ...newOrder, shippingCost: e.target.value })}
-                                    className="w-full pl-5 pr-2 py-2 bg-secondary/50 border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/20 text-foreground"
+                                    className="w-full h-9 pl-5 pr-2 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-slate-900"
                                     placeholder="0.00"
                                     />
                                 </div>
@@ -1240,7 +1271,7 @@ function SaleOrdersContent() {
                                     value={newOrder.discount}
                                     onWheel={(e) => e.currentTarget.blur()}
                                     onChange={e => setNewOrder({ ...newOrder, discount: e.target.value })}
-                                    className="w-full pl-5 pr-2 py-2 bg-secondary/50 border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/20 text-foreground"
+                                    className="w-full h-9 pl-5 pr-2 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-slate-900"
                                     placeholder="0.00"
                                     />
                                 </div>
@@ -1256,7 +1287,7 @@ function SaleOrdersContent() {
                                     value={newOrder.tax}
                                     onWheel={(e) => e.currentTarget.blur()}
                                     onChange={e => setNewOrder({ ...newOrder, tax: e.target.value })}
-                                    className="w-full pl-5 pr-2 py-2 bg-secondary/50 border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/20 text-foreground"
+                                    className="w-full h-9 pl-5 pr-2 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-slate-900"
                                     placeholder="0.00"
                                     />
                                 </div>
@@ -1277,7 +1308,6 @@ function SaleOrdersContent() {
                             </div>
                         </div>
                     </div>
-                </div>
 
                 <div className="border-t border-border pt-6">
                   <div className="flex items-center justify-between mb-4">
@@ -1313,11 +1343,12 @@ function SaleOrdersContent() {
                       <table className="w-full text-left border-collapse border-b border-border">
                         <thead className="bg-secondary/50 text-muted-foreground">
                            <tr>
-                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[35%] border-r border-border">Item / SKU</th>
-                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[15%] border-r border-border">Lot #</th>
-                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[10%] border-r border-border">UOM</th>
-                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[10%] border-r border-border">Qty</th>
-                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[15%] border-r border-border">Price</th>
+                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[25%] border-r border-border">Item / SKU</th>
+                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[20%] border-r border-border">Description</th>
+                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[12%] border-r border-border">Lot #</th>
+                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[8%] border-r border-border">UOM</th>
+                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[8%] border-r border-border">Qty</th>
+                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[12%] border-r border-border">Price</th>
                               <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[10%] text-right border-r border-border">Total</th>
                               <th className="px-2 py-2 w-[5%] bg-card"></th>
                            </tr>
@@ -1328,16 +1359,41 @@ function SaleOrdersContent() {
                                 <td className="p-0 border-r border-border text-foreground">
                                     <div className="w-full h-full">
                                         <SearchableSelect
-                                            options={allSkus
-                                                .filter(s => !newLineItems.some(i => i.id !== item.id && i.sku === s._id))
-                                                .map(s => ({ value: s._id, label: s.name }))
-                                            }
+                                            options={(() => {
+                                                  const available = allSkus.filter(s => !newLineItems.some(i => i.id !== item.id && i.sku === s._id));
+                                                  const opts = available.map(s => ({ value: s._id, label: s.name }));
+                                                  const isMissing = item.sku && !allSkus.find(s => s._id === item.sku);
+                                                  const isLegacyDisplay = !item.sku && item._originalSkuLabel; 
+
+                                                  if (isMissing) {
+                                                      opts.push({ 
+                                                          value: item.sku, 
+                                                          label: item._originalSkuLabel || `Legacy: ${item.sku}` 
+                                                      });
+                                                  } else if (isLegacyDisplay) {
+                                                      opts.push({
+                                                          value: '',
+                                                          label: item._originalSkuLabel || 'Unknown Item'
+                                                      });
+                                                  }
+                                                  
+                                                  return opts;
+                                            })()}
                                             value={item.sku}
                                             onChange={(val) => updateLineItem(item.id, 'sku', val)}
-                                            placeholder="Select SKU"
-                                            className="w-full rounded-none border-none text-sm focus:ring-0 bg-transparent text-foreground"
+                                            placeholder={item._originalSkuLabel || "Select SKU"}
+                                            className="w-full rounded-none border-none text-xs focus:ring-0 bg-transparent text-foreground h-[32px]"
                                         />
                                     </div>
+                                </td>
+                                <td className="p-0 border-r border-border">
+                                    <input
+                                      type="text"
+                                      value={item.productDescription || ''}
+                                      onChange={(e) => updateLineItem(item.id, 'productDescription', e.target.value)}
+                                      className="w-full h-[32px] px-2 text-xs focus:outline-none focus:bg-primary/5 transition-colors rounded-none bg-transparent text-foreground"
+                                      placeholder="Description..."
+                                    />
                                 </td>
                                 <td className="p-0 border-r border-border">
                                     <div 
@@ -1364,7 +1420,7 @@ function SaleOrdersContent() {
                                         onChange={(val) => updateLineItem(item.id, 'uom', val)}
                                         placeholder="UOM"
                                         creatable
-                                        className="w-full rounded-none border-none focus:ring-0 bg-transparent text-foreground"
+                                        className="w-full rounded-none border-none focus:ring-0 bg-transparent text-foreground h-[32px] text-xs"
                                     />
                                 </td>
                                 <td className="p-0 border-r border-border">
@@ -1374,7 +1430,7 @@ function SaleOrdersContent() {
                                       value={item.qtyShipped}
                                       onWheel={(e) => e.currentTarget.blur()}
                                       onChange={(e) => updateLineItem(item.id, 'qtyShipped', parseInt(e.target.value) || 0)}
-                                      className="w-full h-[32px] px-2 text-sm focus:outline-none focus:bg-primary/5 transition-colors font-mono rounded-none bg-transparent text-foreground"
+                                      className="w-full h-[32px] px-2 text-xs focus:outline-none focus:bg-primary/5 transition-colors font-mono rounded-none bg-transparent text-foreground"
                                     />
                                 </td>
                                 <td className="p-0 border-r border-border">
@@ -1387,7 +1443,7 @@ function SaleOrdersContent() {
                                           value={item.price}
                                           onWheel={(e) => e.currentTarget.blur()}
                                           onChange={(e) => updateLineItem(item.id, 'price', parseFloat(e.target.value) || 0)}
-                                          className="w-full h-[32px] pl-5 pr-2 text-sm focus:outline-none focus:bg-primary/5 transition-colors font-mono text-right rounded-none bg-transparent text-foreground"
+                                          className="w-full h-[32px] pl-5 pr-2 text-xs focus:outline-none focus:bg-primary/5 transition-colors font-mono text-right rounded-none bg-transparent text-foreground"
                                         />
                                     </div>
                                 </td>
@@ -1411,7 +1467,7 @@ function SaleOrdersContent() {
                         </tbody>
                         <tfoot className="bg-secondary/50">
                             <tr>
-                                <td colSpan={5} className="px-2 py-2 text-[10px] font-bold text-muted-foreground uppercase text-right tracking-wider border-r border-border">Subtotal</td>
+                                <td colSpan={6} className="px-2 py-2 text-[10px] font-bold text-muted-foreground uppercase text-right tracking-wider border-r border-border">Subtotal</td>
                                 <td className="px-2 py-2 text-xs font-black text-foreground font-mono text-right border-r border-border">
                                     {formatCurrency(newLineItems.reduce((sum, item) => sum + ((item.qtyShipped || 0) * (item.price || 0)), 0))}
                                 </td>
