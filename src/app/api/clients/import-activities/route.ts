@@ -13,52 +13,42 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Invalid input' }, { status: 400 });
         }
 
-        // Build a legacyId → _id lookup map (batch query)
+        // Extract all unique legacyIds from CSV (trimmed)
         const legacyIds = [...new Set(
             activities
-                .map((a: any) => a.client || a.clientid || a.clientId || a.legacyId || a.clientLegacyId)
+                .map((a: any) => (a.client || a.clientid || a.clientId || a.legacyId || a.clientLegacyId || '').toString().trim())
                 .filter(Boolean)
         )];
 
+        // Batch-fetch all matching clients
         const clients = await Client.find({ legacyId: { $in: legacyIds } })
             .select('_id legacyId')
             .lean();
 
         const legacyToId = new Map<string, string>();
         clients.forEach((c: any) => {
-            legacyToId.set(c.legacyId, c._id.toString());
-        });
-
-        // Build existing activity keys for deduplication
-        const existingActivities = await Activity.find({
-            client: { $in: clients.map((c: any) => c._id) }
-        }).select('type client comments createdAt').lean();
-
-        const existingKeys = new Set<string>();
-        existingActivities.forEach((a: any) => {
-            const key = `${a.client}_${a.type}_${(a.comments || '').substring(0, 50)}_${a.createdAt ? new Date(a.createdAt).toISOString().split('T')[0] : ''}`;
-            existingKeys.add(key);
+            legacyToId.set(c.legacyId.toString().trim(), c._id.toString());
         });
 
         let insertedCount = 0;
-        let skippedCount = 0;
-        let missingClientCount = 0;
+        const missingLegacyIds: string[] = [];
         const toInsert: any[] = [];
 
         for (const item of activities) {
-            const clientLegacyId = item.client || item.clientid || item.clientId || item.legacyId || item.clientLegacyId;
-            if (!clientLegacyId) {
-                missingClientCount++;
+            const rawClientId = (item.client || item.clientid || item.clientId || item.legacyId || item.clientLegacyId || '').toString().trim();
+            if (!rawClientId) {
                 continue;
             }
 
-            const clientObjectId = legacyToId.get(clientLegacyId);
+            const clientObjectId = legacyToId.get(rawClientId);
             if (!clientObjectId) {
-                missingClientCount++;
+                if (!missingLegacyIds.includes(rawClientId)) {
+                    missingLegacyIds.push(rawClientId);
+                }
                 continue;
             }
 
-            const type = item.type || 'Call';
+            const type = (item.type || 'Call').trim();
             const comments = item.comments || '';
             const createdBy = item.createdBy || 'Import';
 
@@ -66,14 +56,6 @@ export async function POST(request: Request) {
             if (item.createdAt && !isNaN(Date.parse(item.createdAt))) {
                 createdAt = new Date(item.createdAt);
             }
-
-            // Dedup check
-            const key = `${clientObjectId}_${type}_${comments.substring(0, 50)}_${createdAt.toISOString().split('T')[0]}`;
-            if (existingKeys.has(key)) {
-                skippedCount++;
-                continue;
-            }
-            existingKeys.add(key);
 
             toInsert.push({
                 type,
@@ -84,17 +66,23 @@ export async function POST(request: Request) {
             });
         }
 
-        // Bulk insert
-        if (toInsert.length > 0) {
-            await Activity.insertMany(toInsert);
-            insertedCount = toInsert.length;
+        // Bulk insert in batches of 5000 to avoid memory issues
+        const BATCH_SIZE = 5000;
+        for (let i = 0; i < toInsert.length; i += BATCH_SIZE) {
+            const batch = toInsert.slice(i, i + BATCH_SIZE);
+            await Activity.insertMany(batch, { ordered: false });
+        }
+        insertedCount = toInsert.length;
+
+        if (missingLegacyIds.length > 0) {
+            console.log('Missing client legacyIds:', missingLegacyIds);
         }
 
         return NextResponse.json({
             message: 'Import completed',
             count: insertedCount,
-            skippedDuplicates: skippedCount,
-            missingClients: missingClientCount,
+            missingClients: missingLegacyIds.length,
+            missingClientIds: missingLegacyIds.slice(0, 50), // return first 50 for debugging
             totalProcessed: activities.length
         });
     } catch (error: any) {

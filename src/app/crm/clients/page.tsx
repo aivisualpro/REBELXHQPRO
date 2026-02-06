@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { TableColumnHeader } from '@/components/ui/TableColumnHeader';
 import { Pagination } from '@/components/ui/Pagination';
 import { MultiSelectFilter, MultiSelectFilterRef } from '@/components/ui/filters/MultiSelectFilter';
@@ -74,8 +74,10 @@ export default function ClientsPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   
   // Search & Filter State
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const searchParams = useSearchParams();
+  const urlSearch = searchParams.get('search') || '';
+  const [search, setSearch] = useState(urlSearch);
+  const [debouncedSearch, setDebouncedSearch] = useState(urlSearch);
   
   const [selectedSalesReps, setSelectedSalesReps] = useState<string[]>([]);
   const [selectedStates, setSelectedStates] = useState<string[]>([]);
@@ -147,6 +149,15 @@ export default function ClientsPage() {
     }, 500); 
     return () => clearTimeout(timer);
   }, [search]);
+
+  // Sync when URL search param changes (from header search bar)
+  useEffect(() => {
+    if (urlSearch !== search) {
+      setSearch(urlSearch);
+      setDebouncedSearch(urlSearch);
+      setPage(1);
+    }
+  }, [urlSearch]);
 
   const fetchClients = useCallback(async () => {
     setLoading(true);
