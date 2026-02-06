@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { TableColumnHeader } from '@/components/ui/TableColumnHeader';
 import { Pagination } from '@/components/ui/Pagination';
 import toast from 'react-hot-toast';
@@ -152,6 +152,8 @@ const StatusBadge = ({ status }: { status: string }) => {
 
 export default function LeadsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const search = searchParams.get('search') || '';
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -189,7 +191,6 @@ export default function LeadsPage() {
     });
     return initialState;
   });
-  const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   
   const [selectedSalesReps, setSelectedSalesReps] = useState<string[]>([]);
@@ -546,22 +547,13 @@ export default function LeadsPage() {
       {headerPortalTarget && createPortal(
         <>
           {/* Title */}
-          <h1 className="text-sm font-bold text-foreground uppercase tracking-tight mr-4">Leads</h1>
-          
-          {/* Search */}
-          <div className="relative group flex-1 max-w-xs">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground group-focus-within:text-primary transition-colors" />
-            <input 
-              type="text" 
-              placeholder="Search leads..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 pr-3 h-7 w-full bg-secondary/50 hover:bg-secondary focus:bg-background border border-transparent focus:border-primary rounded text-xs transition-all focus:outline-none placeholder:text-muted-foreground text-foreground"
-            />
-          </div>
+          <h1 className="text-sm font-bold text-foreground uppercase tracking-tight">Leads</h1>
+
+          {/* Spacer */}
+          <div className="flex-1" />
 
           {/* View Toggle */}
-          <div className="flex items-center bg-secondary/50 p-0.5 rounded border border-border h-7 ml-3">
+          <div className="flex items-center bg-secondary/50 p-0.5 rounded border border-border h-7">
             <button 
               onClick={() => setViewMode('table')}
               className={cn(
@@ -587,7 +579,7 @@ export default function LeadsPage() {
           {/* Add Button */}
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="ml-3 flex items-center space-x-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm transition-all cursor-pointer"
+            className="ml-2 flex items-center space-x-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm transition-all cursor-pointer"
             title="Add New Lead"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -614,7 +606,7 @@ export default function LeadsPage() {
               <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
                   <div className="min-w-full px-2 py-2">
                       <table className="w-full text-left border-separate border-spacing-0 relative z-0">
-                          <thead className="bg-secondary/50 border-b border-border sticky top-0 z-10 transition-colors duration-300">
+                          <thead className="sticky top-0 bg-secondary/80 z-10 border-b border-border backdrop-blur-md transition-colors">
                               <tr>
                                   {[
                                       { key: 'name', label: 'name' },
@@ -629,9 +621,9 @@ export default function LeadsPage() {
                                       <th 
                                           key={col.key} 
                                           className={cn(
-                                              "px-1 py-1 border-b border-border",
+                                              "p-1 border-b border-border text-[10px]",
                                               col.align || "text-left",
-                                              (col.key === 'contact' || col.key === 'phone') && "w-16 px-1",
+                                              (col.key === 'contact' || col.key === 'phone') && "w-16 px-2",
                                               col.key === 'status' && "w-24 px-1"
                                           )}
                                       >
@@ -648,23 +640,23 @@ export default function LeadsPage() {
                                   ))}
                               </tr>
                           </thead>
-                          <tbody className="divide-y divide-border transition-colors duration-300">
+                          <tbody className="divide-y divide-border bg-background/50">
                               {loading && leads.length === 0 ? (
-                                  <tr><td colSpan={8} className="px-4 py-12 text-center text-sm text-muted-foreground italic">Loading leads...</td></tr>
+                                  <tr><td colSpan={8} className="px-4 py-12 text-center text-xs text-slate-400">Loading Leads...</td></tr>
                               ) : leads.length > 0 ? (
                                   leads.map((lead) => (
                                       <tr 
                                           key={lead._id} 
+                                          className="group relative z-0 bg-background transition-colors duration-150 cursor-pointer"
                                           onClick={() => router.push(`/crm/leads/${lead._id}`)}
-                                          className="hover:bg-primary/5 hover:scale-[1.008] hover:shadow-md transition-all duration-200 group cursor-pointer relative z-0 hover:z-10"
                                       >
                                           {/* NAME */}
-                                          <td className="px-1 py-1">
-                                              <div className="flex items-center space-x-3">
-                                                  <div className="w-6 h-6 rounded bg-secondary border border-border flex items-center justify-center shrink-0 text-[10px] font-bold text-muted uppercase">
+                                          <td className="p-1 border-r border-border group-hover:border-l-2 group-hover:border-l-primary transition-all">
+                                              <div className="flex items-center space-x-2">
+                                                  <div className="w-5 h-5 rounded bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 text-[8px] font-bold text-slate-500 uppercase">
                                                       {lead.name.substring(0, 2)}
                                                   </div>
-                                                  <span className="text-[10px] font-medium text-foreground leading-[13.3px] truncate max-w-[200px]">{lead.name}</span>
+                                                  <span className="text-[10px] font-medium text-foreground leading-tight truncate max-w-[180px]">{lead.name}</span>
                                                   <button
                                                       onClick={(e) => {
                                                           e.stopPropagation();
@@ -677,10 +669,9 @@ export default function LeadsPage() {
                                                   </button>
                                               </div>
                                           </td>
-
                                           
                                           {/* EMAIL */}
-                                          <td className="px-1 py-1">
+                                          <td className="p-1">
                                               {lead.emails?.[0]?.value && (
                                                   <button 
                                                       onClick={(e) => {
@@ -696,7 +687,7 @@ export default function LeadsPage() {
                                           </td>
 
                                           {/* PHONE */}
-                                          <td className="px-1 py-1">
+                                          <td className="p-1">
                                               {lead.phones?.[0]?.value && (
                                                   <button 
                                                       onClick={(e) => {
@@ -711,9 +702,9 @@ export default function LeadsPage() {
                                           </td>
 
                                           {/* ADDRESS */}
-                                          <td className="px-1 py-1">
+                                          <td className="p-1">
                                               {lead.addresses?.[0] ? (
-                                                  <div className="flex items-center text-[10px] font-medium text-foreground opacity-60 leading-[13.3px]">
+                                                  <div className="flex items-center text-[10px] font-medium text-foreground opacity-60 leading-tight">
                                                       <span className="truncate max-w-[150px]">{lead.addresses[0].city}, {lead.addresses[0].state}</span>
                                                   </div>
                                               ) : (
@@ -722,7 +713,7 @@ export default function LeadsPage() {
                                           </td>
 
                                           {/* SALES REP */}
-                                           <td className="px-1 py-1 text-[10px] font-medium text-foreground opacity-60 leading-[13.3px]">
+                                           <td className="p-1 text-[10px] font-medium text-foreground opacity-60 leading-tight">
                                               {lead.salesPerson ? (
                                                   <span>{lead.salesPerson.firstName} {lead.salesPerson.lastName}</span>
                                               ) : (
@@ -731,17 +722,17 @@ export default function LeadsPage() {
                                           </td>
 
                                           {/* COMPANY TYPE (STATUS) */}
-                                          <td className="px-1 py-1">
+                                          <td className="p-1">
                                               <StatusBadge status={lead.companyType || 'POTENTIAL'} />
                                           </td>
 
                                           {/* LEAD AGING */}
-                                          <td className="p-0">
+                                          <td className="p-1">
                                               <LeadAgingCounter lastActivity={lead.lastActivity} />
                                           </td>
 
                                           {/* ACTIVITIES (Combined) */}
-                                          <td className="px-1 py-1 text-center">
+                                          <td className="p-1 text-center">
                                               <div className="flex items-center justify-center space-x-1">
                                                    <span className={cn(
                                                        "inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded-sm text-[10px] font-bold transition-all",
@@ -772,7 +763,7 @@ export default function LeadsPage() {
                                       </tr>
                                   ))
                               ) : (
-                                  <tr><td colSpan={8} className="p-12 text-center text-slate-400">No leads found</td></tr>
+                                  <tr><td colSpan={8} className="px-4 py-12 text-center text-xs text-slate-400 uppercase font-bold tracking-tighter opacity-50">No leads found</td></tr>
                               )}
                           </tbody>
                       </table>

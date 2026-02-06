@@ -3,16 +3,41 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { Search, Bell, User, LogOut, Sun, Moon } from 'lucide-react';
+import { Search, Bell, User, LogOut, Sun, Moon, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSession, signOut } from 'next-auth/react';
 import { useTheme } from '@/components/ThemeProvider';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 export const DynamicActions = () => {
     const { data: session } = useSession();
     const { theme, toggleTheme } = useTheme();
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const [searchValue, setSearchValue] = useState('');
     const menuRef = useRef<HTMLDivElement>(null);
+    const searchInputRef = useRef<HTMLInputElement>(null);
+    const pathname = usePathname();
+    const router = useRouter();
+    const searchParams = useSearchParams();
+
+    // Routes that support search
+    const searchableRoutes = ['/crm/leads', '/crm/clients', '/sales/wholesale-orders', '/warehouse/skus'];
+    const isSearchable = searchableRoutes.includes(pathname);
+
+    // Sync search value from URL
+    useEffect(() => {
+        const urlSearch = searchParams.get('search') || '';
+        setSearchValue(urlSearch);
+        if (urlSearch) setIsSearchOpen(true);
+    }, [searchParams]);
+
+    // Focus input when search opens
+    useEffect(() => {
+        if (isSearchOpen && searchInputRef.current) {
+            searchInputRef.current.focus();
+        }
+    }, [isSearchOpen]);
 
     // Close menu when clicking outside
     useEffect(() => {
@@ -25,12 +50,75 @@ export const DynamicActions = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    const handleSearchChange = (value: string) => {
+        setSearchValue(value);
+        // Update URL with search param
+        const params = new URLSearchParams(searchParams.toString());
+        if (value) {
+            params.set('search', value);
+        } else {
+            params.delete('search');
+        }
+        router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    };
+
+    const handleSearchClose = () => {
+        setIsSearchOpen(false);
+        setSearchValue('');
+        // Clear search from URL
+        const params = new URLSearchParams(searchParams.toString());
+        params.delete('search');
+        router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    };
+
     return (
         <div className="flex items-center justify-end space-x-1 w-full h-full">
             {/* Global Actions */}
-            <button className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-all cursor-pointer">
-                <Search className="w-4 h-4" />
-            </button>
+            <AnimatePresence mode="wait">
+                {isSearchOpen && isSearchable ? (
+                    <motion.div 
+                        key="search-input"
+                        initial={{ width: 0, opacity: 0 }}
+                        animate={{ width: 160, opacity: 1 }}
+                        exit={{ width: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="relative flex items-center"
+                    >
+                        <Search className="absolute left-2 w-3.5 h-3.5 text-muted-foreground" />
+                        <input
+                            ref={searchInputRef}
+                            type="text"
+                            value={searchValue}
+                            onChange={(e) => handleSearchChange(e.target.value)}
+                            placeholder="Search..."
+                            className="pl-7 pr-7 h-6 w-full bg-secondary border border-border rounded text-xs focus:outline-none focus:border-primary text-foreground placeholder:text-muted-foreground"
+                        />
+                        <button 
+                            onClick={handleSearchClose}
+                            className="absolute right-1.5 p-0.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                        >
+                            <X className="w-3 h-3" />
+                        </button>
+                    </motion.div>
+                ) : (
+                    <motion.button 
+                        key="search-button"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => isSearchable && setIsSearchOpen(true)}
+                        className={cn(
+                            "p-1.5 rounded-full transition-all",
+                            isSearchable 
+                                ? "text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer" 
+                                : "text-muted-foreground/30 cursor-not-allowed"
+                        )}
+                        title={isSearchable ? "Search" : "Search not available on this page"}
+                    >
+                        <Search className="w-4 h-4" />
+                    </motion.button>
+                )}
+            </AnimatePresence>
             <button className="relative p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-all cursor-pointer">
                 <Bell className="w-4 h-4" />
                 <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-red-500 rounded-full border border-card" />
@@ -102,3 +190,4 @@ export const DynamicActions = () => {
         </div>
     );
 };
+
