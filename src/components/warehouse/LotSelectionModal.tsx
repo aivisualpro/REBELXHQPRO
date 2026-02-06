@@ -216,7 +216,7 @@ export function LotSelectionModal({
     );
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[2001] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white shadow-2xl max-w-md w-full overflow-hidden scale-100 transition-transform">
                 {/* Header */}
                 <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">

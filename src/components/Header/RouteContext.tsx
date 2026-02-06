@@ -63,7 +63,7 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
         return {
             title: 'Products',
             actions: [
-                { label: 'Add', icon: Plus, variant: 'primary' },
+                { label: 'Add', icon: Plus, href: '/warehouse/skus?createNew=true', variant: 'primary' },
             ]
         };
     }

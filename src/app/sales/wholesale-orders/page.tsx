@@ -1101,7 +1101,7 @@ function SaleOrdersContent() {
       </div>
 
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-lg shadow-2xl w-full max-w-7xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[95vh]">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-secondary/20 shrink-0">
               <h2 className="text-sm font-bold uppercase text-foreground tracking-wider flex items-center gap-2">
@@ -1156,7 +1156,13 @@ function SaleOrdersContent() {
                             <div className="space-y-1.5">
                                 <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Order Status</label>
                                 <SearchableSelect
-                                    options={statusOptions.length > 0 ? statusOptions : [{ label: 'Picking', value: 'Picking' }]}
+                                    options={[
+                                      { label: 'Picking', value: 'Picking' },
+                                      { label: 'Shipping', value: 'Shipping' },
+                                      { label: 'Pending Payment', value: 'Pending Payment' },
+                                      { label: 'Issued', value: 'Issued' },
+                                      { label: 'Completed', value: 'Completed' }
+                                    ]}
                                     value={newOrder.orderStatus}
                                     onChange={(val) => setNewOrder({ ...newOrder, orderStatus: val })}
                                     className="w-full h-9 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-slate-900"
@@ -1399,6 +1405,7 @@ function SaleOrdersContent() {
                                     <div 
                                         className="w-full h-[32px] px-2 flex items-center cursor-pointer hover:bg-secondary/30 transition-colors"
                                         onClick={() => {
+                                            // Allow lot selection if SKU is set (valid ObjectId or string)
                                             if (!item.sku) {
                                                 toast.error("Select SKU first");
                                                 return;
@@ -1509,7 +1516,7 @@ function SaleOrdersContent() {
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-lg shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
             <div className="p-6 text-center">
               <div className="w-10 h-10 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">

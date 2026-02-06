@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Search,
   ArrowUpDown,
@@ -12,12 +12,15 @@ import {
   Loader2,
   Package,
   Layers,
-  Box
+  Box,
+  Eye,
+  Pencil
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { Pagination } from '@/components/ui/Pagination';
 import { MultiSelectFilter } from '@/components/ui/filters/MultiSelectFilter';
+import { TableColumnHeader } from '@/components/ui/TableColumnHeader';
 
 interface Sku {
   _id: string; // SKU
@@ -44,6 +47,7 @@ interface Sku {
 
 export default function SkusPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [skus, setSkus] = useState<Sku[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -137,6 +141,17 @@ export default function SkusPage() {
       .catch(() => {});
   }, []);
 
+  // Handle createNew URL param
+  useEffect(() => {
+    if (searchParams.get('createNew') === 'true') {
+        openModal();
+        // Remove param
+        const params = new URLSearchParams(searchParams.toString());
+        params.delete('createNew');
+        window.history.replaceState(null, '', `?${params.toString()}`);
+    }
+  }, [searchParams]);
+
   const handleSort = (column: string) => {
     if (sortBy === column) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -218,93 +233,124 @@ export default function SkusPage() {
     }
   };
 
+  // Derived options for filters based on current data
+  const categoryOptions = Array.from(new Set(skus.map(s => s.category).filter(Boolean))).map(c => ({ label: c, value: c }));
+  const subCategoryOptions = Array.from(new Set(skus.map(s => s.subCategory).filter(Boolean))).map(c => ({ label: c, value: c }));
+  const materialOptions = Array.from(new Set(skus.map(s => s.materialType).filter(Boolean))).map(c => ({ label: c, value: c }));
+
   return (
-    <div className="flex flex-col h-[calc(100vh-48px)] bg-background transition-colors duration-300">
-      <div className="flex items-center justify-between px-4 h-11 border-b border-border bg-secondary/50 transition-colors">
-        <div className="flex items-center space-x-4">
-          <h1 className="text-sm font-bold text-foreground uppercase tracking-tighter">SKUs</h1>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search SKUs..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 pr-3 h-8 w-64 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <MultiSelectFilter
-            label="Category"
-            icon={Package}
-            options={Array.from(new Set(skus.map(s => s.category).filter(Boolean))).map(c => ({ label: c, value: c }))}
-            selectedValues={selectedCategories}
-            onChange={setSelectedCategories}
-            className="h-8"
-          />
-          <MultiSelectFilter
-            label="Sub Cat"
-            icon={Layers}
-            options={Array.from(new Set(skus.map(s => s.subCategory).filter(Boolean))).map(c => ({ label: c, value: c }))}
-            selectedValues={selectedSubCategories}
-            onChange={setSelectedSubCategories}
-            className="h-8"
-          />
-          <MultiSelectFilter
-            label="Material"
-            icon={Box}
-            options={Array.from(new Set(skus.map(s => s.materialType).filter(Boolean))).map(c => ({ label: c, value: c }))}
-            selectedValues={selectedMaterialTypes}
-            onChange={setSelectedMaterialTypes}
-            className="h-8"
-          />
-
-          <div className="w-px h-6 bg-border mx-2" />
-
-          <button
-            onClick={() => openModal()}
-            className="h-8 w-8 bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-md flex items-center justify-center rounded cursor-pointer"
-            title="Add SKU"
-          >
-            <Plus className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-
+    <div className="flex flex-col h-[calc(100vh-36px)] bg-background relative transition-colors duration-300">
       <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
         <div className="min-w-full px-2 py-2">
           <table className="w-full text-left border-separate border-spacing-0 relative z-0">
           <thead className="sticky top-0 bg-secondary/80 z-10 border-b border-border backdrop-blur-md transition-colors">
             <tr>
-              <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest w-10">Img</th>
-              {[
-                { key: 'name', label: 'Name' },
-                { key: 'category', label: 'Category' },
-                { key: 'subCategory', label: 'Sub Cat' },
-                { key: 'materialType', label: 'Material' },
-                { key: 'salePrice', label: 'Sale Price' },
-                { key: 'avgCost', label: 'Cost (Avg)' },
-                { key: 'currentStock', label: 'Avb Qty' },
-                { key: 'reOrderPoint', label: 'Re-Ord' },
-                { key: 'orderUpto', label: 'Order Up to' },
-                { key: 'revenue', label: 'Revenue' },
-                { key: 'cogs', label: 'COGS' },
-                { key: 'cogm', label: 'COGM' },
-                { key: 'grossProfit', label: 'Gross Profit' },
-              ].map(col => (
-                <th
-                  key={col.key}
-                  onClick={() => handleSort(col.key)}
-                  className="px-2 py-2 text-[8px] font-bold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary transition-colors border-r border-border last:border-0 whitespace-nowrap"
-                >
-                  <div className="flex items-center space-x-1">
-                    <span>{col.label}</span>
-                    <ArrowUpDown className={cn("w-2 h-2", sortBy === col.key ? "text-foreground" : "text-muted-foreground")} />
-                  </div>
-                </th>
-              ))}
+              {/* Image */}
+              <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest w-10 border-r border-border">Img</th>
+              
+              {/* Name + Search + Actions */}
+              <th className="border-r border-border">
+                <TableColumnHeader
+                  column="name"
+                  title="Name"
+                  currentSortBy={sortBy}
+                  currentSortOrder={sortOrder}
+                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
+                  textFilter={search}
+                  onTextFilterChange={(_key, value) => { setSearch(value); }}
+                  className="text-muted-foreground"
+                />
+              </th>
+
+              {/* Category */}
+              <th className="border-r border-border">
+                <TableColumnHeader
+                  column="category"
+                  title="Category"
+                  currentSortBy={sortBy}
+                  currentSortOrder={sortOrder}
+                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
+                  filterOptions={categoryOptions}
+                  selectedFilters={selectedCategories}
+                  onFilterChange={(_key, values) => setSelectedCategories(values)}
+                  className="text-muted-foreground"
+                />
+              </th>
+
+              {/* Sub Category */}
+              <th className="border-r border-border">
+                <TableColumnHeader
+                  column="subCategory"
+                  title="Sub Cat"
+                  currentSortBy={sortBy}
+                  currentSortOrder={sortOrder}
+                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
+                  filterOptions={subCategoryOptions}
+                  selectedFilters={selectedSubCategories}
+                  onFilterChange={(_key, values) => setSelectedSubCategories(values)}
+                  className="text-muted-foreground"
+                />
+              </th>
+
+              {/* Material */}
+              <th className="border-r border-border">
+                <TableColumnHeader
+                  column="materialType"
+                  title="Material"
+                  currentSortBy={sortBy}
+                  currentSortOrder={sortOrder}
+                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
+                  filterOptions={materialOptions}
+                  selectedFilters={selectedMaterialTypes}
+                  onFilterChange={(_key, values) => setSelectedMaterialTypes(values)}
+                  className="text-muted-foreground"
+                />
+              </th>
+
+              {/* Sale Price */}
+              <th className="border-r border-border">
+                <TableColumnHeader column="salePrice" title="Sale Price" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
+              </th>
+
+              {/* Cost */}
+              <th className="border-r border-border">
+                <TableColumnHeader column="avgCost" title="Cost (Avg)" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
+              </th>
+
+              {/* Avb Qty */}
+              <th className="border-r border-border">
+                <TableColumnHeader column="currentStock" title="Avb Qty" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
+              </th>
+
+              {/* Re-Ord */}
+              <th className="border-r border-border">
+                <TableColumnHeader column="reOrderPoint" title="Re-Ord" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
+              </th>
+
+              {/* Order Up to */}
+              <th className="border-r border-border">
+                <TableColumnHeader column="orderUpto" title="Order Up to" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
+              </th>
+
+              {/* Revenue */}
+              <th className="border-r border-border">
+                <TableColumnHeader column="revenue" title="Revenue" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
+              </th>
+
+              {/* COGS */}
+              <th className="border-r border-border">
+                <TableColumnHeader column="cogs" title="COGS" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
+              </th>
+
+              {/* COGM */}
+              <th className="border-r border-border">
+                <TableColumnHeader column="cogm" title="COGM" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
+              </th>
+
+              {/* Gross Profit */}
+              <th className="border-r border-border last:border-0">
+                <TableColumnHeader column="grossProfit" title="Gross Profit" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border bg-background/50">
@@ -317,10 +363,9 @@ export default function SkusPage() {
             ) : skus.map(sku => (
               <tr 
                 key={sku._id} 
-                className="hover:bg-secondary/40 hover:scale-[1.002] hover:shadow-md transition-all duration-200 group relative z-0 hover:z-10 bg-background"
-                onClick={() => router.push(`/warehouse/skus/${sku._id}`)}
+                className="group relative z-0 bg-background hover:bg-secondary/40 transition-colors duration-150"
               >
-                <td className="px-2 py-1 border-r border-border">
+                <td className="px-2 py-1 border-r border-border group-hover:border-l-2 group-hover:border-l-primary transition-all">
                   <div className="w-6 h-6 rounded bg-secondary overflow-hidden relative border border-border">
                     <img 
                         src={sku.image || globalSettings?.missingSkuImage || '/sku-placeholder.png'} 
@@ -348,7 +393,25 @@ export default function SkusPage() {
                         {sku.tier}
                       </span>
                     ) : null}
-                    <span className="truncate">{sku.name}</span>
+                    <span className="truncate max-w-[180px]" title={sku.name}>{sku.name}</span>
+                    
+                    {/* Hover Actions */}
+                    <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => router.push(`/warehouse/skus/${sku._id}`)}
+                          className="p-1 text-muted-foreground hover:text-primary hover:bg-secondary rounded transition-colors cursor-pointer"
+                          title="View SKU"
+                        >
+                          <Eye className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => openModal(sku)}
+                          className="p-1 text-muted-foreground hover:text-primary hover:bg-secondary rounded transition-colors cursor-pointer"
+                          title="Edit SKU"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                    </div>
                   </div>
                 </td>
                 <td className="px-2 py-1 text-[8px] uppercase font-bold text-muted-foreground border-r border-border">{sku.category}</td>
@@ -369,7 +432,7 @@ export default function SkusPage() {
                 <td className="px-2 py-1 text-[9px] text-emerald-600 font-mono border-r border-border text-right">${(sku.revenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 <td className="px-2 py-1 text-[9px] text-muted-foreground font-mono border-r border-border text-right">${(sku.cogs || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 <td className="px-2 py-1 text-[9px] text-muted-foreground font-mono border-r border-border text-right">${(sku.cogm || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td className="px-2 py-1 text-[9px] font-black text-foreground font-mono text-right">${(sku.grossProfit || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td className="px-2 py-1 text-[9px] font-black text-foreground font-mono text-right border-r border-border last:border-0">${(sku.grossProfit || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
               </tr>
             ))}
           </tbody>

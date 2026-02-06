@@ -34,7 +34,6 @@ async function importVariances() {
 
     if (DATA.length === 0) {
         console.log('No data to import. Please add data to the DATA array in the script.');
-        // Don't exit error, just info
         process.exit(0);
     }
 
@@ -42,73 +41,54 @@ async function importVariances() {
     let successCount = 0;
     let errorCount = 0;
 
-    // Group by Parent SKU to minimize DB writes
-    const groupedData = new Map<string, VarianceImport[]>();
-    
     for (const item of DATA) {
-        const parentId = item.sku;
-        if (!groupedData.has(parentId)) {
-            groupedData.set(parentId, []);
-        }
-        groupedData.get(parentId)?.push(item);
-    }
-
-    console.log(`Found ${groupedData.size} unique parent SKUs to update.`);
-
-    for (const [parentLegacyId, variances] of groupedData) {
         try {
-            const parentSku = await Sku.findOne({ legacyId: parentLegacyId });
+            // Find the parent SKU by matching item.sku (from import) to legacyId (in database)
+            const parentSku = await Sku.findOne({ legacyId: item.sku });
             
             if (!parentSku) {
-                console.log(`❌ Parent SKU not found for legacyId: ${parentLegacyId} (skipping ${variances.length} variances)`);
-                errorCount += variances.length;
+                console.log(`❌ Parent SKU not found - looking for legacyId: "${item.sku}" (variance legacyId: ${item.legacyId})`);
+                errorCount++;
                 continue;
             }
 
-            console.log(`Processing Parent: ${parentSku.name} (${parentLegacyId}) - Adding ${variances.length} variances`);
+            console.log(`Found parent: ${parentSku.name} (legacyId: ${item.sku})`);
 
-            let updated = false;
-
-            for (const item of variances) {
-                // Check if variance already exists by legacyId to avoid duplicates?
-                const exists = parentSku.variances.find((v: any) => v.legacyId === item.legacyId);
-                
-                if (exists) {
-                     console.log(`  -> Variance ${item.legacyId} already exists. Updating...`);
-                     exists.name = item.name;
-                     exists.website = item.website;
-                     exists.image = item.image;
-                     // Update other fields if needed
-                } else {
-                    // Create new
-                    parentSku.variances.push({
-                        _id: new mongoose.Types.ObjectId().toString(),
-                        legacyId: item.legacyId,
-                        name: item.name,
-                        website: item.website,
-                        image: item.image,
-                        // Defaults
-                        sku: '', // The user didn't provide a SKU code for the variance itself, only the parent link
-                        status: 'active' 
-                    });
-                }
-                updated = true;
-                successCount++;
+            // Check if variance already exists by its legacyId
+            const existingVariance = parentSku.variances.find((v: any) => v.legacyId === item.legacyId);
+            
+            if (existingVariance) {
+                console.log(`  -> Variance ${item.legacyId} already exists. Updating...`);
+                existingVariance.name = item.name;
+                existingVariance.website = item.website;
+                existingVariance.image = item.image;
+            } else {
+                // Create new variance
+                console.log(`  -> Adding new variance: ${item.name} (legacyId: ${item.legacyId})`);
+                parentSku.variances.push({
+                    _id: new mongoose.Types.ObjectId().toString(),
+                    legacyId: item.legacyId,
+                    name: item.name,
+                    website: item.website,
+                    image: item.image,
+                    sku: '',
+                    status: 'active' 
+                });
             }
-
-            if (updated) {
-                await parentSku.save();
-            }
-
+            
+            await parentSku.save();
+            console.log(`✓ Success: Variance "${item.name}" added/updated to parent "${parentSku.name}"`);
+            successCount++;
+            
         } catch (error) {
-            console.error(`Error processing parent ${parentLegacyId}:`, error);
-            errorCount += variances.length;
+            console.error(`Error processing variance ${item.legacyId}:`, error);
+            errorCount++;
         }
     }
 
     console.log('--------------------------------');
     console.log(`Import Complete.`);
-    console.log(`Success: ${successCount}`);
+    console.log(`Variances Imported: ${successCount}`);
     console.log(`Failed: ${errorCount}`);
     process.exit(0);
 }

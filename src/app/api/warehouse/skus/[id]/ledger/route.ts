@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import mongoose from 'mongoose';
 import dbConnect from '@/lib/mongoose';
 import Sku from '@/models/Sku';
 import OpeningBalance from '@/models/OpeningBalance';
@@ -13,6 +14,7 @@ import Setting from '@/models/Setting';
 import { getGlobalStartDate } from '@/lib/global-settings';
 
 export const dynamic = 'force-dynamic';
+// Last updated: 2026-02-06 22:56 - Fixed ObjectId lookup
 
 // Helper to round to max 8 decimal places for cleaner display
 const round8 = (num: number): number => Math.round(num * 100000000) / 100000000;
@@ -31,9 +33,19 @@ export async function GET(
 
         const { id } = await context.params;
 
-        // 0. Parallelize SKU fetch and Settings
-        const [sku, startDate, settings] = await Promise.all([
-            Sku.findById(id).lean(),
+        // Database stores _id as ObjectId but schema says String
+        // Use raw MongoDB collection to bypass Mongoose schema issues
+        let sku: any = null;
+        if (mongoose.Types.ObjectId.isValid(id)) {
+            const db = mongoose.connection.db;
+            const collection = db?.collection('skus');
+            if (collection) {
+                sku = await collection.findOne({ _id: new mongoose.Types.ObjectId(id) });
+            }
+        }
+
+        // Get settings in parallel
+        const [startDate, settings] = await Promise.all([
             getGlobalStartDate(),
             Setting.findOne({ key: 'missingSkuImage' }).select('value').lean()
         ]);

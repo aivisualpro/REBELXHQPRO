@@ -162,7 +162,7 @@ export function SearchableSelect({
                     <input
                         ref={inputRef}
                         type="text"
-                        className="w-full pl-9 pr-3 py-2.5 text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring text-foreground placeholder:text-muted-foreground transition-all"
+                        className="w-full pl-9 pr-3 py-2.5 text-sm bg-background border border-input rounded-md focus:outline-none focus:border-primary text-foreground placeholder:text-muted-foreground transition-all"
                         placeholder={placeholder === "Select..." ? "Search..." : `Search ${placeholder}...`}
                         value={search}
                         onChange={e => setSearch(e.target.value)}
