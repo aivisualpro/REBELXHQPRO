@@ -5,7 +5,8 @@ import {
   X,
   Plus,
   Package,
-  Trash2
+  Trash2,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -115,6 +116,7 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
         lockPrice: false
     });
     const [newLineItems, setNewLineItems] = useState<ItemForm[]>([]);
+    const [isSaving, setIsSaving] = useState(false);
 
     // Lot Modal State
     const [isLotModalOpen, setIsLotModalOpen] = useState(false);
@@ -138,10 +140,8 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
                      }
                      if (skusRes.ok) {
                          const data = await skusRes.json();
-                         const filteredSkus = (data.skus || []).filter((s: any) => 
-                             !s.category || (s.category && s.category.toLowerCase() === 'finished goods')
-                         );
-                         setAllSkus(filteredSkus);
+                         // All SKUs available for wholesale orders
+                         setAllSkus(data.skus || []);
                      }
                      if (usersRes.ok) {
                          const data = await usersRes.json();
@@ -388,16 +388,16 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
         if (!newOrder.salesRep) { toast.error('Sales Rep is required'); return; }
         if (!newOrder.shippingAddress) { toast.error('Address is required'); return; }
         if (newLineItems.length === 0) { toast.error('At least 1 line item is required'); return; }
-        if (newLineItems.some(item => !item.sku)) { toast.error('All line items must have a SKU selected'); return; }
+        // Only validate SKUs that are in use (have been touched)
+        const actualLineItems = newLineItems.filter(item => item.sku);
+        if (actualLineItems.length === 0) { toast.error('At least 1 line item with a SKU is required'); return; }
 
         const payload = {
           ...newOrder,
           shippingCost: Number(newOrder.shippingCost) || 0,
           discount: Number(newOrder.discount) || 0,
           tax: Number(newOrder.tax) || 0,
-          // If editing, preserve ID, createdAt etc from original?
-          // The API might expect just fields to update.
-          lineItems: newLineItems.map(item => ({
+          lineItems: actualLineItems.map(item => ({
             sku: item.sku,
             qtyShipped: item.qtyShipped,
             price: item.price,
@@ -408,19 +408,10 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
           }))
         };
 
+        setIsSaving(true);
         try {
             if (orderToEdit) {
-                 // Edit Logic - requires [id] route or PATCH/PUT logic
-                 // Assuming POST to same route handles update if ID is present? 
-                 // No, usually separate.
-                 // The previous code had "Edit functionality requires [id] api route".
-                 // So I will assume the server side for EDIT is not fully ready or I should check.
-                 // But wait, the previous code had a placeholder error: "Edit functionality requires [id] api route (coming soon)"
-                 // So I should replicate that error unless I fix the API too.
-                 // BUT I am supposed to improve the experience. I'll mock the success or try a PUT.
-                 // For now, let's keep the toast.
                  toast.error("Edit functionality requires backend update.");
-                 // onSuccess(); onClose(); // Optimistic close? No.
             } else {
                 const res = await fetch('/api/wholesale/orders', {
                     method: 'POST',
@@ -438,6 +429,8 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
             }
         } catch (e) {
             toast.error('Error saving order');
+        } finally {
+            setIsSaving(false);
         }
     };
     
@@ -701,9 +694,11 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
               <button
                 type="submit"
                 form="create-so-form"
-                className="px-6 py-2.5 bg-primary text-primary-foreground text-xs font-bold uppercase rounded hover:bg-primary/90 transition-colors shadow-lg"
+                disabled={isSaving}
+                className="px-6 py-2.5 bg-primary text-primary-foreground text-xs font-bold uppercase rounded hover:bg-primary/90 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
               >
-                {orderToEdit ? 'Save Changes' : 'Create Order'}
+                {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>{isSaving ? 'Creating...' : (orderToEdit ? 'Save Changes' : 'Create Order')}</span>
               </button>
             </div>
           </div>

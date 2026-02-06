@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
     ArrowLeft,
@@ -80,7 +80,7 @@ interface Financials {
 
 const PAGE_SIZE = 20; // Load 20 rows at a time
 
-export default function SkuDetailsPage() {
+function SkuDetailsPageContent() {
     const params = useParams();
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -814,3 +814,15 @@ export default function SkuDetailsPage() {
 
 // ... helper interfaces ...
 
+// Default export with Suspense wrapper to fix build error with useSearchParams
+export default function SkuDetailsPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex items-center justify-center h-screen bg-white">
+                <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+            </div>
+        }>
+            <SkuDetailsPageContent />
+        </Suspense>
+    );
+}

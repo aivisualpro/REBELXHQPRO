@@ -102,9 +102,9 @@ export async function POST(request: Request) {
         const newItem: any = await SaleOrder.create(body);
 
         const populatedOrder = await SaleOrder.findById(newItem._id)
-            .populate('clientId', 'name')
+            .populate('clientId', 'name legacyId')
             .populate('salesRep', 'firstName lastName')
-            .populate('lineItems.sku', 'name');
+            .populate('lineItems.sku', 'name legacyId');
 
         if (populatedOrder) {
             try {

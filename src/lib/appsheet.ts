@@ -114,9 +114,17 @@ export async function syncOrderToAppSheet(order: any) {
         salesRepName = `${orderObj.salesRep.firstName || ''} ${orderObj.salesRep.lastName || ''}`.trim();
     }
 
+    // Use legacyId for ClientID if client was imported, otherwise use ObjectId
+    let clientIdForAppSheet = '';
+    if (typeof orderObj.clientId === 'object' && orderObj.clientId !== null) {
+        clientIdForAppSheet = orderObj.clientId.legacyId || orderObj.clientId._id || '';
+    } else {
+        clientIdForAppSheet = orderObj.clientId || '';
+    }
+
     const orderRow = {
         'Order #': orderObj._id,
-        'ClientID': orderObj.clientId?._id || orderObj.clientId || '',
+        'ClientID': clientIdForAppSheet,
         'TimeStamp': orderObj.createdAt ? new Date(orderObj.createdAt).toISOString() : '',
         'Sales Representative': salesRepName || '',
         'Discount': orderObj.discount || 0,
@@ -141,17 +149,27 @@ export async function syncOrderToAppSheet(order: any) {
     };
 
     // Map Line Items to "Order Details" table
-    const detailRows = (orderObj.lineItems || []).map((item: any) => ({
-        'RecordID': item._id,
-        'Order #': orderObj._id,
-        'ProductID': item.sku?._id || item.sku || '',
-        'Lot #': item.lotNumber || '',
-        'Qty Shipped': item.qtyShipped || 0,
-        'UOM': item.uom || '',
-        'Price': item.price || 0,
-        'Tracking ID': '', 
-        'TimeStamp': item.createdAt ? new Date(item.createdAt).toISOString() : new Date().toISOString()
-    }));
+    // Use legacyId for ProductID if SKU was imported, otherwise use ObjectId
+    const detailRows = (orderObj.lineItems || []).map((item: any) => {
+        let productIdForAppSheet = '';
+        if (typeof item.sku === 'object' && item.sku !== null) {
+            productIdForAppSheet = item.sku.legacyId || item.sku._id || '';
+        } else {
+            productIdForAppSheet = item.sku || '';
+        }
+        
+        return {
+            'RecordID': item._id,
+            'Order #': orderObj._id,
+            'ProductID': productIdForAppSheet,
+            'Lot #': item.lotNumber || '',
+            'Qty Shipped': item.qtyShipped || 0,
+            'UOM': item.uom || '',
+            'Price': item.price || 0,
+            'Tracking ID': '', 
+            'TimeStamp': item.createdAt ? new Date(item.createdAt).toISOString() : new Date().toISOString()
+        };
+    });
 
     const detailPayload = {
         Action: 'Add',
