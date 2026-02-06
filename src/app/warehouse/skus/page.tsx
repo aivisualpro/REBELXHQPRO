@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Search,
-  Upload,
   ArrowUpDown,
   Edit2,
   Trash2,
@@ -15,7 +14,6 @@ import {
   Layers,
   Box
 } from 'lucide-react';
-import Papa from 'papaparse';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { Pagination } from '@/components/ui/Pagination';
@@ -62,8 +60,7 @@ export default function SkusPage() {
   const [selectedSubCategories, setSelectedSubCategories] = useState<string[]>([]);
   const [selectedMaterialTypes, setSelectedMaterialTypes] = useState<string[]>([]);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const variancesInputRef = useRef<HTMLInputElement>(null);
+
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -149,38 +146,7 @@ export default function SkusPage() {
     }
   };
 
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>, endpoint = '/api/skus/import', key = 'skus') => {
-    const file = e.target.files?.[0];
-    if (!file) return;
 
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (results) => {
-        try {
-          const loadingToast = toast.loading(`Importing ${key}...`);
-          const res = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ [key]: results.data })
-          });
-          toast.dismiss(loadingToast);
-
-          if (res.ok) {
-            const data = await res.json();
-            toast.success(`Imported/Updated ${data.count} items`);
-            fetchSkus();
-          } else {
-            const err = await res.json();
-            toast.error('Import failed: ' + err.error);
-          }
-        } catch (e) {
-          toast.error('Import error');
-          console.error(e);
-        }
-      }
-    });
-  };
 
   const openModal = (sku?: Sku) => {
     if (sku) {
@@ -296,37 +262,6 @@ export default function SkusPage() {
           />
 
           <div className="w-px h-6 bg-border mx-2" />
-
-          <input
-            type="file"
-            accept=".csv"
-            className="hidden"
-            ref={fileInputRef}
-            onChange={(e) => handleImport(e, '/api/skus/import')}
-          />
-          <input
-            type="file"
-            accept=".csv"
-            className="hidden"
-            ref={variancesInputRef}
-            onChange={(e) => handleImport(e, '/api/skus/import-variances', 'variances')}
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="h-8 px-3 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors rounded flex items-center space-x-1 border border-border bg-card shadow-sm cursor-pointer"
-            title="Import SKUs"
-          >
-            <Upload className="w-4 h-4" />
-            <span className="text-[10px] font-bold uppercase">Import SKUs</span>
-          </button>
-          <button
-            onClick={() => variancesInputRef.current?.click()}
-            className="h-8 px-3 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors rounded flex items-center space-x-1 border border-border bg-card shadow-sm cursor-pointer"
-            title="Import Variances"
-          >
-            <Upload className="w-4 h-4" />
-            <span className="text-[10px] font-bold uppercase">Import Variances</span>
-          </button>
 
           <button
             onClick={() => openModal()}

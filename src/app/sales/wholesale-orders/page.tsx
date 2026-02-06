@@ -3,30 +3,23 @@
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  Search,
-  Upload,
-  Calendar,
-  User,
-  ShoppingCart,
   Plus,
-  UsersRound,
   Trash2,
   X,
   Pencil,
   AlertCircle,
   Printer,
-  Package,
   RefreshCw,
-  Loader2
+  Loader2,
+  Package
 } from 'lucide-react';
-import Papa from 'papaparse';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
-import { MultiSelectFilter } from '@/components/ui/filters/MultiSelectFilter';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { TableColumnHeader } from '@/components/ui/TableColumnHeader';
 import { Pagination } from '@/components/ui/Pagination';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal'; // Import Lot Modal
+
 
 interface LineItem {
   _id?: string;
@@ -134,6 +127,7 @@ function SaleOrdersContent() {
   const [selectedSalesReps, setSelectedSalesReps] = useState<string[]>([]);
   const [selectedSkus, setSelectedSkus] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [selectedPaymentMethods, setSelectedPaymentMethods] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<{ from: string; to: string }>({ from: '', to: '' });
 
   // Filter Options
@@ -202,9 +196,6 @@ function SaleOrdersContent() {
     isOpen: false,
     orderId: null
   });
-
-  const importOrdersRef = useRef<HTMLInputElement>(null);
-  const importLineItemsRef = useRef<HTMLInputElement>(null);
 
   // Debounce search
   useEffect(() => {
@@ -356,6 +347,7 @@ function SaleOrdersContent() {
       if (selectedSalesReps.length) params.append('salesRep', selectedSalesReps.join(','));
       if (selectedSkus.length) params.append('sku', selectedSkus.join(','));
       if (selectedStatuses.length) params.append('status', selectedStatuses.join(','));
+      if (selectedPaymentMethods.length) params.append('paymentMethod', selectedPaymentMethods.join(','));
       if (dateRange.from) params.append('fromDate', dateRange.from);
       if (dateRange.to) params.append('toDate', dateRange.to);
 
@@ -378,82 +370,11 @@ function SaleOrdersContent() {
     } finally {
       setLoading(false);
     }
-  }, [page, debouncedSearch, sortBy, sortOrder, selectedClients, selectedSalesReps, selectedSkus, selectedStatuses, dateRange]);
+  }, [page, debouncedSearch, sortBy, sortOrder, selectedClients, selectedSalesReps, selectedSkus, selectedStatuses, selectedPaymentMethods, dateRange]);
 
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
-
-
-
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>, endpoint: string, label: string) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Reset input value to allow re-upload of same file
-    e.target.value = '';
-
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (results) => {
-        const totalRows = results.data.length;
-        if (totalRows === 0) {
-          toast.error('No data found in file');
-          return;
-        }
-
-        const toastId = toast.loading(`Importing ${label} (0%)...`);
-        let processed = 0;
-        let successCount = 0;
-        let errors: string[] = [];
-
-        // Chunking
-        const CHUNK_SIZE = 2500;
-        const chunks = [];
-        for (let i = 0; i < totalRows; i += CHUNK_SIZE) {
-          chunks.push(results.data.slice(i, i + CHUNK_SIZE));
-        }
-
-        try {
-          for (let i = 0; i < chunks.length; i++) {
-            const chunk = chunks[i];
-            
-            const res = await fetch(endpoint, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ data: chunk })
-            });
-
-            if (res.ok) {
-              const data = await res.json();
-              successCount += (data.count || 0);
-            } else {
-              const err = await res.json();
-              errors.push(`Chunk ${i + 1}: ${err.error || 'Unknown error'}`);
-            }
-
-            processed += chunk.length;
-            const percent = Math.round((processed / totalRows) * 100);
-            toast.loading(`Importing ${label} (${processed}/${totalRows}) ${percent}%...`, { id: toastId });
-          }
-
-          if (errors.length > 0) {
-            toast.error(`Import completed with errors. Success: ${successCount}. Failed chunks: ${errors.length}`, { id: toastId, duration: 5000 });
-            console.error('Import errors:', errors);
-          } else {
-            toast.success(`Successfully imported ${successCount} ${label}`, { id: toastId });
-          }
-          
-          fetchOrders();
-
-        } catch (e) {
-            toast.error('Import failed due to network or server error', { id: toastId });
-            console.error(e);
-        }
-      }
-    });
-  };
 
   const handleDeleteClick = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -885,103 +806,9 @@ function SaleOrdersContent() {
       <div className="flex items-center justify-between px-4 h-11 border-b border-border bg-secondary/50 transition-colors">
         <div className="flex items-center space-x-4">
           <h1 className="text-sm font-bold text-foreground uppercase tracking-tighter">Wholesale Orders</h1>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search Order#..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 pr-3 h-8 w-64 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
-            />
-          </div>
         </div>
 
         <div className="flex items-center space-x-2">
-          <MultiSelectFilter
-            label="Client"
-            icon={UsersRound}
-            options={clientOptions}
-            selectedValues={selectedClients}
-            onChange={setSelectedClients}
-            className="h-8"
-          />
-          <MultiSelectFilter
-            label="Sales Rep"
-            icon={User}
-            options={salesRepOptions}
-            selectedValues={selectedSalesReps}
-            onChange={setSelectedSalesReps}
-            className="h-8"
-          />
-           <MultiSelectFilter
-            label="SKU"
-            icon={Package}
-            options={allSkus.map(s => ({ label: s.name, value: s._id }))}
-            selectedValues={selectedSkus}
-            onChange={setSelectedSkus}
-            className="h-8"
-          />
-          <MultiSelectFilter
-            label="Status"
-            icon={ShoppingCart}
-            options={statusOptions}
-            selectedValues={selectedStatuses}
-            onChange={setSelectedStatuses}
-            className="h-8"
-          />
-
-          <div className="flex items-center space-x-1 border border-border bg-card px-3 h-8 rounded">
-            <Calendar className="w-3 h-3 text-muted-foreground" />
-            <input
-              type="date"
-              className="text-[10px] outline-none max-w-[80px] bg-transparent"
-              value={dateRange.from}
-              onChange={e => setDateRange({ ...dateRange, from: e.target.value })}
-            />
-            <span className="text-slate-300">-</span>
-            <input
-              type="date"
-              className="text-[10px] outline-none max-w-[80px] bg-transparent"
-              value={dateRange.to}
-              onChange={e => setDateRange({ ...dateRange, to: e.target.value })}
-            />
-          </div>
-
-          <div className="w-px h-6 bg-border mx-2" />
-          
-          <input
-            type="file"
-            accept=".csv"
-            className="hidden"
-            ref={importOrdersRef}
-            onChange={(e) => handleImport(e, '/api/wholesale/orders/import', 'Orders')}
-          />
-          <input
-            type="file"
-            accept=".csv"
-            className="hidden"
-            ref={importLineItemsRef}
-            onChange={(e) => handleImport(e, '/api/wholesale/orders/import-lineitems', 'Line Items')}
-          />
-
-          <div className="flex items-center space-x-2">
-            <button
-                onClick={() => importOrdersRef.current?.click()}
-                className="h-8 w-8 bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors shadow-sm flex items-center justify-center rounded"
-                title="Import Orders"
-            >
-                <Upload className="w-4 h-4" />
-            </button>
-            <button
-                onClick={() => importLineItemsRef.current?.click()}
-                className="h-8 w-8 bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors shadow-sm flex items-center justify-center rounded"
-                title="Import Line Items"
-            >
-                <Upload className="w-4 h-4" />
-            </button>
-          </div>
-
           <button
             onClick={openCreateModal}
             className="h-8 w-8 bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-md flex items-center justify-center rounded cursor-pointer"
@@ -1017,41 +844,167 @@ function SaleOrdersContent() {
             <table className="w-full text-left border-separate border-spacing-0 relative z-0">
           <thead className="sticky top-0 bg-secondary/80 z-10 border-b border-border backdrop-blur-md transition-colors">
             <tr>
-              {[
-                { key: 'label', label: 'Order #' },
-                { key: 'createdAt', label: 'Date' },
-                { key: 'clientId', label: 'Client' },
-                { key: 'salesRep', label: 'Sales Rep' },
-                { key: 'paymentMethod', label: 'Payment Method' },
-                { key: 'orderStatus', label: 'Status' },
-                { key: 'subtotal', label: 'Subtotal' },
-                { key: 'shippingCost', label: 'Shipping' },
-                { key: 'discount', label: 'Discount' },
-                { key: 'grandTotal', label: 'Grandtotal' },
-                { key: 'balance', label: 'Balance' },
-                { key: 'cost', label: 'Cost' },
-                { key: 'margin', label: 'Margin' },
-              ].map(col => (
-                <th
-                  key={col.key}
-                  className="border-r border-border last:border-0"
-                >
-                  <TableColumnHeader
-                    column={col}
-                    title={col.label}
-                    currentSortBy={sortBy}
-                    currentSortOrder={sortOrder}
-                    onSort={(key, dir) => {
-                      setSortBy(key);
-                      setSortOrder(dir);
-                    }}
-                    onFilter={(_key) => {
-                        toast(`Filtering by ${col.label} implementation pending`);
-                    }}
-                    className="text-muted-foreground"
-                  />
-                </th>
-              ))}
+              {/* Order # - Text search */}
+              <th className="border-r border-border">
+                <TableColumnHeader
+                  column="label"
+                  title="Order #"
+                  currentSortBy={sortBy}
+                  currentSortOrder={sortOrder}
+                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
+                  textFilter={search}
+                  onTextFilterChange={(_key, value) => setSearch(value)}
+                  className="text-muted-foreground"
+                />
+              </th>
+              {/* Date - Date range */}
+              <th className="border-r border-border">
+                <TableColumnHeader
+                  column="createdAt"
+                  title="Date"
+                  currentSortBy={sortBy}
+                  currentSortOrder={sortOrder}
+                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
+                  isDate
+                  dateFrom={dateRange.from}
+                  dateTo={dateRange.to}
+                  onDateFilterChange={(_key, from, to) => setDateRange({ from, to })}
+                  className="text-muted-foreground"
+                />
+              </th>
+              {/* Client - Multi-select */}
+              <th className="border-r border-border">
+                <TableColumnHeader
+                  column="clientId"
+                  title="Client"
+                  currentSortBy={sortBy}
+                  currentSortOrder={sortOrder}
+                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
+                  filterOptions={clientOptions}
+                  selectedFilters={selectedClients}
+                  onFilterChange={(_key, values) => setSelectedClients(values)}
+                  className="text-muted-foreground"
+                />
+              </th>
+              {/* Sales Rep - Multi-select */}
+              <th className="border-r border-border">
+                <TableColumnHeader
+                  column="salesRep"
+                  title="Sales Rep"
+                  currentSortBy={sortBy}
+                  currentSortOrder={sortOrder}
+                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
+                  filterOptions={salesRepOptions}
+                  selectedFilters={selectedSalesReps}
+                  onFilterChange={(_key, values) => setSelectedSalesReps(values)}
+                  className="text-muted-foreground"
+                />
+              </th>
+              {/* Payment Method - Multi-select */}
+              <th className="border-r border-border">
+                <TableColumnHeader
+                  column="paymentMethod"
+                  title="Payment Method"
+                  currentSortBy={sortBy}
+                  currentSortOrder={sortOrder}
+                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
+                  filterOptions={PAYMENT_METHODS}
+                  selectedFilters={selectedPaymentMethods}
+                  onFilterChange={(_key, values) => setSelectedPaymentMethods(values)}
+                  className="text-muted-foreground"
+                />
+              </th>
+              {/* Status - Multi-select */}
+              <th className="border-r border-border">
+                <TableColumnHeader
+                  column="orderStatus"
+                  title="Status"
+                  currentSortBy={sortBy}
+                  currentSortOrder={sortOrder}
+                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
+                  filterOptions={statusOptions}
+                  selectedFilters={selectedStatuses}
+                  onFilterChange={(_key, values) => setSelectedStatuses(values)}
+                  className="text-muted-foreground"
+                />
+              </th>
+              {/* Subtotal */}
+              <th className="border-r border-border">
+                <TableColumnHeader
+                  column="subtotal"
+                  title="Subtotal"
+                  currentSortBy={sortBy}
+                  currentSortOrder={sortOrder}
+                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
+                  className="text-muted-foreground"
+                />
+              </th>
+              {/* Shipping */}
+              <th className="border-r border-border">
+                <TableColumnHeader
+                  column="shippingCost"
+                  title="Shipping"
+                  currentSortBy={sortBy}
+                  currentSortOrder={sortOrder}
+                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
+                  className="text-muted-foreground"
+                />
+              </th>
+              {/* Discount */}
+              <th className="border-r border-border">
+                <TableColumnHeader
+                  column="discount"
+                  title="Discount"
+                  currentSortBy={sortBy}
+                  currentSortOrder={sortOrder}
+                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
+                  className="text-muted-foreground"
+                />
+              </th>
+              {/* Grandtotal */}
+              <th className="border-r border-border">
+                <TableColumnHeader
+                  column="grandTotal"
+                  title="Grandtotal"
+                  currentSortBy={sortBy}
+                  currentSortOrder={sortOrder}
+                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
+                  className="text-muted-foreground"
+                />
+              </th>
+              {/* Balance */}
+              <th className="border-r border-border">
+                <TableColumnHeader
+                  column="balance"
+                  title="Balance"
+                  currentSortBy={sortBy}
+                  currentSortOrder={sortOrder}
+                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
+                  className="text-muted-foreground"
+                />
+              </th>
+              {/* Cost */}
+              <th className="border-r border-border">
+                <TableColumnHeader
+                  column="cost"
+                  title="Cost"
+                  currentSortBy={sortBy}
+                  currentSortOrder={sortOrder}
+                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
+                  className="text-muted-foreground"
+                />
+              </th>
+              {/* Margin */}
+              <th className="border-r border-border last:border-0">
+                <TableColumnHeader
+                  column="margin"
+                  title="Margin"
+                  currentSortBy={sortBy}
+                  currentSortOrder={sortOrder}
+                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
+                  className="text-muted-foreground"
+                />
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border bg-background/50">
@@ -1091,9 +1044,11 @@ function SaleOrdersContent() {
                     <td className="px-2 py-1.5 border-r border-border text-center">
                       <span className={cn(
                         "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider",
-                        order.orderStatus === 'Shipped' ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" :
-                        order.orderStatus === 'Completed' ? "bg-blue-500/10 text-blue-500 border border-blue-500/20" :
-                        order.orderStatus === 'Processing' ? "bg-amber-500/10 text-amber-500 border border-amber-500/20" :
+                        order.orderStatus === 'Completed' ? "bg-emerald-600/15 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 border border-emerald-500/30" :
+                        order.orderStatus === 'Issued' ? "bg-sky-500/15 text-sky-600 dark:bg-sky-500/20 dark:text-sky-400 border border-sky-500/30" :
+                        order.orderStatus === 'Pending Payment' ? "bg-amber-500/15 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 border border-amber-500/30" :
+                        order.orderStatus === 'Shipping' ? "bg-violet-500/15 text-violet-600 dark:bg-violet-500/20 dark:text-violet-400 border border-violet-500/30" :
+                        order.orderStatus === 'Picking' ? "bg-cyan-500/15 text-cyan-600 dark:bg-cyan-500/20 dark:text-cyan-400 border border-cyan-500/30" :
                         "bg-muted text-muted-foreground border border-border"
                       )}>
                         {order.orderStatus}

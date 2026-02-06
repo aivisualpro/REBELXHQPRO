@@ -197,11 +197,12 @@ export default function SaleOrderDetailPage() {
 
   const getStatusColor = (status: string) => {
       switch (status) {
-          case 'Completed': return "bg-emerald-50 text-emerald-600 border-emerald-100";
-          case 'Shipped': return "bg-blue-50 text-blue-600 border-blue-100";
-          case 'Processing': return "bg-orange-50 text-orange-600 border-orange-100";
-          case 'Cancelled': return "bg-red-50 text-red-600 border-red-100";
-          default: return "bg-slate-100 text-slate-500 border-slate-200";
+          case 'Completed': return "bg-emerald-600/15 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 border-emerald-500/30";
+          case 'Issued': return "bg-sky-500/15 text-sky-600 dark:bg-sky-500/20 dark:text-sky-400 border-sky-500/30";
+          case 'Pending Payment': return "bg-amber-500/15 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 border-amber-500/30";
+          case 'Shipping': return "bg-violet-500/15 text-violet-600 dark:bg-violet-500/20 dark:text-violet-400 border-violet-500/30";
+          case 'Picking': return "bg-cyan-500/15 text-cyan-600 dark:bg-cyan-500/20 dark:text-cyan-400 border-cyan-500/30";
+          default: return "bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700";
       }
   };
 
@@ -290,8 +291,8 @@ export default function SaleOrderDetailPage() {
       if (!order || !editingLotItemId) return;
       const updatedItems = order.lineItems?.map(item => 
           item._id === editingLotItemId 
-              ? { ...item, lotNumber, cost: cost || 0, sku: typeof item.sku === 'object' ? item.sku._id : item.sku } 
-              : { ...item, sku: typeof item.sku === 'object' ? item.sku._id : item.sku }
+              ? { ...item, lotNumber, cost: cost || 0, sku: (item.sku && typeof item.sku === 'object') ? item.sku._id : item.sku } 
+              : { ...item, sku: (item.sku && typeof item.sku === 'object') ? item.sku._id : item.sku }
       ) || [];
 
       try {
@@ -398,7 +399,7 @@ export default function SaleOrderDetailPage() {
 
     for (let i = 0; i < updatedItems.length; i++) {
         const item = updatedItems[i];
-        const skuId = typeof item.sku === 'object' ? item.sku._id : item.sku;
+        const skuId = (item.sku && typeof item.sku === 'object') ? item.sku._id : item.sku;
         
         if (skuId && item.lotNumber) {
             setRefreshProgress(`Fetching Lot ${item.lotNumber}... ${Math.round(((i + 1) / updatedItems.length) * 100)}%`);
@@ -733,7 +734,7 @@ export default function SaleOrderDetailPage() {
                                     ) : order.lineItems.map(item => {
                                         const skuName = typeof item.sku === 'object' ? item.sku?.name : allSkus.find(s => s._id === item.sku)?.name || item.sku;
                                         const lineTotal = (item.qtyShipped || 0) * (item.price || 0);
-                                        const skuId = typeof item.sku === 'object' ? item.sku._id : item.sku;
+                                        const skuId = (item.sku && typeof item.sku === 'object') ? item.sku._id : item.sku;
 
                                         return (
                                             <tr key={item._id} className="hover:bg-slate-50 transition-colors">

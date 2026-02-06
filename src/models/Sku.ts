@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 
 const SkuSchema = new mongoose.Schema({
     _id: { type: String, default: () => new mongoose.Types.ObjectId().toString() }, // Mapped from 'sku' or auto-generated
+    legacyId: { type: String, index: true }, // Legacy ID for import matching
     name: { type: String, required: true },
     image: String,
     category: String,

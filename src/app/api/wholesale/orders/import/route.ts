@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import SaleOrder from '@/models/SaleOrder';
 import Client from '@/models/Client';
-import { syncOrderToAppSheet } from '@/lib/appsheet';
+import mongoose from 'mongoose';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
     console.log('[import-orders] API called');
@@ -18,33 +19,64 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Invalid data format' }, { status: 400 });
         }
 
-        let count = 0;
-        const clients = await Client.find({}).select('_id name').lean();
-        const ordersToSync = [];
+        // Debug: Log first row to see actual column names
+        if (data.length > 0) {
+            console.log('[import-orders] Total rows:', data.length);
+            console.log('[import-orders] First row keys:', Object.keys(data[0]));
+            console.log('[import-orders] First row sample:', JSON.stringify(data[0]).substring(0, 500));
+        }
+
+        // Use legacyId pattern - fetch clients by legacyId for matching
+        const clients = await Client.find({}).select('_id legacyId name').lean();
+        // Create a map for quick lookups by legacyId and name
+        const clientByLegacyId = new Map(clients.map((c: any) => [c.legacyId, c._id]));
+        const clientByName = new Map(clients.map((c: any) => [c.name?.toLowerCase(), c._id]));
+
+        const operations: any[] = [];
+        let skippedCount = 0;
 
         for (const row of data) {
-            const mongoId = row._id || row.id;
-            const label = row.label || row.orderId || row['Order ID'];
+            // Generate or use legacyId (same pattern as clients) - check many possible column names
+            const legacyId = row.legacyId || row.LegacyId || row.legacy_id || 
+                            row._id || row.Id || row.ID ||
+                            row.orderId || row.OrderId || row.order_id || row['Order ID'] || row['Order Id'] ||
+                            row.label || row.Label || row['Order Number'] || row.orderNumber;
             
-            if (!mongoId && !label) continue;
+            if (!legacyId) {
+                skippedCount++;
+                continue;
+            }
 
-            const clientNameOrId = row.clientId || row.client || row['Client Name'];
+            const label = row.label || row.orderId || row['Order ID'] || legacyId;
+
+            // Match client by legacyId first, then by name
+            const clientRef = row.clientId || row.client || row['Client Name'] || row.clientLegacyId;
             let clientId = null;
 
-            if (clientNameOrId) {
-                const exactClient = clients.find(c => c._id === clientNameOrId);
-                if (exactClient) {
-                    clientId = exactClient._id;
+            if (clientRef) {
+                // First try to match by legacyId
+                if (clientByLegacyId.has(clientRef)) {
+                    clientId = clientByLegacyId.get(clientRef);
                 } else {
-                     const foundClient = clients.find(c => 
-                        c.name.toLowerCase() === clientNameOrId.toLowerCase() || 
-                        c.name.toLowerCase().includes(clientNameOrId.toLowerCase())
-                    );
-                    if (foundClient) clientId = foundClient._id;
+                    // Try by name (case-insensitive)
+                    const lowerRef = String(clientRef).toLowerCase();
+                    if (clientByName.has(lowerRef)) {
+                        clientId = clientByName.get(lowerRef);
+                    } else {
+                        // Partial match
+                        for (const [name, id] of clientByName) {
+                            if (name && name.includes(lowerRef)) {
+                                clientId = id;
+                                break;
+                            }
+                        }
+                    }
                 }
             }
             
             const updateData: any = {
+                legacyId, // Store the legacyId for future imports/updates
+                label,
                 salesRep: row.salesRep,
                 discount: parseFloat(row.discount) || 0,
                 paymentMethod: row.paymentMethod,
@@ -65,46 +97,32 @@ export async function POST(request: Request) {
                 updateData.createdAt = new Date(row.createdAt);
             }
 
-            if (label) updateData.label = label;
-            if (clientId) updateData.clientId = clientId;
-            if (mongoId) updateData._id = mongoId;
-
-            let filter = {};
-            if (mongoId) {
-                filter = { _id: mongoId };
-            } else {
-                filter = { label: label };
+            if (clientId) {
+                updateData.clientId = clientId;
             }
 
-            const updatedOrder = await SaleOrder.findOneAndUpdate(
-                filter,
-                { $set: updateData },
-                { upsert: true, new: true, lean: true }
-            );
-
-            if (updatedOrder) {
-                ordersToSync.push(updatedOrder);
-            }
-            count++;
-        }
-
-        // Sync to AppSheet (processing limited batch to avoid timeout)
-        if (ordersToSync.length > 0) {
-            // We'll sync them sequentially or in small batches
-            for (const order of ordersToSync) {
-                try {
-                    // Refetch with population for proper sync names
-                    const populated = await SaleOrder.findById(order._id)
-                        .populate('clientId', 'name')
-                        .populate('salesRep', 'firstName lastName')
-                        .populate('lineItems.sku', 'name');
-                    
-                    if (populated) await syncOrderToAppSheet(populated);
-                } catch (e) {
-                    console.error('Error syncing order during import:', e);
+            // Use legacyId as the primary filter for upsert (same as clients)
+            operations.push({
+                updateOne: {
+                    filter: { legacyId },
+                    update: { $set: updateData },
+                    upsert: true
                 }
-            }
+            });
         }
+
+        // Bulk write for performance
+        let count = 0;
+        console.log(`[import-orders] Operations prepared: ${operations.length}, Skipped (no legacyId): ${skippedCount}`);
+        
+        if (operations.length > 0) {
+            const result = await SaleOrder.bulkWrite(operations, { ordered: false });
+            count = (result.upsertedCount || 0) + (result.modifiedCount || 0);
+            console.log(`[import-orders] Bulk write completed: ${count} orders processed (${result.upsertedCount} inserted, ${result.modifiedCount} modified)`);
+        }
+
+        // Skip AppSheet sync during bulk import for performance
+        // AppSheet sync can be triggered separately if needed
 
         return NextResponse.json({ success: true, count });
     } catch (error: any) {

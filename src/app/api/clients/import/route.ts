@@ -6,7 +6,10 @@ import { syncClientToAppSheet } from '@/lib/appsheet';
 export async function POST(request: Request) {
     try {
         await dbConnect();
-        const { clients } = await request.json();
+        const body = await request.json();
+        const { data } = body; // Support new 'data' key from settings import pattern
+        
+        const clients = Array.isArray(data) ? data : body.clients; // Fallback to old format
 
         if (!Array.isArray(clients)) {
             return NextResponse.json({ error: 'Invalid data format' }, { status: 400 });

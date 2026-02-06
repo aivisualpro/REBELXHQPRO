@@ -1,8 +1,8 @@
-import { Currency } from 'lucide-react';
 import mongoose from 'mongoose';
 
 const SaleOrderSchema = new mongoose.Schema({
-    _id: { type: String, default: () => new mongoose.Types.ObjectId().toString() },
+    // _id is now auto-generated as native ObjectId by MongoDB
+    legacyId: { type: String, index: true, sparse: true }, // For import matching (same pattern as clients)
     label: String, // Order ID/Label
     clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'Client' },
     salesRep: { type: String, ref: 'RXHQUsers' },
@@ -22,9 +22,10 @@ const SaleOrderSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now },
 
     lineItems: [{
-        _id: { type: String, default: () => new mongoose.Types.ObjectId().toString() },
+        // _id auto-generated as ObjectId
         orderNumber: String, // As per request, reference to sales order _id or label
-        sku: { type: String, ref: 'Sku' },
+        sku: { type: mongoose.Schema.Types.ObjectId, ref: 'Sku' },
+        productDescription: String, // Product description from import
         lotNumber: String,
         qtyShipped: Number,
         uom: String,
@@ -35,7 +36,7 @@ const SaleOrderSchema = new mongoose.Schema({
     }],
 
     payments: [{
-        _id: { type: String, default: () => new mongoose.Types.ObjectId().toString() },
+        // _id auto-generated as ObjectId
         orderNumber: String, // Ref to order
         paymentAmount: Number,
         createdAt: { type: Date, default: Date.now },
@@ -45,6 +46,8 @@ const SaleOrderSchema = new mongoose.Schema({
 
 SaleOrderSchema.index({ clientId: 1 });
 SaleOrderSchema.index({ orderStatus: 1 });
+// legacyId index is already defined inline with the field
 
 // Force schema refresh
 export default mongoose.models.SaleOrder || mongoose.model('SaleOrder', SaleOrderSchema);
+

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
     Save, 
     Globe, 
@@ -19,10 +19,16 @@ import {
     Image as ImageIcon,
     Layers,
     ShoppingCart,
-    Warehouse
+    Warehouse,
+    Upload,
+    RefreshCw,
+    FileSpreadsheet,
+    Package,
+    CreditCard
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import Papa from 'papaparse';
 
 type Tab = 'general' | 'localization' | 'crm' | 'notifications' | 'security' | 'dataFilter' | 'modules';
 type ModuleSubTab = 'sales' | 'warehouse' | 'reports' | 'help';
@@ -32,6 +38,17 @@ export default function SettingsPage() {
     const [moduleSubTab, setModuleSubTab] = useState<ModuleSubTab>('sales');
     const [saving, setSaving] = useState(false);
     const [loading, setLoading] = useState(true);
+
+    // Sales Import State
+    const [importStatus, setImportStatus] = useState('');
+    const [isImporting, setIsImporting] = useState(false);
+    const importOrdersRef = useRef<HTMLInputElement>(null);
+    const importLineItemsRef = useRef<HTMLInputElement>(null);
+    const importPaymentsRef = useRef<HTMLInputElement>(null);
+
+    // Warehouse Import Refs
+    const importSkusRef = useRef<HTMLInputElement>(null);
+    const importVariancesRef = useRef<HTMLInputElement>(null);
 
     const [settings, setSettings] = useState({
         companyName: 'RebelX Headquarters',
@@ -86,6 +103,83 @@ export default function SettingsPage() {
         } finally {
             setSaving(false);
         }
+    };
+
+    // Handle CSV Import (same pattern as wholesale-orders)
+    const handleImport = (e: React.ChangeEvent<HTMLInputElement>, endpoint: string, label: string) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        e.target.value = ''; // Reset input to allow re-upload
+
+        Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: async (results) => {
+                const totalRows = results.data.length;
+                if (totalRows === 0) {
+                    toast.error('No data found in file');
+                    return;
+                }
+
+                setIsImporting(true);
+                const toastId = toast.loading(`Importing ${label} (0%)...`);
+                setImportStatus(`Importing ${label}...`);
+                let processed = 0;
+                let successCount = 0;
+                let errors: string[] = [];
+
+                // Chunking for large imports
+                const CHUNK_SIZE = 2500;
+                const chunks = [];
+                for (let i = 0; i < totalRows; i += CHUNK_SIZE) {
+                    chunks.push(results.data.slice(i, i + CHUNK_SIZE));
+                }
+
+                try {
+                    for (let i = 0; i < chunks.length; i++) {
+                        const chunk = chunks[i];
+                        
+                        const res = await fetch(endpoint, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ data: chunk })
+                        });
+
+                        if (res.ok) {
+                            const data = await res.json();
+                            successCount += (data.count || 0);
+                        } else {
+                            const err = await res.json();
+                            errors.push(`Chunk ${i + 1}: ${err.error || 'Unknown error'}`);
+                        }
+
+                        processed += chunk.length;
+                        const percent = Math.round((processed / totalRows) * 100);
+                        toast.loading(`Importing ${label} (${processed}/${totalRows}) ${percent}%...`, { id: toastId });
+                        setImportStatus(`Importing ${label}: ${percent}%`);
+                    }
+
+                    if (errors.length > 0) {
+                        toast.error(`Import completed with errors. Success: ${successCount}. Failed chunks: ${errors.length}`, { id: toastId, duration: 5000 });
+                        console.error('Import errors:', errors);
+                        setImportStatus(`⚠️ Completed with errors: ${successCount} imported`);
+                    } else {
+                        toast.success(`Successfully imported ${successCount} ${label}`, { id: toastId });
+                        setImportStatus(`✓ Imported ${successCount} ${label}`);
+                    }
+
+                } catch (e) {
+                    toast.error('Import failed due to network or server error', { id: toastId });
+                    setImportStatus('❌ Import failed');
+                    console.error(e);
+                } finally {
+                    setIsImporting(false);
+                    // Clear status after 5 seconds
+                    setTimeout(() => setImportStatus(''), 5000);
+                }
+            }
+        });
     };
 
     const tabs = [
@@ -437,10 +531,123 @@ export default function SettingsPage() {
                                 {/* Sales Module Settings */}
                                 {moduleSubTab === 'sales' && (
                                     <div className="space-y-6 animate-in fade-in duration-200">
-                                        <div className="p-8 text-center border-2 border-dashed border-slate-200 rounded-lg">
-                                            <ShoppingCart className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                                            <h3 className="text-sm font-bold text-slate-400">Sales Module</h3>
-                                            <p className="text-xs text-slate-400 mt-1">Sales import and configuration options coming soon.</p>
+                                        {/* Hidden File Inputs */}
+                                        <input
+                                            type="file"
+                                            accept=".csv"
+                                            className="hidden"
+                                            ref={importOrdersRef}
+                                            onChange={(e) => handleImport(e, '/api/wholesale/orders/import', 'Orders')}
+                                        />
+                                        <input
+                                            type="file"
+                                            accept=".csv"
+                                            className="hidden"
+                                            ref={importLineItemsRef}
+                                            onChange={(e) => handleImport(e, '/api/wholesale/orders/import-lineitems', 'Line Items')}
+                                        />
+                                        <input
+                                            type="file"
+                                            accept=".csv"
+                                            className="hidden"
+                                            ref={importPaymentsRef}
+                                            onChange={(e) => handleImport(e, '/api/wholesale/orders/import-payments', 'Payments')}
+                                        />
+
+                                        <div className="space-y-4">
+                                            <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">Wholesale Orders Import</h2>
+                                            
+                                            {/* Status Display */}
+                                            {importStatus && (
+                                                <div className={cn(
+                                                    "p-3 rounded-lg text-sm font-medium",
+                                                    importStatus.startsWith('✓') ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
+                                                    importStatus.startsWith('⚠️') ? "bg-amber-50 text-amber-700 border border-amber-200" :
+                                                    importStatus.startsWith('❌') ? "bg-red-50 text-red-700 border border-red-200" :
+                                                    "bg-blue-50 text-blue-700 border border-blue-200"
+                                                )}>
+                                                    {isImporting && <RefreshCw className="w-4 h-4 inline mr-2 animate-spin" />}
+                                                    {importStatus}
+                                                </div>
+                                            )}
+
+                                            <div className="p-4 border border-blue-200 bg-blue-50 rounded-lg flex items-start space-x-4 mb-4">
+                                                <div className="shrink-0 mt-0.5">
+                                                    <Upload className="w-5 h-5 text-blue-600" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-blue-800">Data Import</h4>
+                                                    <p className="text-xs text-blue-700 mt-1">
+                                                        Import wholesale orders data from CSV files. Orders use <code className="bg-blue-100 px-1 rounded">legacyId</code> for matching - 
+                                                        existing records will be updated, new records will be created.
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                {/* Import Orders */}
+                                                <button
+                                                    onClick={() => importOrdersRef.current?.click()}
+                                                    disabled={isImporting}
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mb-3 group-hover:bg-blue-200 transition-colors">
+                                                        <FileSpreadsheet className="w-6 h-6 text-blue-600" />
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-slate-700">Import Orders</h4>
+                                                    <p className="text-[10px] text-slate-500 mt-1 text-center">
+                                                        Order headers, client, status, dates
+                                                    </p>
+                                                </button>
+
+                                                {/* Import Line Items */}
+                                                <button
+                                                    onClick={() => importLineItemsRef.current?.click()}
+                                                    disabled={isImporting}
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-purple-400 hover:bg-purple-50 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center mb-3 group-hover:bg-purple-200 transition-colors">
+                                                        <Package className="w-6 h-6 text-purple-600" />
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-slate-700">Import Line Items</h4>
+                                                    <p className="text-[10px] text-slate-500 mt-1 text-center">
+                                                        SKUs, quantities, prices, lots
+                                                    </p>
+                                                </button>
+
+                                                {/* Import Payments */}
+                                                <button
+                                                    onClick={() => importPaymentsRef.current?.click()}
+                                                    disabled={isImporting}
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-emerald-400 hover:bg-emerald-50 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mb-3 group-hover:bg-emerald-200 transition-colors">
+                                                        <CreditCard className="w-6 h-6 text-emerald-600" />
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-slate-700">Import Payments</h4>
+                                                    <p className="text-[10px] text-slate-500 mt-1 text-center">
+                                                        Payment amounts, dates
+                                                    </p>
+                                                </button>
+                                            </div>
+
+                                            <div className="mt-6 p-4 bg-slate-50 rounded-lg">
+                                                <h4 className="text-xs font-bold text-slate-600 mb-2">CSV Column Reference</h4>
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-[10px] text-slate-500">
+                                                    <div>
+                                                        <span className="font-bold text-slate-700">Orders:</span>
+                                                        <p>legacyId, label, clientId, salesRep, orderStatus, paymentMethod, shippedDate, shippingMethod, trackingNumber, shippingCost, tax, category, shippingAddress, city, state, createdAt</p>
+                                                    </div>
+                                                    <div>
+                                                        <span className="font-bold text-slate-700">Line Items:</span>
+                                                        <p>orderNumber (legacyId), sku, qtyShipped, price, uom, lotNumber, cost</p>
+                                                    </div>
+                                                    <div>
+                                                        <span className="font-bold text-slate-700">Payments:</span>
+                                                        <p>orderNumber (legacyId), paymentAmount, createdAt</p>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 )}
@@ -448,6 +655,22 @@ export default function SettingsPage() {
                                 {/* Warehouse Module Settings */}
                                 {moduleSubTab === 'warehouse' && (
                                     <div className="space-y-6 animate-in fade-in duration-200">
+                                        {/* Hidden File Inputs for SKU Import */}
+                                        <input
+                                            type="file"
+                                            accept=".csv"
+                                            className="hidden"
+                                            ref={importSkusRef}
+                                            onChange={(e) => handleImport(e, '/api/skus/import', 'SKUs')}
+                                        />
+                                        <input
+                                            type="file"
+                                            accept=".csv"
+                                            className="hidden"
+                                            ref={importVariancesRef}
+                                            onChange={(e) => handleImport(e, '/api/skus/import-variances', 'Variances')}
+                                        />
+
                                         <div className="space-y-4">
                                             <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">System Defaults</h2>
                                             
@@ -500,6 +723,84 @@ export default function SettingsPage() {
                                                                 </button>
                                                             )}
                                                         </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* SKU Import Section */}
+                                        <div className="space-y-4">
+                                            <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">SKU Data Import</h2>
+                                            
+                                            {/* Status Display */}
+                                            {importStatus && (
+                                                <div className={cn(
+                                                    "p-3 rounded-lg text-sm font-medium",
+                                                    importStatus.startsWith('✓') ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
+                                                    importStatus.startsWith('⚠️') ? "bg-amber-50 text-amber-700 border border-amber-200" :
+                                                    importStatus.startsWith('❌') ? "bg-red-50 text-red-700 border border-red-200" :
+                                                    "bg-blue-50 text-blue-700 border border-blue-200"
+                                                )}>
+                                                    {isImporting && <RefreshCw className="w-4 h-4 inline mr-2 animate-spin" />}
+                                                    {importStatus}
+                                                </div>
+                                            )}
+
+                                            <div className="p-4 border border-teal-200 bg-teal-50 rounded-lg flex items-start space-x-4 mb-4">
+                                                <div className="shrink-0 mt-0.5">
+                                                    <Upload className="w-5 h-5 text-teal-600" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-teal-800">SKU Data Import</h4>
+                                                    <p className="text-xs text-teal-700 mt-1">
+                                                        Import SKUs and Variances from CSV files. SKUs use <code className="bg-teal-100 px-1 rounded">legacyId</code> for matching - 
+                                                        existing records will be updated, new records will be created.
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                {/* Import SKUs */}
+                                                <button
+                                                    onClick={() => importSkusRef.current?.click()}
+                                                    disabled={isImporting}
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-teal-400 hover:bg-teal-50 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <div className="w-12 h-12 rounded-full bg-teal-100 flex items-center justify-center mb-3 group-hover:bg-teal-200 transition-colors">
+                                                        <Package className="w-6 h-6 text-teal-600" />
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-slate-700">Import SKUs</h4>
+                                                    <p className="text-[10px] text-slate-500 mt-1 text-center">
+                                                        Master product catalog data
+                                                    </p>
+                                                </button>
+
+                                                {/* Import Variances */}
+                                                <button
+                                                    onClick={() => importVariancesRef.current?.click()}
+                                                    disabled={isImporting}
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-orange-400 hover:bg-orange-50 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center mb-3 group-hover:bg-orange-200 transition-colors">
+                                                        <Layers className="w-6 h-6 text-orange-600" />
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-slate-700">Import Variances</h4>
+                                                    <p className="text-[10px] text-slate-500 mt-1 text-center">
+                                                        Product variants (sizes, colors)
+                                                    </p>
+                                                </button>
+                                            </div>
+
+                                            <div className="mt-6 p-4 bg-slate-50 rounded-lg">
+                                                <h4 className="text-xs font-bold text-slate-600 mb-2">CSV Column Reference</h4>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-[10px] text-slate-500">
+                                                    <div>
+                                                        <span className="font-bold text-slate-700">SKUs:</span>
+                                                        <p>legacyId, name, image, category, subCategory, materialType, uom, salePrice, orderUpto, reOrderPoint, kitApplied, isLotApplied</p>
+                                                    </div>
+                                                    <div>
+                                                        <span className="font-bold text-slate-700">Variances:</span>
+                                                        <p>sku (or skuLegacyId), name, website, image</p>
                                                     </div>
                                                 </div>
                                             </div>
