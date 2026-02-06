@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { 
   Search, MoreHorizontal, Mail, Phone, MapPin, 
   Calendar, DollarSign, ShoppingBag, ChevronLeft, ChevronRight,
@@ -59,6 +59,14 @@ const StatusBadge = ({ status }: { status: string }) => {
 };
 
 export default function ClientsPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-sm text-muted-foreground">Loading...</div>}>
+      <ClientsPageContent />
+    </Suspense>
+  );
+}
+
+function ClientsPageContent() {
   const router = useRouter();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);

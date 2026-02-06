@@ -186,7 +186,7 @@ export async function GET(request: Request) {
                     }
                 ]),
                 Activity.aggregate([
-                    { $match: { client: { $in: clientIds.map(String) } } },
+                    { $match: { client: { $in: clientIds } } },
                     {
                         $group: {
                             _id: '$client',
