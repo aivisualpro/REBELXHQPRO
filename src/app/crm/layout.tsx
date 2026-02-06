@@ -218,18 +218,6 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
                   </div>
                 </div>
             </Link>
-            {!isSidebarCollapsed && (
-            <button
-                onClick={(e) => {
-                    e.preventDefault();
-                    setClientModalType('Client');
-                    setIsClientModalOpen(true);
-                }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-secondary rounded transition-colors text-muted hover:text-foreground cursor-pointer"
-            >
-                <Plus className="w-4 h-4" />
-            </button>
-            )}
            </div>
 
           {/* Contacts */}

@@ -317,13 +317,74 @@ export default function ClientsPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-48px)] bg-background text-foreground font-sans">
+      
+      {/* Header / Action Bar */}
+      <div className="flex items-center justify-between px-4 h-11 border-b border-border bg-card sticky top-0 z-20 gap-4">
+        
+        {/* Left: Search (Title Removed) */}
+        <div className="flex items-center space-x-6">
+            <div className="relative group">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                <input 
+                    type="text" 
+                    placeholder="Search clients..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="pl-9 pr-4 h-8 w-64 bg-secondary/50 hover:bg-secondary focus:bg-background border border-transparent focus:border-primary rounded text-sm transition-all focus:outline-none placeholder:text-muted-foreground text-foreground"
+                />
+            </div>
+        </div>
+
+        {/* Right: Filters & Actions */}
+        <div className="flex items-center space-x-2">
+            
+            {/* Filter Group */}
+            <div className="flex items-center space-x-2 mr-4">
+                  <button className="flex items-center space-x-1.5 px-3 h-8 text-[11px] font-bold text-muted-foreground bg-card border border-border rounded hover:bg-secondary transition-all uppercase tracking-wide cursor-pointer">
+                    <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span>City</span>
+                </button>
+                 <button className="flex items-center space-x-1.5 px-3 h-8 text-[11px] font-bold text-muted-foreground bg-card border border-border rounded hover:bg-secondary transition-all uppercase tracking-wide cursor-pointer">
+                    <LucideMap className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span>State</span>
+                </button>
+                 <button className="flex items-center space-x-1.5 px-3 h-8 text-[11px] font-bold text-muted-foreground bg-card border border-border rounded hover:bg-secondary transition-all uppercase tracking-wide cursor-pointer">
+                    <Truck className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span>Shipping</span>
+                </button>
+            </div>
+
+            {/* Fixed Filter Anchors (Ensures dropdowns float over everything) */}
+            <div className="fixed top-12 right-4 z-[100] pointer-events-none">
+                <div className="pointer-events-auto">
+                    <MultiSelectFilter
+                        ref={repFilterRef}
+                        label="Rep"
+                        options={salesRepOptions}
+                        selectedValues={selectedSalesReps}
+                        onChange={setSelectedSalesReps}
+                        className="hidden"
+                    />
+                    <MultiSelectFilter
+                        ref={typeFilterRef}
+                        label="Type"
+                        options={companyTypeOptions}
+                        selectedValues={selectedCompanyTypes}
+                        onChange={setSelectedCompanyTypes}
+                        className="hidden"
+                    />
+                </div>
+            </div>
+        </div>
+      </div>
+
 
 
       {/* Table Content */}
-      <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
-        <div className="min-w-full px-2 py-2">
+      <div className="flex-1 overflow-x-hidden overflow-y-auto bg-background transition-colors duration-300 relative scrollbar-custom">
+        <div className="min-w-full px-2 py-2 flex flex-col">
             <table className="w-full border-separate border-spacing-0 text-left relative z-0">
-                <thead className="sticky top-0 bg-secondary/80 z-10 border-b border-border backdrop-blur-md transition-colors">
+                <thead className="bg-secondary/50 border-b border-border sticky top-0 z-10 backdrop-blur-sm transition-colors">
                     <tr>
                         {[
                             { key: 'name', label: 'name' },
@@ -364,17 +425,18 @@ export default function ClientsPage() {
                         ))}
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-border bg-background/50">
+                <tbody className="divide-y divide-slate-100">
                     {loading && clients.length === 0 ? (
-                        <tr><td colSpan={9} className="px-4 py-12 text-center text-xs text-slate-400">Loading Clients...</td></tr>
+                        <tr><td colSpan={11} className="px-6 py-12 text-center text-sm text-slate-400">Loading...</td></tr>
                     ) : clients.length > 0 ? (
                         clients.map((client) => (
                             <tr 
                                 key={client._id} 
-                                className="group relative z-0 bg-background transition-colors duration-150"
+                                onClick={() => router.push(`/crm/clients/${client._id}`)}
+                                className="hover:bg-primary/5 hover:scale-[1.008] hover:shadow-md transition-all duration-200 group cursor-pointer relative z-0 hover:z-10"
                             >
                                 {/* NAME */}
-                                <td className="p-1 border-r border-border group-hover:border-l-2 group-hover:border-l-primary transition-all">
+                                <td className="p-1">
                                     <div className="flex items-center space-x-2">
                                         <div className="w-5 h-5 rounded bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 text-[8px] font-bold text-slate-500 uppercase">
                                             {client.name.substring(0, 2)}
