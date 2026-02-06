@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { Search, Bell, User, LogOut, Sun, Moon, X } from 'lucide-react';
@@ -9,7 +9,7 @@ import { useSession, signOut } from 'next-auth/react';
 import { useTheme } from '@/components/ThemeProvider';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
-export const DynamicActions = () => {
+const DynamicActionsContent = () => {
     const { data: session } = useSession();
     const { theme, toggleTheme } = useTheme();
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -191,3 +191,17 @@ export const DynamicActions = () => {
     );
 };
 
+// Export with Suspense wrapper to fix build error with useSearchParams
+export const DynamicActions = () => {
+    return (
+        <Suspense fallback={
+            <div className="flex items-center justify-end space-x-1 w-full h-full">
+                <div className="w-4 h-4 rounded-full bg-secondary animate-pulse" />
+                <div className="w-4 h-4 rounded-full bg-secondary animate-pulse" />
+                <div className="w-4 h-4 rounded-full bg-secondary animate-pulse" />
+            </div>
+        }>
+            <DynamicActionsContent />
+        </Suspense>
+    );
+};

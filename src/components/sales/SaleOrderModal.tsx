@@ -56,6 +56,7 @@ const SHIPPING_METHODS = [
 interface ItemForm {
     id: string;
     sku: string;
+    productDescription: string;
     qtyShipped: number;
     price: number;
     uom: string;
@@ -75,7 +76,7 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
     // Resources
     const [allClients, setAllClients] = useState<{ _id: string; name: string; salesPerson?: { _id: string; firstName: string; lastName: string } | string | null; addresses?: { street: string; city: string; state: string }[] }[]>([]);
     const [allUsers, setAllUsers] = useState<{ _id: string; firstName: string; lastName: string }[]>([]);
-    const [allSkus, setAllSkus] = useState<{ _id: string; name: string; salePrice?: number }[]>([]);
+    const [allSkus, setAllSkus] = useState<{ _id: string; name: string; salePrice?: number; productDescription?: string }[]>([]);
 
     // Form State
     const [newOrder, setNewOrder] = useState<{
@@ -181,6 +182,7 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
                 const items: ItemForm[] = (orderToEdit.lineItems || []).map((item: any) => ({
                     id: Math.random().toString(),
                     sku: typeof item.sku === 'object' && item.sku ? item.sku._id : String(item.sku),
+                    productDescription: item.productDescription || '',
                     qtyShipped: item.qtyShipped,
                     price: item.price,
                     cost: item.cost || 0,
@@ -211,6 +213,7 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
                 const initialItems = Array(3).fill(null).map(() => ({
                     id: Math.random().toString(),
                     sku: '',
+                    productDescription: '',
                     qtyShipped: 1,
                     price: 0,
                     cost: 0,
@@ -303,7 +306,7 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
     };
 
     const addLineItem = () => {
-        setNewLineItems([...newLineItems, { id: Math.random().toString(), sku: '', qtyShipped: 1, price: 0, cost: 0, uom: 'Each', lotNumber: '' }]);
+        setNewLineItems([...newLineItems, { id: Math.random().toString(), sku: '', productDescription: '', qtyShipped: 1, price: 0, cost: 0, uom: 'Each', lotNumber: '' }]);
     };
 
     const removeLineItem = (id: string) => {
@@ -321,11 +324,13 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
         if (field === 'sku') {
             const skuObj = allSkus.find(s => s._id === value);
             let newPrice = 0;
+            let newProductDescription = '';
             let newLot = '';
             let newCost = 0;
     
-            if (skuObj && skuObj.salePrice) {
-                newPrice = skuObj.salePrice;
+            if (skuObj) {
+                newPrice = skuObj.salePrice || 0;
+                newProductDescription = skuObj.productDescription || '';
             }
     
             // Auto-Suggest Lot (FIFO)
@@ -354,6 +359,7 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
                     return { 
                         ...item, 
                         price: newPrice || item.price,
+                        productDescription: newProductDescription,
                         lotNumber: newLot,
                         cost: newCost
                     };
@@ -439,7 +445,7 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-card w-full max-w-4xl rounded-none shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 border border-border flex flex-col max-h-[90vh]">
+          <div className="bg-card w-full max-w-6xl rounded-none shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 border border-border flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted/50 shrink-0">
               <h2 className="text-sm font-bold uppercase text-foreground">{orderToEdit ? 'Edit Sale Order' : 'Create Sale Order'}</h2>
               <button
@@ -565,17 +571,18 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
                       </button>
                     </div>
                   ) : (
-                    <div className="border border-border rounded-none">
-                      <table className="w-full text-left border-collapse border-b border-border">
-                        <thead className="bg-muted text-muted-foreground">
+                    <div className="border border-border rounded-none overflow-x-auto">
+                      <table className="w-full text-left border-collapse border-b border-border min-w-[900px]">
+                        <thead className="bg-secondary/80 text-foreground">
                            <tr>
-                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[35%] border-r border-border">Item / SKU</th>
-                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[15%] border-r border-border">Lot #</th>
-                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[10%] border-r border-border">UOM</th>
-                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[10%] border-r border-border">Qty</th>
-                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[15%] border-r border-border">Price</th>
+                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[20%] border-r border-border">Item / SKU</th>
+                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[20%] border-r border-border">Product Description</th>
+                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[10%] border-r border-border">Lot #</th>
+                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[8%] border-r border-border">UOM</th>
+                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[8%] border-r border-border">Qty</th>
+                              <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[12%] border-r border-border">Price</th>
                               <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[10%] text-right border-r border-border">Total</th>
-                              <th className="px-2 py-2 w-[5%] bg-card"></th>
+                              <th className="px-2 py-2 w-[4%] bg-card"></th>
                            </tr>
                         </thead>
                         <tbody className="divide-y divide-border bg-card">
@@ -594,6 +601,15 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
                                             className="w-full rounded-none border-none text-sm focus:ring-0"
                                         />
                                     </div>
+                                </td>
+                                <td className="p-0 border-r border-border">
+                                    <input
+                                        type="text"
+                                        value={item.productDescription}
+                                        onChange={(e) => updateLineItem(item.id, 'productDescription', e.target.value)}
+                                        placeholder="Product description..."
+                                        className="w-full h-[32px] px-2 text-xs focus:outline-none focus:bg-primary/5 transition-colors rounded-none bg-background text-foreground"
+                                    />
                                 </td>
                                 <td className="p-0 border-r border-border">
                                     <div 
