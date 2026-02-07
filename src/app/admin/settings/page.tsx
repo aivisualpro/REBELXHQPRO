@@ -155,12 +155,13 @@ export default function SettingsPage() {
                         if (res.ok) {
                             const data = await res.json();
                             successCount += (data.count || 0);
-                            // Debug: log response data
-                            if (data.count === 0) {
-                                console.warn('Import returned 0 count. Response:', data);
-                                if (data.headers) {
-                                    console.warn('CSV Headers detected:', data.headers);
-                                }
+                            // Always log full response for debugging
+                            console.log(`Import ${label} chunk ${i+1} response:`, JSON.stringify(data, null, 2));
+                            if (data.debug) {
+                                console.log('CSV Headers:', data.debug.csvHeaders);
+                                console.log('First row raw:', data.debug.firstRowRaw);
+                                console.log('PaymentTerms samples:', data.debug.paymentTermsSamples);
+                                console.log('Processed samples:', data.debug.processedSamples);
                             }
                         } else {
                             const err = await res.json();

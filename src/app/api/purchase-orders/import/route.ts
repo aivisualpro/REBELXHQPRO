@@ -133,14 +133,30 @@ export async function POST(request: Request) {
             }
         });
 
-        const result = await PurchaseOrder.bulkWrite(bulkOps as any);
+        // Collect debug info
+        const debugInfo = {
+            totalRows: data.length,
+            csvHeaders: data.length > 0 ? Object.keys(data[0]) : [],
+            firstRowRaw: data.length > 0 ? data[0] : null,
+            paymentTermsSamples: data.slice(0, 10).map((d: any, i: number) => ({
+                row: i,
+                label: d.label || d.legacyId,
+                paymentTerms: d.paymentTerms,
+                payTerms: d.payTerms,
+                payRelatedKeys: Object.keys(d).filter(k => k.toLowerCase().includes('pay') || k.toLowerCase().includes('term'))
+            })),
+            processedSamples: bulkOps.slice(0, 5).map((op: any) => {
+                const doc = op.updateOne?.update?.$set || op.insertOne?.document;
+                return { label: doc?.label, paymentTerms: doc?.paymentTerms, vendor: doc?.vendor };
+            })
+        };
 
-        console.log('=== PO IMPORT RESULT ===');
-        console.log('Upserted:', result.upsertedCount, 'Modified:', result.modifiedCount, 'Inserted:', result.insertedCount);
+        const result = await PurchaseOrder.bulkWrite(bulkOps as any);
 
         return NextResponse.json({
             message: 'Import completed',
-            count: result.upsertedCount + result.modifiedCount + result.insertedCount
+            count: result.upsertedCount + result.modifiedCount + result.insertedCount,
+            debug: debugInfo
         });
     } catch (error: any) {
         console.error('PO Import Error:', error);
