@@ -171,9 +171,9 @@ export const RouteContext = () => {
     }
 
     return (
-        <div className="flex items-center justify-between w-full h-full px-4">
+        <div className="flex items-center gap-3 w-full h-full px-4">
             {/* Title */}
-            <h1 className="text-sm font-bold text-foreground uppercase tracking-tight">
+            <h1 className="text-sm font-bold text-foreground uppercase tracking-tight whitespace-nowrap">
                 {config.title}
             </h1>
 
