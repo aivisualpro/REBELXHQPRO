@@ -30,7 +30,8 @@ import {
     ClipboardCheck,
     FlaskConical,
     UtensilsCrossed,
-    TicketCheck
+    TicketCheck,
+    PackageCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -65,6 +66,8 @@ export default function SettingsPage() {
     const importRecipeLineItemsRef = useRef<HTMLInputElement>(null);
     const importRecipeStepsRef = useRef<HTMLInputElement>(null);
     const importTicketsRef = useRef<HTMLInputElement>(null);
+    const importKitsRef = useRef<HTMLInputElement>(null);
+    const importKitLineItemsRef = useRef<HTMLInputElement>(null);
 
     const [settings, setSettings] = useState({
         companyName: 'RebelX Headquarters',
@@ -750,6 +753,20 @@ export default function SettingsPage() {
                                             ref={importRecipeStepsRef}
                                             onChange={(e) => handleImport(e, '/api/recipes/import-steps', 'Recipe Steps')}
                                         />
+                                        <input
+                                            type="file"
+                                            accept=".csv"
+                                            className="hidden"
+                                            ref={importKitsRef}
+                                            onChange={(e) => handleImport(e, '/api/kits/import', 'Product Kits')}
+                                        />
+                                        <input
+                                            type="file"
+                                            accept=".csv"
+                                            className="hidden"
+                                            ref={importKitLineItemsRef}
+                                            onChange={(e) => handleImport(e, '/api/kits/import-lineitems', 'Kit Line Items')}
+                                        />
 
                                         <div className="space-y-4">
                                             <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">System Defaults</h2>
@@ -1188,6 +1205,68 @@ export default function SettingsPage() {
                                                     <div>
                                                         <span className="font-bold text-slate-700">Recipe Steps:</span>
                                                         <p>recipeId (parent legacyId), step, description, details, createdBy, createdAt</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Product Kits Import Section */}
+                                        <div className="space-y-4">
+                                            <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">Product Kits Import</h2>
+
+                                            <div className="p-4 border border-teal-200 bg-teal-50 rounded-lg flex items-start space-x-4 mb-4">
+                                                <div className="shrink-0 mt-0.5">
+                                                    <PackageCheck className="w-5 h-5 text-teal-600" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-teal-800">Product Kits Import</h4>
+                                                    <p className="text-xs text-teal-700 mt-1">
+                                                        First import Kits (parent records), then import Kit Items to add line items to each kit.
+                                                        The <code className="bg-teal-100 px-1 rounded">kitId</code> in items CSV should match the kit&apos;s <code className="bg-teal-100 px-1 rounded">legacyId</code>.
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <button
+                                                    onClick={() => importKitsRef.current?.click()}
+                                                    disabled={isImporting}
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-teal-400 hover:bg-teal-50 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <div className="w-12 h-12 rounded-full bg-teal-100 flex items-center justify-center mb-3 group-hover:bg-teal-200 transition-colors">
+                                                        <PackageCheck className="w-6 h-6 text-teal-600" />
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-slate-700">Import Product Kits</h4>
+                                                    <p className="text-[10px] text-slate-500 mt-1 text-center">
+                                                        Parent kit records
+                                                    </p>
+                                                </button>
+
+                                                <button
+                                                    onClick={() => importKitLineItemsRef.current?.click()}
+                                                    disabled={isImporting}
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-teal-400 hover:bg-teal-50 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <div className="w-12 h-12 rounded-full bg-teal-100 flex items-center justify-center mb-3 group-hover:bg-teal-200 transition-colors">
+                                                        <PackageCheck className="w-6 h-6 text-teal-600" />
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-slate-700">Import Kit Items</h4>
+                                                    <p className="text-[10px] text-slate-500 mt-1 text-center">
+                                                        Line items for kits
+                                                    </p>
+                                                </button>
+                                            </div>
+
+                                            <div className="mt-4 p-4 bg-slate-50 rounded-lg">
+                                                <h4 className="text-xs font-bold text-slate-600 mb-2">CSV Column Reference</h4>
+                                                <div className="text-[10px] text-slate-500 space-y-1">
+                                                    <div>
+                                                        <span className="font-bold text-slate-700">Kits:</span>
+                                                        <p>legacyId, name, createdBy, createdAt</p>
+                                                    </div>
+                                                    <div>
+                                                        <span className="font-bold text-slate-700">Kit Items:</span>
+                                                        <p>kitId (parent legacyId), sku (SKU legacyId), qty</p>
                                                     </div>
                                                 </div>
                                             </div>

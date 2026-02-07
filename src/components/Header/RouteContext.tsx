@@ -123,6 +123,16 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
         };
     }
 
+    // Kits
+    if (pathname === '/warehouse/kits') {
+        return {
+            title: 'Product Kits',
+            actions: [
+                { label: 'Add', icon: Plus, href: '/warehouse/kits?createNew=true', variant: 'primary' },
+            ]
+        };
+    }
+
     // Schedules
     if (pathname === '/jobs/schedules') {
         return {
