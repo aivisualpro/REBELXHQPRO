@@ -26,7 +26,8 @@ import {
     Package,
     CreditCard,
     Scale,
-    Truck
+    Truck,
+    ClipboardCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -55,6 +56,7 @@ export default function SettingsPage() {
     const importVendorsRef = useRef<HTMLInputElement>(null);
     const importPurchaseOrdersRef = useRef<HTMLInputElement>(null);
     const importPoLineItemsRef = useRef<HTMLInputElement>(null);
+    const importAuditAdjustmentsRef = useRef<HTMLInputElement>(null);
 
     const [settings, setSettings] = useState({
         companyName: 'RebelX Headquarters',
@@ -705,6 +707,13 @@ export default function SettingsPage() {
                                             ref={importPoLineItemsRef}
                                             onChange={(e) => handleImport(e, '/api/purchase-orders/import-lineitems', 'PO Line Items')}
                                         />
+                                        <input
+                                            type="file"
+                                            accept=".csv"
+                                            className="hidden"
+                                            ref={importAuditAdjustmentsRef}
+                                            onChange={(e) => handleImport(e, '/api/audit-adjustments/import', 'Audit Adjustments')}
+                                        />
 
                                         <div className="space-y-4">
                                             <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">System Defaults</h2>
@@ -985,6 +994,47 @@ export default function SettingsPage() {
                                                 <div className="text-[10px] text-slate-500">
                                                     <span className="font-bold text-slate-700">Opening Balances:</span>
                                                     <p>sku, lotNumber, qty, uom, cost, expirationDate, createdAt, createdBy</p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Audit Adjustments Import Section */}
+                                        <div className="space-y-4">
+                                            <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">Audit Adjustments Import</h2>
+
+                                            <div className="p-4 border border-amber-200 bg-amber-50 rounded-lg flex items-start space-x-4 mb-4">
+                                                <div className="shrink-0 mt-0.5">
+                                                    <ClipboardCheck className="w-5 h-5 text-amber-600" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-amber-800">Audit Adjustments Import</h4>
+                                                    <p className="text-xs text-amber-700 mt-1">
+                                                        Import audit adjustments from CSV. The <code className="bg-amber-100 px-1 rounded">sku</code> column maps to SKU <code className="bg-amber-100 px-1 rounded">legacyId</code> for matching. New ObjectIds are generated for each record.
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+                                                <button
+                                                    onClick={() => importAuditAdjustmentsRef.current?.click()}
+                                                    disabled={isImporting}
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-amber-400 hover:bg-amber-50 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mb-3 group-hover:bg-amber-200 transition-colors">
+                                                        <ClipboardCheck className="w-6 h-6 text-amber-600" />
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-slate-700">Import Audit Adjustments</h4>
+                                                    <p className="text-[10px] text-slate-500 mt-1 text-center">
+                                                        Inventory adjustments (qty corrections)
+                                                    </p>
+                                                </button>
+                                            </div>
+
+                                            <div className="mt-4 p-4 bg-slate-50 rounded-lg">
+                                                <h4 className="text-xs font-bold text-slate-600 mb-2">CSV Column Reference</h4>
+                                                <div className="text-[10px] text-slate-500">
+                                                    <span className="font-bold text-slate-700">Audit Adjustments:</span>
+                                                    <p>sku (legacyId), lotNumber, qty, reason, createdBy, createdAt</p>
                                                 </div>
                                             </div>
                                         </div>
