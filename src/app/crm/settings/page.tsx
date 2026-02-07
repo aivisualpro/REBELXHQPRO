@@ -232,20 +232,36 @@ export default function CRMSettingsPage() {
                 }
                 
                 try {
-                    toast.loading(`Importing ${totalRows} activities...`, { id: toastId });
-                    const res = await fetch('/api/clients/import-activities', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ activities: results.data })
-                    });
+                    const BATCH_SIZE = 2000;
+                    let totalImported = 0;
+                    let totalMissing = 0;
                     
-                    if (res.ok) {
-                        const data = await res.json();
-                        toast.success(`Imported ${data.count} activities (${data.skippedDuplicates} duplicates skipped, ${data.missingClients} missing clients)`, { id: toastId });
-                    } else {
-                        const err = await res.json();
-                        toast.error(err.error || 'Import failed', { id: toastId });
+                    for (let i = 0; i < totalRows; i += BATCH_SIZE) {
+                        const batch = results.data.slice(i, i + BATCH_SIZE);
+                        const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+                        const totalBatches = Math.ceil(totalRows / BATCH_SIZE);
+                        
+                        toast.loading(`Importing batch ${batchNum}/${totalBatches} (${i + batch.length}/${totalRows})...`, { id: toastId });
+                        
+                        const res = await fetch('/api/clients/import-activities', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ activities: batch })
+                        });
+                        
+                        if (res.ok) {
+                            const data = await res.json();
+                            totalImported += data.count || 0;
+                            totalMissing += data.missingClients || 0;
+                        } else {
+                            const err = await res.json();
+                            toast.error(`Batch ${batchNum} failed: ${err.error || 'Unknown error'}`, { id: toastId });
+                            setImporting(false);
+                            return;
+                        }
                     }
+                    
+                    toast.success(`Imported ${totalImported} activities (${totalMissing} missing clients)`, { id: toastId });
                 } catch (err) {
                     console.error(err);
                     toast.error('Import failed', { id: toastId });
