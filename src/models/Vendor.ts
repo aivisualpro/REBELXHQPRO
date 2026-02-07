@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 const VendorSchema = new mongoose.Schema({
     _id: { type: String, default: () => new mongoose.Types.ObjectId().toString() },
     name: { type: String, required: true },
+    legacyId: String,
     contactName: String,
     email: String,
     phone: String,

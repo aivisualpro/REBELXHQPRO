@@ -27,7 +27,15 @@ export async function POST(request: Request) {
             if (processedItem['Company Name'] && !processedItem.name) processedItem.name = processedItem['Company Name'];
             if (processedItem['Contact Name'] && !processedItem.contactName) processedItem.contactName = processedItem['Contact Name'];
 
-            if (processedItem._id) {
+            if (processedItem.legacyId) {
+                return {
+                    updateOne: {
+                        filter: { legacyId: processedItem.legacyId },
+                        update: { $set: processedItem },
+                        upsert: true
+                    }
+                };
+            } else if (processedItem._id) {
                 return {
                     updateOne: {
                         filter: { _id: processedItem._id },

@@ -25,7 +25,8 @@ import {
     FileSpreadsheet,
     Package,
     CreditCard,
-    Scale
+    Scale,
+    Truck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -51,6 +52,7 @@ export default function SettingsPage() {
     const importSkusRef = useRef<HTMLInputElement>(null);
     const importVariancesRef = useRef<HTMLInputElement>(null);
     const importOpeningBalancesRef = useRef<HTMLInputElement>(null);
+    const importVendorsRef = useRef<HTMLInputElement>(null);
 
     const [settings, setSettings] = useState({
         companyName: 'RebelX Headquarters',
@@ -679,6 +681,13 @@ export default function SettingsPage() {
                                             ref={importVariancesRef}
                                             onChange={(e) => handleImport(e, '/api/skus/import-variances', 'Variances')}
                                         />
+                                        <input
+                                            type="file"
+                                            accept=".csv"
+                                            className="hidden"
+                                            ref={importVendorsRef}
+                                            onChange={(e) => handleImport(e, '/api/vendors/import', 'Vendors')}
+                                        />
 
                                         <div className="space-y-4">
                                             <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">System Defaults</h2>
@@ -768,7 +777,7 @@ export default function SettingsPage() {
                                                 </div>
                                             </div>
 
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                                 {/* Import SKUs */}
                                                 <button
                                                     onClick={() => importSkusRef.current?.click()}
@@ -796,6 +805,21 @@ export default function SettingsPage() {
                                                     <h4 className="text-sm font-bold text-slate-700">Import Variances</h4>
                                                     <p className="text-[10px] text-slate-500 mt-1 text-center">
                                                         Product variants (sizes, colors)
+                                                    </p>
+                                                </button>
+
+                                                {/* Import Vendors */}
+                                                <button
+                                                    onClick={() => importVendorsRef.current?.click()}
+                                                    disabled={isImporting}
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-indigo-400 hover:bg-indigo-50 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center mb-3 group-hover:bg-indigo-200 transition-colors">
+                                                        <Truck className="w-6 h-6 text-indigo-600" />
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-slate-700">Import Vendors</h4>
+                                                    <p className="text-[10px] text-slate-500 mt-1 text-center">
+                                                        Supplier list (legacyId, name, terms)
                                                     </p>
                                                 </button>
                                             </div>
