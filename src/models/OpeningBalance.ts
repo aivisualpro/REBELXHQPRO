@@ -1,8 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
-export interface IOpeningBalance extends Omit<Document, '_id'> {
-    _id: string; // User imported ID or auto-generated
-    sku: string; // Ref to SKU
+export interface IOpeningBalance extends Document {
+    sku: string;
     lotNumber: string;
     qty: number;
     uom: string;
@@ -13,15 +12,14 @@ export interface IOpeningBalance extends Omit<Document, '_id'> {
 }
 
 const OpeningBalanceSchema: Schema = new Schema({
-    _id: { type: String, default: () => new mongoose.Types.ObjectId().toString() },
-    sku: { type: String, ref: 'Sku', required: true },
+    sku: { type: Schema.Types.Mixed, required: true },
     lotNumber: { type: String, required: true },
     qty: { type: Number, required: true },
     uom: { type: String, required: true },
-    cost: { type: Number, required: true },
+    cost: { type: Number, default: 0 },
     expirationDate: { type: Date },
     createdAt: { type: Date, default: Date.now },
-    createdBy: { type: String, ref: 'RXHQUsers' }
+    createdBy: { type: Schema.Types.ObjectId, ref: 'RXHQUsers' }
 });
 
 export default mongoose.models.OpeningBalance || mongoose.model<IOpeningBalance>('OpeningBalance', OpeningBalanceSchema);

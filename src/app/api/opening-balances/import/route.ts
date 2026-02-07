@@ -47,14 +47,12 @@ export async function POST(request: Request) {
             const sku = row.sku?.toString().trim();
             const lotNumber = row.lotNumber?.toString().trim();
             const qty = row.qty; // keep raw for parsing
-            const cost = row.cost; // keep raw
 
             // Validation
             const missing = [];
             if (!sku) missing.push('sku');
             if (!lotNumber) missing.push('lotNumber');
             if (qty === undefined || qty === null || qty === '') missing.push('qty');
-            if (cost === undefined || cost === null || cost === '') missing.push('cost');
 
             if (missing.length > 0) {
                 errors.push(`Row ${index + 1}: Missing fields: ${missing.join(', ')}`);
@@ -63,7 +61,7 @@ export async function POST(request: Request) {
 
             const resolvedSkuId = skuMap.get(sku);
             if (!resolvedSkuId) {
-                errors.push(`Row ${index + 1}: SKU '${sku}' not found`);
+                // Silently skip rows with unresolved SKUs
                 continue;
             }
 
@@ -72,26 +70,30 @@ export async function POST(request: Request) {
                 lotNumber: lotNumber,
                 qty: parseFloat(qty),
                 uom: row.uom?.toString().trim() || 'EA',
-                cost: parseFloat(cost),
+                cost: row.cost !== undefined && row.cost !== null && row.cost !== '' ? parseFloat(row.cost) : 0,
                 createdAt: row.createdAt ? new Date(row.createdAt) : new Date(),
-                createdBy: row.createdBy || undefined
             };
+
+            // Only set createdBy if it's a valid ObjectId
+            if (row.createdBy && mongoose.Types.ObjectId.isValid(row.createdBy)) {
+                payload.createdBy = new mongoose.Types.ObjectId(row.createdBy);
+            }
 
             if (row.expirationDate) payload.expirationDate = new Date(row.expirationDate);
 
-            if (row._id) {
+            if (row._id && mongoose.Types.ObjectId.isValid(row._id)) {
                 // Upsert by ID
-                payload._id = row._id;
+                payload._id = new mongoose.Types.ObjectId(row._id);
                 operations.push({
                     updateOne: {
-                        filter: { _id: row._id },
+                        filter: { _id: payload._id },
                         update: { $set: payload },
                         upsert: true
                     }
                 });
             } else {
-                // Insert New - Ensure _id is set to String
-                payload._id = new mongoose.Types.ObjectId().toString();
+                // Insert New with auto ObjectId
+                payload._id = new mongoose.Types.ObjectId();
                 operations.push({
                     insertOne: {
                         document: payload

@@ -75,6 +75,16 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
         };
     }
 
+    // Opening Balances
+    if (pathname === '/warehouse/opening-balances') {
+        return {
+            title: 'Opening Balances',
+            actions: [
+                { label: 'Add', icon: Plus, href: '/warehouse/opening-balances?createNew=true', variant: 'primary' },
+            ]
+        };
+    }
+
     // Purchase Orders
     if (pathname === '/warehouse/purchase-orders') {
         return {

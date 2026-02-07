@@ -1,24 +1,30 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import {
     Search,
-    Upload,
     ArrowUpDown,
-    Filter,
+    Loader2,
+    Pencil,
+    Trash2,
+    Eye,
+    List,
+    Plus,
+    X
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { cn } from '@/lib/utils';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
-import { List, Plus, Pencil, Trash2, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Pagination } from '@/components/ui/Pagination';
+import { TableColumnHeader } from '@/components/ui/TableColumnHeader';
 
 interface OpeningBalance {
     _id: string;
-    sku: { _id: string; name: string } | string;
+    sku: { _id: string; name: string; image?: string } | string;
     lotNumber: string;
     qty: number;
     uom: string;
@@ -28,7 +34,17 @@ interface OpeningBalance {
 }
 
 export default function OpeningBalancesPage() {
+    return (
+        <Suspense fallback={<div className="flex items-center justify-center h-[calc(100vh-36px)]"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>}>
+            <OpeningBalancesContent />
+        </Suspense>
+    );
+}
+
+function OpeningBalancesContent() {
+    const router = useRouter();
     const { data: session } = useSession();
+    const searchParams = useSearchParams();
     const [balances, setBalances] = useState<OpeningBalance[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -55,8 +71,8 @@ export default function OpeningBalancesPage() {
         expirationDate: ''
     });
     const [allSkus, setAllSkus] = useState<{ _id: string; name: string }[]>([]);
+    const [globalSettings, setGlobalSettings] = useState<any>(null);
     
-    // Lot Selection
     // Lot Selection State
     const [lotSelector, setLotSelector] = useState<{
         isOpen: boolean;
@@ -96,15 +112,27 @@ export default function OpeningBalancesPage() {
         }
     };
 
-    const importRef = useRef<HTMLInputElement>(null);
-
     useEffect(() => {
         fetchSkus();
+        fetch('/api/settings')
+            .then(res => res.json())
+            .then(data => setGlobalSettings(data))
+            .catch(() => {});
     }, []);
+
+    // Handle createNew URL param from header Add button
+    useEffect(() => {
+        if (searchParams.get('createNew') === 'true') {
+            handleOpenAdd();
+            const params = new URLSearchParams(searchParams.toString());
+            params.delete('createNew');
+            window.history.replaceState(null, '', `?${params.toString()}`);
+        }
+    }, [searchParams]);
 
     const fetchSkus = async () => {
         try {
-            const res = await fetch('/api/skus?limit=1000'); // Fetch all for dropdown
+            const res = await fetch('/api/skus?limit=1000');
             if (res.ok) {
                 const data = await res.json();
                 setAllSkus(data.skus || []);
@@ -119,7 +147,6 @@ export default function OpeningBalancesPage() {
         return () => clearTimeout(timer);
     }, [search]);
 
-    // Reset page when search changes
     useEffect(() => {
         setPage(1);
     }, [debouncedSearch]);
@@ -153,59 +180,6 @@ export default function OpeningBalancesPage() {
         } finally {
             setLoading(false);
         }
-    };
-
-    const handleSort = (column: string) => {
-        if (sortBy === column) {
-            setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-        } else {
-            setSortBy(column);
-            setSortOrder('asc');
-        }
-    };
-
-    const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        Papa.parse(file, {
-            header: true,
-            skipEmptyLines: true,
-            complete: async (results) => {
-                const totalItems = results.data.length;
-                if (totalItems === 0) {
-                    toast.error("No data found");
-                    if (e.target) e.target.value = '';
-                    return;
-                }
-
-                const toastId = toast.loading(`Importing ${totalItems} items...`);
-                try {
-                    const res = await fetch('/api/opening-balances/import', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ data: results.data })
-                    });
-
-                    const data = await res.json();
-
-                    if (res.ok) {
-                        toast.success(`Imported ${data.count} items!`, { id: toastId });
-                        if (data.errors && data.errors.length > 0) {
-                            setTimeout(() => toast.error(`${data.errors.length} errors occurred. Check console.`), 2000);
-                            console.error(data.errors);
-                        }
-                    } else {
-                        toast.error(data.error || "Import failed", { id: toastId });
-                    }
-
-                    fetchBalances();
-                } catch (err: any) {
-                    toast.error(`Error: ${err.message}`, { id: toastId });
-                }
-            }
-        });
-        e.target.value = '';
     };
 
     const handleOpenAdd = () => {
@@ -282,137 +256,221 @@ export default function OpeningBalancesPage() {
         }
     };
 
-    const renderSku = (val: any) => (typeof val === 'object' && val?.name ? val.name : val || '-');
+    const getSkuName = (val: any) => (typeof val === 'object' && val?.name ? val.name : val || '-');
+    const getSkuImage = (val: any) => (typeof val === 'object' && val?.image ? val.image : '');
 
     return (
-        <div className="flex flex-col h-[calc(100vh-48px)] bg-white relative">
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100 bg-slate-50/50">
-                <div className="flex items-center space-x-4">
-                    <h1 className="text-sm font-bold text-slate-900 uppercase tracking-tighter">Opening Balances</h1>
-                    <div className="relative">
-                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                        <input
-                            type="text"
-                            placeholder="Search Lot #..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="pl-8 pr-3 py-1.5 w-64 bg-white border border-slate-200 text-[11px] focus:outline-none focus:ring-1 focus:ring-black/5 transition-all placeholder:text-slate-400 rounded-sm"
-                        />
-                    </div>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                    <button
-                        onClick={handleOpenAdd}
-                        className="h-[28px] px-3 border border-slate-900 bg-slate-900 text-white hover:bg-slate-800 transition-colors rounded-sm flex items-center space-x-1.5"
-                    >
-                        <Plus className="w-3 h-3" />
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Add New</span>
-                    </button>
-                </div>
-            </div>
-
-            {/* Table */}
-            <div className="flex-1 overflow-auto">
-                <table className="w-full border-collapse text-left">
-                    <thead className="sticky top-0 bg-slate-50 z-10 border-b border-slate-100">
-                        <tr>
-                            {[
-                                { key: 'sku', label: 'SKU' },
-                                { key: 'lotNumber', label: 'Lot Number' },
-                                { key: 'qty', label: 'Qty' },
-                                { key: 'uom', label: 'UOM' },
-                                { key: 'cost', label: 'Cost ($)' },
-                                { key: 'expirationDate', label: 'Expires' },
-                                { key: 'createdAt', label: 'Created At' },
-                            ].map(col => (
-                                <th
-                                    key={col.key}
-                                    onClick={() => handleSort(col.key)}
-                                    className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-100 transition-colors border-r border-slate-100 last:border-0"
+        <div className="flex flex-col h-[calc(100vh-36px)] bg-background relative transition-colors duration-300">
+            <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
+                <div className="min-w-full px-2 py-2">
+                    {/* Search Bar */}
+                    <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm pb-2">
+                        <div className="relative max-w-md">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                            <input
+                                type="text"
+                                placeholder="Search by SKU name or lot number..."
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                                className="w-full pl-9 pr-8 py-1.5 text-xs bg-secondary/50 border border-border rounded-md focus:outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/60 transition-colors"
+                            />
+                            {search && (
+                                <button 
+                                    onClick={() => setSearch('')}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                                 >
-                                    <div className="flex items-center space-x-1">
-                                        <span>{col.label}</span>
-                                        <ArrowUpDown className={cn("w-2 h-2", sortBy === col.key ? "text-black" : "text-slate-200")} />
-                                    </div>
+                                    <X className="h-3.5 w-3.5" />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    <table className="w-full text-left border-separate border-spacing-0 relative z-0">
+                        <thead className="sticky top-8 bg-secondary/80 z-10 border-b border-border backdrop-blur-md transition-colors">
+                            <tr>
+                                {/* Image */}
+                                <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest w-10 border-r border-border">Img</th>
+                                
+                                {/* SKU Name */}
+                                <th className="border-r border-border">
+                                    <TableColumnHeader
+                                        column="sku"
+                                        title="SKU"
+                                        currentSortBy={sortBy}
+                                        currentSortOrder={sortOrder}
+                                        onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
+                                        className="text-muted-foreground"
+                                    />
                                 </th>
-                            ))}
-                            <th className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {loading ? (
-                            <tr><td colSpan={7} className="px-4 py-12 text-center text-xs text-slate-400">Loading...</td></tr>
-                        ) : balances.length === 0 ? (
-                            <tr><td colSpan={7} className="px-4 py-12 text-center text-xs text-slate-400 uppercase font-bold tracking-tighter opacity-50">No records found</td></tr>
-                        ) : balances.map(item => (
-                            <tr key={item._id} className="hover:bg-slate-50 transition-colors group">
-                                <td className="px-2 py-1.5 text-[10px] font-bold text-slate-900">{renderSku(item.sku)}</td>
-                                <td className="px-2 py-1.5 text-[10px] text-slate-600 font-mono group">
-                                    <div className="flex items-center gap-2">
-                                        <span className="tracking-tighter">{item.lotNumber}</span>
-                                        <button 
-                                            onClick={() => {
-                                                const skuId = typeof item.sku === 'object' ? item.sku._id : item.sku;
-                                                setLotSelector({
-                                                    isOpen: true,
-                                                    mode: 'row',
-                                                    itemId: item._id,
-                                                    skuId: skuId,
-                                                    currentLot: item.lotNumber
-                                                });
-                                            }}
-                                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-200 rounded-full text-slate-400 hover:text-blue-600 transition-all"
-                                            title="Change Lot Number"
-                                        >
-                                            <List className="w-2.5 h-2.5" />
-                                        </button>
-                                    </div>
-                                </td>
-                                <td className="px-2 py-1.5 text-[10px] text-slate-600 font-mono">{item.qty}</td>
-                                <td className="px-2 py-1.5 text-[8px] text-slate-500 uppercase font-bold">{item.uom}</td>
-                                <td className="px-2 py-1.5 text-[10px] text-slate-600 font-mono">${item.cost.toFixed(8)}</td>
-                                <td className="px-2 py-1.5 text-[10px] text-slate-500 font-mono">
-                                    {item.expirationDate ? new Date(item.expirationDate).toLocaleDateString() : '-'}
-                                </td>
-                                <td className="px-2 py-1.5 text-[10px] text-slate-500 font-mono">
-                                    {new Date(item.createdAt).toLocaleDateString()}
-                                </td>
-                                <td className="px-2 py-1.5 text-right">
-                                    <div className="flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={() => handleOpenEdit(item)} className="p-1 hover:bg-slate-200 rounded text-slate-500 hover:text-blue-600 transition-colors">
-                                            <Pencil className="w-3 h-3" />
-                                        </button>
-                                        <button onClick={() => handleDelete(item._id)} className="p-1 hover:bg-slate-200 rounded text-slate-500 hover:text-red-600 transition-colors">
-                                            <Trash2 className="w-3 h-3" />
-                                        </button>
-                                    </div>
-                                </td>
+
+                                {/* Lot Number */}
+                                <th className="border-r border-border">
+                                    <TableColumnHeader column="lotNumber" title="Lot Number" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
+                                </th>
+
+                                {/* Qty */}
+                                <th className="border-r border-border">
+                                    <TableColumnHeader column="qty" title="Qty" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
+                                </th>
+
+                                {/* UOM */}
+                                <th className="border-r border-border">
+                                    <TableColumnHeader column="uom" title="UOM" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
+                                </th>
+
+                                {/* Cost */}
+                                <th className="border-r border-border">
+                                    <TableColumnHeader column="cost" title="Cost ($)" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
+                                </th>
+
+                                {/* Expires */}
+                                <th className="border-r border-border">
+                                    <TableColumnHeader column="expirationDate" title="Expires" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
+                                </th>
+
+                                {/* Created At */}
+                                <th className="border-r border-border last:border-0">
+                                    <TableColumnHeader column="createdAt" title="Created At" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
+                                </th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody className="divide-y divide-border bg-background/50">
+                            {loading ? (
+                                <tr><td colSpan={8} className="px-2 py-12 text-center text-[10px] text-slate-400">Loading...</td></tr>
+                            ) : balances.length === 0 ? (
+                                <tr><td colSpan={8} className="px-2 py-12 text-center text-[10px] text-slate-400 uppercase font-bold tracking-tighter opacity-50">No records found</td></tr>
+                            ) : balances.map(item => (
+                                <tr 
+                                    key={item._id} 
+                                    className="group relative z-0 bg-background hover:bg-secondary/40 transition-colors duration-150"
+                                >
+                                    {/* Image */}
+                                    <td className="px-2 py-1 border-r border-border group-hover:border-l-2 group-hover:border-l-primary transition-all">
+                                        <div className="w-6 h-6 rounded bg-secondary overflow-hidden relative border border-border">
+                                            <img 
+                                                src={getSkuImage(item.sku) || globalSettings?.missingSkuImage || '/sku-placeholder.png'} 
+                                                alt="" 
+                                                className="w-full h-full object-cover"
+                                                onError={(e) => {
+                                                    const target = e.target as HTMLImageElement;
+                                                    const fallback = globalSettings?.missingSkuImage || '/sku-placeholder.png';
+                                                    if (target.src !== fallback && target.src.indexOf('sku-placeholder.png') === -1) {
+                                                        target.src = fallback;
+                                                    }
+                                                }} 
+                                            />
+                                        </div>
+                                    </td>
+
+                                    {/* SKU Name + Hover Actions */}
+                                    <td className="px-2 py-1 text-[9px] text-foreground font-medium border-r border-border whitespace-nowrap">
+                                        <div className="flex items-center justify-between w-full gap-2">
+                                            <span className="truncate max-w-[200px]" title={getSkuName(item.sku)}>{getSkuName(item.sku)}</span>
+                                            
+                                            {/* Hover Actions - Right Aligned */}
+                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                                                <button
+                                                    onClick={() => {
+                                                        const skuId = typeof item.sku === 'object' ? item.sku._id : item.sku;
+                                                        router.push(`/warehouse/skus/${skuId}`);
+                                                    }}
+                                                    className="p-1 text-muted-foreground hover:text-primary hover:bg-secondary rounded transition-colors cursor-pointer"
+                                                    title="View SKU"
+                                                >
+                                                    <Eye className="w-3 h-3" />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleOpenEdit(item)}
+                                                    className="p-1 text-muted-foreground hover:text-primary hover:bg-secondary rounded transition-colors cursor-pointer"
+                                                    title="Edit"
+                                                >
+                                                    <Pencil className="w-3 h-3" />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(item._id)}
+                                                    className="p-1 text-muted-foreground hover:text-destructive hover:bg-secondary rounded transition-colors cursor-pointer"
+                                                    title="Delete"
+                                                >
+                                                    <Trash2 className="w-3 h-3" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    {/* Lot Number */}
+                                    <td className="px-2 py-1 text-[9px] text-muted-foreground font-mono border-r border-border">
+                                        <div className="flex items-center gap-2">
+                                            <span className="tracking-tighter">{item.lotNumber}</span>
+                                            <button 
+                                                onClick={() => {
+                                                    const skuId = typeof item.sku === 'object' ? item.sku._id : item.sku;
+                                                    setLotSelector({
+                                                        isOpen: true,
+                                                        mode: 'row',
+                                                        itemId: item._id,
+                                                        skuId: skuId,
+                                                        currentLot: item.lotNumber
+                                                    });
+                                                }}
+                                                className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-secondary rounded text-muted-foreground hover:text-primary transition-all"
+                                                title="Change Lot Number"
+                                            >
+                                                <List className="w-2.5 h-2.5" />
+                                            </button>
+                                        </div>
+                                    </td>
+
+                                    {/* Qty */}
+                                    <td className="px-2 py-1 text-[9px] font-bold text-foreground border-r border-border text-center">{item.qty}</td>
+
+                                    {/* UOM */}
+                                    <td className="px-2 py-1 text-[8px] uppercase font-bold text-muted-foreground border-r border-border">{item.uom}</td>
+
+                                    {/* Cost */}
+                                    <td className="px-2 py-1 text-[9px] text-muted-foreground font-mono border-r border-border text-right">
+                                        ${(item.cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
+                                    </td>
+
+                                    {/* Expires */}
+                                    <td className="px-2 py-1 text-[9px] text-muted-foreground font-mono border-r border-border">
+                                        {item.expirationDate ? new Date(item.expirationDate).toLocaleDateString() : '-'}
+                                    </td>
+
+                                    {/* Created At */}
+                                    <td className="px-2 py-1 text-[9px] text-muted-foreground font-mono border-r border-border last:border-0">
+                                        {new Date(item.createdAt).toLocaleDateString()}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
-            <Pagination
-                currentPage={page}
-                totalPages={totalPages}
-                onPageChange={setPage}
-                totalItems={totalItems}
-                itemsPerPage={20}
-                itemName="Items"
-            />
+            <div className="border-t border-border bg-background transition-colors duration-300">
+                <Pagination
+                    currentPage={page}
+                    totalPages={totalPages}
+                    onPageChange={setPage}
+                    totalItems={totalItems}
+                    itemsPerPage={20}
+                    itemName="Items"
+                />
+            </div>
 
             {/* Add/Edit Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="bg-white w-full max-w-md shadow-2xl overflow-hidden scale-100 transition-transform">
-                        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-                            <h3 className="font-bold text-slate-900">{editingId ? 'Edit Opening Balance' : 'Add Opening Balance'}</h3>
-                            <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-black transition-colors"><X className="w-5 h-5" /></button>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+                            <h2 className="text-sm font-black uppercase tracking-widest text-slate-900">
+                                {editingId ? 'Edit Opening Balance' : 'Add Opening Balance'}
+                            </h2>
+                            <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-black transition-colors">
+                                <X className="w-5 h-5" />
+                            </button>
                         </div>
-                        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-bold uppercase text-slate-500">SKU</label>
                                 <SearchableSelect
@@ -432,7 +490,7 @@ export default function OpeningBalancesPage() {
                                             type="text" 
                                             value={formData.lotNumber} 
                                             onChange={e => setFormData({...formData, lotNumber: e.target.value})} 
-                                            className="w-full px-3 py-2 border border-slate-200 text-sm outline-none focus:border-black transition-colors"
+                                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm outline-none focus:border-black transition-colors"
                                             placeholder="Enter Lot #"
                                         />
                                         <button
@@ -458,29 +516,29 @@ export default function OpeningBalancesPage() {
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-[10px] font-bold uppercase text-slate-500">Quantity</label>
-                                    <input type="number" step="0.01" value={formData.qty} onChange={e => setFormData({...formData, qty: parseFloat(e.target.value)})} className="w-full px-3 py-2 border border-slate-200 text-sm outline-none focus:border-black transition-colors" />
+                                    <input type="number" step="0.01" value={formData.qty} onChange={e => setFormData({...formData, qty: parseFloat(e.target.value)})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm outline-none focus:border-black transition-colors" />
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
                                     <label className="text-[10px] font-bold uppercase text-slate-500">UOM</label>
-                                    <input type="text" value={formData.uom} onChange={e => setFormData({...formData, uom: e.target.value})} className="w-full px-3 py-2 border border-slate-200 text-sm outline-none focus:border-black transition-colors" />
+                                    <input type="text" value={formData.uom} onChange={e => setFormData({...formData, uom: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm outline-none focus:border-black transition-colors" />
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-[10px] font-bold uppercase text-slate-500">Cost ($)</label>
-                                    <input type="number" step="0.01" value={formData.cost} onChange={e => setFormData({...formData, cost: parseFloat(e.target.value)})} className="w-full px-3 py-2 border border-slate-200 text-sm outline-none focus:border-black transition-colors" />
+                                    <input type="number" step="0.01" value={formData.cost} onChange={e => setFormData({...formData, cost: parseFloat(e.target.value)})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm outline-none focus:border-black transition-colors" />
                                 </div>
                             </div>
 
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-bold uppercase text-slate-500">Expiration Date (Optional)</label>
-                                <input type="date" value={formData.expirationDate} onChange={e => setFormData({...formData, expirationDate: e.target.value})} className="w-full px-3 py-2 border border-slate-200 text-sm outline-none focus:border-black transition-colors" />
+                                <input type="date" value={formData.expirationDate} onChange={e => setFormData({...formData, expirationDate: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm outline-none focus:border-black transition-colors" />
                             </div>
 
                             <div className="pt-4 flex gap-3">
-                                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-3 border border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-wider hover:bg-slate-50 transition-colors">Cancel</button>
-                                <button type="submit" className="flex-1 py-3 bg-slate-900 text-white text-xs font-bold uppercase tracking-wider hover:bg-slate-800 transition-colors">Save</button>
+                                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-3 text-slate-500 text-xs font-bold uppercase tracking-wider hover:text-black hover:bg-slate-100 transition-colors">Cancel</button>
+                                <button type="submit" className="flex-1 py-3 bg-primary text-primary-foreground text-xs font-bold uppercase tracking-wider hover:bg-primary/90 transition-colors">Save</button>
                             </div>
                         </form>
                     </div>
