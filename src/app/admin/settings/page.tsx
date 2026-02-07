@@ -29,7 +29,8 @@ import {
     Truck,
     ClipboardCheck,
     FlaskConical,
-    UtensilsCrossed
+    UtensilsCrossed,
+    TicketCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -63,6 +64,7 @@ export default function SettingsPage() {
     const importRecipesRef = useRef<HTMLInputElement>(null);
     const importRecipeLineItemsRef = useRef<HTMLInputElement>(null);
     const importRecipeStepsRef = useRef<HTMLInputElement>(null);
+    const importTicketsRef = useRef<HTMLInputElement>(null);
 
     const [settings, setSettings] = useState({
         companyName: 'RebelX Headquarters',
@@ -748,6 +750,13 @@ export default function SettingsPage() {
                                             ref={importRecipeStepsRef}
                                             onChange={(e) => handleImport(e, '/api/recipes/import-steps', 'Recipe Steps')}
                                         />
+                                        <input
+                                            type="file"
+                                            accept=".csv"
+                                            className="hidden"
+                                            ref={importTicketsRef}
+                                            onChange={(e) => handleImport(e, '/api/tickets/import', 'Tickets')}
+                                        />
 
                                         <div className="space-y-4">
                                             <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">System Defaults</h2>
@@ -1207,10 +1216,45 @@ export default function SettingsPage() {
                                 {/* Help Module Settings */}
                                 {moduleSubTab === 'help' && (
                                     <div className="space-y-6 animate-in fade-in duration-200">
-                                        <div className="p-8 text-center border-2 border-dashed border-slate-200 rounded-lg">
-                                            <HelpCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                                            <h3 className="text-sm font-bold text-slate-400">Help Module</h3>
-                                            <p className="text-xs text-slate-400 mt-1">Help and documentation settings coming soon.</p>
+                                        {/* Tickets Import Section */}
+                                        <div className="space-y-4">
+                                            <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">Tickets Import</h2>
+
+                                            <div className="p-4 border border-violet-200 bg-violet-50 rounded-lg flex items-start space-x-4 mb-4">
+                                                <div className="shrink-0 mt-0.5">
+                                                    <TicketCheck className="w-5 h-5 text-violet-600" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-violet-800">Import Tickets</h4>
+                                                    <p className="text-xs text-violet-700 mt-1">
+                                                        Import help desk tickets from a CSV file. The <code className="bg-violet-100 px-1 rounded">requestedBy</code> field should contain a user email or ID.
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <button
+                                                    onClick={() => importTicketsRef.current?.click()}
+                                                    disabled={isImporting}
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-violet-400 hover:bg-violet-50 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <div className="w-12 h-12 rounded-full bg-violet-100 flex items-center justify-center mb-3 group-hover:bg-violet-200 transition-colors">
+                                                        <TicketCheck className="w-6 h-6 text-violet-600" />
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-slate-700">Import Tickets</h4>
+                                                    <p className="text-[10px] text-slate-500 mt-1 text-center">
+                                                        Help desk tickets
+                                                    </p>
+                                                </button>
+                                            </div>
+
+                                            <div className="mt-4 p-4 bg-slate-50 rounded-lg">
+                                                <h4 className="text-xs font-bold text-slate-600 mb-2">CSV Column Reference</h4>
+                                                <div className="text-[10px] text-slate-500">
+                                                    <span className="font-bold text-slate-700">Tickets:</span>
+                                                    <p>date, requestedBy, subCategory, issue, reason, priority, deadline, description, department, document, status, completionNote, completedBy, completedAt</p>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 )}

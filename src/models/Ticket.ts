@@ -1,7 +1,6 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
-export interface ITicket extends Omit<Document, '_id'> {
-    _id: string;
+export interface ITicket extends Document {
     date: Date;
     requestedBy: string;
     subCategory: string;
@@ -11,9 +10,9 @@ export interface ITicket extends Omit<Document, '_id'> {
     deadline?: Date;
     description: string;
     department: string;
-    document?: string; // URL to document
+    document?: string;
     status: 'Open' | 'In Progress' | 'Resolved' | 'Closed';
-    createdBy: string; // User ID or Name
+    createdBy: string;
     createdAt: Date;
     completionNote?: string;
     completedBy?: string;
@@ -21,7 +20,7 @@ export interface ITicket extends Omit<Document, '_id'> {
 }
 
 const TicketSchema: Schema = new Schema({
-    _id: { type: String, default: () => new mongoose.Types.ObjectId().toString() },
+    // _id auto-generated as ObjectId
     date: { type: Date, default: Date.now },
     requestedBy: { type: String, ref: 'RXHQUsers', required: true },
     subCategory: { type: String },
@@ -33,13 +32,16 @@ const TicketSchema: Schema = new Schema({
     department: { type: String },
     document: { type: String },
     status: { type: String, enum: ['Open', 'In Progress', 'Resolved', 'Closed'], default: 'Open' },
-    createdBy: { type: String }, // keeping as string for flexibility in imports
+    createdBy: { type: String },
     completionNote: { type: String },
     completedBy: { type: String, ref: 'RXHQUsers' },
     completedAt: { type: Date }
 }, {
-    timestamps: true,
-    _id: false
+    timestamps: true
 });
 
-export default mongoose.models.Ticket || mongoose.model<ITicket>('Ticket', TicketSchema);
+// Force schema refresh on hot reload
+if (mongoose.models.Ticket) {
+    delete mongoose.models.Ticket;
+}
+export default mongoose.model<ITicket>('Ticket', TicketSchema);

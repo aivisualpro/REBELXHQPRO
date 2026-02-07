@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import {
     Search,
-    Upload,
     ArrowUpDown,
     Plus,
     Edit2,
@@ -15,7 +14,6 @@ import {
     AlertCircle,
     Clock
 } from 'lucide-react';
-import Papa from 'papaparse';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { Pagination } from '@/components/ui/Pagination';
@@ -69,7 +67,7 @@ export default function TicketsPage() {
     const [formData, setFormData] = useState<Partial<Ticket>>({});
     const [saving, setSaving] = useState(false);
 
-    const importRef = useRef<HTMLInputElement>(null);
+
 
     useEffect(() => {
         const timer = setTimeout(() => setDebouncedSearch(search), 500);
@@ -133,49 +131,6 @@ export default function TicketsPage() {
         }
     };
 
-    const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        Papa.parse(file, {
-            header: true,
-            skipEmptyLines: true,
-            complete: async (results) => {
-                const totalItems = results.data.length;
-                if (totalItems === 0) {
-                    toast.error("No data found");
-                    if (e.target) e.target.value = '';
-                    return;
-                }
-
-                const toastId = toast.loading(`Importing ${totalItems} tickets...`);
-                try {
-                    const res = await fetch('/api/tickets/import', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ data: results.data })
-                    });
-
-                    const data = await res.json();
-
-                    if (res.ok) {
-                        toast.success(`Imported ${data.count} tickets!`, { id: toastId });
-                        if (data.errors && data.errors.length > 0) {
-                            setTimeout(() => toast.error(`${data.errors.length} errors occurred. Check console.`), 2000);
-                            console.error(data.errors);
-                        }
-                    } else {
-                        toast.error(data.error || "Import failed", { id: toastId });
-                    }
-
-                    fetchTickets();
-                } catch (err: any) {
-                    toast.error(`Error: ${err.message}`, { id: toastId });
-                }
-            }
-        });
-        e.target.value = '';
-    };
 
     const openModal = (item?: Ticket) => {
         setEditingItem(item || null);
@@ -301,21 +256,7 @@ export default function TicketsPage() {
                         <span className="text-[10px] font-bold uppercase tracking-wider">New Ticket</span>
                     </button>
 
-                    {session?.user?.email === 'adeel@grassrootsharvest.com' && (
-                        <>
-                            <div className="h-4 w-px bg-slate-200 mx-1" />
 
-                            <input type="file" accept=".csv" className="hidden" ref={importRef} onChange={handleImport} />
-                            <button
-                                onClick={() => importRef.current?.click()}
-                                className="h-[28px] px-3 border border-slate-200 text-slate-600 hover:text-black hover:bg-slate-50 transition-colors rounded-sm flex items-center space-x-1.5 bg-white"
-                                title="Import CSV"
-                            >
-                                <Upload className="w-3 h-3" />
-                                <span className="text-[10px] font-bold uppercase tracking-wider">Import</span>
-                            </button>
-                        </>
-                    )}
                 </div>
             </div>
 
