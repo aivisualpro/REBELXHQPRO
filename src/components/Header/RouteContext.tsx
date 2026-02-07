@@ -103,6 +103,16 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
         };
     }
 
+    // Audit Adjustments
+    if (pathname === '/warehouse/audit-adjustments') {
+        return {
+            title: 'Audit Adjustments',
+            actions: [
+                { label: 'Add', icon: Plus, href: '/warehouse/audit-adjustments?createNew=true', variant: 'primary' },
+            ]
+        };
+    }
+
     // Schedules
     if (pathname === '/jobs/schedules') {
         return {

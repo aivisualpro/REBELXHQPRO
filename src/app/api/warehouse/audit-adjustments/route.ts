@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import mongoose from 'mongoose';
 import dbConnect from '@/lib/mongoose';
 import AuditAdjustment from '@/models/AuditAdjustment';
 import Sku from '@/models/Sku';
@@ -9,46 +10,104 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
     try {
         await dbConnect();
+        // Ensure models are registered for Vercel cold starts
+        void User;
+
         const { searchParams } = new URL(request.url);
         const page = parseInt(searchParams.get('page') || '1');
         const limit = parseInt(searchParams.get('limit') || '20');
         const search = searchParams.get('search') || '';
-        const limitQuery = searchParams.get('limit'); // Check if limit was explicitly passed (e.g. for dropdowns)
+        const sortBy = searchParams.get('sortBy') || 'createdAt';
+        const sortOrder = searchParams.get('sortOrder') === 'asc' ? 1 : -1;
 
         let query: any = {};
 
         if (search) {
-             // We can't easily regex search on ObjectId refs without aggregation, 
-             // but we can search on reason or lotNumber directly.
-             // Or find SKUs that match name and use their IDs.
-             const matchingSkus = await Sku.find({ name: { $regex: search, $options: 'i' } }).select('_id');
-             const skuIds = matchingSkus.map(s => s._id);
+             const matchingSkus = await Sku.find({ name: { $regex: search, $options: 'i' } }).select('_id legacyId').lean();
+             const skuIds = matchingSkus.map(s => s._id.toString());
+             const skuLegacyIds = matchingSkus.map((s: any) => s.legacyId).filter(Boolean);
 
              query.$or = [
                 { lotNumber: { $regex: search, $options: 'i' } },
                 { reason: { $regex: search, $options: 'i' } },
-                { sku: { $in: skuIds } }
+                { createdBy: { $regex: search, $options: 'i' } },
+                { sku: { $in: [...skuIds, ...skuLegacyIds] } }
             ];
         }
 
-        const effectiveLimit = limitQuery ? parseInt(limitQuery) : limit;
+        const sortObj: any = { [sortBy]: sortOrder };
 
         const [total, adjustments] = await Promise.all([
             AuditAdjustment.countDocuments(query),
             AuditAdjustment.find(query)
-                .populate('sku', 'name uom')
-                .populate('createdBy', 'firstName lastName email') // Populate user details
-                .sort({ createdAt: -1 })
-                .skip((page - 1) * effectiveLimit)
-                .limit(effectiveLimit)
+                .sort(sortObj)
+                .skip((page - 1) * limit)
+                .limit(limit)
                 .lean()
         ]);
 
+        // Manually hydrate SKU data using raw MongoDB driver (same pattern as opening balances)
+        // Mongoose populate/find can't resolve string _id refs due to BSON type mismatch
+        const skuRefIds = [...new Set(adjustments.map((a: any) => a.sku?.toString()).filter(Boolean))];
+        
+        const skuMap = new Map<string, { _id: string; name: string; uom: string; image: string }>();
+
+        if (skuRefIds.length > 0) {
+            const db = mongoose.connection.db;
+            if (db) {
+                // Push both string and ObjectId forms to handle type mismatch
+                const lookupIds: any[] = [];
+                skuRefIds.forEach(id => {
+                    lookupIds.push(id); // string form
+                    if (mongoose.Types.ObjectId.isValid(id)) {
+                        lookupIds.push(new mongoose.Types.ObjectId(id)); // ObjectId form
+                    }
+                });
+
+                const skuDocs = await db.collection('skus').find(
+                    { _id: { $in: lookupIds } },
+                    { projection: { _id: 1, name: 1, uom: 1, image: 1 } }
+                ).toArray();
+
+                skuDocs.forEach((s: any) => {
+                    skuMap.set(s._id.toString(), { _id: s._id.toString(), name: s.name || '', uom: s.uom || '', image: s.image || '' });
+                });
+            }
+        }
+
+        // Hydrate createdBy emails to user names via rxhqusers collection
+        const createdByEmails = [...new Set(adjustments.map((a: any) => a.createdBy?.toString()).filter(Boolean))];
+        const userMap = new Map<string, { firstName: string; lastName: string }>();
+
+        if (createdByEmails.length > 0) {
+            const db = mongoose.connection.db;
+            if (db) {
+                const userDocs = await db.collection('rxhqusers').find(
+                    { email: { $in: createdByEmails } },
+                    { projection: { email: 1, firstName: 1, lastName: 1 } }
+                ).toArray();
+
+                userDocs.forEach((u: any) => {
+                    userMap.set(u.email, { firstName: u.firstName || '', lastName: u.lastName || '' });
+                });
+            }
+        }
+
+        const hydratedAdjustments = adjustments.map((a: any) => {
+            const skuData = skuMap.get(a.sku?.toString()) || { _id: a.sku, name: a.sku, uom: '', image: '' };
+            const userData = userMap.get(a.createdBy?.toString());
+            return {
+                ...a,
+                sku: skuData,
+                createdBy: userData ? { firstName: userData.firstName, lastName: userData.lastName } : a.createdBy
+            };
+        });
+
         return NextResponse.json({
-            adjustments,
+            adjustments: hydratedAdjustments,
             total,
             page,
-            totalPages: Math.ceil(total / effectiveLimit)
+            totalPages: Math.ceil(total / limit)
         });
 
     } catch (error: any) {
