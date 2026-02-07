@@ -1,8 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import Sku from '@/models/Sku';
+import mongoose from 'mongoose';
 
 export const dynamic = 'force-dynamic';
+
+// Helper: find SKU by _id regardless of whether stored as ObjectId or String
+async function findSkuById(id: string) {
+    // Try as ObjectId first, then as string
+    let sku = null;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+        sku = await Sku.findById(id);
+    }
+    if (!sku) {
+        sku = await Sku.findOne({ _id: id });
+    }
+    return sku;
+}
 
 export async function GET(
     request: NextRequest,
@@ -11,7 +25,7 @@ export async function GET(
     try {
         await dbConnect();
         const { id } = await context.params;
-        const sku = await Sku.findById(id);
+        const sku = await findSkuById(id);
 
         if (!sku) {
             return NextResponse.json({ error: 'SKU not found' }, { status: 404 });
@@ -32,12 +46,13 @@ export async function PATCH(
         const { id } = await context.params;
         const body = await request.json();
 
-        // Prevent updating _id if passed, though usually mongoose ignores it or errors if diff
-        const updatedSku = await Sku.findByIdAndUpdate(
-            id,
-            { $set: body },
-            { new: true, runValidators: true }
-        );
+        let updatedSku = null;
+        if (mongoose.Types.ObjectId.isValid(id)) {
+            updatedSku = await Sku.findByIdAndUpdate(id, { $set: body }, { new: true, runValidators: true });
+        }
+        if (!updatedSku) {
+            updatedSku = await Sku.findOneAndUpdate({ _id: id }, { $set: body }, { new: true, runValidators: true });
+        }
 
         if (!updatedSku) {
             return NextResponse.json({ error: 'SKU not found' }, { status: 404 });
@@ -56,7 +71,14 @@ export async function DELETE(
     try {
         await dbConnect();
         const { id } = await context.params;
-        const deletedSku = await Sku.findByIdAndDelete(id);
+
+        let deletedSku = null;
+        if (mongoose.Types.ObjectId.isValid(id)) {
+            deletedSku = await Sku.findByIdAndDelete(id);
+        }
+        if (!deletedSku) {
+            deletedSku = await Sku.findOneAndDelete({ _id: id });
+        }
 
         if (!deletedSku) {
             return NextResponse.json({ error: 'SKU not found' }, { status: 404 });

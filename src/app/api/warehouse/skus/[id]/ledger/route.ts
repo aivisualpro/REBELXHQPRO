@@ -33,15 +33,18 @@ export async function GET(
 
         const { id } = await context.params;
 
-        // Database stores _id as ObjectId but schema says String
-        // Use raw MongoDB collection to bypass Mongoose schema issues
+        // Try both ObjectId and String _id lookups to handle both storage formats
         let sku: any = null;
         if (mongoose.Types.ObjectId.isValid(id)) {
             const db = mongoose.connection.db;
             const collection = db?.collection('skus');
             if (collection) {
-                sku = await collection.findOne({ _id: new mongoose.Types.ObjectId(id) });
+                sku = await collection.findOne({ _id: new mongoose.Types.ObjectId(id) as any });
             }
+        }
+        // Fallback: try string _id (CSV imports store _id as string)
+        if (!sku) {
+            sku = await Sku.findOne({ _id: id }).lean();
         }
 
         // Get settings in parallel
