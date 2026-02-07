@@ -286,7 +286,7 @@ function OpeningBalancesContent() {
                     </div>
 
                     <table className="w-full text-left border-separate border-spacing-0 relative z-0">
-                        <thead className="sticky top-8 bg-secondary/80 z-10 border-b border-border backdrop-blur-md transition-colors">
+                        <thead className="sticky top-12 bg-secondary/80 z-10 border-b border-border backdrop-blur-md transition-colors">
                             <tr>
                                 {/* Image */}
                                 <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest w-10 border-r border-border">Img</th>

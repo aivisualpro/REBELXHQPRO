@@ -100,7 +100,7 @@ const typeIcons: { [key: string]: React.ReactNode } = {
 
 const TASKS_PER_PAGE = 10;
 
-export default function TasksPage() {
+function TasksContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const search = searchParams.get('search') || '';
@@ -875,5 +875,17 @@ export default function TasksPage() {
                 </div>
             )}
         </div>
+    );
+}
+
+export default function TasksPage() {
+    return (
+        <React.Suspense fallback={
+            <div className="flex items-center justify-center h-screen">
+                <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+            </div>
+        }>
+            <TasksContent />
+        </React.Suspense>
     );
 }
