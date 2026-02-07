@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
+import mongoose from 'mongoose';
 import Manufacturing from '@/models/Manufacturing';
 
 import Sku from '@/models/Sku';
@@ -218,10 +219,8 @@ export async function GET(
         const { id } = await context.params;
 
         const order = await Manufacturing.findById(id)
-            .populate('sku', 'name image category')
             .populate('createdBy', 'firstName lastName email')
             .populate('finishedBy', 'firstName lastName email')
-            .populate('lineItems.sku', 'name category')
             .populate('labor.user', 'firstName lastName email')
             .populate('notes.createdBy', 'firstName lastName email')
             .populate('recipesId', 'name sku steps qty notes')
@@ -231,15 +230,62 @@ export async function GET(
             return NextResponse.json({ error: 'Order not found' }, { status: 404 });
         }
 
+        // Manual SKU hydration using native driver (handles String _id, ObjectId _id, and legacyId)
+        const rawSkuIds = new Set<string>();
+        if (order.sku) rawSkuIds.add(String(order.sku));
+        order.lineItems?.forEach((li: any) => { if (li.sku) rawSkuIds.add(String(li.sku)); });
+
+        const db = mongoose.connection.db;
+        let skuById = new Map<string, any>();
+        let skuByLegacy = new Map<string, any>();
+
+        if (db && rawSkuIds.size > 0) {
+            const rawSkuArr = Array.from(rawSkuIds);
+            const objectIds = rawSkuArr
+                .filter(id => mongoose.Types.ObjectId.isValid(id))
+                .map(id => new mongoose.Types.ObjectId(id));
+
+            const allSkus = await db.collection('skus').find({
+                $or: [
+                    { _id: { $in: rawSkuArr } },
+                    { _id: { $in: objectIds } },
+                    { legacyId: { $in: rawSkuArr } }
+                ]
+            } as any, { projection: { _id: 1, name: 1, image: 1, category: 1, legacyId: 1 } }).toArray();
+
+            allSkus.forEach((s: any) => {
+                skuById.set(String(s._id), s);
+                if (s.legacyId) skuByLegacy.set(String(s.legacyId), s);
+            });
+        }
+
+        // Hydrate order.sku
+        if (order.sku) {
+            const skuStr = String(order.sku);
+            const found = skuById.get(skuStr) || skuByLegacy.get(skuStr);
+            if (found) {
+                (order as any).sku = { _id: String(found._id), name: found.name, image: found.image, category: found.category };
+            }
+        }
+
+        // Hydrate lineItems.sku
+        order.lineItems?.forEach((li: any) => {
+            if (!li.sku) return;
+            const skuStr = String(li.sku);
+            const found = skuById.get(skuStr) || skuByLegacy.get(skuStr);
+            if (found) {
+                li.sku = { _id: String(found._id), name: found.name, category: found.category };
+            }
+        });
+
         if (order.lineItems && Array.isArray(order.lineItems)) {
             order.lineItems = await enrichLineItemsWithCost(order.lineItems) as any;
         }
 
         // Enrich with Tiers
         const allSkuIds = new Set<string>();
-        if (order.sku) {
-            const skuId = (typeof order.sku === 'object' && order.sku !== null) ? ((order.sku as any)._id || order.sku).toString() : (order.sku as any).toString();
-            allSkuIds.add(skuId);
+        if (order.sku && typeof order.sku === 'object' && order.sku !== null) {
+            allSkuIds.add(((order.sku as any)._id || '').toString());
         }
         order.lineItems?.forEach((li: any) => {
             const id = li.sku?._id || li.sku;
@@ -247,9 +293,8 @@ export async function GET(
         });
 
         const tiers = await getSkuTiers(Array.from(allSkuIds));
-        if (order.sku) {
-            const skuId = (typeof order.sku === 'object' && order.sku !== null) ? ((order.sku as any)._id || order.sku).toString() : (order.sku as any).toString();
-            (order.sku as any).tier = tiers[skuId];
+        if (order.sku && typeof order.sku === 'object' && order.sku !== null) {
+            (order.sku as any).tier = tiers[((order.sku as any)._id || '').toString()];
         }
         order.lineItems?.forEach((li: any) => {
             const id = li.sku?._id || li.sku;
@@ -274,10 +319,8 @@ export async function PATCH(
         const body = await request.json();
 
         const order = await Manufacturing.findByIdAndUpdate(id, body, { new: true })
-            .populate('sku', 'name image category')
             .populate('createdBy', 'firstName lastName email')
             .populate('finishedBy', 'firstName lastName email')
-            .populate('lineItems.sku', 'name category')
             .populate('labor.user', 'firstName lastName email')
             .populate('notes.createdBy', 'firstName lastName email')
             .populate('recipesId', 'name sku steps qty notes')
@@ -287,15 +330,59 @@ export async function PATCH(
             return NextResponse.json({ error: 'Order not found' }, { status: 404 });
         }
 
+        // Manual SKU hydration using native driver (handles String _id, ObjectId _id, and legacyId)
+        const rawSkuIds = new Set<string>();
+        if (order.sku) rawSkuIds.add(String(order.sku));
+        order.lineItems?.forEach((li: any) => { if (li.sku) rawSkuIds.add(String(li.sku)); });
+
+        const db = mongoose.connection.db;
+        let skuById = new Map<string, any>();
+        let skuByLegacy = new Map<string, any>();
+
+        if (db && rawSkuIds.size > 0) {
+            const rawSkuArr = Array.from(rawSkuIds);
+            const objectIds = rawSkuArr
+                .filter(id => mongoose.Types.ObjectId.isValid(id))
+                .map(id => new mongoose.Types.ObjectId(id));
+
+            const allSkus = await db.collection('skus').find({
+                $or: [
+                    { _id: { $in: rawSkuArr } },
+                    { _id: { $in: objectIds } },
+                    { legacyId: { $in: rawSkuArr } }
+                ]
+            } as any, { projection: { _id: 1, name: 1, image: 1, category: 1, legacyId: 1 } }).toArray();
+
+            allSkus.forEach((s: any) => {
+                skuById.set(String(s._id), s);
+                if (s.legacyId) skuByLegacy.set(String(s.legacyId), s);
+            });
+        }
+
+        if (order.sku) {
+            const skuStr = String(order.sku);
+            const found = skuById.get(skuStr) || skuByLegacy.get(skuStr);
+            if (found) {
+                (order as any).sku = { _id: String(found._id), name: found.name, image: found.image, category: found.category };
+            }
+        }
+        order.lineItems?.forEach((li: any) => {
+            if (!li.sku) return;
+            const skuStr = String(li.sku);
+            const found = skuById.get(skuStr) || skuByLegacy.get(skuStr);
+            if (found) {
+                li.sku = { _id: String(found._id), name: found.name, category: found.category };
+            }
+        });
+
         if (order.lineItems && Array.isArray(order.lineItems)) {
             order.lineItems = await enrichLineItemsWithCost(order.lineItems) as any;
         }
 
         // Enrich with Tiers
         const allSkuIds = new Set<string>();
-        if (order.sku) {
-            const skuId = (typeof order.sku === 'object' && order.sku !== null) ? ((order.sku as any)._id || order.sku).toString() : (order.sku as any).toString();
-            allSkuIds.add(skuId);
+        if (order.sku && typeof order.sku === 'object' && order.sku !== null) {
+            allSkuIds.add(((order.sku as any)._id || '').toString());
         }
         order.lineItems?.forEach((li: any) => {
             const id = li.sku?._id || li.sku;
@@ -303,9 +390,8 @@ export async function PATCH(
         });
 
         const tiers = await getSkuTiers(Array.from(allSkuIds));
-        if (order.sku) {
-            const skuId = (typeof order.sku === 'object' && order.sku !== null) ? ((order.sku as any)._id || order.sku).toString() : (order.sku as any).toString();
-            (order.sku as any).tier = tiers[skuId];
+        if (order.sku && typeof order.sku === 'object' && order.sku !== null) {
+            (order.sku as any).tier = tiers[((order.sku as any)._id || '').toString()];
         }
         order.lineItems?.forEach((li: any) => {
             const id = li.sku?._id || li.sku;

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import Manufacturing from '@/models/Manufacturing';
+import mongoose from 'mongoose';
 import Sku from '@/models/Sku';
 import { applyDateFilter } from '@/lib/global-settings';
 import { getSkuTiers } from '@/lib/sku-tiers';
@@ -67,24 +68,36 @@ export async function GET(request: Request) {
                 .limit(limit)
                 .lean();
 
-        // Manual SKU hydration (handles both _id and legacyId matches)
+        // Manual SKU hydration using native driver (handles String _id, ObjectId _id, and legacyId)
         const rawSkuIds = new Set<string>();
-        orders.forEach((o: any) => { if (o.sku) rawSkuIds.add(String(o.sku)); });
-
-        const allSkus = await Sku.find({
-            $or: [
-                { _id: { $in: Array.from(rawSkuIds) } },
-                { legacyId: { $in: Array.from(rawSkuIds) } }
-            ]
-        }).select('_id name legacyId').lean();
-
-        // Build lookup maps
-        const skuById = new Map<string, any>();
-        const skuByLegacy = new Map<string, any>();
-        allSkus.forEach((s: any) => {
-            skuById.set(s._id.toString(), s);
-            if (s.legacyId) skuByLegacy.set(String(s.legacyId), s);
+        orders.forEach((o: any) => {
+            if (o.sku) rawSkuIds.add(String(o.sku));
+            o.lineItems?.forEach((li: any) => { if (li.sku) rawSkuIds.add(String(li.sku)); });
         });
+
+        const db = mongoose.connection.db;
+        let skuById = new Map<string, any>();
+        let skuByLegacy = new Map<string, any>();
+
+        if (db && rawSkuIds.size > 0) {
+            const rawSkuArr = Array.from(rawSkuIds);
+            const objectIds = rawSkuArr
+                .filter(id => mongoose.Types.ObjectId.isValid(id))
+                .map(id => new mongoose.Types.ObjectId(id));
+
+            const allSkus = await db.collection('skus').find({
+                $or: [
+                    { _id: { $in: rawSkuArr } },
+                    { _id: { $in: objectIds } },
+                    { legacyId: { $in: rawSkuArr } }
+                ]
+            } as any, { projection: { _id: 1, name: 1, image: 1, category: 1, legacyId: 1 } }).toArray();
+
+            allSkus.forEach((s: any) => {
+                skuById.set(String(s._id), s);
+                if (s.legacyId) skuByLegacy.set(String(s.legacyId), s);
+            });
+        }
 
         // Hydrate orders with SKU data
         orders.forEach((o: any) => {
@@ -92,9 +105,8 @@ export async function GET(request: Request) {
             const skuStr = String(o.sku);
             const found = skuById.get(skuStr) || skuByLegacy.get(skuStr);
             if (found) {
-                o.sku = { _id: found._id, name: found.name };
+                o.sku = { _id: String(found._id), name: found.name };
             }
-            // If not found, leave sku as the raw string
         });
 
         // Enrich with Tiers

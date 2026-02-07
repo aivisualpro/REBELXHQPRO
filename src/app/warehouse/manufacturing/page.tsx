@@ -71,13 +71,8 @@ function ManufacturingContent() {
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
-  // SKU list for name display
-  const [skuList, setSkuList] = useState<any[]>([]);
 
 
-
-
-  // Action Menu State
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -126,17 +121,7 @@ function ManufacturingContent() {
     }
   }, [page, debouncedSearch, sortBy, sortOrder]);
 
-  // Fetch SKU list for name display
-  useEffect(() => {
-    fetch('/api/skus?limit=0&ignoreDate=true')
-      .then(res => res.json())
-      .then(data => {
-        if (data.skus) {
-          setSkuList(data.skus.map((s: any) => ({ _id: s._id, name: s.name, legacyId: s.legacyId })));
-        }
-      })
-      .catch(err => console.error("Failed to fetch SKU list", err));
-  }, []);
+
 
   useEffect(() => {
     fetchOrders();
@@ -209,10 +194,8 @@ function ManufacturingContent() {
                 <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-medium whitespace-nowrap">
                    <div className="flex items-center space-x-1.5">
                       {(() => {
-                        if (!order.sku) return null;
-                        const skuId = typeof order.sku === 'object' ? (order.sku as any)?._id : order.sku;
-                        const skuData = (typeof order.sku === 'object' && order.sku !== null && (order.sku as any).tier) ? order.sku : skuList.find(s => s._id === skuId);
-                        const tier = skuData?.tier;
+                        if (!order.sku || typeof order.sku !== 'object') return null;
+                        const tier = (order.sku as any)?.tier;
                         if (!tier) return null;
                         return (
                           <span className={cn(
@@ -226,7 +209,7 @@ function ManufacturingContent() {
                         );
                       })()}
                       <span className="max-w-[150px] overflow-hidden text-ellipsis">
-                        {typeof order.sku === 'object' && order.sku !== null ? (order.sku as any)?.name : (skuList.find(s => s._id === order.sku || s.legacyId === order.sku)?.name || order.sku || '-')}
+                        {typeof order.sku === 'object' && order.sku !== null ? (order.sku as any)?.name : (order.sku || '-')}
                       </span>
                    </div>
                 </td>
