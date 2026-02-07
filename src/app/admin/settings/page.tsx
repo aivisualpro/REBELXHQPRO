@@ -750,13 +750,6 @@ export default function SettingsPage() {
                                             ref={importRecipeStepsRef}
                                             onChange={(e) => handleImport(e, '/api/recipes/import-steps', 'Recipe Steps')}
                                         />
-                                        <input
-                                            type="file"
-                                            accept=".csv"
-                                            className="hidden"
-                                            ref={importTicketsRef}
-                                            onChange={(e) => handleImport(e, '/api/tickets/import', 'Tickets')}
-                                        />
 
                                         <div className="space-y-4">
                                             <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">System Defaults</h2>
@@ -1216,6 +1209,13 @@ export default function SettingsPage() {
                                 {/* Help Module Settings */}
                                 {moduleSubTab === 'help' && (
                                     <div className="space-y-6 animate-in fade-in duration-200">
+                                        <input
+                                            type="file"
+                                            accept=".csv"
+                                            className="hidden"
+                                            ref={importTicketsRef}
+                                            onChange={(e) => handleImport(e, '/api/tickets/import', 'Tickets')}
+                                        />
                                         {/* Tickets Import Section */}
                                         <div className="space-y-4">
                                             <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">Tickets Import</h2>
