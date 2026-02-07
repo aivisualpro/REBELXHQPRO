@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
+import mongoose from 'mongoose';
 import dbConnect from '@/lib/mongoose';
 import { Recipe } from '@/models/Recipe';
-import Sku from '@/models/Sku';
-import User from '@/models/User';
 
 export async function POST(request: Request) {
     try {
@@ -16,131 +15,111 @@ export async function POST(request: Request) {
         let count = 0;
         const errors: string[] = [];
 
-        // Caches
-        const recipeCache = new Map<string, any>(); // Stores full recipe doc or just _id (we need _id)
+        // Build SKU lookup map (legacyId -> _id) using raw driver
+        const db = mongoose.connection.db;
+        const skuMap = new Map<string, string>();
+        if (db) {
+            const allSkus = await db.collection('skus').find(
+                {},
+                { projection: { _id: 1, legacyId: 1, name: 1 } }
+            ).toArray();
+            allSkus.forEach((s: any) => {
+                if (s.legacyId) skuMap.set(String(s.legacyId), s._id.toString());
+                skuMap.set(s._id.toString(), s._id.toString());
+                if (s.name) skuMap.set(s.name.toLowerCase(), s._id.toString());
+            });
+        }
 
-        // Lookup Helpers
-        const findRecipeId = async (rId: string): Promise<string | null> => {
-            if (!rId) return null;
-            if (recipeCache.has(rId)) return recipeCache.get(rId);
+        // Build recipe lookup map (legacyId -> _id)
+        const recipeMap = new Map<string, string>();
+        if (db) {
+            const allRecipes = await db.collection('recipes').find(
+                {},
+                { projection: { _id: 1, legacyId: 1, name: 1 } }
+            ).toArray();
+            allRecipes.forEach((r: any) => {
+                if (r.legacyId) recipeMap.set(String(r.legacyId), r._id.toString());
+                recipeMap.set(r._id.toString(), r._id.toString());
+                if (r.name) recipeMap.set(r.name, r._id.toString());
+            });
+        }
 
-            let recipe;
-            if (rId.match(/^[0-9a-fA-F]{24}$/)) {
-                recipe = await Recipe.findById(rId).select('_id').lean();
-            }
-            // If not found by ID or ID not valid, try name/custom _id
-            if (!recipe) {
-                recipe = await Recipe.findOne({
-                    $or: [
-                        { _id: rId },
-                        { name: rId }
-                    ]
-                }).select('_id').lean();
-            }
-
-            const id = recipe ? (recipe as any)._id : null;
-            recipeCache.set(rId, id);
-            return id;
-        };
-
-        // Group data by Recipe Reference (to minimize Recipe lookups and usage of $push)
-        const operations: any[] = [];
+        // Group rows by recipeId
         const groups = new Map<string, any[]>();
-
         for (const row of data) {
-            const rRef = row.recipeId;
+            const rRef = row.recipeId || '';
+            if (!rRef) { errors.push(`Row missing recipeId (sku: ${row.sku})`); continue; }
             if (!groups.has(rRef)) groups.set(rRef, []);
-            groups.get(rRef)?.push(row);
+            groups.get(rRef)!.push(row);
         }
 
-        // Process each Group
+        const operations: any[] = [];
+
         for (const [rRef, rows] of groups.entries()) {
-            try {
-                const recipeId = await findRecipeId(rRef);
-                if (!recipeId) {
-                    errors.push(`Recipe not found for '${rRef}' (referenced in ${rows.length} rows)`);
-                    continue;
-                }
+            // Resolve recipe by legacyId first
+            const recipeId = recipeMap.get(rRef);
+            if (!recipeId) {
+                errors.push(`Recipe not found for '${rRef}' (${rows.length} rows)`);
+                continue;
+            }
 
-                const newItems: any[] = [];
-                for (const row of rows) {
-                    try {
-                        const skuVal = row.sku;
-                        if (!skuVal) throw new Error("SKU required");
-                        // We do NOT validate SKU existence as per request
+            const newItems: any[] = [];
+            for (const row of rows) {
+                try {
+                    const skuInput = String(row.sku || '').trim();
+                    if (!skuInput) throw new Error('SKU required');
 
-                        const userId = row.createdBy || row.createBy;
-                        // We do NOT validate User existence as per request
+                    // Resolve SKU by legacyId
+                    const resolvedSku = skuMap.get(skuInput) || skuMap.get(skuInput.toLowerCase());
+                    if (!resolvedSku) throw new Error(`SKU '${skuInput}' not found`);
 
-                        const newItem: any = {
-                            sku: skuVal,
-                            qty: row.qty,
-                            uom: row.uom,
-                            createdBy: userId,
-                            createdAt: row.createdAt || row.createAt ? new Date(row.createdAt || row.createAt) : new Date()
-                        };
+                    const createdBy = row.createdBy || row.createBy || '';
+                    const createdAt = row.createdAt || row.createAt;
 
-                        // Use provided _id if available, otherwise fallback to object_id, otherwise let Mongo generate
-                        if (row._id) {
-                            newItem._id = row._id;
-                        } else if (row.object_id) {
-                            newItem._id = row.object_id;
-                        }
-
-                        newItems.push(newItem);
-                    } catch (rowErr: any) {
-                        errors.push(`Row error (sku: ${row.sku}): ${rowErr.message}`);
-                    }
-                }
-
-                if (newItems.length > 0) {
-                    operations.push({
-                        updateOne: {
-                            filter: { _id: recipeId },
-                            update: { $push: { lineItems: { $each: newItems } } }
-                        }
+                    newItems.push({
+                        _id: new mongoose.Types.ObjectId(),
+                        sku: resolvedSku,
+                        qty: parseFloat(row.qty) || 0,
+                        uom: row.uom || '',
+                        createdBy,
+                        createdAt: createdAt ? new Date(createdAt) : new Date()
                     });
+                } catch (rowErr: any) {
+                    errors.push(`Row error (sku: ${row.sku}): ${rowErr.message}`);
                 }
+            }
 
-            } catch (groupErr: any) {
-                errors.push(`Group error (${rRef}): ${groupErr.message}`);
+            if (newItems.length > 0) {
+                operations.push({
+                    updateOne: {
+                        filter: { _id: new mongoose.Types.ObjectId(recipeId) },
+                        update: { $push: { lineItems: { $each: newItems } } }
+                    }
+                });
             }
         }
 
-        // Execute Bulk Write
         if (operations.length > 0) {
             try {
-                const res = await Recipe.bulkWrite(operations, { ordered: false });
-                // Count isn't exactly "rows import" here, it's matched receipts. 
-                // We should probably count items pushed. But bulkWrite result gives modifiedCount (recipes).
-                // Let's sum up valid items from operations to be properly descriptive if we want users to know item count.
-                // However user sees "Imported X items" based on our return.
-                // We can calculate total queued items.
+                await Recipe.bulkWrite(operations, { ordered: false });
                 let queuedItems = 0;
                 operations.forEach(op => queuedItems += op.updateOne.update.$push.lineItems.$each.length);
-
-                // If no errors in bulkWrite, assume all queued inserted.
                 count = queuedItems;
             } catch (bulkErr: any) {
-                console.error("Bulk Write Error:", bulkErr);
+                console.error('Bulk Write Error:', bulkErr);
                 if (bulkErr.writeErrors) {
                     for (const we of bulkErr.writeErrors) {
-                        const failedOpIndex = we.index;
-                        const failedOp = operations[failedOpIndex];
-                        // const failedId = failedOp.updateOne.filter._id; 
-                        // It's hard to map back to exact rows from here easily without complexity, 
-                        // but we know which recipe failed.
-                        errors.push(`Write error for recipe: ${we.errmsg}`);
+                        errors.push(`Write error: ${we.errmsg}`);
                     }
                 } else {
                     errors.push(`Bulk write failed: ${bulkErr.message}`);
                 }
-                // Fallback count not easily available for individual items in a failed $push batch
             }
         }
 
         return NextResponse.json({ count, errors });
     } catch (error: any) {
+        console.error('Recipe Line Items Import Error:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

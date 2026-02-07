@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
+import mongoose from 'mongoose';
 import dbConnect from '@/lib/mongoose';
 import { Recipe } from '@/models/Recipe';
-import User from '@/models/User';
 
 export async function POST(request: Request) {
     try {
@@ -15,106 +15,80 @@ export async function POST(request: Request) {
         let count = 0;
         const errors: string[] = [];
 
-        // Caches
-        const recipeCache = new Map<string, any>();
+        // Build recipe lookup map (legacyId -> _id) using raw driver
+        const db = mongoose.connection.db;
+        const recipeMap = new Map<string, string>();
+        if (db) {
+            const allRecipes = await db.collection('recipes').find(
+                {},
+                { projection: { _id: 1, legacyId: 1, name: 1 } }
+            ).toArray();
+            allRecipes.forEach((r: any) => {
+                if (r.legacyId) recipeMap.set(String(r.legacyId), r._id.toString());
+                recipeMap.set(r._id.toString(), r._id.toString());
+                if (r.name) recipeMap.set(r.name, r._id.toString());
+            });
+        }
 
-        // Lookup Helpers
-        const findRecipeId = async (rId: string): Promise<string | null> => {
-            if (!rId) return null;
-            if (recipeCache.has(rId)) return recipeCache.get(rId);
-
-            let recipe;
-            if (rId.match(/^[0-9a-fA-F]{24}$/)) {
-                recipe = await Recipe.findById(rId).select('_id').lean();
-            }
-            if (!recipe) {
-                recipe = await Recipe.findOne({
-                    $or: [
-                        { _id: rId },
-                        { name: rId }
-                    ]
-                }).select('_id').lean();
-            }
-
-            const id = recipe ? (recipe as any)._id : null;
-            recipeCache.set(rId, id);
-            return id;
-        };
-
-        // Group data by Recipe Reference
-        const operations: any[] = [];
+        // Group rows by recipeId
         const groups = new Map<string, any[]>();
-
         for (const row of data) {
-            const rRef = row.recipeId;
+            const rRef = row.recipeId || '';
+            if (!rRef) { errors.push(`Row missing recipeId (step: ${row.step})`); continue; }
             if (!groups.has(rRef)) groups.set(rRef, []);
-            groups.get(rRef)?.push(row);
+            groups.get(rRef)!.push(row);
         }
 
-        // Process each Group
+        const operations: any[] = [];
+
         for (const [rRef, rows] of groups.entries()) {
-            try {
-                const recipeId = await findRecipeId(rRef);
-                if (!recipeId) {
-                    errors.push(`Recipe not found for '${rRef}' (referenced in ${rows.length} rows)`);
-                    continue;
-                }
+            // Resolve recipe by legacyId first
+            const recipeId = recipeMap.get(rRef);
+            if (!recipeId) {
+                errors.push(`Recipe not found for '${rRef}' (${rows.length} rows)`);
+                continue;
+            }
 
-                const newSteps: any[] = [];
-                for (const row of rows) {
-                    try {
-                        const userId = row.createdBy || row.createBy;
+            const newSteps: any[] = [];
+            for (const row of rows) {
+                try {
+                    const createdBy = row.createdBy || row.createBy || '';
+                    const createdAt = row.createdAt || row.createAt;
 
-                        const newStep: any = {
-                            step: row.step,
-                            description: row.description,
-                            details: row.details,
-                            createdBy: userId,
-                            createdAt: row.createdAt || row.createAt ? new Date(row.createdAt || row.createAt) : new Date()
-                        };
-
-                        if (row._id) {
-                            newStep._id = row._id;
-                        } else if (row.object_id) {
-                            newStep._id = row.object_id;
-                        }
-
-                        newSteps.push(newStep);
-                    } catch (rowErr: any) {
-                        errors.push(`Row error (step: ${row.step}): ${rowErr.message}`);
-                    }
-                }
-
-                if (newSteps.length > 0) {
-                    operations.push({
-                        updateOne: {
-                            filter: { _id: recipeId },
-                            update: { $push: { steps: { $each: newSteps } } }
-                        }
+                    newSteps.push({
+                        _id: new mongoose.Types.ObjectId(),
+                        step: row.step || '',
+                        description: row.description || '',
+                        details: row.details || '',
+                        createdBy,
+                        createdAt: createdAt ? new Date(createdAt) : new Date()
                     });
+                } catch (rowErr: any) {
+                    errors.push(`Row error (step: ${row.step}): ${rowErr.message}`);
                 }
+            }
 
-            } catch (groupErr: any) {
-                errors.push(`Group error (${rRef}): ${groupErr.message}`);
+            if (newSteps.length > 0) {
+                operations.push({
+                    updateOne: {
+                        filter: { _id: new mongoose.Types.ObjectId(recipeId) },
+                        update: { $push: { steps: { $each: newSteps } } }
+                    }
+                });
             }
         }
 
-        // Execute Bulk Write
         if (operations.length > 0) {
             try {
-                const res = await Recipe.bulkWrite(operations, { ordered: false });
-
+                await Recipe.bulkWrite(operations, { ordered: false });
                 let queuedItems = 0;
                 operations.forEach(op => queuedItems += op.updateOne.update.$push.steps.$each.length);
-
                 count = queuedItems;
             } catch (bulkErr: any) {
-                console.error("Bulk Write Error:", bulkErr);
+                console.error('Bulk Write Error:', bulkErr);
                 if (bulkErr.writeErrors) {
                     for (const we of bulkErr.writeErrors) {
-                        const failedOpIndex = we.index;
-                        // const failedOp = operations[failedOpIndex];
-                        errors.push(`Write error for recipe: ${we.errmsg}`);
+                        errors.push(`Write error: ${we.errmsg}`);
                     }
                 } else {
                     errors.push(`Bulk write failed: ${bulkErr.message}`);
@@ -124,6 +98,7 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ count, errors });
     } catch (error: any) {
+        console.error('Recipe Steps Import Error:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

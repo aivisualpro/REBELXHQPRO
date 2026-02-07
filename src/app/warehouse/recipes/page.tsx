@@ -1,11 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import {
   Search,
-  Upload,
   ArrowUpDown,
   Plus,
   Filter,
@@ -15,7 +14,6 @@ import {
   Copy,
   Edit2
 } from 'lucide-react';
-import Papa from 'papaparse';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { Pagination } from '@/components/ui/Pagination';
@@ -70,10 +68,7 @@ export default function RecipesPage() {
   const [skus, setSkus] = useState<Sku[]>([]);
   const [saving, setSaving] = useState(false);
 
-  // Refs for Import
-  const importRecipeRef = useRef<HTMLInputElement>(null);
-  const importLineItemsRef = useRef<HTMLInputElement>(null);
-  const importStepsRef = useRef<HTMLInputElement>(null);
+
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -234,78 +229,6 @@ export default function RecipesPage() {
     }
   };
 
-  // --- Import Logic ---
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>, endpoint: string, label: string) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (results) => {
-        const totalItems = results.data.length;
-        if (totalItems === 0) {
-          toast.error("No data found in file");
-          if (e.target) e.target.value = '';
-          return;
-        }
-
-        const CHUNK_SIZE = 50;
-        const toastId = toast.loading(`Preparing to import ${totalItems} items...`);
-        let successCount = 0;
-        let allErrors: string[] = [];
-
-        try {
-          // Process in chunks
-          for (let i = 0; i < totalItems; i += CHUNK_SIZE) {
-            const chunk = results.data.slice(i, i + CHUNK_SIZE);
-            const currentProgress = Math.min(i + CHUNK_SIZE, totalItems);
-
-            toast.loading(`Importing ${label}... ${currentProgress}/${totalItems} (${Math.round((currentProgress / totalItems) * 100)}%)`, {
-              id: toastId
-            });
-
-            try {
-              const res = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ data: chunk })
-              });
-
-              if (res.ok) {
-                const data = await res.json();
-                successCount += (data.count || 0);
-                if (data.errors && Array.isArray(data.errors)) {
-                  allErrors = [...allErrors, ...data.errors];
-                }
-              } else {
-                const err = await res.json();
-                allErrors.push(`Chunk ${i / CHUNK_SIZE + 1} failed: ${err.error || res.statusText}`);
-              }
-            } catch (chunkErr: any) {
-              allErrors.push(`Chunk ${i / CHUNK_SIZE + 1} network error: ${chunkErr.message}`);
-            }
-          }
-
-          // Final Report
-          if (allErrors.length > 0) {
-            toast.error(`Imported ${successCount} items. ${allErrors.length} errors occurred.`, { id: toastId, duration: 5000 });
-            console.error('Import Errors:', allErrors);
-            // Show first error in a separate clean toast
-            setTimeout(() => toast.error(`Error details: ${allErrors[0]}`), 1000);
-          } else {
-            toast.success(`Successfully imported all ${successCount} items!`, { id: toastId });
-          }
-
-          fetchRecipes();
-
-        } catch (err: any) {
-          toast.error(`Import process failed: ${err.message}`, { id: toastId });
-        }
-      }
-    });
-    e.target.value = '';
-  };
 
   const renderSku = (val: any) => {
     if (typeof val === 'object' && val?.name) return val.name;
@@ -353,29 +276,6 @@ export default function RecipesPage() {
             />
           </div>
 
-          <div className="w-px h-6 bg-border mx-1"></div>
-
-          {/* Actions */}
-          {session?.user?.email === 'adeel@grassrootsharvest.com' && (
-            <>
-              <input type="file" accept=".csv" className="hidden" ref={importRecipeRef} onChange={(e) => handleImport(e, '/api/recipes/import', 'Recipes')} />
-              <input type="file" accept=".csv" className="hidden" ref={importLineItemsRef} onChange={(e) => handleImport(e, '/api/recipes/import-lineitems', 'Line Items')} />
-              <input type="file" accept=".csv" className="hidden" ref={importStepsRef} onChange={(e) => handleImport(e, '/api/recipes/import-steps', 'Steps')} />
-
-              <button onClick={() => importRecipeRef.current?.click()} className="h-8 px-2 border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors rounded flex items-center space-x-1 bg-card shadow-sm cursor-pointer" title="Import Recipes">
-                <Upload className="w-3 h-3" />
-                <span className="hidden xl:inline text-[10px] font-bold uppercase tracking-wider">Recipes</span>
-              </button>
-              <button onClick={() => importLineItemsRef.current?.click()} className="h-8 px-2 border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors rounded flex items-center space-x-1 bg-card shadow-sm cursor-pointer" title="Import Line Items">
-                <Upload className="w-3 h-3" />
-                <span className="hidden xl:inline text-[10px] font-bold uppercase tracking-wider">Items</span>
-              </button>
-              <button onClick={() => importStepsRef.current?.click()} className="h-8 px-2 border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors rounded flex items-center space-x-1 bg-card shadow-sm cursor-pointer" title="Import Steps">
-                <Upload className="w-3 h-3" />
-                <span className="hidden xl:inline text-[10px] font-bold uppercase tracking-wider">Steps</span>
-              </button>
-            </>
-          )}
 
           <button onClick={() => openModal('create')} className="h-8 px-3 bg-primary text-black hover:opacity-90 transition-all rounded shadow-md flex items-center space-x-1.5 ml-1 cursor-pointer">
             <Plus className="w-3 h-3" />

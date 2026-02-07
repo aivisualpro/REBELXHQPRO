@@ -28,7 +28,8 @@ import {
     Scale,
     Truck,
     ClipboardCheck,
-    FlaskConical
+    FlaskConical,
+    UtensilsCrossed
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -59,6 +60,9 @@ export default function SettingsPage() {
     const importPoLineItemsRef = useRef<HTMLInputElement>(null);
     const importAuditAdjustmentsRef = useRef<HTMLInputElement>(null);
     const importLabResultsRef = useRef<HTMLInputElement>(null);
+    const importRecipesRef = useRef<HTMLInputElement>(null);
+    const importRecipeLineItemsRef = useRef<HTMLInputElement>(null);
+    const importRecipeStepsRef = useRef<HTMLInputElement>(null);
 
     const [settings, setSettings] = useState({
         companyName: 'RebelX Headquarters',
@@ -723,6 +727,27 @@ export default function SettingsPage() {
                                             ref={importLabResultsRef}
                                             onChange={(e) => handleImport(e, '/api/lab-results/import', 'Lab Results')}
                                         />
+                                        <input
+                                            type="file"
+                                            accept=".csv"
+                                            className="hidden"
+                                            ref={importRecipesRef}
+                                            onChange={(e) => handleImport(e, '/api/recipes/import', 'Recipes')}
+                                        />
+                                        <input
+                                            type="file"
+                                            accept=".csv"
+                                            className="hidden"
+                                            ref={importRecipeLineItemsRef}
+                                            onChange={(e) => handleImport(e, '/api/recipes/import-lineitems', 'Recipe Line Items')}
+                                        />
+                                        <input
+                                            type="file"
+                                            accept=".csv"
+                                            className="hidden"
+                                            ref={importRecipeStepsRef}
+                                            onChange={(e) => handleImport(e, '/api/recipes/import-steps', 'Recipe Steps')}
+                                        />
 
                                         <div className="space-y-4">
                                             <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">System Defaults</h2>
@@ -1085,6 +1110,83 @@ export default function SettingsPage() {
                                                 <div className="text-[10px] text-slate-500">
                                                     <span className="font-bold text-slate-700">Lab Results:</span>
                                                     <p>name, variations, brand, labTestStatus, labResultDate, company, link</p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Recipes Import Section */}
+                                        <div className="space-y-4">
+                                            <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">Recipes Import</h2>
+
+                                            <div className="p-4 border border-amber-200 bg-amber-50 rounded-lg flex items-start space-x-4 mb-4">
+                                                <div className="shrink-0 mt-0.5">
+                                                    <UtensilsCrossed className="w-5 h-5 text-amber-600" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-amber-800">Recipes Import</h4>
+                                                    <p className="text-xs text-amber-700 mt-1">
+                                                        Import recipes, line items, and steps from CSV. The <code className="bg-amber-100 px-1 rounded">sku</code> column maps to SKU <code className="bg-amber-100 px-1 rounded">legacyId</code>. Recipe <code className="bg-amber-100 px-1 rounded">legacyId</code> is used for matching parent recipes.
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <button
+                                                    onClick={() => importRecipesRef.current?.click()}
+                                                    disabled={isImporting}
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-amber-400 hover:bg-amber-50 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mb-3 group-hover:bg-amber-200 transition-colors">
+                                                        <UtensilsCrossed className="w-6 h-6 text-amber-600" />
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-slate-700">Import Recipes</h4>
+                                                    <p className="text-[10px] text-slate-500 mt-1 text-center">
+                                                        Master recipe data
+                                                    </p>
+                                                </button>
+                                                <button
+                                                    onClick={() => importRecipeLineItemsRef.current?.click()}
+                                                    disabled={isImporting}
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-amber-400 hover:bg-amber-50 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mb-3 group-hover:bg-amber-200 transition-colors">
+                                                        <Layers className="w-6 h-6 text-amber-600" />
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-slate-700">Import Recipe Items</h4>
+                                                    <p className="text-[10px] text-slate-500 mt-1 text-center">
+                                                        Ingredient line items
+                                                    </p>
+                                                </button>
+                                                <button
+                                                    onClick={() => importRecipeStepsRef.current?.click()}
+                                                    disabled={isImporting}
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-amber-400 hover:bg-amber-50 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mb-3 group-hover:bg-amber-200 transition-colors">
+                                                        <FileSpreadsheet className="w-6 h-6 text-amber-600" />
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-slate-700">Import Recipe Steps</h4>
+                                                    <p className="text-[10px] text-slate-500 mt-1 text-center">
+                                                        Process steps
+                                                    </p>
+                                                </button>
+                                            </div>
+
+                                            <div className="mt-4 p-4 bg-slate-50 rounded-lg">
+                                                <h4 className="text-xs font-bold text-slate-600 mb-2">CSV Column Reference</h4>
+                                                <div className="text-[10px] text-slate-500 space-y-1">
+                                                    <div>
+                                                        <span className="font-bold text-slate-700">Recipes:</span>
+                                                        <p>legacyId, name, sku (legacyId), qty, uom, createdBy, createdAt</p>
+                                                    </div>
+                                                    <div>
+                                                        <span className="font-bold text-slate-700">Recipe Line Items:</span>
+                                                        <p>recipeId (parent legacyId), sku (legacyId), qty, uom, createdBy, createdAt</p>
+                                                    </div>
+                                                    <div>
+                                                        <span className="font-bold text-slate-700">Recipe Steps:</span>
+                                                        <p>recipeId (parent legacyId), step, description, details, createdBy, createdAt</p>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
