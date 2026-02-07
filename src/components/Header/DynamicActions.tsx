@@ -22,7 +22,7 @@ const DynamicActionsContent = () => {
     const searchParams = useSearchParams();
 
     // Routes that support search
-    const searchableRoutes = ['/crm/leads', '/crm/clients', '/sales/wholesale-orders', '/warehouse/skus'];
+    const searchableRoutes = ['/crm/leads', '/crm/clients', '/crm/tasks', '/sales/wholesale-orders', '/warehouse/skus'];
     const isSearchable = searchableRoutes.includes(pathname);
 
     // Sync search value from URL
@@ -74,51 +74,34 @@ const DynamicActionsContent = () => {
     return (
         <div className="flex items-center justify-end space-x-1 w-full h-full">
             {/* Global Actions */}
-            <AnimatePresence mode="wait">
-                {isSearchOpen && isSearchable ? (
-                    <motion.div 
-                        key="search-input"
-                        initial={{ width: 0, opacity: 0 }}
-                        animate={{ width: 160, opacity: 1 }}
-                        exit={{ width: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="relative flex items-center"
-                    >
-                        <Search className="absolute left-2 w-3.5 h-3.5 text-muted-foreground" />
+            {isSearchable ? (
+                    <div className="relative flex items-center">
+                        <Search className="absolute left-2.5 w-3.5 h-3.5 text-muted-foreground" />
                         <input
                             ref={searchInputRef}
                             type="text"
                             value={searchValue}
                             onChange={(e) => handleSearchChange(e.target.value)}
                             placeholder="Search..."
-                            className="pl-7 pr-7 h-6 w-full bg-secondary border border-border rounded text-xs focus:outline-none focus:border-primary text-foreground placeholder:text-muted-foreground"
+                            className="pl-8 pr-8 h-7 w-60 bg-secondary border border-border rounded text-xs focus:outline-none focus:border-primary text-foreground placeholder:text-muted-foreground"
                         />
-                        <button 
-                            onClick={handleSearchClose}
-                            className="absolute right-1.5 p-0.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                        >
-                            <X className="w-3 h-3" />
-                        </button>
-                    </motion.div>
-                ) : (
-                    <motion.button 
-                        key="search-button"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        onClick={() => isSearchable && setIsSearchOpen(true)}
-                        className={cn(
-                            "p-1.5 rounded-full transition-all",
-                            isSearchable 
-                                ? "text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer" 
-                                : "text-muted-foreground/30 cursor-not-allowed"
+                        {searchValue && (
+                            <button 
+                                onClick={handleSearchClose}
+                                className="absolute right-2 p-0.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                            >
+                                <X className="w-3 h-3" />
+                            </button>
                         )}
-                        title={isSearchable ? "Search" : "Search not available on this page"}
+                    </div>
+            ) : (
+                    <button 
+                        className="p-1.5 rounded-full text-muted-foreground/30 cursor-not-allowed"
+                        title="Search not available on this page"
                     >
                         <Search className="w-4 h-4" />
-                    </motion.button>
-                )}
-            </AnimatePresence>
+                    </button>
+            )}
             <button className="relative p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-all cursor-pointer">
                 <Bell className="w-4 h-4" />
                 <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-red-500 rounded-full border border-card" />

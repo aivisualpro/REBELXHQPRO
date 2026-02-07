@@ -310,20 +310,6 @@ export default function OpeningBalancesPage() {
                         <Plus className="w-3 h-3" />
                         <span className="text-[10px] font-bold uppercase tracking-wider">Add New</span>
                     </button>
-
-                    {session?.user?.email === 'adeel@grassrootsharvest.com' && (
-                        <>
-                            <input type="file" accept=".csv" className="hidden" ref={importRef} onChange={handleImport} />
-                            <button
-                                onClick={() => importRef.current?.click()}
-                                className="h-[28px] px-3 border border-slate-200 text-slate-600 hover:text-black hover:bg-slate-50 transition-colors rounded-sm flex items-center space-x-1.5 bg-white"
-                                title="Import CSV"
-                            >
-                                <Upload className="w-3 h-3" />
-                                <span className="text-[10px] font-bold uppercase tracking-wider">Import</span>
-                            </button>
-                        </>
-                    )}
                 </div>
             </div>
 

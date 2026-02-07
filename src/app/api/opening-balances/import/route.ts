@@ -25,18 +25,20 @@ export async function POST(request: Request) {
             if (row.sku) skuIdentifiers.add(row.sku.toString().trim());
         });
 
-        // 2. Fetch SKUs to resolve names/IDs
+        // 2. Fetch SKUs to resolve by legacyId (CSV sku column = legacyId)
         const matchingSkus = await Sku.find({
             $or: [
+                { legacyId: { $in: Array.from(skuIdentifiers) } },
                 { _id: { $in: Array.from(skuIdentifiers) } },
                 { name: { $in: Array.from(skuIdentifiers) } }
             ]
-        }).select('_id name').lean();
+        }).select('_id name legacyId').lean();
 
         const skuMap = new Map<string, string>();
         matchingSkus.forEach(s => {
             skuMap.set(s._id.toString(), s._id.toString());
-            skuMap.set(s.name, s._id.toString());
+            if (s.name) skuMap.set(s.name, s._id.toString());
+            if ((s as any).legacyId) skuMap.set((s as any).legacyId.toString(), s._id.toString());
         });
 
         // 3. Build Operations

@@ -24,7 +24,8 @@ import {
     RefreshCw,
     FileSpreadsheet,
     Package,
-    CreditCard
+    CreditCard,
+    Scale
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -49,6 +50,7 @@ export default function SettingsPage() {
     // Warehouse Import Refs
     const importSkusRef = useRef<HTMLInputElement>(null);
     const importVariancesRef = useRef<HTMLInputElement>(null);
+    const importOpeningBalancesRef = useRef<HTMLInputElement>(null);
 
     const [settings, setSettings] = useState({
         companyName: 'RebelX Headquarters',
@@ -809,6 +811,109 @@ export default function SettingsPage() {
                                                         <span className="font-bold text-slate-700">Variances:</span>
                                                         <p>sku (or skuLegacyId), name, website, image</p>
                                                     </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Opening Balances Import Section */}
+                                        <div className="space-y-4">
+                                            <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">Opening Balances Import</h2>
+                                            
+                                            <input
+                                                type="file"
+                                                accept=".csv"
+                                                className="hidden"
+                                                ref={importOpeningBalancesRef}
+                                                onChange={(e) => {
+                                                    const file = e.target.files?.[0];
+                                                    if (!file) return;
+                                                    e.target.value = '';
+                                                    setIsImporting(true);
+                                                    const toastId = toast.loading('Parsing opening balances...');
+
+                                                    Papa.parse(file, {
+                                                        header: true,
+                                                        skipEmptyLines: true,
+                                                        complete: async (results) => {
+                                                            const rows = results.data as any[];
+                                                            if (rows.length === 0) {
+                                                                toast.error('No data found', { id: toastId });
+                                                                setIsImporting(false);
+                                                                return;
+                                                            }
+
+                                                            const BATCH_SIZE = 2000;
+                                                            let totalImported = 0;
+                                                            let allErrors: string[] = [];
+
+                                                            for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+                                                                const batch = rows.slice(i, i + BATCH_SIZE);
+                                                                const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+                                                                const totalBatches = Math.ceil(rows.length / BATCH_SIZE);
+                                                                toast.loading(`Importing batch ${batchNum}/${totalBatches} (${rows.length} total)...`, { id: toastId });
+
+                                                                try {
+                                                                    const res = await fetch('/api/opening-balances/import', {
+                                                                        method: 'POST',
+                                                                        headers: { 'Content-Type': 'application/json' },
+                                                                        body: JSON.stringify({ data: batch })
+                                                                    });
+                                                                    const data = await res.json();
+                                                                    if (res.ok) {
+                                                                        totalImported += data.count || 0;
+                                                                        if (data.errors?.length) allErrors.push(...data.errors);
+                                                                    } else {
+                                                                        allErrors.push(`Batch ${batchNum}: ${data.error}`);
+                                                                    }
+                                                                } catch (err: any) {
+                                                                    allErrors.push(`Batch ${batchNum}: ${err.message}`);
+                                                                }
+                                                            }
+
+                                                            toast.success(`Imported ${totalImported} opening balances!`, { id: toastId });
+                                                            if (allErrors.length > 0) {
+                                                                setTimeout(() => toast.error(`${allErrors.length} errors. Check console.`), 1500);
+                                                                console.error('Opening Balances import errors:', allErrors);
+                                                            }
+                                                            setIsImporting(false);
+                                                        }
+                                                    });
+                                                }}
+                                            />
+
+                                            <div className="p-4 border border-indigo-200 bg-indigo-50 rounded-lg flex items-start space-x-4 mb-4">
+                                                <div className="shrink-0 mt-0.5">
+                                                    <Scale className="w-5 h-5 text-indigo-600" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-indigo-800">Opening Balances Import</h4>
+                                                    <p className="text-xs text-indigo-700 mt-1">
+                                                        Import inventory opening balances from CSV. The <code className="bg-indigo-100 px-1 rounded">sku</code> column maps to SKU <code className="bg-indigo-100 px-1 rounded">legacyId</code> for matching.
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+                                                <button
+                                                    onClick={() => importOpeningBalancesRef.current?.click()}
+                                                    disabled={isImporting}
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-indigo-400 hover:bg-indigo-50 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center mb-3 group-hover:bg-indigo-200 transition-colors">
+                                                        <Upload className="w-6 h-6 text-indigo-600" />
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-slate-700">Import Opening Balances</h4>
+                                                    <p className="text-[10px] text-slate-500 mt-1 text-center">
+                                                        Inventory starting quantities &amp; costs
+                                                    </p>
+                                                </button>
+                                            </div>
+
+                                            <div className="mt-4 p-4 bg-slate-50 rounded-lg">
+                                                <h4 className="text-xs font-bold text-slate-600 mb-2">CSV Column Reference</h4>
+                                                <div className="text-[10px] text-slate-500">
+                                                    <span className="font-bold text-slate-700">Opening Balances:</span>
+                                                    <p>sku, lotNumber, qty, uom, cost, expirationDate, createdAt, createdBy</p>
                                                 </div>
                                             </div>
                                         </div>

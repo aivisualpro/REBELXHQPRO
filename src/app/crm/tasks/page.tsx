@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ReactDOM from 'react-dom';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
     Phone,
     Mail,
@@ -33,7 +34,6 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
-import { useRouter } from 'next/navigation';
 
 interface Task {
     _id: string;
@@ -102,7 +102,8 @@ const TASKS_PER_PAGE = 10;
 
 export default function TasksPage() {
     const router = useRouter();
-    const [search, setSearch] = useState('');
+    const searchParams = useSearchParams();
+    const search = searchParams.get('search') || '';
     const [generating, setGenerating] = useState(false);
     const [users, setUsers] = useState<{ _id: string; firstName: string; lastName: string }[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
@@ -419,39 +420,23 @@ export default function TasksPage() {
 
     // Header Portal Content
     const headerContent = (
-        <div className="flex items-center justify-between w-full h-full px-4">
-            <div className="flex items-center space-x-4">
-                <h1 className="text-sm font-bold text-foreground uppercase tracking-tight">Tasks</h1>
-                <div className="relative group">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                    <input 
-                        type="text" 
-                        placeholder="Search by client..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="pl-8 pr-4 h-7 w-52 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
-                    />
-                </div>
-            </div>
-
-            <div className="flex items-center space-x-2">
-                <button
-                    onClick={handleAutoGenerate}
-                    disabled={generating}
-                    className="flex items-center space-x-1.5 px-3 h-7 text-[10px] font-bold text-primary-foreground bg-primary border border-primary/20 rounded hover:opacity-90 transition-all uppercase tracking-wide disabled:opacity-50 shadow-sm cursor-pointer"
-                >
-                    {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
-                    <span>Auto-Generate</span>
-                </button>
-                
-                <button
-                    onClick={() => setIsNewTaskModalOpen(true)}
-                    className="flex items-center justify-center h-7 w-7 bg-card border border-border text-foreground hover:bg-secondary rounded shadow-sm transition-all cursor-pointer"
-                    title="New Task"
-                >
-                    <Plus className="w-4 h-4" />
-                </button>
-            </div>
+        <div className="flex items-center w-full h-full px-4 space-x-2">
+            <h1 className="text-sm font-bold text-foreground uppercase tracking-tight">Tasks</h1>
+            <button
+                onClick={handleAutoGenerate}
+                disabled={generating}
+                className="p-1 rounded bg-primary text-primary-foreground hover:opacity-90 transition-all disabled:opacity-50 cursor-pointer"
+                title="Auto-Generate Tasks"
+            >
+                {generating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
+            </button>
+            <button
+                onClick={() => setIsNewTaskModalOpen(true)}
+                className="p-1 rounded bg-yellow-400 hover:bg-yellow-500 transition-colors cursor-pointer"
+                title="New Task"
+            >
+                <Plus className="w-3 h-3 text-black" />
+            </button>
         </div>
     );
 
