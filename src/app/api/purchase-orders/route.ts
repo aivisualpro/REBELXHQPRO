@@ -3,6 +3,7 @@ import dbConnect from '@/lib/mongoose';
 import PurchaseOrder from '@/models/PurchaseOrder';
 import Sku from '@/models/Sku';
 import Vendor from '@/models/Vendor';
+import User from '@/models/User';
 import { applyDateFilter } from '@/lib/global-settings';
 
 export const dynamic = 'force-dynamic';
@@ -12,6 +13,7 @@ export async function GET(request: Request) {
         await dbConnect();
         void Sku; // Ensure Sku model is registered
         void Vendor; // Ensure Vendor model is registered
+        void User; // Ensure RXHQUsers model is registered
 
         const { searchParams } = new URL(request.url);
 
