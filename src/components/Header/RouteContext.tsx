@@ -113,6 +113,16 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
         };
     }
 
+    // Lab Results
+    if (pathname === '/warehouse/lab-results') {
+        return {
+            title: 'Lab Results',
+            actions: [
+                { label: 'Add', icon: Plus, href: '/warehouse/lab-results?createNew=true', variant: 'primary' },
+            ]
+        };
+    }
+
     // Schedules
     if (pathname === '/jobs/schedules') {
         return {
