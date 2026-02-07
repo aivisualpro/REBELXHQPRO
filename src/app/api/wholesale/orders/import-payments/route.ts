@@ -98,13 +98,19 @@ export async function POST(req: NextRequest) {
         }
 
         // Fetch all orders in ONE query (now also searches by legacyId)
-        const orders = await SaleOrder.find({
-            $or: [
-                { label: { $in: Array.from(orderRefs) } },
-                { _id: { $in: Array.from(orderRefs) } },
-                { legacyId: { $in: Array.from(orderRefs) } }
-            ]
-        });
+        // Only include valid ObjectIds in the _id search to prevent CastError
+        const allRefs = Array.from(orderRefs);
+        const validObjectIds = allRefs.filter(id => mongoose.Types.ObjectId.isValid(id) && id.length === 24);
+        
+        const orConditions: any[] = [
+            { label: { $in: allRefs } },
+            { legacyId: { $in: allRefs } }
+        ];
+        if (validObjectIds.length > 0) {
+            orConditions.push({ _id: { $in: validObjectIds } });
+        }
+
+        const orders = await SaleOrder.find({ $or: orConditions });
 
         console.log('[import-payments] Found', orders.length, 'matching orders in DB');
 
