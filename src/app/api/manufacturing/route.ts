@@ -60,7 +60,6 @@ export async function GET(request: Request) {
 
         const total = await Manufacturing.countDocuments(query);
         const orders = await Manufacturing.find(query)
-                .populate('sku', 'name')
                 .populate('createdBy', 'firstName lastName')
                 .populate('finishedBy', 'firstName lastName')
                 .sort({ [sortBy]: sortOrder as any })
@@ -68,12 +67,44 @@ export async function GET(request: Request) {
                 .limit(limit)
                 .lean();
 
-        // Return orders with their stored cost values (set by sync-costs API)
-        // No on-the-fly calculation - costs are synced via the global Sync Costs button
+        // Manual SKU hydration (handles both _id and legacyId matches)
+        const rawSkuIds = new Set<string>();
+        orders.forEach((o: any) => { if (o.sku) rawSkuIds.add(String(o.sku)); });
+
+        const allSkus = await Sku.find({
+            $or: [
+                { _id: { $in: Array.from(rawSkuIds) } },
+                { legacyId: { $in: Array.from(rawSkuIds) } }
+            ]
+        }).select('_id name legacyId').lean();
+
+        // Build lookup maps
+        const skuById = new Map<string, any>();
+        const skuByLegacy = new Map<string, any>();
+        allSkus.forEach((s: any) => {
+            skuById.set(s._id.toString(), s);
+            if (s.legacyId) skuByLegacy.set(String(s.legacyId), s);
+        });
+
+        // Hydrate orders with SKU data
+        orders.forEach((o: any) => {
+            if (!o.sku) return;
+            const skuStr = String(o.sku);
+            const found = skuById.get(skuStr) || skuByLegacy.get(skuStr);
+            if (found) {
+                o.sku = { _id: found._id, name: found.name };
+            }
+            // If not found, leave sku as the raw string
+        });
 
         // Enrich with Tiers
         const allSkuIds = new Set<string>();
-        orders.forEach((o: any) => { if (o.sku) allSkuIds.add((o.sku._id || o.sku).toString()); });
+        orders.forEach((o: any) => {
+            if (o.sku) {
+                const id = (typeof o.sku === 'object' ? (o.sku._id || o.sku) : o.sku).toString();
+                allSkuIds.add(id);
+            }
+        });
         const tiers = await getSkuTiers(Array.from(allSkuIds));
         orders.forEach((o: any) => {
             if (o.sku && typeof o.sku === 'object') {

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowUpDown,
   MoreVertical,
+  Eye,
   Pencil,
   Trash2
 } from 'lucide-react';
@@ -201,8 +202,7 @@ function ManufacturingContent() {
               return (
               <tr
                 key={order._id}
-                className="hover:bg-primary/5 hover:scale-[1.008] hover:shadow-md transition-all duration-200 group cursor-pointer relative z-0 hover:z-10"
-                onClick={() => router.push(`/warehouse/manufacturing/${order._id}`)}
+                className="hover:bg-primary/5 transition-all duration-200 group relative z-0 hover:z-10"
               >
                 <td className="px-2 py-1.5 text-[10px] font-bold text-foreground tracking-tight font-mono">{order.label || '-'}</td>
                 <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono">{new Date(order.createdAt).toLocaleDateString()}</td>
@@ -251,7 +251,7 @@ function ManufacturingContent() {
                 <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono">${(order.laborCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
                 <td className="px-2 py-1.5 text-[10px] text-foreground font-mono font-bold">${(order.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
                 <td className="px-2 py-1.5 text-[10px] text-emerald-500 font-mono font-bold">${unitCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
-                <td className="px-2 py-1.5 relative" onClick={(e) => e.stopPropagation()}>
+                <td className="px-2 py-1.5 relative">
                   <div className="relative" ref={openMenuId === order._id ? menuRef : null}>
                     <button
                       onClick={() => setOpenMenuId(openMenuId === order._id ? null : order._id)}
@@ -261,6 +261,16 @@ function ManufacturingContent() {
                     </button>
                     {openMenuId === order._id && (
                       <div className="absolute right-0 top-full mt-1 bg-card border border-border shadow-lg z-50 min-w-[120px] py-1">
+                        <button
+                          onClick={() => {
+                            setOpenMenuId(null);
+                            router.push(`/warehouse/manufacturing/${order._id}`);
+                          }}
+                          className="w-full px-3 py-1.5 text-left text-[10px] font-medium text-foreground hover:bg-secondary flex items-center gap-2 cursor-pointer transition-colors"
+                        >
+                          <Eye className="w-3 h-3" />
+                          View
+                        </button>
                         <button
                           onClick={() => {
                             setOpenMenuId(null);
