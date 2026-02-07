@@ -8,6 +8,7 @@ import Manufacturing from '@/models/Manufacturing';
 import AuditAdjustment from '@/models/AuditAdjustment';
 import WebOrder from '@/models/WebOrder';
 import { applyDateFilter } from '@/lib/global-settings';
+import { getSkuTiers } from '@/lib/sku-tiers';
 
 export const dynamic = 'force-dynamic';
 
@@ -85,7 +86,10 @@ export async function GET(request: Request) {
         }
 
         const skuIds = skusRaw.map(s => s._id);
+        const strSkuIds = skusRaw.map(s => s._id.toString());
         const allVariances = skusRaw.flatMap(s => (s as any).variances?.map((v: any) => v._id) || []);
+
+        const tiers = await getSkuTiers(strSkuIds);
 
         // --- Optimized Aggregations ---
 
@@ -350,11 +354,6 @@ export async function GET(request: Request) {
 
             const hasSales = (soData || woSku || wosVarMap.has(varianceIds[0])); // approximated check
             const hasConsumption = (myConsMos.length > 0);
-            
-            let tier = 0;
-            if (hasSales && !hasConsumption) tier = 1;
-            else if (hasSales && hasConsumption) tier = 2;
-            else if (!hasSales && hasConsumption) tier = 3;
 
             return {
                 ...sku,
@@ -365,7 +364,7 @@ export async function GET(request: Request) {
                 cogm,
                 grossProfit: revenue - cogs,
                 totalWebOrders: sku.totalWebOrders || 0,
-                tier: sku.tier || tier
+                tier: tiers[id] || 0
             };
         });
 
