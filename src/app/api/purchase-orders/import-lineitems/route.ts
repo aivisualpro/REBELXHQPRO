@@ -22,14 +22,15 @@ export async function POST(request: Request) {
         };
 
         const operations = data
-            .filter((item: any) => item.poNumber) // poNumber acts as reference to Parent PO
+            .filter((item: any) => item.poNumber) // poNumber acts as reference to Parent PO (legacyId)
             .map((item: any) => {
                 const qtyOrdered = parseNum(item.qtyOrdered);
                 const cost = parseNum(item.cost);
+                const amount = parseNum(item.amount);
 
                 return {
                     updateOne: {
-                        filter: { _id: item.poNumber },
+                        filter: { legacyId: item.poNumber },
                         update: {
                             $push: {
                                 lineItems: {
@@ -40,6 +41,7 @@ export async function POST(request: Request) {
                                     qtyReceived: parseNum(item.qtyReceived),
                                     uom: item.uom,
                                     cost: cost,
+                                    amount: amount,
                                     createdAt: item.createAt ? new Date(item.createAt) : new Date(),
                                     createdBy: item.createBy || item.createdBy
                                 }

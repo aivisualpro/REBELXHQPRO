@@ -53,6 +53,8 @@ export default function SettingsPage() {
     const importVariancesRef = useRef<HTMLInputElement>(null);
     const importOpeningBalancesRef = useRef<HTMLInputElement>(null);
     const importVendorsRef = useRef<HTMLInputElement>(null);
+    const importPurchaseOrdersRef = useRef<HTMLInputElement>(null);
+    const importPoLineItemsRef = useRef<HTMLInputElement>(null);
 
     const [settings, setSettings] = useState({
         companyName: 'RebelX Headquarters',
@@ -688,6 +690,20 @@ export default function SettingsPage() {
                                             ref={importVendorsRef}
                                             onChange={(e) => handleImport(e, '/api/vendors/import', 'Vendors')}
                                         />
+                                        <input
+                                            type="file"
+                                            accept=".csv"
+                                            className="hidden"
+                                            ref={importPurchaseOrdersRef}
+                                            onChange={(e) => handleImport(e, '/api/purchase-orders/import', 'Purchase Orders')}
+                                        />
+                                        <input
+                                            type="file"
+                                            accept=".csv"
+                                            className="hidden"
+                                            ref={importPoLineItemsRef}
+                                            onChange={(e) => handleImport(e, '/api/purchase-orders/import-lineitems', 'PO Line Items')}
+                                        />
 
                                         <div className="space-y-4">
                                             <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">System Defaults</h2>
@@ -820,6 +836,36 @@ export default function SettingsPage() {
                                                     <h4 className="text-sm font-bold text-slate-700">Import Vendors</h4>
                                                     <p className="text-[10px] text-slate-500 mt-1 text-center">
                                                         Supplier list (legacyId, name, terms)
+                                                    </p>
+                                                </button>
+
+                                                {/* Import POs */}
+                                                <button
+                                                    onClick={() => importPurchaseOrdersRef.current?.click()}
+                                                    disabled={isImporting}
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mb-3 group-hover:bg-blue-200 transition-colors">
+                                                        <FileSpreadsheet className="w-6 h-6 text-blue-600" />
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-slate-700">Import POs</h4>
+                                                    <p className="text-[10px] text-slate-500 mt-1 text-center">
+                                                        Purchase Orders (legacyId, vendor)
+                                                    </p>
+                                                </button>
+
+                                                {/* Import PO Line Items */}
+                                                <button
+                                                    onClick={() => importPoLineItemsRef.current?.click()}
+                                                    disabled={isImporting}
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-cyan-400 hover:bg-cyan-50 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <div className="w-12 h-12 rounded-full bg-cyan-100 flex items-center justify-center mb-3 group-hover:bg-cyan-200 transition-colors">
+                                                        <ShoppingCart className="w-6 h-6 text-cyan-600" />
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-slate-700">Import PO Lines</h4>
+                                                    <p className="text-[10px] text-slate-500 mt-1 text-center">
+                                                        Items for POs (poNumber, sku, qty)
                                                     </p>
                                                 </button>
                                             </div>

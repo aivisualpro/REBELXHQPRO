@@ -35,7 +35,15 @@ export async function POST(request: Request) {
                 processedItem.receivedDate = new Date(processedItem.receivedDate);
             }
 
-            if (processedItem._id) {
+            if (processedItem.legacyId) {
+                return {
+                    updateOne: {
+                        filter: { legacyId: processedItem.legacyId },
+                        update: { $set: processedItem },
+                        upsert: true
+                    }
+                };
+            } else if (processedItem._id) {
                 return {
                     updateOne: {
                         filter: { _id: processedItem._id },

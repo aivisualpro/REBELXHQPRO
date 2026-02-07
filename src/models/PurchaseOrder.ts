@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 
 const PurchaseOrderSchema = new mongoose.Schema({
     _id: { type: String, default: () => new mongoose.Types.ObjectId().toString() },
+    legacyId: { type: String, unique: true }, // Added for legacy support
     label: String, // PO Number
     vendor: { type: String, ref: 'Vendor' },
     paymentTerms: String,
@@ -19,6 +20,7 @@ const PurchaseOrderSchema = new mongoose.Schema({
         qtyReceived: Number,
         uom: String,
         cost: Number,
+        amount: Number, // Added as per request
         createdAt: { type: Date, default: Date.now },
         createdBy: { type: String, ref: 'RXHQUsers' }
     }]
