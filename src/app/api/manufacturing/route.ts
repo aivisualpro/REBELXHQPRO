@@ -36,7 +36,7 @@ export async function GET(request: Request) {
             
             query.$or = [
                 { label: { $regex: search, $options: 'i' } }, // Search by label
-                { '_id': { $regex: search, $options: 'i' } }, // or WO ID
+                { legacyId: { $regex: search, $options: 'i' } }, // or legacy WO ID
                 ...(matchingSkuIds.length > 0 ? [{ sku: { $in: matchingSkuIds } }] : [])
             ];
         }

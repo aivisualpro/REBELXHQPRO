@@ -1,15 +1,14 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import {
-  Search,
   ArrowUpDown,
-  Plus,
   X,
   Trash2,
-  Edit2
+  Edit2,
+  Eye
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -24,9 +23,10 @@ interface Kit {
   lineItems: any[];
 }
 
-export default function KitsPage() {
+function KitsPageContent() {
   const router = useRouter();
   const { data: session } = useSession();
+  const searchParams = useSearchParams();
   const [kits, setKits] = useState<Kit[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -35,9 +35,7 @@ export default function KitsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
 
-  // Filter State
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  // Sorting
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
@@ -48,17 +46,30 @@ export default function KitsPage() {
   const [formData, setFormData] = useState({ name: '' });
   const [saving, setSaving] = useState(false);
 
+  // Read search from URL (set by main header)
+  const search = searchParams.get('search') || '';
+
+  // Listen for createNew param from header Add button
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search);
-      setPage(1);
-    }, 500);
-    return () => clearTimeout(timer);
+    if (searchParams.get('createNew') === 'true') {
+      setModalMode('create');
+      setSelectedKit(null);
+      setFormData({ name: '' });
+      setIsModalOpen(true);
+      // Remove createNew from URL
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('createNew');
+      router.replace(`/warehouse/kits${params.toString() ? '?' + params.toString() : ''}`, { scroll: false });
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    setPage(1);
   }, [search]);
 
   useEffect(() => {
     fetchKits();
-  }, [page, debouncedSearch, sortBy, sortOrder]);
+  }, [page, search, sortBy, sortOrder]);
 
   const fetchKits = async () => {
     setLoading(true);
@@ -66,7 +77,7 @@ export default function KitsPage() {
       const params = new URLSearchParams({
         page: page.toString(),
         limit: '20',
-        search: debouncedSearch,
+        search,
         sortBy,
         sortOrder: sortOrder === 'asc' ? 'asc' : 'desc'
       });
@@ -164,30 +175,6 @@ export default function KitsPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-48px)] bg-background transition-colors duration-300 relative">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 h-11 border-b border-border bg-secondary/50 transition-colors">
-        <div className="flex items-center space-x-4">
-          <h1 className="text-sm font-bold text-foreground uppercase tracking-tighter shrink-0">Product Kits</h1>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search Kits..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 pr-3 h-8 w-64 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <button onClick={() => openModal('create')} className="h-8 px-3 bg-primary text-black hover:opacity-90 transition-all rounded shadow-md flex items-center space-x-1.5 ml-1 cursor-pointer">
-            <Plus className="w-3 h-3" />
-            <span className="hidden sm:inline text-[10px] font-black uppercase tracking-widest">New</span>
-          </button>
-        </div>
-      </div>
-
       <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
         <div className="min-w-full px-2 py-2">
           <table className="w-full text-left border-separate border-spacing-0 relative z-0">
@@ -221,8 +208,7 @@ export default function KitsPage() {
               ) : kits.map(kit => (
                 <tr
                   key={kit._id}
-                  className="hover:bg-secondary/40 hover:scale-[1.002] hover:shadow-md transition-all duration-200 group relative z-0 hover:z-10 bg-background cursor-pointer"
-                  onClick={() => router.push(`/warehouse/kits/${kit._id}`)}
+                  className="hover:bg-secondary/40 transition-all duration-200 group relative z-0 hover:z-10 bg-background"
                 >
                   <td className="px-4 py-2 text-[11px] font-bold text-foreground whitespace-nowrap overflow-hidden text-ellipsis max-w-[300px] border-r border-border">{kit.name}</td>
                   <td className="px-4 py-2 text-[11px] text-muted-foreground font-mono border-r border-border">{new Date(kit.createdAt).toLocaleDateString()}</td>
@@ -230,12 +216,19 @@ export default function KitsPage() {
                     {kit.createdBy ? `${kit.createdBy.firstName} ${kit.createdBy.lastName}` : '-'}
                   </td>
                   <td className="px-4 py-2 text-center text-[11px] font-bold text-muted-foreground border-r border-border">{kit.lineItems?.length || 0}</td>
-                  <td className="px-4 py-2 text-right" onClick={e => e.stopPropagation()}>
+                  <td className="px-4 py-2 text-right">
                     <div className="flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => router.push(`/warehouse/kits/${kit._id}`)}
+                        className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded transition-colors"
+                        title="View"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
                       <button
                         onClick={() => openModal('edit', kit)}
                         className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded transition-colors"
-                        title="Edit Details"
+                        title="Edit"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
@@ -277,14 +270,6 @@ export default function KitsPage() {
               <button onClick={() => setIsModalOpen(false)} className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-6 space-y-4">
-              {selectedKit && modalMode === 'edit' && (
-                <div className="bg-secondary/40 p-4 rounded border border-border mb-2">
-                  <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
-                    Contains <span className="text-foreground font-black">{selectedKit.lineItems?.length || 0}</span> Line Items.
-                    (To edit items, click on the kit row)
-                  </p>
-                </div>
-              )}
               <div>
                 <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">Kit Name</label>
                 <input
@@ -309,5 +294,13 @@ export default function KitsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function KitsPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-[calc(100vh-48px)]"><span className="text-xs text-muted-foreground">Loading...</span></div>}>
+      <KitsPageContent />
+    </Suspense>
   );
 }

@@ -2,16 +2,18 @@ import mongoose from 'mongoose';
 
 // Define Labor sub-schema explicitly
 const LaborSchema = new mongoose.Schema({
-    _id: { type: String, default: () => new mongoose.Types.ObjectId().toString() },
+    // _id auto-generated as ObjectId
     type: String,
     user: { type: String, ref: 'RXHQUsers' },
     duration: String, // Format: HH:MM:SS
     hourlyRate: Number,
     createdAt: { type: Date, default: Date.now }
-}, { _id: false }); // Disable auto _id since we're providing our own
+});
 
 const ManufacturingSchema = new mongoose.Schema({
-    _id: { type: String, default: () => new mongoose.Types.ObjectId().toString() }, // custom or auto
+    // _id auto-generated as ObjectId
+    legacyId: { type: String, index: true, sparse: true },
+    label: String,
     sku: { type: String, ref: 'Sku', required: true }, // reference by SKU string ID
     recipesId: { type: String, ref: 'Recipe' },
     uom: String,
@@ -20,9 +22,8 @@ const ManufacturingSchema = new mongoose.Schema({
     scheduledStart: Date,
     scheduledFinish: Date,
     priority: { type: String, enum: ['Low', 'Medium', 'High'], default: 'Medium' },
-    label: String, // New field
     notes: [{
-        _id: { type: String, default: () => new mongoose.Types.ObjectId().toString() },
+        // _id auto-generated as ObjectId
         note: String,
         createdBy: { type: String, ref: 'RXHQUsers' },
         createdAt: { type: Date, default: Date.now }
@@ -33,7 +34,8 @@ const ManufacturingSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now },
 
     lineItems: [{
-        _id: { type: String, default: () => new mongoose.Types.ObjectId().toString() },
+        // _id auto-generated as ObjectId
+        woNumber: String, // parent legacyId reference (kept for data lineage)
         lotNumber: String,
         label: String,
         recipeId: String,
@@ -44,7 +46,8 @@ const ManufacturingSchema = new mongoose.Schema({
         qtyExtra: Number,
         qtyScrapped: Number,
         cost: { type: Number, default: 0 }, // Unit cost from lot/opening balance
-        createdAt: { type: Date, default: Date.now }
+        createdAt: { type: Date, default: Date.now },
+        createdBy: { type: String, ref: 'RXHQUsers' }
     }],
 
     labor: [LaborSchema],

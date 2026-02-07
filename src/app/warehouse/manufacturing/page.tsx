@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Search,
-  Upload,
   ArrowUpDown,
   Filter,
   Calendar,
@@ -15,7 +14,6 @@ import {
   Pencil,
   Trash2
 } from 'lucide-react';
-import Papa from 'papaparse';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { Pagination } from '@/components/ui/Pagination';
@@ -80,10 +78,7 @@ export default function ManufacturingPage() {
   const [skuList, setSkuList] = useState<any[]>([]);
   const [creatorOptions, setCreatorOptions] = useState<{ label: string, value: string }[]>([]);
 
-  const woInputRef = useRef<HTMLInputElement>(null);
-  const liInputRef = useRef<HTMLInputElement>(null);
-  const laborInputRef = useRef<HTMLInputElement>(null);
-  const notesInputRef = useRef<HTMLInputElement>(null);
+
 
 
   // Action Menu State
@@ -186,45 +181,7 @@ export default function ManufacturingPage() {
     }
   };
 
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>, endpoint: string, label: string) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
 
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      dynamicTyping: false, // Keep as strings to avoid parsing issues
-      complete: async (results) => {
-        try {
-          console.log('Parsed CSV data:', results.data); // Debug log
-          console.log('First row:', results.data[0]); // Debug log
-          
-          const loadingToast = toast.loading(`Importing ${label}...`);
-          const res = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ data: results.data })
-          });
-          toast.dismiss(loadingToast);
-
-          if (res.ok) {
-            const data = await res.json();
-            toast.success(`Imported/Updated ${data.count} items`);
-            fetchOrders();
-          } else {
-            const err = await res.json();
-            toast.error('Import failed: ' + err.error);
-          }
-        } catch (e) {
-          toast.error('Import error');
-          console.error(e);
-        }
-      }
-    });
-    
-    // Reset input so same file can be selected again
-    e.target.value = '';
-  };
 
 
   return (
@@ -288,68 +245,7 @@ export default function ManufacturingPage() {
             />
           </div>
 
-          <div className="w-px h-6 bg-slate-200 mx-2" />
 
-          <input
-            type="file"
-            accept=".csv"
-            className="hidden"
-            ref={woInputRef}
-            onChange={(e) => handleImport(e, '/api/manufacturing/import', 'WO Data')}
-          />
-          <input
-            type="file"
-            accept=".csv"
-            className="hidden"
-            ref={liInputRef}
-            onChange={(e) => handleImport(e, '/api/manufacturing/import-lineitems', 'Line Items')}
-          />
-          <input
-            type="file"
-            accept=".csv"
-            className="hidden"
-            ref={laborInputRef}
-            onChange={(e) => handleImport(e, '/api/manufacturing/import-labor', 'Labor')}
-          />
-
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => woInputRef.current?.click()}
-              className="h-[30px] w-[30px] bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors shadow-sm flex items-center justify-center rounded-none cursor-pointer"
-              title="Import Manufacturing Orders"
-            >
-              <Upload className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => liInputRef.current?.click()}
-              className="h-[30px] w-[30px] bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors shadow-sm flex items-center justify-center rounded-none cursor-pointer"
-              title="Import Line Items"
-            >
-              <Upload className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => laborInputRef.current?.click()}
-              className="h-[30px] w-[30px] bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors shadow-sm flex items-center justify-center rounded-none cursor-pointer"
-              title="Import Labor"
-            >
-              <Upload className="w-4 h-4" />
-            </button>
-          </div>
-
-          <input
-            type="file"
-            accept=".csv"
-            className="hidden"
-            ref={notesInputRef}
-            onChange={(e) => handleImport(e, '/api/manufacturing/import-notes', 'Notes')}
-          />
-          <button
-            onClick={() => notesInputRef.current?.click()}
-            className="h-[30px] w-[30px] bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors shadow-sm flex items-center justify-center rounded-none cursor-pointer"
-            title="Import Notes"
-          >
-            <Upload className="w-4 h-4" />
-          </button>
 
         </div>
       </div>

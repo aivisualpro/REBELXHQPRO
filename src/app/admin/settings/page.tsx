@@ -68,6 +68,10 @@ export default function SettingsPage() {
     const importTicketsRef = useRef<HTMLInputElement>(null);
     const importKitsRef = useRef<HTMLInputElement>(null);
     const importKitLineItemsRef = useRef<HTMLInputElement>(null);
+    const importMfgOrdersRef = useRef<HTMLInputElement>(null);
+    const importMfgLineItemsRef = useRef<HTMLInputElement>(null);
+    const importMfgLaborRef = useRef<HTMLInputElement>(null);
+    const importMfgNotesRef = useRef<HTMLInputElement>(null);
 
     const [settings, setSettings] = useState({
         companyName: 'RebelX Headquarters',
@@ -767,6 +771,34 @@ export default function SettingsPage() {
                                             ref={importKitLineItemsRef}
                                             onChange={(e) => handleImport(e, '/api/kits/import-lineitems', 'Kit Line Items')}
                                         />
+                                        <input
+                                            type="file"
+                                            accept=".csv"
+                                            className="hidden"
+                                            ref={importMfgOrdersRef}
+                                            onChange={(e) => handleImport(e, '/api/manufacturing/import', 'Manufacturing Orders')}
+                                        />
+                                        <input
+                                            type="file"
+                                            accept=".csv"
+                                            className="hidden"
+                                            ref={importMfgLineItemsRef}
+                                            onChange={(e) => handleImport(e, '/api/manufacturing/import-lineitems', 'Manufacturing Line Items')}
+                                        />
+                                        <input
+                                            type="file"
+                                            accept=".csv"
+                                            className="hidden"
+                                            ref={importMfgLaborRef}
+                                            onChange={(e) => handleImport(e, '/api/manufacturing/import-labor', 'Manufacturing Labor')}
+                                        />
+                                        <input
+                                            type="file"
+                                            accept=".csv"
+                                            className="hidden"
+                                            ref={importMfgNotesRef}
+                                            onChange={(e) => handleImport(e, '/api/manufacturing/import-notes', 'Manufacturing Notes')}
+                                        />
 
                                         <div className="space-y-4">
                                             <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">System Defaults</h2>
@@ -1267,6 +1299,104 @@ export default function SettingsPage() {
                                                     <div>
                                                         <span className="font-bold text-slate-700">Kit Items:</span>
                                                         <p>kitId (parent legacyId), sku (SKU legacyId), qty</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Manufacturing Import Section */}
+                                        <div className="space-y-4">
+                                            <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">Manufacturing Import</h2>
+
+                                            <div className="p-4 border border-violet-200 bg-violet-50 rounded-lg flex items-start space-x-4 mb-4">
+                                                <div className="shrink-0 mt-0.5">
+                                                    <Truck className="w-5 h-5 text-violet-600" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-violet-800">Manufacturing Import</h4>
+                                                    <p className="text-xs text-violet-700 mt-1">
+                                                        Import in order: Manufacturing Orders first, then Line Items, Labor, and Notes.
+                                                        The <code className="bg-violet-100 px-1 rounded">woNumber</code> in sub-imports should match the order&apos;s <code className="bg-violet-100 px-1 rounded">legacyId</code>.
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                                <button
+                                                    onClick={() => importMfgOrdersRef.current?.click()}
+                                                    disabled={isImporting}
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-violet-400 hover:bg-violet-50 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <div className="w-12 h-12 rounded-full bg-violet-100 flex items-center justify-center mb-3 group-hover:bg-violet-200 transition-colors">
+                                                        <Truck className="w-6 h-6 text-violet-600" />
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-slate-700">Import Orders</h4>
+                                                    <p className="text-[10px] text-slate-500 mt-1 text-center">
+                                                        Manufacturing orders
+                                                    </p>
+                                                </button>
+
+                                                <button
+                                                    onClick={() => importMfgLineItemsRef.current?.click()}
+                                                    disabled={isImporting}
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-violet-400 hover:bg-violet-50 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <div className="w-12 h-12 rounded-full bg-violet-100 flex items-center justify-center mb-3 group-hover:bg-violet-200 transition-colors">
+                                                        <Truck className="w-6 h-6 text-violet-600" />
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-slate-700">Import Line Items</h4>
+                                                    <p className="text-[10px] text-slate-500 mt-1 text-center">
+                                                        WO line items
+                                                    </p>
+                                                </button>
+
+                                                <button
+                                                    onClick={() => importMfgLaborRef.current?.click()}
+                                                    disabled={isImporting}
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-violet-400 hover:bg-violet-50 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <div className="w-12 h-12 rounded-full bg-violet-100 flex items-center justify-center mb-3 group-hover:bg-violet-200 transition-colors">
+                                                        <Truck className="w-6 h-6 text-violet-600" />
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-slate-700">Import Labor</h4>
+                                                    <p className="text-[10px] text-slate-500 mt-1 text-center">
+                                                        Labor entries
+                                                    </p>
+                                                </button>
+
+                                                <button
+                                                    onClick={() => importMfgNotesRef.current?.click()}
+                                                    disabled={isImporting}
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-violet-400 hover:bg-violet-50 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <div className="w-12 h-12 rounded-full bg-violet-100 flex items-center justify-center mb-3 group-hover:bg-violet-200 transition-colors">
+                                                        <Truck className="w-6 h-6 text-violet-600" />
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-slate-700">Import Notes</h4>
+                                                    <p className="text-[10px] text-slate-500 mt-1 text-center">
+                                                        WO notes
+                                                    </p>
+                                                </button>
+                                            </div>
+
+                                            <div className="mt-4 p-4 bg-slate-50 rounded-lg">
+                                                <h4 className="text-xs font-bold text-slate-600 mb-2">CSV Column Reference</h4>
+                                                <div className="text-[10px] text-slate-500 space-y-1">
+                                                    <div>
+                                                        <span className="font-bold text-slate-700">Manufacturing Orders:</span>
+                                                        <p>legacyId, label, sku (SKU legacyId), recipesId (Recipe legacyId), qty, uom, qtyDifference, scheduledStart, scheduledFinish, priority, status, createdBy, finishedBy, createdAt</p>
+                                                    </div>
+                                                    <div>
+                                                        <span className="font-bold text-slate-700">Line Items:</span>
+                                                        <p>woNumber (parent legacyId), lotNumber, recipeId (Recipe legacyId), sku (SKU legacyId), uom, recipeQty, sa, qtyExtra, qtyScrapped, createdAt, createdBy</p>
+                                                    </div>
+                                                    <div>
+                                                        <span className="font-bold text-slate-700">Labor:</span>
+                                                        <p>woNumber (parent legacyId), type, user, duration, hourlyRate, createdAt</p>
+                                                    </div>
+                                                    <div>
+                                                        <span className="font-bold text-slate-700">Notes:</span>
+                                                        <p>woNumber (parent legacyId), note, createdBy, createdAt</p>
                                                     </div>
                                                 </div>
                                             </div>
