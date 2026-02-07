@@ -21,14 +21,14 @@ const ManufacturingSchema = new mongoose.Schema({
     qtyDifference: Number,
     scheduledStart: Date,
     scheduledFinish: Date,
-    priority: { type: String, enum: ['Low', 'Medium', 'High'], default: 'Medium' },
+    priority: { type: String, enum: ['Normal', 'High', 'Extreme'], default: 'Normal' },
     notes: [{
         // _id auto-generated as ObjectId
         note: String,
         createdBy: { type: String, ref: 'RXHQUsers' },
         createdAt: { type: Date, default: Date.now }
     }],
-    status: { type: String, default: 'Draft' }, // e.g. Draft, In Progress, Completed
+    status: { type: String, enum: ['Pending', 'Processing', 'Ready to QC', 'Fulfilled'], default: 'Pending' },
     createdBy: { type: String, ref: 'RXHQUsers' },
     finishedBy: { type: String, ref: 'RXHQUsers' },
     createdAt: { type: Date, default: Date.now },

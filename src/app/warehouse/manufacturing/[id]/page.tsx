@@ -243,7 +243,7 @@ export default function ManufacturingDetailPage() {
                 const totalQty = bomQty + qtyScrapped + qtyExtra;
                 const cost = totalQty * (item.cost || 0);
 
-                const cat = (typeof item.sku === 'object' && item.sku.category) ? item.sku.category.toLowerCase() : '';
+                const cat = (typeof item.sku === 'object' && item.sku !== null && item.sku.category) ? item.sku.category.toLowerCase() : '';
                 if (cat.includes('packaging')) {
                     packaging += cost;
                 } else {
@@ -345,7 +345,7 @@ export default function ManufacturingDetailPage() {
         ],
     ];
 
-    const skuImage = (typeof order.sku === 'object' && order.sku.image) ? order.sku.image : skuList.find(s => s._id === order.sku)?.image;
+    const skuImage = (typeof order.sku === 'object' && order.sku !== null && order.sku.image) ? order.sku.image : skuList.find(s => s._id === (typeof order.sku === 'string' ? order.sku : (order.sku as any)?._id))?.image;
 
     const handleUpdateQtyDiff = (diffValue: number) => {
         if (!order) return;
@@ -529,7 +529,7 @@ export default function ManufacturingDetailPage() {
                 </div>
                 <div className="flex items-center space-x-2">
                     <Link 
-                        href={`/warehouse/skus/${typeof order.sku === 'object' ? order.sku._id : order.sku}?lot=${encodeURIComponent(order.label || order._id)}`}
+                        href={`/warehouse/skus/${typeof order.sku === 'object' && order.sku !== null ? (order.sku as any)._id : order.sku}?lot=${encodeURIComponent(order.label || order._id)}`}
                         className="px-3 py-1 bg-slate-100 border border-slate-200 text-slate-600 rounded text-[10px] font-bold uppercase hover:bg-slate-200 transition-colors flex items-center gap-1.5"
                     >
                         <Layers className="w-3 h-3" />
@@ -545,16 +545,17 @@ export default function ManufacturingDetailPage() {
                     <div className="flex items-center gap-2">
                         <div className={cn(
                             "px-2 py-1 text-[9px] font-black uppercase tracking-widest border rounded-none",
-                            order.status === 'Completed' ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
-                            order.status === 'In Progress' ? "bg-blue-50 text-blue-600 border-blue-100" :
+                            order.status === 'Fulfilled' ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+                            order.status === 'Processing' ? "bg-blue-50 text-blue-600 border-blue-100" :
+                            order.status === 'Ready to QC' ? "bg-amber-50 text-amber-600 border-amber-100" :
                             "bg-slate-100 text-slate-500 border-slate-200"
                         )}>
                             {order.status}
                         </div>
                         <div className={cn(
                             "px-2 py-1 text-[9px] font-black uppercase tracking-widest border rounded-none",
-                            order.priority === 'High' ? "bg-red-50 text-red-600 border-red-100" :
-                            order.priority === 'Medium' ? "bg-orange-50 text-orange-600 border-orange-100" :
+                            order.priority === 'Extreme' ? "bg-red-50 text-red-600 border-red-100" :
+                            order.priority === 'High' ? "bg-orange-50 text-orange-600 border-orange-100" :
                             "bg-slate-100 text-slate-500 border-slate-200"
                         )}>
                             {order.priority}
@@ -566,7 +567,7 @@ export default function ManufacturingDetailPage() {
                         <div 
                             className="flex items-center space-x-3 mb-6 cursor-pointer group"
                             onClick={() => {
-                                const skuId = typeof order.sku === 'object' ? order.sku._id : order.sku;
+                                const skuId = typeof order.sku === 'object' && order.sku !== null ? (order.sku as any)._id : order.sku;
                                 if (skuId) router.push(`/warehouse/skus/${skuId}`);
                             }}
                         >
@@ -864,7 +865,7 @@ export default function ManufacturingDetailPage() {
                                                     <span 
                                                         className="hover:text-blue-600 hover:underline cursor-pointer transition-colors"
                                                         onClick={() => {
-                                                            const skuId = typeof item.sku === 'object' ? item.sku._id : item.sku;
+                                                            const skuId = typeof item.sku === 'object' && item.sku !== null ? (item.sku as any)._id : item.sku;
                                                             if (skuId) router.push(`/warehouse/skus/${skuId}`);
                                                         }}
                                                     >
@@ -891,7 +892,7 @@ export default function ManufacturingDetailPage() {
                                                 <div className="flex items-center gap-1">
                                                     {item.lotNumber ? (
                                                         <Link 
-                                                            href={`/warehouse/skus/${typeof item.sku === 'object' ? item.sku._id : item.sku}?lot=${encodeURIComponent(item.lotNumber)}`}
+                                                            href={`/warehouse/skus/${typeof item.sku === 'object' && item.sku !== null ? (item.sku as any)._id : item.sku}?lot=${encodeURIComponent(item.lotNumber)}`}
                                                             className="hover:underline hover:text-blue-600 cursor-pointer text-slate-700 font-mono"
                                                             onClick={(e) => e.stopPropagation()}
                                                         >
@@ -901,7 +902,7 @@ export default function ManufacturingDetailPage() {
                                                         <span>-</span>
                                                     )}
                                                     <button 
-                                                        onClick={() => item.sku && handleEditLot(item._id, typeof item.sku === 'object' ? item.sku._id : item.sku)}
+                                                        onClick={() => item.sku && handleEditLot(item._id, typeof item.sku === 'object' && item.sku !== null ? (item.sku as any)._id : item.sku)}
                                                         className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-500 transition-all p-0.5"
                                                         title="Edit Lot #"
                                                     >

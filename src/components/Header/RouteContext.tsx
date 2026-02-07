@@ -133,6 +133,16 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
         };
     }
 
+    // Manufacturing
+    if (pathname === '/warehouse/manufacturing') {
+        return {
+            title: 'Manufacturing',
+            actions: [
+                { label: 'Add', icon: Plus, href: '/warehouse/manufacturing/new', variant: 'primary' },
+            ]
+        };
+    }
+
     // Schedules
     if (pathname === '/jobs/schedules') {
         return {

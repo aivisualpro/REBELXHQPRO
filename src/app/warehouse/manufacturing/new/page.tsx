@@ -28,7 +28,7 @@ export default function NewManufacturingOrderPage() {
     const [uom, setUom] = useState('');
     const [scheduledStart, setScheduledStart] = useState('');
     const [scheduledFinish, setScheduledFinish] = useState('');
-    const [priority, setPriority] = useState('Medium');
+    const [priority, setPriority] = useState('Normal');
     const [label, setLabel] = useState('');
     
     // Data Options
@@ -96,7 +96,7 @@ export default function NewManufacturingOrderPage() {
                 scheduledFinish: scheduledFinish || undefined,
                 priority,
                 label,
-                status: 'Draft',
+                status: 'Pending',
                 createdBy: (session?.user as any)?.id || session?.user?.email, // Fallback if id not available
                 createdAt: new Date().toISOString(),
                 // Initialize empty arrays if needed
@@ -295,9 +295,9 @@ export default function NewManufacturingOrderPage() {
                                         onChange={e => setPriority(e.target.value)}
                                         className="w-full h-10 px-3 border border-slate-200 rounded-none text-xs focus:outline-none focus:border-black/20 appearance-none bg-white"
                                     >
-                                        <option value="Low">Low</option>
-                                        <option value="Medium">Medium</option>
+                                        <option value="Normal">Normal</option>
                                         <option value="High">High</option>
+                                        <option value="Extreme">Extreme</option>
                                     </select>
                                 </div>
                             </div>

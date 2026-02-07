@@ -1,15 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  Search,
   ArrowUpDown,
-  Filter,
-  Calendar,
-  User,
-  Factory,
-  Plus,
   MoreVertical,
   Pencil,
   Trash2
@@ -17,7 +11,6 @@ import {
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { Pagination } from '@/components/ui/Pagination';
-import { MultiSelectFilter } from '@/components/ui/filters/MultiSelectFilter';
 
 interface LineItem {
   _id: string;
@@ -56,27 +49,29 @@ interface ManufacturingOrder {
 }
 
 export default function ManufacturingPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-[calc(100vh-48px)] bg-background"><div className="text-sm text-muted-foreground">Loading...</div></div>}>
+      <ManufacturingContent />
+    </Suspense>
+  );
+}
+
+function ManufacturingContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlSearch = searchParams.get('search') || '';
   const [orders, setOrders] = useState<ManufacturingOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalOrders, setTotalOrders] = useState(0);
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState(urlSearch);
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
-  // Filters
-  const [selectedSkus, setSelectedSkus] = useState<string[]>([]);
-  const [selectedCreators, setSelectedCreators] = useState<string[]>([]);
-  const [dateRange, setDateRange] = useState<{ from: string, to: string }>({ from: '', to: '' });
-
-  // Filter Options (Populated dynamically from fetched data for simplicity in this iteration)
-  const [skuOptions, setSkuOptions] = useState<{ label: string, value: string }[]>([]);
+  // SKU list for name display
   const [skuList, setSkuList] = useState<any[]>([]);
-  const [creatorOptions, setCreatorOptions] = useState<{ label: string, value: string }[]>([]);
 
 
 
@@ -96,14 +91,11 @@ export default function ManufacturingPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [openMenuId]);
 
-  // Debounce search
+  // Sync search from URL params
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search);
-      setPage(1);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [search]);
+    setDebouncedSearch(urlSearch);
+    setPage(1);
+  }, [urlSearch]);
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -116,11 +108,6 @@ export default function ManufacturingPage() {
         sortOrder,
       });
 
-      if (selectedSkus.length) params.append('sku', selectedSkus.join(','));
-      if (selectedCreators.length) params.append('createdBy', selectedCreators.join(','));
-      if (dateRange.from) params.append('fromDate', dateRange.from);
-      if (dateRange.to) params.append('toDate', dateRange.to);
-
       const res = await fetch(`/api/manufacturing?${params.toString()}`);
       const data = await res.json();
 
@@ -128,9 +115,6 @@ export default function ManufacturingPage() {
         setOrders(data.orders || []);
         setTotalPages(data.totalPages || 1);
         setTotalOrders(data.total || 0);
-
-        // Local derivation removed - options are now fetched globally on mount
-
       } else {
         setError(data.error || 'Failed to fetch orders');
       }
@@ -139,33 +123,18 @@ export default function ManufacturingPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, debouncedSearch, sortBy, sortOrder, selectedSkus, selectedCreators, dateRange]);
+  }, [page, debouncedSearch, sortBy, sortOrder]);
 
-  // Fetch global filter options on mount
+  // Fetch SKU list for name display
   useEffect(() => {
-    // 1. Fetch SKUs
-    fetch('/api/reports/cogm/skus')
+    fetch('/api/skus?limit=0&ignoreDate=true')
       .then(res => res.json())
       .then(data => {
         if (data.skus) {
-          setSkuList(data.skus);
-          setSkuOptions(data.skus.map((s: any) => ({ label: s.name, value: s._id })));
+          setSkuList(data.skus.map((s: any) => ({ _id: s._id, name: s.name, legacyId: s.legacyId })));
         }
       })
-      .catch(err => console.error("Failed to fetch SKU options", err));
-
-    // 2. Fetch Creators (Users)
-    fetch('/api/users?limit=0')
-      .then(res => {
-          if (!res.ok) throw new Error('Failed to fetch users');
-          return res.json();
-      })
-      .then(data => {
-        if (data.users) {
-          setCreatorOptions(data.users.map((u: any) => ({ label: `${u.firstName} ${u.lastName}`, value: u._id })));
-        }
-      })
-      .catch(err => console.error("Failed to fetch Creator options", err));
+      .catch(err => console.error("Failed to fetch SKU list", err));
   }, []);
 
   useEffect(() => {
@@ -186,69 +155,6 @@ export default function ManufacturingPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-48px)] bg-background transition-colors duration-300">
-      {/* Action Bar */}
-      <div className="flex items-center justify-between px-4 h-11 border-b border-border bg-secondary/50 transition-colors">
-        <div className="flex items-center space-x-4">
-          <h1 className="text-sm font-bold text-foreground uppercase tracking-tighter">Manufacturing</h1>
-          <button
-            onClick={() => router.push('/warehouse/manufacturing/new')}
-            className="h-8 px-3 bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-wider hover:bg-primary/90 transition-colors flex items-center gap-1.5 rounded shadow-sm cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add</span>
-          </button>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search WO# or SKU..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 pr-3 h-8 w-64 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <MultiSelectFilter
-            label="SKU"
-            icon={Factory}
-            options={skuOptions}
-            selectedValues={selectedSkus}
-            onChange={setSelectedSkus}
-            className="h-8"
-          />
-          <MultiSelectFilter
-            label="Creator"
-            icon={User}
-            options={creatorOptions}
-            selectedValues={selectedCreators}
-            onChange={setSelectedCreators}
-            className="h-8"
-          />
-
-          {/* Date Range - Simplified for now */}
-          <div className="flex items-center space-x-1 border border-border bg-card px-2 h-8 rounded">
-            <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-            <input
-              type="date"
-              className="text-[10px] outline-none max-w-[80px] bg-transparent text-foreground"
-              value={dateRange.from}
-              onChange={e => setDateRange({ ...dateRange, from: e.target.value })}
-            />
-            <span className="text-muted-foreground">-</span>
-            <input
-              type="date"
-              className="text-[10px] outline-none max-w-[80px] bg-transparent text-foreground"
-              value={dateRange.to}
-              onChange={e => setDateRange({ ...dateRange, to: e.target.value })}
-            />
-          </div>
-
-
-
-        </div>
-      </div>
 
       <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
         <div className="min-w-full px-2 py-2">
@@ -303,8 +209,9 @@ export default function ManufacturingPage() {
                 <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-medium whitespace-nowrap">
                    <div className="flex items-center space-x-1.5">
                       {(() => {
-                        const skuId = typeof order.sku === 'object' ? order.sku?._id : order.sku;
-                        const skuData = (typeof order.sku === 'object' && (order.sku as any).tier) ? order.sku : skuList.find(s => s._id === skuId);
+                        if (!order.sku) return null;
+                        const skuId = typeof order.sku === 'object' ? (order.sku as any)?._id : order.sku;
+                        const skuData = (typeof order.sku === 'object' && order.sku !== null && (order.sku as any).tier) ? order.sku : skuList.find(s => s._id === skuId);
                         const tier = skuData?.tier;
                         if (!tier) return null;
                         return (
@@ -319,7 +226,7 @@ export default function ManufacturingPage() {
                         );
                       })()}
                       <span className="max-w-[150px] overflow-hidden text-ellipsis">
-                        {typeof order.sku === 'object' ? order.sku?.name : (skuList.find(s => s._id === order.sku)?.name || order.sku)}
+                        {typeof order.sku === 'object' && order.sku !== null ? (order.sku as any)?.name : (skuList.find(s => s._id === order.sku || s.legacyId === order.sku)?.name || order.sku || '-')}
                       </span>
                    </div>
                 </td>
@@ -328,9 +235,10 @@ export default function ManufacturingPage() {
                 <td className="px-2 py-1.5">
                   <span className={cn(
                     "px-1.5 py-0.5 rounded-[2px] text-[8px] font-bold uppercase",
-                    order.status === 'Completed' ? "bg-green-500/10 text-green-500" :
-                      order.status === 'In Progress' ? "bg-blue-500/10 text-blue-500" :
-                        "bg-muted text-muted-foreground"
+                    order.status === 'Fulfilled' ? "bg-green-500/10 text-green-500" :
+                      order.status === 'Processing' ? "bg-blue-500/10 text-blue-500" :
+                        order.status === 'Ready to QC' ? "bg-amber-500/10 text-amber-500" :
+                          "bg-muted text-muted-foreground"
                   )}>
                     {order.status}
                   </span>
