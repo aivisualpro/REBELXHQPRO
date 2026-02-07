@@ -669,12 +669,21 @@ export default function PurchaseOrdersPage() {
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-black text-muted-foreground uppercase tracking-wider">Payment Terms</label>
-                    <input
-                      type="text"
+                    <SearchableSelect
+                      options={[
+                        { label: 'Net 15', value: 'Net 15' },
+                        { label: 'Net 30', value: 'Net 30' },
+                        { label: 'Net 60', value: 'Net 60' },
+                        { label: 'Due on Receipt', value: 'Due on Receipt' },
+                        { label: 'ACH', value: 'ACH' },
+                        { label: 'CC', value: 'CC' },
+                        { label: 'ACH-Already Paid', value: 'ACH-Already Paid' },
+                        { label: 'Credit Card', value: 'Credit Card' }
+                      ]}
                       value={newOrder.paymentTerms}
-                      onChange={e => setNewOrder({ ...newOrder, paymentTerms: e.target.value })}
-                      className="w-full px-3 py-2 border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 bg-background text-foreground"
-                      placeholder="e.g. Net 30"
+                      onChange={(val) => setNewOrder({ ...newOrder, paymentTerms: val })}
+                      placeholder="Select Terms..."
+                      creatable
                     />
                   </div>
                   <div className="space-y-1.5">
