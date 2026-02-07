@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import {
     Phone,
     Mail,
@@ -27,7 +28,8 @@ import {
     Snowflake,
     HeartCrack,
     Search,
-    ListTodo
+    ListTodo,
+    Eye
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -43,7 +45,8 @@ interface Task {
         emails?: { value: string; label: string }[];
     };
     type: string;
-    status: 'Pending' | 'In Progress' | 'Completed' | 'Skipped' | 'Overdue';
+    task?: string;
+    status: 'To Do' | 'In Progress' | 'In Review' | 'Ignored' | 'Completed';
     priority: 'Low' | 'Medium' | 'High' | 'Critical';
     dueDate: string;
     assignedTo?: string;
@@ -54,11 +57,6 @@ interface Task {
     triggerReason?: string;
     createdAt: string;
     completedAt?: string;
-}
-
-interface Stats {
-    byStatus: { _id: string; count: number }[];
-    overdue: number;
 }
 
 interface Client {
@@ -74,11 +72,12 @@ interface Client {
     emails?: { value: string; label: string }[];
 }
 
-type KanbanColumn = 'Pending' | 'In Progress' | 'Completed';
+type KanbanColumn = 'To Do' | 'In Progress' | 'In Review' | 'Completed';
 
 const COLUMNS: { id: KanbanColumn; label: string; color: string; bgColor: string; icon: React.ReactNode }[] = [
-    { id: 'Pending', label: 'TO DO', color: 'text-amber-600', bgColor: 'bg-amber-50 border-amber-200', icon: <Clock className="w-4 h-4" /> },
+    { id: 'To Do', label: 'TO DO', color: 'text-amber-600', bgColor: 'bg-amber-50 border-amber-200', icon: <Clock className="w-4 h-4" /> },
     { id: 'In Progress', label: 'IN PROGRESS', color: 'text-blue-600', bgColor: 'bg-blue-50 border-blue-200', icon: <PlayCircle className="w-4 h-4" /> },
+    { id: 'In Review', label: 'IN REVIEW', color: 'text-purple-600', bgColor: 'bg-purple-50 border-purple-200', icon: <Eye className="w-4 h-4" /> },
     { id: 'Completed', label: 'DONE', color: 'text-emerald-600', bgColor: 'bg-emerald-50 border-emerald-200', icon: <CheckCircle2 className="w-4 h-4" /> },
 ];
 
@@ -99,29 +98,32 @@ const typeIcons: { [key: string]: React.ReactNode } = {
     'Upsell Opportunity': <TrendingUp className="w-3.5 h-3.5" />
 };
 
-function HeaderStatItem({ icon: Icon, value, label, colorClass, gradientClass }: { icon: any, value: string | number, label: string, colorClass: string, gradientClass: string }) {
-    return (
-        <div className="flex items-center space-x-2.5 px-3 py-1 border-r border-slate-100 last:border-0">
-            <div className={cn("w-7 h-7 flex items-center justify-center rounded-lg shadow-sm text-white", gradientClass)}>
-                <Icon className="w-4 h-4" />
-            </div>
-            <div className="flex flex-col">
-                <span className="text-xs font-black text-slate-900 leading-none">{value}</span>
-                <span className={cn("text-[8px] font-bold uppercase tracking-wider", colorClass)}>{label}</span>
-            </div>
-        </div>
-    );
-}
+const TASKS_PER_PAGE = 10;
 
 export default function TasksPage() {
     const router = useRouter();
-    const [tasks, setTasks] = useState<Task[]>([]);
     const [search, setSearch] = useState('');
-    const [stats, setStats] = useState<Stats | null>(null);
-    const [loading, setLoading] = useState(true);
     const [generating, setGenerating] = useState(false);
     const [users, setUsers] = useState<{ _id: string; firstName: string; lastName: string }[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
+
+    // Per-column state
+    const [columnTasks, setColumnTasks] = useState<Record<KanbanColumn, Task[]>>({
+        'To Do': [], 'In Progress': [], 'In Review': [], 'Completed': []
+    });
+    const [columnPages, setColumnPages] = useState<Record<KanbanColumn, number>>({
+        'To Do': 1, 'In Progress': 1, 'In Review': 1, 'Completed': 1
+    });
+    const [columnTotals, setColumnTotals] = useState<Record<KanbanColumn, number>>({
+        'To Do': 0, 'In Progress': 0, 'In Review': 0, 'Completed': 0
+    });
+    const [columnLoading, setColumnLoading] = useState<Record<KanbanColumn, boolean>>({
+        'To Do': false, 'In Progress': false, 'In Review': false, 'Completed': false
+    });
+    const [initialLoading, setInitialLoading] = useState(true);
+
+    // Status counts from aggregation (real totals)
+    const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
 
     // Drag state
     const [draggedTask, setDraggedTask] = useState<Task | null>(null);
@@ -144,46 +146,74 @@ export default function TasksPage() {
         notes: ''
     });
 
-    const inactivityStats = React.useMemo(() => {
-        const now = Date.now();
-        const dayMs = 24 * 60 * 60 * 1000;
-        const relevantClients = clients.filter(c => (c.totalRevenue || 0) >= 100);
-        
-        let i30 = 0, i60 = 0, i90 = 0;
-        relevantClients.forEach(c => {
-            const time = c.lastActivity ? new Date(c.lastActivity).getTime() : 0;
-            const diff = time === 0 ? 999 * dayMs : now - time;
-            const days = Math.floor(diff / dayMs);
-            if (days > 90) i90++;
-            else if (days > 60) i60++;
-            else if (days > 30) i30++;
-        });
-        const total = relevantClients.length;
-        const active = total - i30 - i60 - i90;
-        const rate = total > 0 ? Math.round((active / total) * 100) : 100;
-        return { i30, i60, i90, total, active, rate };
-    }, [clients]);
+    // Header portal
+    const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+    useEffect(() => {
+        const el = document.getElementById('header-portal-target');
+        if (el) setPortalTarget(el);
+    }, []);
+
+    // Fetch tasks for a specific column
+    const fetchColumnTasks = useCallback(async (status: KanbanColumn, page: number, append = false) => {
+        setColumnLoading(prev => ({ ...prev, [status]: true }));
+        try {
+            const params = new URLSearchParams({
+                status,
+                page: String(page),
+                limit: String(TASKS_PER_PAGE),
+                ...(search && { search })
+            });
+            const res = await fetch(`/api/crm/retention?${params}`);
+            const data = await res.json();
+
+            if (data.statusCounts) {
+                setStatusCounts(data.statusCounts);
+            }
+
+            setColumnTasks(prev => {
+                const newTasks = data.tasks || [];
+                if (append) {
+                    const merged = [...prev[status], ...newTasks];
+                    // Deduplicate by _id
+                    const seen = new Set<string>();
+                    const deduped = merged.filter((t: Task) => {
+                        if (seen.has(t._id)) return false;
+                        seen.add(t._id);
+                        return true;
+                    });
+                    return { ...prev, [status]: deduped };
+                }
+                return { ...prev, [status]: newTasks };
+            });
+            setColumnTotals(prev => ({ ...prev, [status]: data.total || 0 }));
+            setColumnPages(prev => ({ ...prev, [status]: page }));
+        } catch (error) {
+            console.error(`Error fetching ${status} tasks:`, error);
+        } finally {
+            setColumnLoading(prev => ({ ...prev, [status]: false }));
+        }
+    }, [search]);
+
+    // Initial load: fetch all columns
+    const fetchAllColumns = useCallback(async () => {
+        setInitialLoading(true);
+        await Promise.all(COLUMNS.map(col => fetchColumnTasks(col.id, 1, false)));
+        setInitialLoading(false);
+    }, [fetchColumnTasks]);
 
     useEffect(() => {
-        fetchTasks();
+        fetchAllColumns();
         fetchUsers();
         fetchClients();
     }, []);
 
-    const fetchTasks = useCallback(async () => {
-        try {
-            setLoading(true);
-            const res = await fetch(`/api/crm/retention?limit=200`);
-            const data = await res.json();
-            setTasks(data.tasks || []);
-            setStats(data.stats || null);
-        } catch (error) {
-            console.error('Error fetching tasks:', error);
-            toast.error('Failed to load tasks');
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+    // Re-fetch when search changes
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            fetchAllColumns();
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [search]);
 
     const fetchUsers = async () => {
         try {
@@ -211,7 +241,7 @@ export default function TasksPage() {
             const res = await fetch('/api/crm/retention/auto-generate', { method: 'POST' });
             const data = await res.json();
             toast.success(`Created ${data.tasksCreated} tasks (${data.tasksAssigned} auto-assigned)`);
-            fetchTasks();
+            fetchAllColumns();
         } catch (error) {
             console.error('Auto-generate error:', error);
             toast.error('Failed to generate tasks');
@@ -227,16 +257,18 @@ export default function TasksPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(updates)
             });
-            if (res.ok) {
-                // Optimistic update
-                setTasks(prev => prev.map(t => t._id === taskId ? { ...t, ...updates } : t));
-                return true;
-            }
+            if (res.ok) return true;
             return false;
         } catch (error) {
             console.error('Update error:', error);
             return false;
         }
+    };
+
+    // Load more for a column
+    const handleLoadMore = (status: KanbanColumn) => {
+        const nextPage = columnPages[status] + 1;
+        fetchColumnTasks(status, nextPage, true);
     };
 
     // Drag & Drop Handlers
@@ -265,11 +297,14 @@ export default function TasksPage() {
             return;
         }
 
-        // Optimistic update
         const previousStatus = draggedTask.status;
-        setTasks(prev => prev.map(t => 
-            t._id === draggedTask._id ? { ...t, status: targetColumn } : t
-        ));
+
+        // Remove from source column, add to target column
+        setColumnTasks(prev => ({
+            ...prev,
+            [previousStatus]: prev[previousStatus as KanbanColumn].filter(t => t._id !== draggedTask._id),
+            [targetColumn]: [{ ...draggedTask, status: targetColumn }, ...prev[targetColumn]]
+        }));
 
         const updates: Partial<Task> = { status: targetColumn };
         if (targetColumn === 'Completed') {
@@ -280,12 +315,17 @@ export default function TasksPage() {
         
         if (!success) {
             // Revert on failure
-            setTasks(prev => prev.map(t => 
-                t._id === draggedTask._id ? { ...t, status: previousStatus } : t
-            ));
+            setColumnTasks(prev => ({
+                ...prev,
+                [previousStatus]: [{ ...draggedTask, status: previousStatus as any }, ...prev[previousStatus as KanbanColumn]],
+                [targetColumn]: prev[targetColumn].filter(t => t._id !== draggedTask._id)
+            }));
             toast.error('Failed to move task');
         } else {
             toast.success(`Task moved to ${targetColumn}`);
+            // Refresh counts
+            fetchColumnTasks(previousStatus as KanbanColumn, 1, false);
+            fetchColumnTasks(targetColumn, 1, false);
         }
 
         setDraggedTask(null);
@@ -308,7 +348,7 @@ export default function TasksPage() {
             setIsModalOpen(false);
             setSelectedTask(null);
             setOutcomeText('');
-            fetchTasks();
+            fetchAllColumns();
         } else {
             toast.error('Failed to complete task');
         }
@@ -335,7 +375,7 @@ export default function TasksPage() {
                     assignedTo: '',
                     notes: ''
                 });
-                fetchTasks();
+                fetchAllColumns();
             } else {
                 toast.error('Failed to create task');
             }
@@ -352,31 +392,10 @@ export default function TasksPage() {
         setIsModalOpen(true);
     };
 
-    const getColumnTasks = (status: KanbanColumn) => {
-        const filtered = search 
-            ? tasks.filter(t => t.clientInfo?.name?.toLowerCase().includes(search.toLowerCase()))
-            : tasks;
-
-        // Include Overdue in Pending column
-        if (status === 'Pending') {
-            return filtered.filter(t => t.status === 'Pending' || t.status === 'Overdue');
-        }
-        return filtered.filter(t => t.status === status);
-    };
-
-    const getStatusCount = (status: string) => {
-        const filtered = search 
-            ? tasks.filter(t => t.clientInfo?.name?.toLowerCase().includes(search.toLowerCase()))
-            : tasks;
-
-        if (status === 'Pending') {
-            return filtered.filter(t => t.status === 'Pending' || t.status === 'Overdue').length;
-        }
-        return filtered.filter(t => t.status === status).length;
-    };
-
     const formatDate = (dateStr: string) => {
+        if (!dateStr) return 'No date';
         const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return 'Invalid Date';
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const taskDate = new Date(dateStr);
@@ -391,159 +410,191 @@ export default function TasksPage() {
     };
 
     const isOverdue = (task: Task) => {
-        return task.status === 'Overdue' || (new Date(task.dueDate) < new Date(new Date().setHours(0, 0, 0, 0)) && task.status !== 'Completed' && task.status !== 'Skipped');
+        return (task.dueDate && new Date(task.dueDate) < new Date(new Date().setHours(0, 0, 0, 0)) && task.status !== 'Completed' && task.status !== 'Ignored');
     };
 
-    return (
-        <div className="flex flex-col h-[calc(100vh-48px)] bg-background transition-colors duration-300 overflow-hidden">
-            {/* Header / Action Bar */}
-            <div className="flex items-center justify-between px-4 h-11 border-b border-border bg-secondary/50 sticky top-0 z-20 gap-4 transition-colors">
-                
-                {/* Left: Search */}
-                <div className="flex items-center space-x-6">
-                    <div className="relative group">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                        <input 
-                            type="text" 
-                            placeholder="Search tasks by client..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="pl-9 pr-4 h-8 w-64 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
-                        />
-                    </div>
-                </div>
+    const getColumnCount = (columnId: KanbanColumn) => {
+        return statusCounts[columnId] || 0;
+    };
 
-                <div className="flex items-center space-x-2">
-                    <button
-                        onClick={handleAutoGenerate}
-                        disabled={generating}
-                        className="flex items-center space-x-1.5 px-3 h-8 text-[11px] font-bold text-primary-foreground bg-primary border border-primary/20 rounded hover:opacity-90 transition-all uppercase tracking-wide disabled:opacity-50 shadow-sm cursor-pointer"
-                    >
-                        {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
-                        <span>Auto-Generate</span>
-                    </button>
-                    
-                    <button
-                        onClick={() => setIsNewTaskModalOpen(true)}
-                        className="flex items-center justify-center h-8 px-4 bg-card border border-border text-foreground text-[11px] font-bold uppercase hover:bg-secondary rounded shadow-sm transition-all cursor-pointer"
-                    >
-                        <Plus className="w-3.5 h-3.5 mr-1.5" />
-                        <span>New Task</span>
-                    </button>
+    // Header Portal Content
+    const headerContent = (
+        <div className="flex items-center justify-between w-full h-full px-4">
+            <div className="flex items-center space-x-4">
+                <h1 className="text-sm font-bold text-foreground uppercase tracking-tight">Tasks</h1>
+                <div className="relative group">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                    <input 
+                        type="text" 
+                        placeholder="Search by client..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="pl-8 pr-4 h-7 w-52 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
+                    />
                 </div>
             </div>
 
+            <div className="flex items-center space-x-2">
+                <button
+                    onClick={handleAutoGenerate}
+                    disabled={generating}
+                    className="flex items-center space-x-1.5 px-3 h-7 text-[10px] font-bold text-primary-foreground bg-primary border border-primary/20 rounded hover:opacity-90 transition-all uppercase tracking-wide disabled:opacity-50 shadow-sm cursor-pointer"
+                >
+                    {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+                    <span>Auto-Generate</span>
+                </button>
+                
+                <button
+                    onClick={() => setIsNewTaskModalOpen(true)}
+                    className="flex items-center justify-center h-7 w-7 bg-card border border-border text-foreground hover:bg-secondary rounded shadow-sm transition-all cursor-pointer"
+                    title="New Task"
+                >
+                    <Plus className="w-4 h-4" />
+                </button>
+            </div>
+        </div>
+    );
+
+    return (
+        <div className="flex flex-col h-[calc(100vh-48px)] bg-background transition-colors duration-300 overflow-hidden">
+            {/* Portal header actions */}
+            {portalTarget && ReactDOM.createPortal(headerContent, portalTarget)}
+
             <div className="flex-1 overflow-x-auto p-1">
-                {loading ? (
+                {initialLoading ? (
                     <div className="flex items-center justify-center h-full">
                         <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
                     </div>
                 ) : (
                     <div className="flex space-x-4 h-full min-w-max">
-                        {COLUMNS.map((column) => (
-                            <div
-                                key={column.id}
-                                className={cn(
-                                    "flex flex-col w-[360px] bg-secondary/30 border border-border shadow-sm h-full transition-all rounded-lg overflow-hidden",
-                                    dragOverColumn === column.id && "ring-2 ring-primary ring-offset-2"
-                                )}
-                                onDragOver={(e) => handleDragOver(e, column.id)}
-                                onDragLeave={handleDragLeave}
-                                onDrop={(e) => handleDrop(e, column.id)}
-                            >
-                                {/* Column Header */}
-                                <div className={cn("px-4 py-3 border-b border-border flex items-center justify-between shrink-0 bg-background/50")}>
-                                    <div className="flex items-center space-x-2">
-                                        <span className={column.color}>{column.icon}</span>
-                                        <span className={cn("text-xs font-black uppercase tracking-wider text-foreground")}>{column.label}</span>
-                                    </div>
-                                    <span className={cn("text-sm font-black text-muted-foreground/50")}>{getStatusCount(column.id)}</span>
-                                </div>
+                        {COLUMNS.map((column) => {
+                            const tasks = columnTasks[column.id];
+                            const total = getColumnCount(column.id);
+                            const hasMore = tasks.length < columnTotals[column.id];
+                            const isLoading = columnLoading[column.id];
 
-                                {/* Column Content */}
-                                <div className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-custom">
-                                    {getColumnTasks(column.id).length === 0 ? (
-                                        <div className="flex flex-col items-center justify-center py-8 text-slate-400">
-                                            <div className="w-12 h-12 bg-slate-100 flex items-center justify-center mb-2">
-                                                {column.icon}
-                                            </div>
-                                            <p className="text-[10px] font-bold uppercase">No tasks</p>
-                                        </div>
-                                    ) : (
-                                        getColumnTasks(column.id).map((task) => (
-                                            <div
-                                                key={task._id}
-                                                draggable
-                                                onDragStart={(e) => handleDragStart(e, task)}
-                                                onDragEnd={handleDragEnd}
-                                                onClick={() => openTaskModal(task)}
-                                                className={cn(
-                                                    "bg-background border border-border border-l-4 p-3 cursor-grab active:cursor-grabbing hover:shadow-lg transition-all group rounded hover:scale-[1.02] transform transition-transform duration-200",
-                                                    priorityColors[task.priority],
-                                                    draggedTask?._id === task._id && "opacity-50 scale-95",
-                                                    isOverdue(task) && "bg-destructive/5"
-                                                )}
-                                            >
-                                                {/* Task Header */}
-                                                <div className="flex items-start justify-between mb-2">
-                                                    <div className="flex items-center space-x-2">
-                                                        <div className={cn(
-                                                            "w-6 h-6 flex items-center justify-center",
-                                                            task.priority === 'Critical' ? "bg-red-100 text-red-600" :
-                                                            task.priority === 'High' ? "bg-orange-100 text-orange-600" :
-                                                            task.priority === 'Medium' ? "bg-blue-100 text-blue-600" :
-                                                            "bg-slate-100 text-slate-600"
-                                                        )}>
-                                                            {typeIcons[task.type] || <Target className="w-3 h-3" />}
-                                                        </div>
-                                                        <span className="text-[10px] font-bold text-slate-600 uppercase">{task.type}</span>
-                                                    </div>
-                                                    <GripVertical className="w-4 h-4 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                </div>
-
-                                                {/* Client Name */}
-                                                <div className="text-sm font-bold text-foreground mb-2 truncate">
-                                                    {task.clientInfo?.name || 'Unknown Client'}
-                                                </div>
-
-                                                {/* Notes Preview */}
-                                                {task.notes && (
-                                                    <p className="text-[10px] text-slate-500 line-clamp-2 mb-2">{task.notes}</p>
-                                                )}
-
-                                                {/* Auto-generated badge */}
-                                                {task.autoGenerated && (
-                                                    <div className="flex items-center space-x-1 mb-2">
-                                                        <Zap className="w-2.5 h-2.5 text-orange-500" />
-                                                        <span className="text-[9px] font-bold text-orange-600 uppercase">{task.triggerReason}</span>
-                                                    </div>
-                                                )}
-
-                                                {/* Footer */}
-                                                <div className="flex items-center justify-between pt-2 border-t border-border">
-                                                    <div className="flex items-center space-x-1">
-                                                        <Calendar className="w-3 h-3 text-slate-400" />
-                                                        <span className={cn(
-                                                            "text-[10px] font-bold",
-                                                            isOverdue(task) ? "text-red-600" : "text-slate-500"
-                                                        )}>
-                                                            {formatDate(task.dueDate)}
-                                                        </span>
-                                                    </div>
-                                                    {task.assignedToInfo && (
-                                                        <div className="flex items-center space-x-1">
-                                                            <div className="w-5 h-5 bg-slate-200 flex items-center justify-center text-[8px] font-black text-slate-600">
-                                                                {task.assignedToInfo.firstName?.charAt(0)}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))
+                            return (
+                                <div
+                                    key={column.id}
+                                    className={cn(
+                                        "flex flex-col w-[360px] bg-secondary/30 border border-border shadow-sm h-full transition-all rounded-lg overflow-hidden",
+                                        dragOverColumn === column.id && "ring-2 ring-primary ring-offset-2"
                                     )}
+                                    onDragOver={(e) => handleDragOver(e, column.id)}
+                                    onDragLeave={handleDragLeave}
+                                    onDrop={(e) => handleDrop(e, column.id)}
+                                >
+                                    {/* Column Header */}
+                                    <div className={cn("px-4 py-3 border-b border-border flex items-center justify-between shrink-0 bg-background/50")}>
+                                        <div className="flex items-center space-x-2">
+                                            <span className={column.color}>{column.icon}</span>
+                                            <span className={cn("text-xs font-black uppercase tracking-wider text-foreground")}>{column.label}</span>
+                                        </div>
+                                        <span className={cn("text-sm font-black text-muted-foreground/50")}>{total}</span>
+                                    </div>
+
+                                    {/* Column Content */}
+                                    <div className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-custom">
+                                        {tasks.length === 0 && !isLoading ? (
+                                            <div className="flex flex-col items-center justify-center py-8 text-slate-400">
+                                                <div className="w-12 h-12 bg-slate-100 flex items-center justify-center mb-2">
+                                                    {column.icon}
+                                                </div>
+                                                <p className="text-[10px] font-bold uppercase">No tasks</p>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                {tasks.map((task) => (
+                                                    <div
+                                                        key={task._id}
+                                                        draggable
+                                                        onDragStart={(e) => handleDragStart(e, task)}
+                                                        onDragEnd={handleDragEnd}
+                                                        onClick={() => openTaskModal(task)}
+                                                        className={cn(
+                                                            "bg-background border border-border border-l-4 p-3 cursor-grab active:cursor-grabbing hover:shadow-lg transition-all group rounded hover:scale-[1.02] transform transition-transform duration-200",
+                                                            priorityColors[task.priority],
+                                                            draggedTask?._id === task._id && "opacity-50 scale-95",
+                                                            isOverdue(task) && "bg-destructive/5"
+                                                        )}
+                                                    >
+                                                        {/* Task Header */}
+                                                        <div className="flex items-start justify-between mb-2">
+                                                            <div className="flex items-center space-x-2">
+                                                                <div className={cn(
+                                                                    "w-6 h-6 flex items-center justify-center",
+                                                                    task.priority === 'Critical' ? "bg-red-100 text-red-600" :
+                                                                    task.priority === 'High' ? "bg-orange-100 text-orange-600" :
+                                                                    task.priority === 'Medium' ? "bg-blue-100 text-blue-600" :
+                                                                    "bg-slate-100 text-slate-600"
+                                                                )}>
+                                                                    {typeIcons[task.type] || <Target className="w-3 h-3" />}
+                                                                </div>
+                                                                <span className="text-[10px] font-bold text-slate-600 uppercase">{task.type}</span>
+                                                            </div>
+                                                            <GripVertical className="w-4 h-4 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                        </div>
+
+                                                        {/* Client Name */}
+                                                        <div className="text-sm font-bold text-foreground mb-2 truncate">
+                                                            {task.clientInfo?.name || 'Unknown Client'}
+                                                        </div>
+
+                                                        {/* Notes Preview */}
+                                                        {task.notes && (
+                                                            <p className="text-[10px] text-slate-500 line-clamp-2 mb-2">{task.notes}</p>
+                                                        )}
+
+                                                        {/* Auto-generated badge */}
+                                                        {task.autoGenerated && (
+                                                            <div className="flex items-center space-x-1 mb-2">
+                                                                <Zap className="w-2.5 h-2.5 text-orange-500" />
+                                                                <span className="text-[9px] font-bold text-orange-600 uppercase">{task.triggerReason}</span>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Footer */}
+                                                        <div className="flex items-center justify-between pt-2 border-t border-border">
+                                                            <div className="flex items-center space-x-1">
+                                                                <Calendar className="w-3 h-3 text-slate-400" />
+                                                                <span className={cn(
+                                                                    "text-[10px] font-bold",
+                                                                    isOverdue(task) ? "text-red-600" : "text-slate-500"
+                                                                )}>
+                                                                    {formatDate(task.dueDate)}
+                                                                </span>
+                                                            </div>
+                                                            {task.assignedToInfo && (
+                                                                <div className="flex items-center space-x-1">
+                                                                    <div className="w-5 h-5 bg-slate-200 flex items-center justify-center text-[8px] font-black text-slate-600">
+                                                                        {task.assignedToInfo.firstName?.charAt(0)}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+
+                                                {/* Load More Button */}
+                                                {hasMore && (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleLoadMore(column.id); }}
+                                                        disabled={isLoading}
+                                                        className="w-full py-2 text-[10px] font-bold uppercase text-muted-foreground hover:text-foreground hover:bg-secondary/50 border border-dashed border-border rounded transition-all cursor-pointer"
+                                                    >
+                                                        {isLoading ? (
+                                                            <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" />
+                                                        ) : (
+                                                            `Load More (${tasks.length}/${columnTotals[column.id]})`
+                                                        )}
+                                                    </button>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>
@@ -629,7 +680,7 @@ export default function TasksPage() {
                                         "font-bold uppercase px-2 py-0.5",
                                         selectedTask.status === 'Completed' ? "bg-emerald-100 text-emerald-700" :
                                         selectedTask.status === 'In Progress' ? "bg-blue-100 text-blue-700" :
-                                        selectedTask.status === 'Overdue' ? "bg-red-100 text-red-700" :
+                                        selectedTask.status === 'In Review' ? "bg-purple-100 text-purple-700" :
                                         "bg-amber-100 text-amber-700"
                                     )}>
                                         {selectedTask.status}
@@ -638,7 +689,7 @@ export default function TasksPage() {
                                 <div>
                                     <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Due Date</div>
                                     <span className={cn("font-bold", isOverdue(selectedTask) ? "text-red-600" : "text-slate-700")}>
-                                        {new Date(selectedTask.dueDate).toLocaleDateString()}
+                                        {selectedTask.dueDate ? new Date(selectedTask.dueDate).toLocaleDateString() : 'No date'}
                                     </span>
                                 </div>
                             </div>
@@ -677,12 +728,12 @@ export default function TasksPage() {
                             <div className="flex items-center space-x-2">
                                 {selectedTask.status !== 'Completed' && (
                                     <>
-                                        {selectedTask.status === 'Pending' && (
+                                        {selectedTask.status === 'To Do' && (
                                             <button
                                                 onClick={async () => {
                                                     await handleUpdateTask(selectedTask._id, { status: 'In Progress' });
                                                     setIsModalOpen(false);
-                                                    fetchTasks();
+                                                    fetchAllColumns();
                                                 }}
                                                 className="flex items-center space-x-1 px-3 py-2 bg-blue-600 text-white text-xs font-bold uppercase hover:bg-blue-700"
                                             >
@@ -692,14 +743,14 @@ export default function TasksPage() {
                                         )}
                                         <button
                                             onClick={async () => {
-                                                await handleUpdateTask(selectedTask._id, { status: 'Skipped' });
+                                                await handleUpdateTask(selectedTask._id, { status: 'Ignored' });
                                                 setIsModalOpen(false);
-                                                fetchTasks();
+                                                fetchAllColumns();
                                             }}
                                             className="flex items-center space-x-1 px-3 py-2 text-slate-500 hover:bg-slate-100 text-xs font-bold uppercase"
                                         >
                                             <SkipForward className="w-3.5 h-3.5" />
-                                            <span>Skip</span>
+                                            <span>Ignore</span>
                                         </button>
                                     </>
                                 )}

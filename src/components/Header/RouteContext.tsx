@@ -135,6 +135,15 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
         };
     }
 
+    // Tasks
+    if (pathname === '/crm/tasks') {
+        return {
+            title: '',
+            actions: [],
+            isPortal: true
+        };
+    }
+
     // Default: No context
     return null;
 };

@@ -160,7 +160,7 @@ export async function POST(request: NextRequest) {
 
         // Get existing pending/in-progress tasks to avoid duplicates
         const existingTasks = await RetentionTask.find({
-            status: { $in: ['Pending', 'In Progress'] }
+            status: { $in: ['To Do', 'In Progress', 'In Review'] }
         }, 'client triggerReason').lean();
 
         const existingTaskSet = new Set(
@@ -269,10 +269,10 @@ export async function POST(request: NextRequest) {
         // Update overdue tasks
         const overdueResult = await RetentionTask.updateMany(
             { 
-                status: { $in: ['Pending', 'In Progress'] },
+                status: { $in: ['To Do', 'In Progress', 'In Review'] },
                 dueDate: { $lt: new Date() }
             },
-            { $set: { status: 'Overdue' } }
+            { $set: { updatedAt: new Date() } }
         );
 
         return NextResponse.json({
