@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Search,
   Upload,
@@ -14,7 +14,8 @@ import {
   Trash2,
   X,
   Pencil,
-  AlertCircle
+  AlertCircle,
+  Eye
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { cn } from '@/lib/utils';
@@ -74,18 +75,21 @@ const UOM_OPTIONS = [
   { label: 'Gal', value: 'Gal' }
 ];
 
-export default function PurchaseOrdersPage() {
+function PurchaseOrdersContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalOrders, setTotalOrders] = useState(0);
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  // Search from URL params (main header)
+  const search = searchParams.get('search') || '';
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
 
   // Filters
   const [selectedVendors, setSelectedVendors] = useState<string[]>([]);
@@ -120,7 +124,7 @@ export default function PurchaseOrdersPage() {
   const poInputRef = useRef<HTMLInputElement>(null);
   const liInputRef = useRef<HTMLInputElement>(null);
 
-  // Debounce search
+  // Debounce search from URL
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
@@ -128,6 +132,15 @@ export default function PurchaseOrdersPage() {
     }, 500);
     return () => clearTimeout(timer);
   }, [search]);
+
+  // Open create modal from URL param (?createNew=true)
+  useEffect(() => {
+    if (searchParams.get('createNew') === 'true') {
+      openCreateModal();
+      // Clear the param from URL
+      router.replace('/warehouse/purchase-orders', { scroll: false });
+    }
+  }, [searchParams]);
 
   // Fetch active vendors and Skus for Filters and Create Modal
   useEffect(() => {
@@ -427,100 +440,6 @@ export default function PurchaseOrdersPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-48px)] bg-background transition-colors duration-300 relative">
-      <div className="flex items-center justify-between px-4 h-11 border-b border-border bg-secondary/50">
-        <div className="flex items-center space-x-4">
-          <h1 className="text-sm font-bold text-foreground uppercase tracking-tighter shrink-0">Purchase Orders</h1>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search PO# or Vendor..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 pr-3 h-8 w-64 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <MultiSelectFilter
-            label="Vendor"
-            icon={Building2}
-            options={vendorOptions}
-            selectedValues={selectedVendors}
-            onChange={setSelectedVendors}
-            className="h-8"
-          />
-          <MultiSelectFilter
-            label="Status"
-            icon={ShoppingCart}
-            options={statusOptions}
-            selectedValues={selectedStatuses}
-            onChange={setSelectedStatuses}
-            className="h-8"
-          />
-
-          <div className="flex items-center space-x-1 border border-border bg-background px-3 h-8 rounded">
-            <Calendar className="w-3 h-3 text-muted-foreground" />
-            <input
-              type="date"
-              className="text-[10px] outline-none max-w-[80px] bg-transparent text-foreground"
-              value={dateRange.from}
-              onChange={e => setDateRange({ ...dateRange, from: e.target.value })}
-            />
-            <span className="text-muted-foreground/30">-</span>
-            <input
-              type="date"
-              className="text-[10px] outline-none max-w-[80px] bg-transparent text-foreground"
-              value={dateRange.to}
-              onChange={e => setDateRange({ ...dateRange, to: e.target.value })}
-            />
-          </div>
-
-          <div className="w-px h-6 bg-border mx-2" />
-
-          <input
-            type="file"
-            accept=".csv"
-            className="hidden"
-            ref={poInputRef}
-            onChange={(e) => handleImport(e, '/api/purchase-orders/import', 'PO Data')}
-          />
-          <input
-            type="file"
-            accept=".csv"
-            className="hidden"
-            ref={liInputRef}
-            onChange={(e) => handleImport(e, '/api/purchase-orders/import-lineitems', 'Line Items')}
-          />
-
-          <button
-            onClick={() => poInputRef.current?.click()}
-            className="h-8 px-3 border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors rounded flex items-center space-x-1.5 bg-card shadow-sm cursor-pointer"
-            title="Import Purchase Orders"
-          >
-            <Upload className="w-3.5 h-3.5" />
-            <span className="text-[10px] font-bold uppercase tracking-wider">Import PO</span>
-          </button>
-
-          <button
-            onClick={() => liInputRef.current?.click()}
-            className="h-8 px-3 border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors rounded flex items-center space-x-1.5 bg-card shadow-sm cursor-pointer"
-            title="Import Line Items"
-          >
-            <Upload className="w-3.5 h-3.5" />
-            <span className="text-[10px] font-bold uppercase tracking-wider">Import Line Items</span>
-          </button>
-
-          <button
-            onClick={openCreateModal}
-            className="h-8 w-8 bg-primary text-black hover:opacity-90 transition-all shadow-md flex items-center justify-center rounded cursor-pointer"
-            title="Add PO"
-          >
-            <Plus className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
 
       <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
         <div className="min-w-full px-2 py-2">
@@ -563,8 +482,7 @@ export default function PurchaseOrdersPage() {
             ) : orders.map(order => (
               <tr
                 key={order._id}
-                className="hover:bg-secondary/40 hover:scale-[1.002] hover:shadow-md transition-all duration-200 group relative z-0 hover:z-10 bg-background cursor-pointer"
-                onClick={() => router.push(`/warehouse/purchase-orders/${order._id}`)}
+                className="hover:bg-secondary/40 transition-all duration-200 group relative z-0 hover:z-10 bg-background"
               >
                 <td className="px-4 py-2 text-[11px] font-bold text-foreground tracking-tight border-r border-border">{order.label || '-'}</td>
                 <td className="px-4 py-2 text-[11px] text-foreground font-medium border-r border-border">{renderVendor(order)}</td>
@@ -595,15 +513,22 @@ export default function PurchaseOrdersPage() {
                 <td className="px-4 py-2 text-right">
                   <div className="flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
+                      onClick={() => router.push(`/warehouse/purchase-orders/${order._id}`)}
+                      className="p-1 text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10 rounded transition-colors cursor-pointer"
+                      title="View Order"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                    </button>
+                    <button
                       onClick={(e) => handleEditClick(e, order)}
-                      className="p-1 text-muted-foreground hover:text-foreground hover:bg-secondary rounded transition-colors relative z-20"
+                      className="p-1 text-muted-foreground hover:text-foreground hover:bg-secondary rounded transition-colors cursor-pointer"
                       title="Edit Order"
                     >
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={(e) => handleDeleteClick(e, order._id)}
-                      className="p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors relative z-20"
+                      className="p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors cursor-pointer"
                       title="Delete Order"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -840,5 +765,13 @@ export default function PurchaseOrdersPage() {
         />
       </div>
     </div>
+  );
+}
+
+export default function PurchaseOrdersPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-sm text-muted-foreground">Loading...</div>}>
+      <PurchaseOrdersContent />
+    </Suspense>
   );
 }

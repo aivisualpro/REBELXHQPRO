@@ -30,10 +30,22 @@ export async function GET(request: Request) {
         let query: any = {};
 
         if (search) {
+            // Find vendors whose name matches the search term
+            const matchingVendors = await Vendor.find(
+                { name: { $regex: search, $options: 'i' } },
+                { _id: 1 }
+            ).lean();
+            const matchingVendorIds = matchingVendors.map((v: any) => v._id);
+
             query.$or = [
                 { label: { $regex: search, $options: 'i' } },
-                // removed vendor regex search as it is now a reference
-                { '_id': { $regex: search, $options: 'i' } }
+                { _id: { $regex: search, $options: 'i' } },
+                { legacyId: { $regex: search, $options: 'i' } },
+                { paymentTerms: { $regex: search, $options: 'i' } },
+                { status: { $regex: search, $options: 'i' } },
+                { 'lineItems.lotNumber': { $regex: search, $options: 'i' } },
+                { 'lineItems.uom': { $regex: search, $options: 'i' } },
+                ...(matchingVendorIds.length > 0 ? [{ vendor: { $in: matchingVendorIds } }] : [])
             ];
         }
 

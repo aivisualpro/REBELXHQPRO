@@ -33,13 +33,13 @@ export const Header = () => {
                     <MegaMenu />
                 </div>
 
-                {/* Route Context: 30% - Dynamic title + route-specific actions */}
-                <div className="w-[30%] h-full flex items-center">
+                {/* Route Context: 25% - Dynamic title + route-specific actions */}
+                <div className="w-[25%] h-full flex items-center">
                     <RouteContext />
                 </div>
 
-                {/* Right: 15% Actions - Global actions */}
-                <div className="w-[15%] flex items-center justify-end">
+                {/* Right: 20% Actions - Global actions */}
+                <div className="w-[20%] flex items-center justify-end">
                     <DynamicActions />
                     <MobileMenu />
                 </div>

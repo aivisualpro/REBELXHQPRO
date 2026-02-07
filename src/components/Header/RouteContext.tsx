@@ -90,7 +90,7 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
         return {
             title: 'Purchase Orders',
             actions: [
-                { label: 'Add', icon: Plus, variant: 'primary' },
+                { label: 'Add', icon: Plus, href: '/warehouse/purchase-orders?createNew=true', variant: 'primary' },
             ]
         };
     }
