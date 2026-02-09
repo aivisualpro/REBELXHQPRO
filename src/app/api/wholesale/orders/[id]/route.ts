@@ -8,7 +8,7 @@ import PurchaseOrder from '@/models/PurchaseOrder';
 import Manufacturing from '@/models/Manufacturing';
 import AuditAdjustment from '@/models/AuditAdjustment';
 import Client from '@/models/Client';
-import { deleteOrderFromAppSheet } from '@/lib/appsheet';
+import { deleteOrderFromAppSheet, syncPaymentToAppSheet } from '@/lib/appsheet';
 
 
 export const dynamic = 'force-dynamic';
@@ -215,11 +215,32 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         const { id } = await context.params;
         const body = await request.json();
 
+        // Capture existing payments before update (for detecting new ones)
+        let existingPaymentIds: string[] = [];
+        if (body.payments && Array.isArray(body.payments)) {
+            const existingOrder = await SaleOrder.findById(id).select('payments label').lean();
+            if (existingOrder?.payments) {
+                existingPaymentIds = existingOrder.payments.map((p: any) => p._id?.toString());
+            }
+        }
+
         if (body.lineItems && Array.isArray(body.lineItems)) {
             body.lineItems = body.lineItems.map((item: any) => ({
                 ...item,
                 total: (item.qtyShipped || 0) * (item.price || 0)
             }));
+        }
+
+        // For payments, strip out client-generated string _ids for new entries
+        if (body.payments && Array.isArray(body.payments)) {
+            body.payments = body.payments.map((p: any) => {
+                // If _id looks like a timestamp string (not a valid ObjectId), remove it so Mongo generates a real one
+                if (p._id && typeof p._id === 'string' && !/^[0-9a-fA-F]{24}$/.test(p._id)) {
+                    const { _id, ...rest } = p;
+                    return rest;
+                }
+                return p;
+            });
         }
 
         const updatedOrder = await SaleOrder.findByIdAndUpdate(
@@ -237,6 +258,28 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
 
         if (updatedOrder.lineItems && Array.isArray(updatedOrder.lineItems)) {
             updatedOrder.lineItems = await enrichLineItemsWithCost(updatedOrder.lineItems);
+        }
+
+        // Sync new payments to AppSheet in background
+        if (body.payments && Array.isArray(updatedOrder.payments)) {
+            const newPayments = updatedOrder.payments.filter(
+                (p: any) => !existingPaymentIds.includes(p._id?.toString())
+            );
+            if (newPayments.length > 0) {
+                after(async () => {
+                    try {
+                        for (const payment of newPayments) {
+                            await syncPaymentToAppSheet(
+                                updatedOrder.label || updatedOrder.legacyId || updatedOrder._id?.toString(),
+                                payment,
+                                'Add'
+                            );
+                        }
+                    } catch (err) {
+                        console.error('Background AppSheet payment sync failed:', err);
+                    }
+                });
+            }
         }
 
         return NextResponse.json(updatedOrder);

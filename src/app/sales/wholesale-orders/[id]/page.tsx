@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
-import { ArrowLeft, Package, Calendar, CreditCard, Truck, Plus, X, Trash2, Pencil, User, MapPin, DollarSign, List, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Calendar, CreditCard, Truck, Plus, X, Trash2, Pencil, User, MapPin, DollarSign, List, RefreshCw } from 'lucide-react';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -214,7 +214,7 @@ export default function SaleOrderDetailPage() {
           case 'Pending Payment': return "bg-amber-500/15 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 border-amber-500/30";
           case 'Shipping': return "bg-violet-500/15 text-violet-600 dark:bg-violet-500/20 dark:text-violet-400 border-violet-500/30";
           case 'Picking': return "bg-cyan-500/15 text-cyan-600 dark:bg-cyan-500/20 dark:text-cyan-400 border-cyan-500/30";
-          default: return "bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700";
+          default: return "bg-secondary text-muted-foreground border-border";
       }
   };
 
@@ -475,35 +475,34 @@ export default function SaleOrderDetailPage() {
 
   if (loading) {
       return (
-          <div className="flex items-center justify-center h-[calc(100vh-48px)] bg-white">
-              <div className="text-sm text-slate-400">Loading...</div>
+          <div className="flex items-center justify-center h-[calc(100vh-48px)] bg-background">
+              <div className="text-sm text-muted-foreground">Loading...</div>
           </div>
       );
   }
 
   if (!order) {
       return (
-          <div className="flex items-center justify-center h-[calc(100vh-48px)] bg-white">
-              <div className="text-sm text-slate-400">Order not found</div>
+          <div className="flex items-center justify-center h-[calc(100vh-48px)] bg-background">
+              <div className="text-sm text-muted-foreground">Order not found</div>
           </div>
       );
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-48px)] bg-white relative">
+    <div className="flex flex-col h-[calc(100vh-48px)] bg-background relative">
         {/* Header Portal Content */}
         {headerPortal && order && createPortal(
             <>
-                {/* Title */}
+                {/* Actions - Back, Edit, Delete */}
                 <div className="flex items-center space-x-2">
-                     <span className="text-slate-400 font-medium">/</span>
-                     <h1 className="text-sm font-bold text-foreground uppercase tracking-tight">
-                        Order #{order.label || order._id}
-                    </h1>
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center space-x-2">
+                    <button 
+                        onClick={() => router.back()} 
+                        className="flex items-center space-x-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded transition-all cursor-pointer border border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
+                    >
+                        <ArrowLeft className="w-3.5 h-3.5" />
+                        <span>Back</span>
+                    </button>
                     <button 
                         onClick={() => {
                             setEditingHeader({
@@ -549,17 +548,10 @@ export default function SaleOrderDetailPage() {
                             }
                         }}
                         disabled={isDeleting}
-                        className="flex items-center space-x-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded transition-all cursor-pointer border border-red-300 text-red-600 hover:text-white hover:bg-red-600 disabled:opacity-50"
+                        className="flex items-center space-x-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded transition-all cursor-pointer border border-red-500/30 text-red-500 hover:text-white hover:bg-red-600 disabled:opacity-50"
                     >
                         <Trash2 className="w-3.5 h-3.5" />
                         <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
-                    </button>
-                    <button 
-                        onClick={() => router.back()} 
-                        className="flex items-center space-x-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded transition-all cursor-pointer border border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
-                    >
-                        <ArrowLeft className="w-3.5 h-3.5" />
-                        <span>Back</span>
                     </button>
                 </div>
             </>,
@@ -570,121 +562,133 @@ export default function SaleOrderDetailPage() {
 
         <div className="flex flex-1 overflow-hidden">
             {/* Left Sidebar: Details (30%) */}
-            <div className="w-[30%] border-r border-slate-200 bg-slate-50/30 overflow-y-auto p-6 space-y-6">
-                {/* Status Chip */}
-                <div className="flex items-center gap-2">
-                    <select
-                        value={order.orderStatus}
-                        onChange={(e) => handleStatusChange(e.target.value)}
-                        className={cn(
-                            "px-2 py-1 text-[9px] font-black uppercase tracking-widest border rounded-none cursor-pointer outline-none appearance-none",
-                            getStatusColor(order.orderStatus)
-                        )}
-                    >
-                        <option value="Completed">Completed</option>
-                        <option value="Issued">Issued</option>
-                        <option value="Pending Payment">Pending Payment</option>
-                        <option value="Shipping">Shipping</option>
-                        <option value="Picking">Picking</option>
-                    </select>
+            <div className="w-[30%] border-r border-border bg-secondary/30 overflow-y-auto p-4 space-y-4">
+                {/* Identity Boxes */}
+                <div className="grid grid-cols-3 gap-2">
+                    <div className="border border-border rounded-md p-3 bg-background text-center">
+                        <div className="text-[11px] font-bold text-foreground">#{order.label}</div>
+                    </div>
+                    <div className="border border-border rounded-md p-3 bg-background text-center">
+                        <div className="text-[11px] font-bold text-foreground truncate">{renderClient(order.clientId)}</div>
+                    </div>
+                    <div className="border border-border rounded-md p-3 bg-background text-center flex items-center justify-center">
+                        <select
+                            value={order.orderStatus}
+                            onChange={(e) => handleStatusChange(e.target.value)}
+                            className={cn(
+                                "text-[10px] font-black uppercase tracking-wider border rounded cursor-pointer outline-none appearance-none bg-transparent px-1 py-0.5 w-full text-center",
+                                getStatusColor(order.orderStatus)
+                            )}
+                        >
+                            <option value="Completed">Completed</option>
+                            <option value="Issued">Issued</option>
+                            <option value="Pending Payment">Pending</option>
+                            <option value="Shipping">Shipping</option>
+                            <option value="Picking">Picking</option>
+                        </select>
+                    </div>
                 </div>
 
-                {/* Order Header */}
+                {/* Details */}
                 <div>
-                    <div className="flex items-center space-x-3 mb-6">
-                        <div className="w-14 h-14 bg-white border border-slate-200 flex items-center justify-center p-1 shadow-sm shrink-0">
-                            <Package className="w-6 h-6 text-slate-400" />
-                        </div>
-                        <div>
-                            <h1 className="text-xl font-black text-slate-900 tracking-tight leading-none">Order #{order.label}</h1>
-                            <p className="text-[11px] text-slate-400 uppercase tracking-widest mt-1">{renderClient(order.clientId)}</p>
-                        </div>
-                    </div>
 
                     {/* Info Rows */}
                     <div className="space-y-6">
-                        {/* Quantity Section */}
-                        <div className="space-y-3">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <div className="text-[10px] text-slate-400 uppercase tracking-widest mb-1 font-bold italic">Total Qty</div>
-                                    <div className="text-lg font-black text-slate-900">{totalQty} <span className="text-[10px] text-slate-400 font-bold uppercase">Items</span></div>
-                                </div>
-                                <div>
-                                    <div className="text-[10px] text-slate-400 uppercase tracking-widest mb-1 font-bold italic">Order Total</div>
-                                    <div className="text-lg font-black text-slate-900">{formatCurrency(grandTotal)}</div>
-                                </div>
-                            </div>
-                            <div className="bg-black/5 p-3 flex justify-between items-center">
-                                <div className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Balance Due</div>
-                                <div className={cn("text-lg font-black", balance > 0 ? "text-red-600" : "text-emerald-600")}>
-                                    {formatCurrency(balance)}
-                                </div>
-                            </div>
-                        </div>
 
-                        <div className="grid grid-cols-2 gap-y-4 gap-x-6">
-                            <div>
-                                <div className="text-[10px] text-slate-400 uppercase tracking-widest mb-0.5 font-bold italic">Order Date</div>
-                                <div className="text-xs font-medium text-slate-700">{formatDate(order.createdAt)}</div>
+                        <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                                <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold italic">Order Date</div>
+                                <div className="text-xs font-medium text-foreground">{formatDate(order.createdAt)}</div>
                             </div>
-                            <div>
-                                <div className="text-[10px] text-slate-400 uppercase tracking-widest mb-0.5 font-bold italic">Shipped Date</div>
-                                <div className="text-xs font-medium text-slate-700">{formatDate(order.shippedDate)}</div>
+                            <div className="flex justify-between items-center">
+                                <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold italic">Shipped Date</div>
+                                <div className="text-xs font-medium text-foreground">{formatDate(order.shippedDate)}</div>
                             </div>
-                            <div>
-                                <div className="text-[10px] text-slate-400 uppercase tracking-widest mb-0.5 font-bold italic">Payment Method</div>
-                                <div className="text-xs font-medium text-slate-700">{order.paymentMethod || '-'}</div>
+                            <div className="flex justify-between items-center">
+                                <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold italic">Payment Method</div>
+                                <div className="text-xs font-medium text-foreground">{order.paymentMethod || '-'}</div>
                             </div>
-                            <div>
-                                <div className="text-[10px] text-slate-400 uppercase tracking-widest mb-0.5 font-bold italic">Ship Via</div>
-                                <div className="text-xs font-medium text-slate-700">{order.shippingMethod || '-'}</div>
+                            <div className="flex justify-between items-center">
+                                <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold italic">Ship Via</div>
+                                <div className="text-xs font-medium text-foreground">{order.shippingMethod || '-'}</div>
                             </div>
-                            <div>
-                                <div className="text-[10px] text-slate-400 uppercase tracking-widest mb-0.5 font-bold italic">Sales Rep</div>
-                                <div className="text-xs font-medium text-slate-700">{getUserName(order.salesRep)}</div>
+                            <div className="flex justify-between items-center">
+                                <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold italic">Sales Rep</div>
+                                <div className="text-xs font-medium text-foreground">{getUserName(order.salesRep)}</div>
                             </div>
-                            <div>
-                                <div className="text-[10px] text-slate-400 uppercase tracking-widest mb-0.5 font-bold italic">Tracking</div>
-                                <div className="text-xs font-medium text-slate-700">{order.trackingNumber || '-'}</div>
-                            </div>
+                            {/* Tracking Card */}
+                            {order.trackingNumber ? (
+                              <div className="mt-1">
+                                <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold italic mb-1.5">Tracking</div>
+                                <a
+                                  href={order.trackingNumber.startsWith('http') 
+                                    ? order.trackingNumber 
+                                    : `https://www.ups.com/track?loc=en_US&tracknum=${order.trackingNumber}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="block group"
+                                >
+                                  <div className="border border-border rounded-md p-3 bg-background hover:border-amber-500/50 hover:shadow-sm transition-all cursor-pointer">
+                                    <div className="flex items-center justify-between mb-1.5">
+                                      <div className="flex items-center space-x-2">
+                                        <div className="w-5 h-5 bg-[#FFB500] rounded flex items-center justify-center shrink-0">
+                                          <Truck className="w-3 h-3 text-[#351C15]" />
+                                        </div>
+                                        <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">UPS Tracking</span>
+                                      </div>
+                                      <svg className="w-3 h-3 text-muted-foreground group-hover:text-amber-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                                    </div>
+                                    <div className="font-mono text-[11px] font-bold text-foreground tracking-wide break-all">
+                                      {order.trackingNumber.startsWith('http') 
+                                        ? (() => { try { return new URL(order.trackingNumber).searchParams.get('tracknum') || order.trackingNumber; } catch { return order.trackingNumber; }})()
+                                        : order.trackingNumber}
+                                    </div>
+                                  </div>
+                                </a>
+                              </div>
+                            ) : (
+                              <div className="flex justify-between items-center">
+                                <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold italic">Tracking</div>
+                                <div className="text-xs font-medium text-foreground">-</div>
+                              </div>
+                            )}
                         </div>
 
                         {/* Address */}
                         <div>
-                            <div className="text-[10px] text-slate-400 uppercase tracking-widest mb-0.5 font-bold italic">Shipping Address</div>
-                            <div className="text-xs font-medium text-slate-700">{order.shippingAddress || '-'}</div>
-                            <div className="text-xs text-slate-500">{order.city}, {order.state}</div>
+                            <div className="text-[10px] text-muted-foreground uppercase tracking-widest mb-0.5 font-bold italic">Shipping Address</div>
+                            <div className="text-xs font-medium text-foreground">{order.shippingAddress || '-'}</div>
+                            <div className="text-xs text-muted-foreground">{order.city}, {order.state}</div>
                         </div>
                     </div>
                 </div>
 
                 {/* Payment Summary */}
                 <div>
-                    <h3 className="text-xs font-bold uppercase text-slate-900 tracking-widest mb-4 border-b border-slate-200 pb-2">Payment Summary</h3>
+                    <h3 className="text-xs font-bold uppercase text-foreground tracking-widest mb-4 border-b border-border pb-2">Payment Summary</h3>
                     <div className="space-y-3">
                         <div className="flex justify-between items-center group">
-                            <span className="text-sm text-slate-500 group-hover:text-slate-900 transition-colors">Subtotal</span>
-                            <span className="text-sm font-mono font-medium text-slate-700">{formatCurrency(subtotal)}</span>
+                            <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">Subtotal</span>
+                            <span className="text-sm font-mono font-medium text-foreground">{formatCurrency(subtotal)}</span>
                         </div>
                         <div className="flex justify-between items-center group">
-                            <span className="text-sm text-slate-500 group-hover:text-slate-900 transition-colors">Shipping</span>
-                            <span className="text-sm font-mono font-medium text-slate-700">{formatCurrency(order.shippingCost || 0)}</span>
+                            <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">Shipping</span>
+                            <span className="text-sm font-mono font-medium text-foreground">{formatCurrency(order.shippingCost || 0)}</span>
                         </div>
                         <div className="flex justify-between items-center group">
-                            <span className="text-sm text-slate-500 group-hover:text-slate-900 transition-colors">Discount</span>
+                            <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">Discount</span>
                             <span className="text-sm font-mono font-medium text-red-500">-{formatCurrency(order.discount || 0)}</span>
                         </div>
-                        <div className="flex justify-between items-center group pt-1 border-t border-slate-100">
-                            <span className="text-sm text-slate-700 font-bold">Order Total</span>
-                            <span className="text-sm font-mono font-bold text-slate-900">{formatCurrency(grandTotal)}</span>
+                        <div className="flex justify-between items-center group pt-1 border-t border-border">
+                            <span className="text-sm text-foreground font-bold">Order Total</span>
+                            <span className="text-sm font-mono font-bold text-foreground">{formatCurrency(grandTotal)}</span>
                         </div>
                         <div className="flex justify-between items-center group">
-                            <span className="text-sm text-slate-500 group-hover:text-slate-900 transition-colors">Payments Received</span>
+                            <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">Payments Received</span>
                             <span className="text-sm font-mono font-medium text-emerald-600">{formatCurrency(totalPayments)}</span>
                         </div>
-                        <div className="pt-3 mt-3 border-t border-slate-200 flex justify-between items-center">
-                            <span className="text-sm font-bold text-slate-900 uppercase tracking-wider">Balance</span>
+                        <div className="pt-3 mt-3 border-t border-border flex justify-between items-center">
+                            <span className="text-sm font-bold text-foreground uppercase tracking-wider">Balance</span>
                             <span className={cn("text-base font-mono font-bold", balance > 0 ? "text-red-600" : "text-emerald-600")}>
                                 {formatCurrency(balance)}
                             </span>
@@ -694,25 +698,25 @@ export default function SaleOrderDetailPage() {
             </div>
 
             {/* Right Content: Tabs (70%) */}
-            <div className="w-[70%] bg-white flex flex-col overflow-hidden">
+            <div className="w-[70%] bg-background flex flex-col overflow-hidden">
                 {/* Tabs & Actions */}
-                <div className="px-6 border-b border-slate-100 shrink-0 flex items-center justify-between bg-white z-10">
-                    <div className="flex space-x-1">
+                <div className="px-6 border-b border-border shrink-0 flex items-center justify-between bg-background z-10 h-9">
+                    <div className="flex space-x-1 h-full">
                         {TABS.map(tab => (
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}
                                 className={cn(
-                                    "px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors border-b-2 -mb-px outline-none flex items-center space-x-1.5",
+                                    "px-4 text-[10px] font-black uppercase tracking-widest transition-colors border-b-2 -mb-px outline-none flex items-center space-x-1.5",
                                     activeTab === tab
-                                        ? "text-black border-black"
-                                        : "text-slate-400 border-transparent hover:text-slate-600"
+                                        ? "text-foreground border-foreground"
+                                        : "text-muted-foreground border-transparent hover:text-foreground"
                                 )}
                             >
                                 <span>{tab}</span>
                                 <span className={cn(
                                     "px-1.5 py-0.5 rounded-none text-[9px] font-bold",
-                                    activeTab === tab ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-500"
+                                    activeTab === tab ? "bg-foreground text-background" : "bg-secondary text-muted-foreground"
                                 )}>
                                     {tab === 'Line Items' ? order.lineItems?.length || 0 : order.payments?.length || 0}
                                 </span>
@@ -724,24 +728,12 @@ export default function SaleOrderDetailPage() {
                     <div className="flex items-center space-x-2">
                         {activeTab === 'Line Items' && (
                             <>
-                                {isRefreshingCosts && (
-                                    <span className="text-[10px] text-blue-600 font-mono animate-pulse font-bold">{refreshProgress}</span>
-                                )}
-                                <button
-                                    onClick={handleRefreshCosts}
-                                    disabled={isRefreshingCosts || !order || !order.lineItems || order.lineItems.length === 0}
-                                    className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100 hover:text-black transition-colors flex items-center space-x-1 shadow-sm disabled:opacity-50"
-                                    title="Refresh Costs from Lot #"
-                                >
-                                    <RefreshCw className={cn("w-3 h-3", isRefreshingCosts && "animate-spin")} />
-                                    <span className="hidden sm:inline">Sync</span>
-                                </button>
                                 <button
                                     onClick={() => {
                                         setEditingItem({ sku: '', lotNumber: '', qtyShipped: 1, price: 0, uom: 'Each' });
                                         setIsItemModalOpen(true);
                                     }}
-                                    className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-black text-white hover:bg-slate-800 transition-colors flex items-center space-x-1 shadow-sm"
+                                    className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-foreground text-background hover:opacity-90 transition-colors flex items-center space-x-1 shadow-sm"
                                 >
                                     <Plus className="w-3 h-3" />
                                     <span>Add Item</span>
@@ -768,19 +760,19 @@ export default function SaleOrderDetailPage() {
                     {activeTab === 'Line Items' && (
                         <div className="animate-in fade-in duration-300">
                             <table className="w-full border-collapse text-left">
-                                <thead className="bg-slate-50 border-y border-slate-100 sticky top-0 z-20">
+                                <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
                                     <tr>
                                         {['SKU', 'Lot #', 'UOM', 'Qty', 'Cost', 'Price', 'Total', 'Actions'].map(col => (
-                                            <th key={col} className="px-3 py-1.5 text-[8px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                                            <th key={col} className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">
                                                 {col}
                                             </th>
                                         ))}
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-100">
+                                <tbody className="divide-y divide-border">
                                     {(!order.lineItems || order.lineItems.length === 0) ? (
                                         <tr>
-                                            <td colSpan={8} className="px-3 py-6 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">No line items</td>
+                                            <td colSpan={8} className="px-3 py-6 text-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider">No line items</td>
                                         </tr>
                                     ) : order.lineItems.map(item => {
                                     const skuNameRaw = typeof item.sku === 'object' ? item.sku?.name : allSkus.find(s => s._id === item.sku)?.name || item.sku;
@@ -789,8 +781,8 @@ export default function SaleOrderDetailPage() {
                                         const skuId = (item.sku && typeof item.sku === 'object') ? item.sku._id : item.sku;
 
                                         return (
-                                            <tr key={item._id} className="hover:bg-slate-50 transition-colors">
-                                                <td className="px-3 py-1.5 text-[10px] text-slate-700">
+                                            <tr key={item._id} className="hover:bg-secondary/50 transition-colors">
+                                                <td className="px-3 py-1.5 text-[10px] text-foreground">
                                                     <span 
                                                         onClick={() => router.push(`/warehouse/skus/${skuId}`)}
                                                         className="hover:text-blue-600 hover:underline cursor-pointer transition-colors"
@@ -798,12 +790,12 @@ export default function SaleOrderDetailPage() {
                                                         {skuName || '-'}
                                                     </span>
                                                 </td>
-                                                <td className="px-3 py-1.5 text-[10px] text-slate-500 group">
+                                                <td className="px-3 py-1.5 text-[10px] text-muted-foreground group">
                                                     <div className="flex items-center gap-1">
                                                         {item.lotNumber ? (
                                                             <Link 
                                                                 href={`/warehouse/skus/${skuId}?lot=${encodeURIComponent(item.lotNumber)}`}
-                                                                className="text-slate-700 font-mono hover:text-blue-600 hover:underline transition-colors"
+                                                                className="text-foreground font-mono hover:text-blue-600 hover:underline transition-colors"
                                                             >
                                                                 {item.lotNumber}
                                                             </Link>
@@ -812,18 +804,18 @@ export default function SaleOrderDetailPage() {
                                                         )}
                                                         <button 
                                                             onClick={() => handleEditLot(item._id, skuId)}
-                                                            className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-500 transition-all p-0.5"
+                                                            className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-blue-500 transition-all p-0.5"
                                                             title="Edit Lot #"
                                                         >
                                                             <Pencil className="w-2.5 h-2.5" />
                                                         </button>
                                                     </div>
                                                 </td>
-                                                <td className="px-3 py-1.5 text-[9px] uppercase text-slate-400">{item.uom || '-'}</td>
-                                                <td className="px-3 py-1.5 text-[10px] text-slate-500 font-mono">{item.qtyShipped}</td>
+                                                <td className="px-3 py-1.5 text-[9px] uppercase text-muted-foreground">{item.uom || '-'}</td>
+                                                <td className="px-3 py-1.5 text-[10px] text-muted-foreground font-mono">{item.qtyShipped}</td>
                                                 <td className="px-3 py-1.5 text-[10px] text-orange-600 font-mono whitespace-nowrap">{formatCost(item.cost)}</td>
-                                                <td className="px-3 py-1.5 text-[10px] text-slate-500 font-mono">{formatCurrency(item.price)}</td>
-                                                <td className="px-3 py-1.5 text-[10px] text-slate-700 font-mono bg-slate-50/30">{formatCurrency(lineTotal)}</td>
+                                                <td className="px-3 py-1.5 text-[10px] text-muted-foreground font-mono">{formatCurrency(item.price)}</td>
+                                                <td className="px-3 py-1.5 text-[10px] text-foreground font-mono bg-secondary/20">{formatCurrency(lineTotal)}</td>
                                                 <td className="px-3 py-1.5">
                                                     <div className="flex items-center space-x-1">
                                                         <button 
@@ -834,13 +826,13 @@ export default function SaleOrderDetailPage() {
                                                                 });
                                                                 setIsItemModalOpen(true);
                                                             }}
-                                                            className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
+                                                            className="p-1 text-muted-foreground hover:text-blue-600 transition-colors"
                                                         >
                                                             <Pencil className="w-3 h-3" />
                                                         </button>
                                                         <button 
                                                             onClick={() => handleDeleteItem(item._id)}
-                                                            className="p-1 text-slate-400 hover:text-red-600 transition-colors"
+                                                            className="p-1 text-muted-foreground hover:text-red-600 transition-colors"
                                                         >
                                                             <Trash2 className="w-3 h-3" />
                                                         </button>
@@ -851,13 +843,13 @@ export default function SaleOrderDetailPage() {
                                     })}
                                 </tbody>
                                 {order.lineItems && order.lineItems.length > 0 && (
-                                    <tfoot className="bg-slate-50 border-t border-slate-200">
+                                    <tfoot className="bg-secondary border-t border-border">
                                         <tr>
-                                            <td colSpan={3} className="px-3 py-1.5 text-[10px] font-bold text-slate-500 uppercase text-right">Subtotal</td>
-                                            <td className="px-3 py-1.5 text-[10px] font-bold text-slate-700">{totalQty}</td>
+                                            <td colSpan={3} className="px-3 py-1.5 text-[10px] font-bold text-muted-foreground uppercase text-right">Subtotal</td>
+                                            <td className="px-3 py-1.5 text-[10px] font-bold text-foreground">{totalQty}</td>
                                             <td className="px-3 py-1.5"></td>
                                             <td className="px-3 py-1.5"></td>
-                                            <td className="px-3 py-1.5 text-[10px] font-black text-slate-900">{formatCurrency(subtotal)}</td>
+                                            <td className="px-3 py-1.5 text-[10px] font-black text-foreground">{formatCurrency(subtotal)}</td>
                                             <td className="px-3 py-1.5"></td>
                                         </tr>
                                     </tfoot>
@@ -869,25 +861,25 @@ export default function SaleOrderDetailPage() {
                     {activeTab === 'Payments' && (
                         <div className="animate-in fade-in duration-300">
                             <table className="w-full border-collapse text-left">
-                                <thead className="bg-slate-50 border-y border-slate-100 sticky top-0 z-20">
+                                <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
                                     <tr>
                                         {['Date', 'Amount', 'Created By', 'Actions'].map(col => (
-                                            <th key={col} className="px-3 py-1.5 text-[8px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                                            <th key={col} className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">
                                                 {col}
                                             </th>
                                         ))}
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-100">
+                                <tbody className="divide-y divide-border">
                                     {(!order.payments || order.payments.length === 0) ? (
                                         <tr>
-                                            <td colSpan={4} className="px-3 py-6 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">No payments recorded</td>
+                                            <td colSpan={4} className="px-3 py-6 text-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider">No payments recorded</td>
                                         </tr>
                                     ) : order.payments.map(payment => (
-                                        <tr key={payment._id} className="hover:bg-slate-50 transition-colors">
-                                            <td className="px-3 py-1.5 text-[10px] text-slate-500 font-mono">{formatDate(payment.createdAt)}</td>
+                                        <tr key={payment._id} className="hover:bg-secondary/50 transition-colors">
+                                            <td className="px-3 py-1.5 text-[10px] text-muted-foreground font-mono">{formatDate(payment.createdAt)}</td>
                                             <td className="px-3 py-1.5 text-[10px] text-emerald-600 font-mono font-bold">{formatCurrency(payment.paymentAmount)}</td>
-                                            <td className="px-3 py-1.5 text-[10px] text-slate-500">{getUserName(payment.createdBy)}</td>
+                                            <td className="px-3 py-1.5 text-[10px] text-muted-foreground">{getUserName(payment.createdBy)}</td>
                                             <td className="px-3 py-1.5">
                                                 <div className="flex items-center space-x-1">
                                                     <button 
@@ -898,13 +890,13 @@ export default function SaleOrderDetailPage() {
                                                             });
                                                             setIsPaymentModalOpen(true);
                                                         }}
-                                                        className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
+                                                        className="p-1 text-muted-foreground hover:text-blue-600 transition-colors"
                                                     >
                                                         <Pencil className="w-3 h-3" />
                                                     </button>
                                                     <button 
                                                         onClick={() => handleDeletePayment(payment._id)}
-                                                        className="p-1 text-slate-400 hover:text-red-600 transition-colors"
+                                                        className="p-1 text-muted-foreground hover:text-red-600 transition-colors"
                                                     >
                                                         <Trash2 className="w-3 h-3" />
                                                     </button>
@@ -914,9 +906,9 @@ export default function SaleOrderDetailPage() {
                                     ))}
                                 </tbody>
                                 {order.payments && order.payments.length > 0 && (
-                                    <tfoot className="bg-slate-50 border-t border-slate-200">
+                                    <tfoot className="bg-secondary border-t border-border">
                                         <tr>
-                                            <td className="px-3 py-1.5 text-[10px] font-bold text-slate-500 uppercase">Total</td>
+                                            <td className="px-3 py-1.5 text-[10px] font-bold text-muted-foreground uppercase">Total</td>
                                             <td className="px-3 py-1.5 text-[10px] font-black text-emerald-600">{formatCurrency(totalPayments)}</td>
                                             <td colSpan={2}></td>
                                         </tr>
@@ -932,16 +924,16 @@ export default function SaleOrderDetailPage() {
         {/* Item Modal */}
         {isItemModalOpen && editingItem && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                <div className="bg-white rounded-lg shadow-2xl w-full max-w-lg animate-in fade-in zoom-in duration-200">
-                    <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-                        <h2 className="text-sm font-bold uppercase text-slate-900">{editingItem._id ? 'Edit Item' : 'Add Item'}</h2>
-                        <button onClick={() => setIsItemModalOpen(false)} className="text-slate-400 hover:text-black">
+                <div className="bg-card rounded-lg shadow-2xl w-full max-w-lg animate-in fade-in zoom-in duration-200">
+                    <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-secondary/50">
+                        <h2 className="text-sm font-bold uppercase text-foreground">{editingItem._id ? 'Edit Item' : 'Add Item'}</h2>
+                        <button onClick={() => setIsItemModalOpen(false)} className="text-muted-foreground hover:text-foreground">
                             <X className="w-4 h-4" />
                         </button>
                     </div>
                     <div className="p-6 space-y-4">
                         <div className="space-y-1.5">
-                            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">SKU</label>
+                            <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">SKU</label>
                             <SearchableSelect
                                 options={(() => {
                                     const opts = allSkus.map(s => ({ value: s._id, label: s.name }));
@@ -1015,7 +1007,7 @@ export default function SaleOrderDetailPage() {
                             />
                         )}
                         <div className="grid grid-cols-2 gap-4">
-                            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Lot #</label>
+                            <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Lot #</label>
                             <div className="relative">
                                 <input
                                     type="text"
@@ -1025,16 +1017,16 @@ export default function SaleOrderDetailPage() {
                                         if (editingItem.sku) setIsItemLotModalOpen(true);
                                         else toast.error('Please select a SKU first');
                                     }}
-                                    className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:outline-none cursor-pointer hover:bg-slate-50"
+                                    className="w-full px-3 py-2 border border-border rounded text-sm focus:outline-none cursor-pointer hover:bg-secondary"
                                     placeholder={editingItem.sku ? "Select Lot..." : "Select SKU first"}
                                 />
-                                <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
                                     <List className="w-4 h-4" />
                                 </div>
                             </div>
                         </div>
                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">UOM</label>
+                                <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">UOM</label>
                                 <SearchableSelect
                                     options={UOM_OPTIONS}
                                     value={editingItem.uom || 'Each'}
@@ -1044,30 +1036,30 @@ export default function SaleOrderDetailPage() {
                             </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Qty</label>
+                                <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Qty</label>
                                 <input
                                     type="number"
                                     min="1"
                                     value={editingItem.qtyShipped || 1}
                                     onChange={(e) => setEditingItem({ ...editingItem, qtyShipped: parseInt(e.target.value) || 0 })}
-                                    className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:outline-none"
+                                    className="w-full px-3 py-2 border border-border rounded text-sm focus:outline-none"
                                 />
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Price</label>
+                                <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Price</label>
                                 <div className="relative">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">$</span>
                                     <input
                                         type="number"
                                         step="0.01"
                                         value={editingItem.price || 0}
                                         onChange={(e) => setEditingItem({ ...editingItem, price: parseFloat(e.target.value) || 0 })}
-                                        className="w-full pl-6 pr-3 py-2 border border-slate-200 rounded text-sm focus:outline-none"
+                                        className="w-full pl-6 pr-3 py-2 border border-border rounded text-sm focus:outline-none"
                                     />
                                 </div>
                             </div>
                         </div>
-                        <button onClick={handleSaveItem} className="w-full py-2.5 bg-black text-white text-xs font-bold uppercase rounded hover:bg-slate-800 transition-colors">
+                        <button onClick={handleSaveItem} className="w-full py-2.5 bg-foreground text-background text-xs font-bold uppercase rounded hover:opacity-90 transition-colors">
                             {editingItem._id ? 'Save Changes' : 'Add Item'}
                         </button>
                     </div>
@@ -1078,35 +1070,35 @@ export default function SaleOrderDetailPage() {
         {/* Payment Modal */}
         {isPaymentModalOpen && editingPayment && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                <div className="bg-white rounded-lg shadow-2xl w-full max-w-md animate-in fade-in zoom-in duration-200">
-                    <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-green-50/50">
-                        <h2 className="text-sm font-bold uppercase text-slate-900">{editingPayment._id ? 'Edit Payment' : 'Add Payment'}</h2>
-                        <button onClick={() => setIsPaymentModalOpen(false)} className="text-slate-400 hover:text-black">
+                <div className="bg-card rounded-lg shadow-2xl w-full max-w-md animate-in fade-in zoom-in duration-200">
+                    <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-emerald-500/10">
+                        <h2 className="text-sm font-bold uppercase text-foreground">{editingPayment._id ? 'Edit Payment' : 'Add Payment'}</h2>
+                        <button onClick={() => setIsPaymentModalOpen(false)} className="text-muted-foreground hover:text-foreground">
                             <X className="w-4 h-4" />
                         </button>
                     </div>
                     <div className="p-6 space-y-4">
                         <div className="space-y-1.5">
-                            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Amount</label>
+                            <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Amount</label>
                             <div className="relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
                                 <input
                                     type="number"
                                     step="0.01"
                                     value={editingPayment.paymentAmount || ''}
                                     onChange={(e) => setEditingPayment({ ...editingPayment, paymentAmount: parseFloat(e.target.value) || 0 })}
-                                    className="w-full pl-7 pr-3 py-2 border border-slate-200 rounded text-sm focus:outline-none"
+                                    className="w-full pl-7 pr-3 py-2 border border-border rounded text-sm focus:outline-none"
                                     placeholder="0.00"
                                 />
                             </div>
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Date</label>
+                            <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Date</label>
                             <input
                                 type="date"
                                 value={editingPayment.createdAt || ''}
                                 onChange={(e) => setEditingPayment({ ...editingPayment, createdAt: e.target.value })}
-                                className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:outline-none"
+                                className="w-full px-3 py-2 border border-border rounded text-sm focus:outline-none"
                             />
                         </div>
                         <button onClick={handleSavePayment} className="w-full py-2.5 bg-emerald-600 text-white text-xs font-bold uppercase rounded hover:bg-emerald-700 transition-colors">
@@ -1120,21 +1112,21 @@ export default function SaleOrderDetailPage() {
         {/* Edit Header Modal */}
         {isHeaderModalOpen && editingHeader && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
-                    <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50 shrink-0">
-                        <h2 className="text-sm font-bold uppercase text-slate-900">Edit Order Details</h2>
-                        <button onClick={() => setIsHeaderModalOpen(false)} className="text-slate-400 hover:text-black">
+                <div className="bg-card rounded-lg shadow-2xl w-full max-w-2xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+                    <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-secondary/50 shrink-0">
+                        <h2 className="text-sm font-bold uppercase text-foreground">Edit Order Details</h2>
+                        <button onClick={() => setIsHeaderModalOpen(false)} className="text-muted-foreground hover:text-foreground">
                             <X className="w-4 h-4" />
                         </button>
                     </div>
                     <div className="p-6 overflow-y-auto">
                         <div className="grid grid-cols-2 gap-4 mb-4">
                              <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Order Status</label>
+                                <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Order Status</label>
                                 <select
                                     value={editingHeader.orderStatus}
                                     onChange={(e) => setEditingHeader({...editingHeader, orderStatus: e.target.value})}
-                                    className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:outline-none bg-white"
+                                    className="w-full px-3 h-9 border border-border rounded text-sm focus:outline-none bg-card"
                                 >
                                     <option value="Completed">Completed</option>
                                     <option value="Issued">Issued</option>
@@ -1144,7 +1136,7 @@ export default function SaleOrderDetailPage() {
                                 </select>
                              </div>
                              <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Sales Rep</label>
+                                <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Sales Rep</label>
                                 <SearchableSelect
                                     options={allUsers.map(u => ({ label: `${u.firstName} ${u.lastName}`, value: u._id }))}
                                     value={editingHeader.salesRep}
@@ -1155,7 +1147,7 @@ export default function SaleOrderDetailPage() {
                         
                         <div className="grid grid-cols-2 gap-4 mb-4">
                              <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Payment Method</label>
+                                <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Payment Method</label>
                                 <SearchableSelect
                                     options={PAYMENT_METHODS}
                                     value={editingHeader.paymentMethod}
@@ -1163,19 +1155,19 @@ export default function SaleOrderDetailPage() {
                                 />
                              </div>
                              <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Shipped Date</label>
+                                <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Shipped Date</label>
                                 <input
                                     type="date"
                                     value={editingHeader.shippedDate}
                                     onChange={(e) => setEditingHeader({...editingHeader, shippedDate: e.target.value})}
-                                    className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:outline-none"
+                                    className="w-full px-3 h-9 border border-border rounded text-sm focus:outline-none"
                                 />
                              </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4 mb-4">
                              <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Shipping Method</label>
+                                <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Shipping Method</label>
                                 <SearchableSelect
                                     options={SHIPPING_METHODS}
                                     value={editingHeader.shippingMethod}
@@ -1184,23 +1176,23 @@ export default function SaleOrderDetailPage() {
                                 />
                              </div>
                              <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Tracking Number</label>
+                                <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Tracking Number</label>
                                 <input
                                     type="text"
                                     value={editingHeader.trackingNumber}
                                     onChange={(e) => setEditingHeader({...editingHeader, trackingNumber: e.target.value})}
-                                    className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:outline-none"
+                                    className="w-full px-3 h-9 border border-border rounded text-sm focus:outline-none"
                                 />
                              </div>
                         </div>
 
                         <div className="space-y-1.5 mb-4">
-                            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Shipping Address</label>
+                            <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Shipping Address</label>
                             <input
                                 type="text"
                                 value={editingHeader.shippingAddress}
                                 onChange={(e) => setEditingHeader({...editingHeader, shippingAddress: e.target.value})}
-                                className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:outline-none"
+                                className="w-full px-3 h-9 border border-border rounded text-sm focus:outline-none"
                                 placeholder="Street Address"
                             />
                             <div className="grid grid-cols-2 gap-4 mt-2">
@@ -1208,14 +1200,14 @@ export default function SaleOrderDetailPage() {
                                     type="text"
                                     value={editingHeader.city}
                                     onChange={(e) => setEditingHeader({...editingHeader, city: e.target.value})}
-                                    className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:outline-none"
+                                    className="w-full px-3 h-9 border border-border rounded text-sm focus:outline-none"
                                     placeholder="City"
                                 />
                                 <input
                                     type="text"
                                     value={editingHeader.state}
                                     onChange={(e) => setEditingHeader({...editingHeader, state: e.target.value})}
-                                    className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:outline-none"
+                                    className="w-full px-3 h-9 border border-border rounded text-sm focus:outline-none"
                                     placeholder="State"
                                 />
                             </div>
@@ -1223,40 +1215,40 @@ export default function SaleOrderDetailPage() {
 
                          <div className="grid grid-cols-3 gap-4 mb-4">
                              <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Shipping Cost ($)</label>
+                                <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Shipping Cost ($)</label>
                                 <input
                                     type="number"
                                     step="0.01"
                                     value={editingHeader.shippingCost}
                                     onChange={(e) => setEditingHeader({...editingHeader, shippingCost: parseFloat(e.target.value) || 0})}
-                                    className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:outline-none"
+                                    className="w-full px-3 h-9 border border-border rounded text-sm focus:outline-none"
                                 />
                              </div>
                              <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Discount ($)</label>
+                                <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Discount ($)</label>
                                 <input
                                     type="number"
                                     step="0.01"
                                     value={editingHeader.discount}
                                     onChange={(e) => setEditingHeader({...editingHeader, discount: parseFloat(e.target.value) || 0})}
-                                    className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:outline-none"
+                                    className="w-full px-3 h-9 border border-border rounded text-sm focus:outline-none"
                                 />
                              </div>
                              <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Tax ($)</label>
+                                <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Tax ($)</label>
                                 <input
                                     type="number"
                                     step="0.01"
                                     value={editingHeader.tax}
                                     onChange={(e) => setEditingHeader({...editingHeader, tax: parseFloat(e.target.value) || 0})}
-                                    className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:outline-none"
+                                    className="w-full px-3 h-9 border border-border rounded text-sm focus:outline-none"
                                 />
                              </div>
                         </div>
 
                     </div>
-                    <div className="p-4 border-t border-slate-100 bg-slate-50/50 shrink-0">
-                        <button onClick={handleSaveHeader} className="w-full py-2.5 bg-black text-white text-xs font-bold uppercase rounded hover:bg-slate-800 transition-colors">
+                    <div className="p-4 border-t border-border bg-secondary/50 shrink-0">
+                        <button onClick={handleSaveHeader} className="w-full h-9 bg-[#FFEF5F] text-black text-xs font-bold uppercase rounded hover:opacity-90 transition-colors">
                             Save Changes
                         </button>
                     </div>

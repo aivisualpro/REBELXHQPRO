@@ -380,3 +380,55 @@ export async function deleteOrderFromAppSheet(order: any) {
         console.error('AppSheet Order Delete Error:', error);
     }
 }
+
+export async function syncPaymentToAppSheet(orderLabel: string, payment: any, action: 'Add' | 'Edit' | 'Delete' = 'Add') {
+    const appId = process.env.APPSHEET_APP_ID;
+    const accessKey = process.env.APPSHEET_ACCESS_KEY;
+
+    if (!appId || !accessKey) {
+        console.error('AppSheet API credentials missing');
+        return;
+    }
+
+    const row: Record<string, any> = {
+        'Order #': orderLabel || '',
+        'Payment Date': payment.createdAt ? new Date(payment.createdAt).toLocaleDateString('en-US') : '',
+        'Payment Amount': payment.paymentAmount || 0,
+        'Create By': payment.createdBy || '',
+    };
+
+    // Include _id for Edit/Delete actions
+    if (payment._id) {
+        row['_RowNumber'] = payment._id?.toString();
+    }
+
+    const payload = {
+        Action: action,
+        Properties: {
+            Locale: 'en-US',
+            Timezone: 'Eastern Standard Time',
+        },
+        Rows: [row]
+    };
+
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 30000);
+        const response = await fetch(`https://api.appsheet.com/api/v2/apps/${appId}/tables/Payments/Action`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'ApplicationAccessKey': accessKey,
+            },
+            body: JSON.stringify(payload),
+            signal: controller.signal,
+        });
+        clearTimeout(timeout);
+
+        const result = await response.json();
+        console.log(`AppSheet Payment ${action} Result:`, result);
+        return result;
+    } catch (error) {
+        console.error('AppSheet Payment Sync Error:', error);
+    }
+}
