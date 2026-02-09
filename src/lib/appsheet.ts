@@ -87,7 +87,7 @@ export async function syncClientToAppSheet(clients: any | any[]) {
         }
 
         return {
-            'Client_id': clientObj._id || '',
+            'Client_id': clientObj.legacyId || clientObj._id || '',
             'Name': clientObj.name || '',
             'Description': clientObj.description || '',
             'Sales Person': salesPersonName || '',
@@ -174,7 +174,7 @@ export async function syncOrderToAppSheet(order: any) {
         salesRepEmail = orderObj.salesRep; // Fallback to ID/string if not populated
     }
 
-    // Use legacyId for ClientID if client was imported, otherwise use ObjectId
+    // Use legacyId as AppSheet key if exists (imported), otherwise use _id (new records)
     let clientIdForAppSheet = '';
     if (typeof orderObj.clientId === 'object' && orderObj.clientId !== null) {
         clientIdForAppSheet = orderObj.clientId.legacyId || orderObj.clientId._id || '';
@@ -183,7 +183,7 @@ export async function syncOrderToAppSheet(order: any) {
     }
 
     const orderRow = {
-        'Order #': orderObj._id,
+        'Order #': orderObj.legacyId || orderObj._id,
         'ClientID': clientIdForAppSheet,
         'TimeStamp': orderObj.createdAt ? new Date(orderObj.createdAt).toISOString() : '',
         'Sales Representative': salesRepEmail || '',
@@ -209,7 +209,7 @@ export async function syncOrderToAppSheet(order: any) {
     };
 
     // Map Line Items to "Order Details" table
-    // Use legacyId for ProductID if SKU was imported, otherwise use ObjectId
+    // Use legacyId as AppSheet key if exists (imported), otherwise use _id (new records)
     const detailRows = (orderObj.lineItems || []).map((item: any) => {
         let productIdForAppSheet = '';
         if (typeof item.sku === 'object' && item.sku !== null) {
@@ -220,7 +220,7 @@ export async function syncOrderToAppSheet(order: any) {
         
         return {
             'RecordID': item._id,
-            'Order #': orderObj._id,
+            'Order #': orderObj.legacyId || orderObj._id,
             'ProductID': productIdForAppSheet,
             'Lot #': item.lotNumber || '',
             'Qty Shipped': item.qtyShipped || 0,

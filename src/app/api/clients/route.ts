@@ -247,18 +247,13 @@ export async function POST(request: Request) {
         await dbConnect();
         const body = await request.json();
 
-        // 1. Generate a manual string ID if not present (since schema uses String for _id)
-        // 1. Map clientid to legacyId if present
-        if (!body.legacyId && (body.clientId || body.clientid || body._id)) {
-            body.legacyId = body.clientId || body.clientid || body._id;
+        // Map clientid to legacyId if present (import scenario only)
+        if (!body.legacyId && (body.clientId || body.clientid)) {
+            body.legacyId = body.clientId || body.clientid;
             delete body.clientId;
             delete body.clientid;
-            delete body._id;
         }
-        
-        if (!body.legacyId) {
-            body.legacyId = 'CL-' + Math.random().toString(36).substring(2, 9).toUpperCase();
-        }
+        // Do NOT auto-generate legacyId for new records — it's only for imported data
 
         // 2. Format notes if it's a string (from UI)
         if (typeof body.notes === 'string') {
