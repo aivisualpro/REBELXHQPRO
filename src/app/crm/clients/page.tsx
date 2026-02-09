@@ -1,13 +1,13 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Search, MoreHorizontal, Mail, Phone, MapPin, 
   Calendar, DollarSign, ShoppingBag, ChevronLeft, ChevronRight,
   ArrowUpDown, User, Layers, Briefcase, Map as LucideMap, ChevronDown,
   Truck, Upload, FileText, UserSquare2, SlidersHorizontal, 
-  Send, X, Trash2, Paperclip, Loader2,
-  Eye, Pencil
+  Send, X, Trash2, Paperclip, Loader2, Plus
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -101,6 +101,10 @@ function ClientsPageContent() {
   const [composeData, setComposeData] = useState({ to: '', subject: '', body: '' });
   const [sendingEmail, setSendingEmail] = useState(false);
   
+  // Portal targets
+  const [headerPortalTarget, setHeaderPortalTarget] = useState<HTMLElement | null>(null);
+  const [contentHeaderPortalTarget, setContentHeaderPortalTarget] = useState<HTMLElement | null>(null);
+  
   // Refs for remote opening filters from header
   const repFilterRef = useRef<MultiSelectFilterRef>(null);
   const typeFilterRef = useRef<MultiSelectFilterRef>(null);
@@ -148,6 +152,14 @@ function ClientsPageContent() {
         }
     };
     fetchOptions();
+  }, []);
+
+  // Find portal targets
+  useEffect(() => {
+    const headerTarget = document.getElementById('header-portal-target');
+    if (headerTarget) setHeaderPortalTarget(headerTarget);
+    const contentTarget = document.getElementById('crm-content-header-portal');
+    if (contentTarget) setContentHeaderPortalTarget(contentTarget);
   }, []);
 
   useEffect(() => {
@@ -336,7 +348,53 @@ function ClientsPageContent() {
 
 
   return (
-    <div className="flex flex-col h-[calc(100vh-48px)] bg-background text-foreground font-sans">
+    <div className="flex flex-col h-full bg-background text-foreground font-sans">
+
+      {/* Header Portal - page title */}
+      {headerPortalTarget && createPortal(
+        <>
+          <h1 className="text-sm font-bold text-foreground uppercase tracking-tight">Clients</h1>
+          <div className="flex-1" />
+        </>,
+        headerPortalTarget
+      )}
+
+      {/* Content Header Portal - search, filters, add */}
+      {contentHeaderPortalTarget && createPortal(
+        <div className="flex items-center gap-2 px-3 h-9 border-b border-border bg-secondary/30">
+          {/* Search - Left Side */}
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search clients..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-7 w-[220px] pl-8 pr-3 text-[11px] bg-background border border-border rounded focus:outline-none focus:ring-1 focus:ring-[#FFEF5F] focus:border-[#FFEF5F] placeholder:text-muted-foreground/60 text-foreground"
+            />
+          </div>
+
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Filter Chips */}
+          <MultiSelectFilter
+            ref={repFilterRef}
+            label="Rep"
+            options={salesRepOptions}
+            selectedValues={selectedSalesReps}
+            onChange={(vals) => { setSelectedSalesReps(vals); setPage(1); }}
+          />
+          <MultiSelectFilter
+            ref={typeFilterRef}
+            label="Type"
+            options={companyTypeOptions}
+            selectedValues={selectedCompanyTypes}
+            onChange={(vals) => { setSelectedCompanyTypes(vals); setPage(1); }}
+          />
+        </div>,
+        contentHeaderPortalTarget
+      )}
 
 
       {/* Table Content */}
@@ -391,7 +449,8 @@ function ClientsPageContent() {
                         clients.map((client) => (
                             <tr 
                                 key={client._id} 
-                                className="group relative z-0 bg-background transition-colors duration-150"
+                                onClick={() => router.push(`/crm/clients/${client._id}`)}
+                                className="group relative z-0 bg-background transition-colors duration-150 cursor-pointer hover:bg-secondary/40"
                             >
                                 {/* NAME */}
                                 <td className="p-1 border-r border-border group-hover:border-l-2 group-hover:border-l-primary transition-all">
@@ -400,29 +459,6 @@ function ClientsPageContent() {
                                             {client.name.substring(0, 2)}
                                         </div>
                                         <span className="text-[10px] font-medium text-foreground leading-tight truncate max-w-[180px]">{client.name}</span>
-                                        <div className="flex items-center space-x-0.5 ml-auto opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                                            <button
-                                                onClick={() => window.location.href = `/crm/clients/${client._id}`}
-                                                className="p-0.5 text-muted-foreground hover:text-blue-600 hover:bg-blue-100 rounded transition-colors cursor-pointer"
-                                                title="View"
-                                            >
-                                                <Eye className="w-3 h-3" />
-                                            </button>
-                                            <button
-                                                onClick={() => window.location.href = `/crm/clients/${client._id}`}
-                                                className="p-0.5 text-muted-foreground hover:text-amber-600 hover:bg-amber-100 rounded transition-colors cursor-pointer"
-                                                title="Edit"
-                                            >
-                                                <Pencil className="w-3 h-3" />
-                                            </button>
-                                            <button
-                                                onClick={() => { /* future delete */ }}
-                                                className="p-0.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors cursor-pointer"
-                                                title="Delete"
-                                            >
-                                                <Trash2 className="w-3 h-3" />
-                                            </button>
-                                        </div>
                                     </div>
                                 </td>
                                 

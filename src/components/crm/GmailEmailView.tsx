@@ -243,7 +243,7 @@ export function GmailEmailView({ initialLabel, forcedClientEmails }: GmailEmailV
   return (
     <div className="flex flex-col h-full bg-background transition-colors duration-300">
         {/* Gmail Header Controls */}
-        <div className="flex items-center justify-between px-6 h-11 border-b border-border bg-secondary/50 transition-colors">
+        <div className="flex items-center justify-between px-6 h-9 border-b border-border bg-secondary/50 transition-colors">
             <h1 className="text-sm font-bold text-foreground uppercase tracking-tighter shrink-0">
                 {initialLabel === 'INBOX' ? unreadCount > 0 ? `Inbox (${unreadCount})` : 'Inbox' : 'Sent'}
             </h1>

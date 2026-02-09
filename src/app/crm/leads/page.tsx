@@ -7,8 +7,7 @@ import {
   Calendar, DollarSign, ShoppingBag, ChevronLeft, ChevronRight,
   ArrowUpDown, User, Layers, Briefcase, Map as LucideMap, ChevronDown,
   Truck, Upload, FileText, Activity, CheckCircle2, X,
-  List, LayoutGrid, GripVertical, MessageSquare, ExternalLink, Send, Trash2, Paperclip, Loader2,
-  Eye, Pencil
+  List, LayoutGrid, GripVertical, MessageSquare, ExternalLink, Send, Trash2, Paperclip, Loader2
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -167,6 +166,8 @@ function LeadsPageContent() {
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [headerPortalTarget, setHeaderPortalTarget] = useState<HTMLElement | null>(null);
+  const [contentHeaderPortalTarget, setContentHeaderPortalTarget] = useState<HTMLElement | null>(null);
+  const [localSearch, setLocalSearch] = useState(search);
   
   // Pagination & Sort
   const [page, setPage] = useState(1);
@@ -200,11 +201,28 @@ function LeadsPageContent() {
       { label: 'FL', value: 'FL' }, { label: 'IL', value: 'IL' }
   ]);
 
-  // Find header portal target
+  // Find portal targets
   useEffect(() => {
     const target = document.getElementById('header-portal-target');
     if (target) setHeaderPortalTarget(target);
+    const contentTarget = document.getElementById('crm-content-header-portal');
+    if (contentTarget) setContentHeaderPortalTarget(contentTarget);
   }, []);
+
+  // Sync local search to URL with debounce
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const params = new URLSearchParams(window.location.search);
+      if (localSearch) {
+        params.set('search', localSearch);
+      } else {
+        params.delete('search');
+      }
+      const newUrl = `${window.location.pathname}${params.toString() ? '?' + params.toString() : ''}`;
+      window.history.replaceState({}, '', newUrl);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [localSearch]);
 
   useEffect(() => {
     // Fetch Settings
@@ -541,14 +559,32 @@ function LeadsPageContent() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-48px)] bg-background text-foreground font-sans transition-colors duration-300">
+    <div className="flex flex-col h-full bg-background text-foreground font-sans transition-colors duration-300">
       
 
-      {/* Header Portal Content */}
+      {/* Header Portal Content - just page title */}
       {headerPortalTarget && createPortal(
         <>
-          {/* Title */}
           <h1 className="text-sm font-bold text-foreground uppercase tracking-tight">Leads</h1>
+          <div className="flex-1" />
+        </>,
+        headerPortalTarget
+      )}
+
+      {/* Content Header Portal - search, filters, view toggle, add button */}
+      {contentHeaderPortalTarget && createPortal(
+        <div className="flex items-center gap-2 px-3 h-9 border-b border-border bg-secondary/30">
+          {/* Search - Left Side */}
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search leads..."
+              value={localSearch}
+              onChange={(e) => setLocalSearch(e.target.value)}
+              className="h-7 w-[220px] pl-8 pr-3 text-[11px] bg-background border border-border rounded focus:outline-none focus:ring-1 focus:ring-[#FFEF5F] focus:border-[#FFEF5F] placeholder:text-muted-foreground/60 text-foreground"
+            />
+          </div>
 
           {/* Spacer */}
           <div className="flex-1" />
@@ -580,14 +616,14 @@ function LeadsPageContent() {
           {/* Add Button */}
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="ml-2 flex items-center space-x-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm transition-all cursor-pointer"
+            className="flex items-center space-x-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm transition-all cursor-pointer h-7"
             title="Add New Lead"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add</span>
           </button>
-        </>,
-        headerPortalTarget
+        </div>,
+        contentHeaderPortalTarget
       )}
 
       <ClientModal 
@@ -648,7 +684,8 @@ function LeadsPageContent() {
                                   leads.map((lead) => (
                                       <tr 
                                           key={lead._id} 
-                                          className="group relative z-0 bg-background transition-colors duration-150"
+                                          onClick={() => router.push(`/crm/leads/${lead._id}`)}
+                                          className="group relative z-0 bg-background transition-colors duration-150 cursor-pointer hover:bg-secondary/40"
                                       >
                                           {/* NAME */}
                                           <td className="p-1 border-r border-border group-hover:border-l-2 group-hover:border-l-primary transition-all">
@@ -657,29 +694,6 @@ function LeadsPageContent() {
                                                       {lead.name.substring(0, 2)}
                                                   </div>
                                                   <span className="text-[10px] font-medium text-foreground leading-tight truncate max-w-[180px]">{lead.name}</span>
-                                                  <div className="flex items-center space-x-0.5 ml-auto opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                                                      <button
-                                                          onClick={() => router.push(`/crm/leads/${lead._id}`)}
-                                                          className="p-0.5 text-muted-foreground hover:text-blue-600 hover:bg-blue-100 rounded transition-colors cursor-pointer"
-                                                          title="View"
-                                                      >
-                                                          <Eye className="w-3 h-3" />
-                                                      </button>
-                                                      <button
-                                                          onClick={() => router.push(`/crm/leads/${lead._id}`)}
-                                                          className="p-0.5 text-muted-foreground hover:text-amber-600 hover:bg-amber-100 rounded transition-colors cursor-pointer"
-                                                          title="Edit"
-                                                      >
-                                                          <Pencil className="w-3 h-3" />
-                                                      </button>
-                                                      <button
-                                                          onClick={() => handleDeleteLead(lead._id, lead.name)}
-                                                          className="p-0.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors cursor-pointer"
-                                                          title="Delete"
-                                                      >
-                                                          <Trash2 className="w-3 h-3" />
-                                                      </button>
-                                                  </div>
                                               </div>
                                           </td>
                                           

@@ -274,7 +274,7 @@ export default function CallsView({ clientId, clientPhone, onInitiateCall }: Cal
   return (
     <div className="flex flex-col h-full bg-background transition-colors duration-300">
       {/* Action Bar */}
-      <div className="flex items-center justify-between px-4 h-11 border-b border-border bg-secondary/50 transition-colors">
+      <div className="flex items-center justify-between px-4 h-9 border-b border-border bg-secondary/50 transition-colors">
         <div className="flex items-center space-x-4">
           <h1 className="text-sm font-bold text-foreground uppercase tracking-tighter flex items-center gap-2">
             <PhoneCall className="w-4 h-4" />

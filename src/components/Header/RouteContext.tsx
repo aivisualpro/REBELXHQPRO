@@ -51,8 +51,9 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
     // Clients
     if (pathname === '/crm/clients') {
         return {
-            title: 'Clients',
-            actions: []
+            title: '', // Will be portaled
+            actions: [],
+            isPortal: true // Flag to identify portal mode
         };
     }
 

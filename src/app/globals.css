@@ -80,13 +80,13 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #000000;
+  background: var(--background);
 }
 
 ::-webkit-scrollbar-thumb {
   background: #FFEF5F;
   border-radius: 10px;
-  border: 2px solid #000000;
+  border: 2px solid var(--background);
 }
 
 ::-webkit-scrollbar-thumb:hover {

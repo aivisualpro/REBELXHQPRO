@@ -753,33 +753,33 @@ export default function ClientDashboardPage() {
         <>
             <div className="flex flex-col h-[calc(100vh-40px)] overflow-hidden bg-background">
             {/* Shell Layer 1: Route Header */}
-            <div className="sticky top-0 z-[50] bg-card border-b border-border px-4 flex items-center space-x-2 shrink-0 h-11 shadow-sm">
+            <div className="sticky top-0 z-[50] bg-card border-b border-border px-4 flex items-center space-x-2 shrink-0 h-9">
                 <button 
                     onClick={() => router.back()} 
-                    className="w-9 h-9 bg-primary flex items-center justify-center text-primary-foreground hover:bg-primary/90 transition-colors shrink-0 rounded"
+                    className="w-7 h-7 bg-primary flex items-center justify-center text-primary-foreground hover:bg-primary/90 transition-colors shrink-0 rounded"
                 >
-                    <ArrowLeft className="w-4 h-4" />
+                    <ArrowLeft className="w-3.5 h-3.5" />
                 </button>
 
                 <button 
                     onClick={() => setIsEditModalOpen(true)}
-                    className="w-9 h-9 bg-primary flex items-center justify-center text-primary-foreground hover:bg-primary/90 transition-colors shrink-0 rounded"
+                    className="w-7 h-7 bg-primary flex items-center justify-center text-primary-foreground hover:bg-primary/90 transition-colors shrink-0 rounded"
                 >
-                    <Edit className="w-4 h-4" />
+                    <Edit className="w-3.5 h-3.5" />
                 </button>
 
-                <div className="flex-1 max-w-sm relative group h-9">
-                    <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 group-focus-within:text-primary transition-colors" />
+                <div className="flex-1 max-w-sm relative group h-7">
+                    <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 group-focus-within:text-[#FFEF5F] transition-colors" />
                     <input 
                         type="text" 
                         placeholder={`Search ${activeTab.toLowerCase()}...`}
-                        className="w-full h-full pl-9 pr-4 bg-secondary/50 border border-transparent text-[11px] focus:outline-none focus:ring-1 focus:ring-ring focus:bg-background focus:border-ring transition-all rounded-md placeholder:text-muted-foreground font-medium text-foreground"
+                        className="w-full h-full pl-9 pr-4 bg-secondary/50 border border-transparent text-[11px] focus:outline-none focus:ring-1 focus:ring-[#FFEF5F] focus:bg-background focus:border-[#FFEF5F] transition-all rounded placeholder:text-muted-foreground font-medium text-foreground"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
                 </div>
 
-                <div className="flex items-center space-x-1 h-9 ml-4">
+                <div className="flex items-center space-x-1 h-7 ml-4">
                     {[
                         { id: 'Emails', icon: Mail, count: summary?.totalEmails },
                         { id: 'Calls', icon: Phone, count: summary?.totalCalls },
@@ -1142,21 +1142,7 @@ export default function ClientDashboardPage() {
                 </main>
             </div>
 
-            {/* Shell Layer 3: Footer */}
-            <div className="h-[24px] border-t border-slate-200 bg-slate-100/50 shrink-0 flex items-center justify-between px-4 z-[50]">
-                <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-1.5">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">System Ready</span>
-                    </div>
-                </div>
-                <div className="flex items-center space-x-4">
-                    <span className="text-[9px] text-slate-400 font-mono uppercase tracking-tighter">Client Dashboard v1.0</span>
-                    <span className="text-[9px] text-slate-400 font-mono uppercase tracking-tighter">
-                        {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
-                    </span>
-                </div>
-            </div>
+
         </div>
 
             <ClientModal

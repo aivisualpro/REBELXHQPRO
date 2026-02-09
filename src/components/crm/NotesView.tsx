@@ -117,7 +117,7 @@ export default function NotesView({ clientId, onNotesUpdate }: NotesViewProps) {
         <div className="flex flex-col h-full bg-background text-foreground font-sans">
             
             {/* Header / Action Bar */}
-            <div className="flex items-center justify-between px-4 h-11 border-b border-border bg-card sticky top-0 z-20 gap-4">
+            <div className="flex items-center justify-between px-4 h-9 border-b border-border bg-card sticky top-0 z-20 gap-4">
                 
                 {/* Left: Search */}
                 <div className="flex items-center space-x-6">

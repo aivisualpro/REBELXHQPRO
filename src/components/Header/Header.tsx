@@ -11,7 +11,7 @@ import { MobileMenu } from './MobileMenu';
 export const Header = () => {
     return (
         <header className="sticky top-0 z-[1000] w-full bg-background border-b border-border transition-colors duration-300">
-            <div className="max-w-[1600px] mx-auto h-9 px-3 flex items-center">
+            <div className="max-w-[1600px] mx-auto h-9 px-4 flex items-center">
                 {/* Left: 5% Logo */}
                 <div className="w-[5%] flex items-center">
                     <Link href="/" className="flex items-center group">

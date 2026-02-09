@@ -205,7 +205,7 @@ export default function OrdersView({ clientId }: OrdersViewProps) {
     <div className="flex flex-col h-full bg-background transition-colors duration-300">
       
       {/* Header / Action Bar */}
-      <div className="flex items-center justify-between px-4 h-11 border-b border-border bg-card sticky top-0 z-20 gap-4">
+      <div className="flex items-center justify-between px-4 h-9 border-b border-border bg-card sticky top-0 z-20 gap-4">
         
         {/* Left: Search */}
         <div className="flex items-center space-x-6">
@@ -214,13 +214,13 @@ export default function OrdersView({ clientId }: OrdersViewProps) {
                 Orders
             </h1>
             <div className="relative group">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-[#FFEF5F] transition-colors" />
                 <input 
                     type="text" 
                     placeholder="Search orders..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="pl-9 pr-4 h-8 w-64 bg-secondary/50 hover:bg-secondary focus:bg-background border border-transparent focus:border-primary rounded text-sm transition-all focus:outline-none placeholder:text-muted-foreground text-foreground"
+                    className="pl-9 pr-4 h-7 w-64 bg-secondary/50 hover:bg-secondary focus:bg-background border border-transparent focus:border-[#FFEF5F] rounded text-sm transition-all focus:outline-none focus:ring-1 focus:ring-[#FFEF5F] placeholder:text-muted-foreground text-foreground"
                 />
             </div>
         </div>
@@ -236,17 +236,9 @@ export default function OrdersView({ clientId }: OrdersViewProps) {
                      options={clientOptions}
                      selectedValues={selectedClients}
                      onChange={setSelectedClients}
-                     className="h-8"
+                     className="h-7"
                      />
                   )}
-
-                  <MultiSelectFilter
-                    label="Status"
-                    options={statusOptions}
-                    selectedValues={selectedStatuses}
-                    onChange={setSelectedStatuses}
-                    className="h-8"
-                   />
             </div>
 
             <div className="w-px h-6 bg-border" />
@@ -254,7 +246,7 @@ export default function OrdersView({ clientId }: OrdersViewProps) {
             {/* Actions Group */}
             <button 
                 onClick={() => setIsModalOpen(true)}
-                className="flex items-center justify-center w-8 h-8 bg-[#FFEF5F] text-black hover:opacity-90 rounded shadow-sm transition-all cursor-pointer"
+                className="flex items-center justify-center w-7 h-7 bg-[#FFEF5F] text-black hover:opacity-90 rounded shadow-sm transition-all cursor-pointer"
                 title="Create Order"
             >
                 <Plus className="w-4 h-4" />
@@ -304,51 +296,51 @@ export default function OrdersView({ clientId }: OrdersViewProps) {
                         ))}
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-border">
                     {loading && orders.length === 0 ? (
-                        <tr><td colSpan={7} className="px-6 py-12 text-center text-sm text-slate-400">Loading...</td></tr>
+                        <tr><td colSpan={7} className="px-6 py-12 text-center text-sm text-muted-foreground">Loading...</td></tr>
                     ) : orders.length > 0 ? (
                         orders.map((order) => (
                             <tr 
                                 key={order._id} 
-                                className="hover:bg-blue-50/50 hover:scale-[1.002] transition-all duration-200 group relative z-0 hover:z-10 cursor-pointer"
-                                onClick={() => router.push(`/sales/wholesale-orders?id=${order._id}`)} // Or open modal? Navigate is safer.
+                                className="hover:bg-secondary/40 transition-all duration-200 group relative z-0 hover:z-10 cursor-pointer bg-background"
+                                onClick={() => router.push(`/sales/wholesale-orders/${order._id}`)}
                             >
-                                <td className="p-2 border-b border-slate-50 text-[11px] font-bold text-slate-700">
-                                    <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">{order.label}</span>
+                                <td className="p-2 border-b border-border text-[11px] font-bold text-foreground">
+                                    <span className="font-mono bg-secondary px-1.5 py-0.5 rounded text-foreground/80">{order.label}</span>
                                 </td>
-                                <td className="p-2 border-b border-slate-50 text-[10px] text-slate-500 text-center">
+                                <td className="p-2 border-b border-border text-[10px] text-muted-foreground text-center">
                                     {new Date(order.createdAt).toLocaleDateString()}
                                 </td>
                                 {!clientId && (
-                                    <td className="p-2 border-b border-slate-50 text-[11px] font-medium text-slate-600 truncate max-w-[150px]">
+                                    <td className="p-2 border-b border-border text-[11px] font-medium text-foreground/70 truncate max-w-[150px]">
                                         {typeof order.clientId === 'object' ? order.clientId?.name : '-'}
                                     </td>
                                 )}
-                                <td className="p-2 border-b border-slate-50 text-[11px] font-bold text-emerald-600 text-right">
+                                <td className="p-2 border-b border-border text-[11px] font-bold text-emerald-500 text-right">
                                     ${(order.totalAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                 </td>
-                                <td className="p-2 border-b border-slate-50 text-center">
+                                <td className="p-2 border-b border-border text-center">
                                     <span className={cn(
                                         "px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider",
-                                        order.orderStatus === 'Completed' ? "bg-emerald-100 text-emerald-700" :
-                                        order.orderStatus === 'Pending' ? "bg-amber-100 text-amber-700" :
-                                        order.orderStatus === 'Cancelled' ? "bg-red-100 text-red-700" :
-                                        "bg-slate-100 text-slate-600"
+                                        order.orderStatus === 'Completed' ? "bg-emerald-500/15 text-emerald-500 dark:text-emerald-400" :
+                                        order.orderStatus === 'Pending' ? "bg-amber-500/15 text-amber-600 dark:text-amber-400" :
+                                        order.orderStatus === 'Cancelled' ? "bg-red-500/15 text-red-600 dark:text-red-400" :
+                                        "bg-secondary text-muted-foreground"
                                     )}>
                                         {order.orderStatus}
                                     </span>
                                 </td>
-                                <td className="p-2 border-b border-slate-50 text-[10px] text-slate-500 truncate max-w-[100px]">
+                                <td className="p-2 border-b border-border text-[10px] text-muted-foreground truncate max-w-[100px]">
                                     {typeof order.salesRep === 'object' ? `${order.salesRep?.firstName} ${order.salesRep?.lastName}` : '-'}
                                 </td>
                             </tr>
                         ))
                     ) : (
                         <tr>
-                            <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
+                            <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
                                 <div className="flex flex-col items-center justify-center space-y-2">
-                                    <ShoppingCart className="w-8 h-8 text-slate-200" />
+                                    <ShoppingCart className="w-8 h-8 text-muted-foreground/30" />
                                     <span>No orders found</span>
                                 </div>
                             </td>

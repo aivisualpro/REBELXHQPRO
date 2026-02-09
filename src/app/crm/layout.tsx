@@ -121,7 +121,7 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
         {/* Top Header & Toggle */}
         <div className={cn(
           "flex items-center shrink-0 border-b border-border transition-all duration-300",
-          isSidebarCollapsed ? "justify-center h-11" : "justify-between h-11 px-4"
+          isSidebarCollapsed ? "justify-center h-9" : "justify-between h-9 px-4"
         )}>
           {!isSidebarCollapsed && (
             <span className="text-foreground font-black text-xs uppercase tracking-widest opacity-80">CRM Console</span>
@@ -340,8 +340,12 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-auto bg-background/50">
-        {children}
+      <main className="flex-1 flex flex-col overflow-hidden bg-background/50">
+        {/* Content Header Bar - portal target for page-specific search/filters/actions */}
+        <div id="crm-content-header-portal" className="shrink-0" />
+        <div className="flex-1 overflow-auto">
+          {children}
+        </div>
       </main>
 
       <ClientModal 
