@@ -442,7 +442,7 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-card w-full max-w-6xl rounded-none shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 border border-border flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between px-6 py-2 border-b border-border bg-muted/50 shrink-0">
+            <div className="flex items-center justify-between px-6 border-b border-border bg-muted/50 shrink-0 h-9">
               <h2 className="text-sm font-bold uppercase text-foreground">{orderToEdit ? 'Edit Sale Order' : 'Create Sale Order'}</h2>
               <button
                 onClick={onClose}
@@ -467,7 +467,7 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
                                 required
                                 readOnly
                                 value={newOrder.label}
-                                className="w-full h-[34px] px-3 border border-input rounded-md text-sm bg-muted text-foreground focus:outline-none cursor-not-allowed"
+                                className="w-full h-[34px] px-3 border border-border rounded-md text-sm bg-secondary/50 text-muted-foreground focus:outline-none cursor-not-allowed"
                                 />
                             </div>
                             <div className="space-y-1.5">
@@ -477,7 +477,7 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
                                         type="text"
                                         readOnly
                                         value={allClients.find(c => c._id === newOrder.clientId)?.name || 'Loading...'}
-                                        className="w-full h-[34px] px-3 border border-input rounded-md text-sm bg-muted text-foreground focus:outline-none cursor-not-allowed"
+                                        className="w-full h-[34px] px-3 border border-border rounded-md text-sm bg-secondary/50 text-muted-foreground focus:outline-none cursor-not-allowed"
                                     />
                                 ) : (
                                     <SearchableSelect
@@ -497,7 +497,7 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
                                         type="text"
                                         readOnly
                                         value={allUsers.find(u => u._id === newOrder.salesRep) ? `${allUsers.find(u => u._id === newOrder.salesRep)?.firstName} ${allUsers.find(u => u._id === newOrder.salesRep)?.lastName}` : 'Loading...'}
-                                        className="w-full h-[34px] px-3 border border-input rounded-md text-sm bg-muted text-foreground focus:outline-none cursor-not-allowed"
+                                        className="w-full h-[34px] px-3 border border-border rounded-md text-sm bg-secondary/50 text-muted-foreground focus:outline-none cursor-not-allowed"
                                     />
                                 ) : (
                                     <SearchableSelect
@@ -696,12 +696,12 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
               </form>
             </div>
 
-            <div className="px-4 py-2 border-t border-border bg-muted/20 flex justify-end shrink-0">
+            <div className="px-4 border-t border-border bg-muted/20 flex items-center justify-end shrink-0 h-9">
               <button
                 type="submit"
                 form="create-so-form"
                 disabled={isSaving}
-                className="px-6 py-2.5 bg-primary text-primary-foreground text-xs font-bold uppercase rounded hover:bg-primary/90 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                className="px-6 py-1.5 bg-primary text-primary-foreground text-xs font-bold uppercase rounded hover:bg-primary/90 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
               >
                 {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 <span>{isSaving ? 'Creating...' : (orderToEdit ? 'Save Changes' : 'Create Order')}</span>

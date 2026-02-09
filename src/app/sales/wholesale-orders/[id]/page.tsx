@@ -270,26 +270,47 @@ export default function SaleOrderDetailPage() {
   };
 
   const handleDeleteItem = async (itemId: string) => {
-      if (!order || !window.confirm('Delete this item?')) return;
-      const updatedItems = order.lineItems?.filter(i => i._id !== itemId).map(i => ({
-          ...i,
-          sku: typeof i.sku === 'object' ? i.sku._id : i.sku
-      })) || [];
-
-      try {
-          const res = await fetch(`/api/wholesale/orders/${order._id}`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ lineItems: updatedItems })
-          });
-          if (res.ok) {
-              const data = await res.json();
-              setOrder(data);
-              toast.success('Item deleted');
-          }
-      } catch (e) {
-          toast.error('Failed to delete');
-      }
+      if (!order) return;
+      toast((t) => (
+          <div className="flex flex-col gap-2">
+              <p className="text-sm font-bold text-foreground">Delete this item?</p>
+              <p className="text-xs text-muted-foreground">This action cannot be undone.</p>
+              <div className="flex gap-2 mt-1">
+                  <button
+                      onClick={() => toast.dismiss(t.id)}
+                      className="flex-1 px-3 py-1.5 text-xs font-bold rounded border border-border bg-background text-foreground hover:bg-secondary transition-colors"
+                  >
+                      Cancel
+                  </button>
+                  <button
+                      onClick={async () => {
+                          toast.dismiss(t.id);
+                          const updatedItems = order.lineItems?.filter(i => i._id !== itemId).map(i => ({
+                              ...i,
+                              sku: typeof i.sku === 'object' ? i.sku._id : i.sku
+                          })) || [];
+                          try {
+                              const res = await fetch(`/api/wholesale/orders/${order._id}`, {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ lineItems: updatedItems })
+                              });
+                              if (res.ok) {
+                                  const data = await res.json();
+                                  setOrder(data);
+                                  toast.success('Item deleted');
+                              }
+                          } catch (e) {
+                              toast.error('Failed to delete');
+                          }
+                      }}
+                      className="flex-1 px-3 py-1.5 text-xs font-bold rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+                  >
+                      Delete
+                  </button>
+              </div>
+          </div>
+      ), { duration: 10000, style: { maxWidth: '360px' } });
   };
 
   // Lot Selection
@@ -361,23 +382,44 @@ export default function SaleOrderDetailPage() {
   };
 
   const handleDeletePayment = async (paymentId: string) => {
-      if (!order || !window.confirm('Delete this payment?')) return;
-      const updatedPayments = order.payments?.filter(p => p._id !== paymentId) || [];
-
-      try {
-          const res = await fetch(`/api/wholesale/orders/${order._id}`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ payments: updatedPayments })
-          });
-          if (res.ok) {
-              const data = await res.json();
-              setOrder(data);
-              toast.success('Payment deleted');
-          }
-      } catch (e) {
-          toast.error('Failed to delete');
-      }
+      if (!order) return;
+      toast((t) => (
+          <div className="flex flex-col gap-2">
+              <p className="text-sm font-bold text-foreground">Delete this payment?</p>
+              <p className="text-xs text-muted-foreground">This action cannot be undone.</p>
+              <div className="flex gap-2 mt-1">
+                  <button
+                      onClick={() => toast.dismiss(t.id)}
+                      className="flex-1 px-3 py-1.5 text-xs font-bold rounded border border-border bg-background text-foreground hover:bg-secondary transition-colors"
+                  >
+                      Cancel
+                  </button>
+                  <button
+                      onClick={async () => {
+                          toast.dismiss(t.id);
+                          const updatedPayments = order.payments?.filter(p => p._id !== paymentId) || [];
+                          try {
+                              const res = await fetch(`/api/wholesale/orders/${order._id}`, {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ payments: updatedPayments })
+                              });
+                              if (res.ok) {
+                                  const data = await res.json();
+                                  setOrder(data);
+                                  toast.success('Payment deleted');
+                              }
+                          } catch (e) {
+                              toast.error('Failed to delete');
+                          }
+                      }}
+                      className="flex-1 px-3 py-1.5 text-xs font-bold rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+                  >
+                      Delete
+                  </button>
+              </div>
+          </div>
+      ), { duration: 10000, style: { maxWidth: '360px' } });
   };
 
   const handleSaveHeader = async () => {
@@ -527,25 +569,46 @@ export default function SaleOrderDetailPage() {
                         <span>Edit</span>
                     </button>
                     <button 
-                        onClick={async () => {
-                            if (!window.confirm('Are you sure you want to delete this order? This action cannot be undone.')) return;
-                            setIsDeleting(true);
-                            try {
-                                const res = await fetch(`/api/wholesale/orders/${order._id}`, {
-                                    method: 'DELETE'
-                                });
-                                if (res.ok) {
-                                    toast.success('Order deleted');
-                                    router.push('/sales/wholesale-orders');
-                                } else {
-                                    const data = await res.json();
-                                    toast.error(data.error || 'Failed to delete order');
-                                }
-                            } catch (e) {
-                                toast.error('Error deleting order');
-                            } finally {
-                                setIsDeleting(false);
-                            }
+                        onClick={() => {
+                            toast((t) => (
+                                <div className="flex flex-col gap-2">
+                                    <p className="text-sm font-bold text-foreground">Delete this order?</p>
+                                    <p className="text-xs text-muted-foreground">This action cannot be undone.</p>
+                                    <div className="flex gap-2 mt-1">
+                                        <button
+                                            onClick={() => toast.dismiss(t.id)}
+                                            className="flex-1 px-3 py-1.5 text-xs font-bold rounded border border-border bg-background text-foreground hover:bg-secondary transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={async () => {
+                                                toast.dismiss(t.id);
+                                                setIsDeleting(true);
+                                                try {
+                                                    const res = await fetch(`/api/wholesale/orders/${order._id}`, {
+                                                        method: 'DELETE'
+                                                    });
+                                                    if (res.ok) {
+                                                        toast.success('Order deleted');
+                                                        router.push('/sales/wholesale-orders');
+                                                    } else {
+                                                        const data = await res.json();
+                                                        toast.error(data.error || 'Failed to delete order');
+                                                    }
+                                                } catch (e) {
+                                                    toast.error('Error deleting order');
+                                                } finally {
+                                                    setIsDeleting(false);
+                                                }
+                                            }}
+                                            className="flex-1 px-3 py-1.5 text-xs font-bold rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
+                                </div>
+                            ), { duration: 10000, style: { maxWidth: '360px' } });
                         }}
                         disabled={isDeleting}
                         className="flex items-center space-x-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded transition-all cursor-pointer border border-red-500/30 text-red-500 hover:text-white hover:bg-red-600 disabled:opacity-50"
@@ -566,10 +629,10 @@ export default function SaleOrderDetailPage() {
                 {/* Identity Boxes */}
                 <div className="grid grid-cols-3 gap-2">
                     <div className="border border-border rounded-md p-3 bg-background text-center">
-                        <div className="text-[11px] font-bold text-foreground">#{order.label}</div>
+                        <div className="text-[11px] font-bold text-foreground">{order.label}</div>
                     </div>
                     <div className="border border-border rounded-md p-3 bg-background text-center">
-                        <div className="text-[11px] font-bold text-foreground truncate">{renderClient(order.clientId)}</div>
+                        <div className="text-[11px] font-bold text-foreground break-words">{renderClient(order.clientId)}</div>
                     </div>
                     <div className="border border-border rounded-md p-3 bg-background text-center flex items-center justify-center">
                         <select
@@ -1112,143 +1175,194 @@ export default function SaleOrderDetailPage() {
         {/* Edit Header Modal */}
         {isHeaderModalOpen && editingHeader && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                <div className="bg-card rounded-lg shadow-2xl w-full max-w-2xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
-                    <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-secondary/50 shrink-0">
+                <div className="bg-card rounded-none shadow-2xl w-full max-w-4xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh] border border-border overflow-hidden">
+                    <div className="flex items-center justify-between px-6 border-b border-border bg-muted/50 shrink-0 h-9">
                         <h2 className="text-sm font-bold uppercase text-foreground">Edit Order Details</h2>
-                        <button onClick={() => setIsHeaderModalOpen(false)} className="text-muted-foreground hover:text-foreground">
+                        <button onClick={() => setIsHeaderModalOpen(false)} className="text-muted-foreground hover:text-foreground transition-colors">
                             <X className="w-4 h-4" />
                         </button>
                     </div>
-                    <div className="p-6 overflow-y-auto">
-                        <div className="grid grid-cols-2 gap-4 mb-4">
-                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Order Status</label>
-                                <select
-                                    value={editingHeader.orderStatus}
-                                    onChange={(e) => setEditingHeader({...editingHeader, orderStatus: e.target.value})}
-                                    className="w-full px-3 h-9 border border-border rounded text-sm focus:outline-none bg-card"
-                                >
-                                    <option value="Completed">Completed</option>
-                                    <option value="Issued">Issued</option>
-                                    <option value="Pending Payment">Pending Payment</option>
-                                    <option value="Shipping">Shipping</option>
-                                    <option value="Picking">Picking</option>
-                                </select>
-                             </div>
-                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Sales Rep</label>
-                                <SearchableSelect
-                                    options={allUsers.map(u => ({ label: `${u.firstName} ${u.lastName}`, value: u._id }))}
-                                    value={editingHeader.salesRep}
-                                    onChange={(val) => setEditingHeader({...editingHeader, salesRep: val})}
-                                />
-                             </div>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-4 mb-4">
-                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Payment Method</label>
-                                <SearchableSelect
-                                    options={PAYMENT_METHODS}
-                                    value={editingHeader.paymentMethod}
-                                    onChange={(val) => setEditingHeader({...editingHeader, paymentMethod: val})}
-                                />
-                             </div>
-                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Shipped Date</label>
-                                <input
-                                    type="date"
-                                    value={editingHeader.shippedDate}
-                                    onChange={(e) => setEditingHeader({...editingHeader, shippedDate: e.target.value})}
-                                    className="w-full px-3 h-9 border border-border rounded text-sm focus:outline-none"
-                                />
-                             </div>
-                        </div>
+                    <div className="flex-1 overflow-auto p-4 scrollbar-custom bg-background">
+                        <div className="space-y-6">
+                            {/* Order Details Section */}
+                            <div>
+                                <h4 className="text-xs font-bold text-foreground uppercase tracking-wider mb-3 pb-1 border-b border-border">Order Details</h4>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Order Name/ID</label>
+                                        <input
+                                            type="text"
+                                            readOnly
+                                            value={order?.label || ''}
+                                            className="w-full h-[34px] px-3 border border-border rounded-md text-sm bg-secondary/50 text-muted-foreground focus:outline-none cursor-not-allowed"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Client</label>
+                                        <input
+                                            type="text"
+                                            readOnly
+                                            value={typeof order?.clientId === 'object' && order?.clientId ? (order.clientId as any).name : String(order?.clientId || '')}
+                                            className="w-full h-[34px] px-3 border border-border rounded-md text-sm bg-secondary/50 text-muted-foreground focus:outline-none cursor-not-allowed"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Sales Rep</label>
+                                        <SearchableSelect
+                                            options={allUsers.map(u => ({ label: `${u.firstName || ''} ${u.lastName || ''}`.trim(), value: u._id }))}
+                                            value={editingHeader.salesRep}
+                                            onChange={(val) => setEditingHeader({...editingHeader, salesRep: val})}
+                                            placeholder="Select Rep..."
+                                            className="w-full"
+                                            triggerClassName="py-[6px] bg-card"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Payment Method</label>
+                                        <SearchableSelect
+                                            options={PAYMENT_METHODS}
+                                            value={editingHeader.paymentMethod}
+                                            onChange={(val) => setEditingHeader({...editingHeader, paymentMethod: val})}
+                                            placeholder="Select Method..."
+                                            className="w-full"
+                                            triggerClassName="py-[6px] bg-card"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
 
-                        <div className="grid grid-cols-2 gap-4 mb-4">
-                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Shipping Method</label>
-                                <SearchableSelect
-                                    options={SHIPPING_METHODS}
-                                    value={editingHeader.shippingMethod}
-                                    onChange={(val) => setEditingHeader({...editingHeader, shippingMethod: val})}
-                                    creatable
-                                />
-                             </div>
-                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Tracking Number</label>
-                                <input
-                                    type="text"
-                                    value={editingHeader.trackingNumber}
-                                    onChange={(e) => setEditingHeader({...editingHeader, trackingNumber: e.target.value})}
-                                    className="w-full px-3 h-9 border border-border rounded text-sm focus:outline-none"
-                                />
-                             </div>
-                        </div>
+                            {/* Shipping Details Section */}
+                            <div>
+                                <h4 className="text-xs font-bold text-foreground uppercase tracking-wider mb-3 pb-1 border-b border-border">Shipping Details</h4>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Order Status</label>
+                                        <select
+                                            value={editingHeader.orderStatus}
+                                            onChange={(e) => setEditingHeader({...editingHeader, orderStatus: e.target.value})}
+                                            className="w-full h-[34px] px-3 border border-input rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary/20 bg-background text-foreground"
+                                        >
+                                            <option value="Completed">Completed</option>
+                                            <option value="Issued">Issued</option>
+                                            <option value="Pending Payment">Pending Payment</option>
+                                            <option value="Shipping">Shipping</option>
+                                            <option value="Picking">Picking</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Shipped Date</label>
+                                        <input
+                                            type="date"
+                                            value={editingHeader.shippedDate}
+                                            onChange={(e) => setEditingHeader({...editingHeader, shippedDate: e.target.value})}
+                                            className="w-full h-[34px] px-3 border border-input rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary/20 bg-background text-foreground"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Shipping Method</label>
+                                        <SearchableSelect
+                                            options={SHIPPING_METHODS}
+                                            value={editingHeader.shippingMethod}
+                                            onChange={(val) => setEditingHeader({...editingHeader, shippingMethod: val})}
+                                            placeholder="Select Method..."
+                                            creatable
+                                            className="w-full"
+                                            triggerClassName="py-[6px] bg-card"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Tracking Number</label>
+                                        <input
+                                            type="text"
+                                            value={editingHeader.trackingNumber}
+                                            onChange={(e) => setEditingHeader({...editingHeader, trackingNumber: e.target.value})}
+                                            className="w-full h-[34px] px-3 border border-input rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary/20 bg-background text-foreground"
+                                        />
+                                    </div>
 
-                        <div className="space-y-1.5 mb-4">
-                            <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Shipping Address</label>
-                            <input
-                                type="text"
-                                value={editingHeader.shippingAddress}
-                                onChange={(e) => setEditingHeader({...editingHeader, shippingAddress: e.target.value})}
-                                className="w-full px-3 h-9 border border-border rounded text-sm focus:outline-none"
-                                placeholder="Street Address"
-                            />
-                            <div className="grid grid-cols-2 gap-4 mt-2">
-                                <input
-                                    type="text"
-                                    value={editingHeader.city}
-                                    onChange={(e) => setEditingHeader({...editingHeader, city: e.target.value})}
-                                    className="w-full px-3 h-9 border border-border rounded text-sm focus:outline-none"
-                                    placeholder="City"
-                                />
-                                <input
-                                    type="text"
-                                    value={editingHeader.state}
-                                    onChange={(e) => setEditingHeader({...editingHeader, state: e.target.value})}
-                                    className="w-full px-3 h-9 border border-border rounded text-sm focus:outline-none"
-                                    placeholder="State"
-                                />
+                                    {/* Address - Full Width */}
+                                    <div className="col-span-2 md:col-span-4">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Shipping Address</label>
+                                            <input
+                                                type="text"
+                                                value={editingHeader.shippingAddress}
+                                                onChange={(e) => setEditingHeader({...editingHeader, shippingAddress: e.target.value})}
+                                                className="w-full h-[34px] px-3 border border-input rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary/20 bg-background text-foreground"
+                                                placeholder="Street Address, City, State, Zip"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="col-span-1 md:col-span-2">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">City</label>
+                                            <input
+                                                type="text"
+                                                value={editingHeader.city}
+                                                onChange={(e) => setEditingHeader({...editingHeader, city: e.target.value})}
+                                                className="w-full h-[34px] px-3 border border-input rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary/20 bg-background text-foreground"
+                                                placeholder="City"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="col-span-1 md:col-span-2">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">State</label>
+                                            <input
+                                                type="text"
+                                                value={editingHeader.state}
+                                                onChange={(e) => setEditingHeader({...editingHeader, state: e.target.value})}
+                                                className="w-full h-[34px] px-3 border border-input rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary/20 bg-background text-foreground"
+                                                placeholder="State"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Costs Section */}
+                            <div>
+                                <h4 className="text-xs font-bold text-foreground uppercase tracking-wider mb-3 pb-1 border-b border-border">Costs</h4>
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Shipping Cost ($)</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            value={editingHeader.shippingCost}
+                                            onWheel={(e) => e.currentTarget.blur()}
+                                            onChange={(e) => setEditingHeader({...editingHeader, shippingCost: parseFloat(e.target.value) || 0})}
+                                            className="w-full h-[34px] px-3 border border-input rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary/20 bg-background text-foreground"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Discount ($)</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            value={editingHeader.discount}
+                                            onWheel={(e) => e.currentTarget.blur()}
+                                            onChange={(e) => setEditingHeader({...editingHeader, discount: parseFloat(e.target.value) || 0})}
+                                            className="w-full h-[34px] px-3 border border-input rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary/20 bg-background text-foreground"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Tax ($)</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            value={editingHeader.tax}
+                                            onWheel={(e) => e.currentTarget.blur()}
+                                            onChange={(e) => setEditingHeader({...editingHeader, tax: parseFloat(e.target.value) || 0})}
+                                            className="w-full h-[34px] px-3 border border-input rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary/20 bg-background text-foreground"
+                                        />
+                                    </div>
+                                </div>
                             </div>
                         </div>
-
-                         <div className="grid grid-cols-3 gap-4 mb-4">
-                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Shipping Cost ($)</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={editingHeader.shippingCost}
-                                    onChange={(e) => setEditingHeader({...editingHeader, shippingCost: parseFloat(e.target.value) || 0})}
-                                    className="w-full px-3 h-9 border border-border rounded text-sm focus:outline-none"
-                                />
-                             </div>
-                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Discount ($)</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={editingHeader.discount}
-                                    onChange={(e) => setEditingHeader({...editingHeader, discount: parseFloat(e.target.value) || 0})}
-                                    className="w-full px-3 h-9 border border-border rounded text-sm focus:outline-none"
-                                />
-                             </div>
-                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Tax ($)</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={editingHeader.tax}
-                                    onChange={(e) => setEditingHeader({...editingHeader, tax: parseFloat(e.target.value) || 0})}
-                                    className="w-full px-3 h-9 border border-border rounded text-sm focus:outline-none"
-                                />
-                             </div>
-                        </div>
-
                     </div>
-                    <div className="p-4 border-t border-border bg-secondary/50 shrink-0">
-                        <button onClick={handleSaveHeader} className="w-full h-9 bg-[#FFEF5F] text-black text-xs font-bold uppercase rounded hover:opacity-90 transition-colors">
+                    <div className="px-4 border-t border-border bg-muted/20 flex items-center justify-end shrink-0 h-9">
+                        <button onClick={handleSaveHeader} className="px-6 py-1.5 bg-[#FFEF5F] text-black text-xs font-bold uppercase rounded hover:opacity-90 transition-colors shadow-lg">
                             Save Changes
                         </button>
                     </div>

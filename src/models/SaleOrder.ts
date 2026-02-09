@@ -41,6 +41,14 @@ const SaleOrderSchema = new mongoose.Schema({
         paymentAmount: Number,
         createdAt: { type: Date, default: Date.now },
         createdBy: { type: String, ref: 'RXHQUsers' }
+    }],
+
+    notes: [{
+        // _id auto-generated as ObjectId
+        legacyId: String, // Used during import to reference parent order legacyId
+        note: String,
+        createdBy: { type: String, ref: 'RXHQUsers' },
+        createdAt: { type: Date, default: Date.now }
     }]
 });
 
