@@ -377,10 +377,11 @@ export async function GET(
         }
 
         const isPendingProduction = (t: any) => t.type === 'Produced' && t.status === 'Pending';
+        const isUnfulfilledConsumption = (t: any) => t.type === 'Consumption' && t.status !== 'Fulfilled';
 
         const filteredTransactions = (startDate ? transactions.filter(t => t.date >= startDate) : transactions).map(t => {
-            // Produced + Pending: show in table but don't count towards balance or stats
-            if (!isPendingProduction(t)) {
+            // Produced + Pending OR Consumption + not Fulfilled: show in table but don't count towards balance or stats
+            if (!isPendingProduction(t) && !isUnfulfilledConsumption(t)) {
                 balance = round8(balance + t.quantity);
             }
             const key = `${t.date.getFullYear()}-${String(t.date.getMonth()+1).padStart(2,'0')}`;
@@ -394,7 +395,7 @@ export async function GET(
                     const s = monthlyStats.get(key)!;
                     s.revenue += rev; s.qty += qty;
                 }
-            } else if (t.type === 'Produced' && !isPendingProduction(t)) {
+            } else if (t.type === 'Produced' && !isPendingProduction(t) && !isUnfulfilledConsumption(t)) {
                 if (monthlyStats.has(key)) {
                     const s = monthlyStats.get(key)!;
                     s.productionQty += t.quantity;

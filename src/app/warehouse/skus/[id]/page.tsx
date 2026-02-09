@@ -307,6 +307,7 @@ function SkuDetailsPageContent() {
     });
 
     const isPendingProduction = (tx: Transaction) => tx.type === 'Produced' && tx.status === 'Pending';
+    const isUnfulfilledConsumption = (tx: Transaction) => tx.type === 'Consumption' && tx.status !== 'Fulfilled';
 
     const displayTransactions = selectedLot === 'All' 
         ? finalTransactions 
@@ -314,7 +315,7 @@ function SkuDetailsPageContent() {
             let runningBal = 0;
             const ascTx = [...finalTransactions].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
             const balanced = ascTx.map(tx => {
-                if (!isPendingProduction(tx)) {
+                if (!isPendingProduction(tx) && !isUnfulfilledConsumption(tx)) {
                     runningBal += tx.quantity;
                 }
                 return { ...tx, balance: runningBal };
@@ -428,6 +429,27 @@ function SkuDetailsPageContent() {
                                                 </p>
                                                 <p className="text-[9px] text-amber-600 mt-0.5">
                                                     <span className="font-mono font-bold">+{pendingQty.toLocaleString()}</span> units not counted until fulfilled
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+                            {/* Unfulfilled Consumption Warning */}
+                            {(() => {
+                                const unfulfilledTxs = transactions.filter(tx => tx.type === 'Consumption' && tx.status !== 'Fulfilled');
+                                if (unfulfilledTxs.length === 0) return null;
+                                const unfulfilledQty = unfulfilledTxs.reduce((acc, tx) => acc + Math.abs(tx.quantity), 0);
+                                return (
+                                    <div className="w-full mt-2 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2.5">
+                                        <div className="flex items-start space-x-2">
+                                            <AlertTriangle className="w-3.5 h-3.5 text-rose-500 mt-0.5 shrink-0" />
+                                            <div>
+                                                <p className="text-[10px] font-bold text-rose-700 uppercase tracking-wide">
+                                                    {unfulfilledTxs.length} Unfulfilled Consumption{unfulfilledTxs.length > 1 ? 's' : ''}
+                                                </p>
+                                                <p className="text-[9px] text-rose-600 mt-0.5">
+                                                    <span className="font-mono font-bold">{unfulfilledQty.toLocaleString()}</span> units not counted until fulfilled
                                                 </p>
                                             </div>
                                         </div>
@@ -722,7 +744,7 @@ function SkuDetailsPageContent() {
                         </div>
                         <div className="flex items-center space-x-2">
                             {(() => {
-                                const countable = displayTransactions.filter(tx => !isPendingProduction(tx));
+                                const countable = displayTransactions.filter(tx => !isPendingProduction(tx) && !isUnfulfilledConsumption(tx));
                                 const totalQty = countable.reduce((acc, tx) => acc + tx.quantity, 0);
                                 return (
                                     <>
@@ -761,7 +783,7 @@ function SkuDetailsPageContent() {
                         </thead>
                         <tbody className="divide-y divide-slate-50">
                             {paginatedTransactions.map((tx) => (
-                                <tr key={tx._id} className={cn("hover:bg-slate-50/50 transition-colors group cursor-pointer", isPendingProduction(tx) && "!bg-rose-50 hover:!bg-rose-100 border-l-2 border-l-rose-400")} onClick={() => router.push(tx.link)}>
+                                <tr key={tx._id} className={cn("hover:bg-slate-50/50 transition-colors group cursor-pointer", (isPendingProduction(tx) || isUnfulfilledConsumption(tx)) && "!bg-rose-50 hover:!bg-rose-100 border-l-2 border-l-rose-400")} onClick={() => router.push(tx.link)}>
                                     <td className="px-3 py-2 text-[10px] text-slate-500 font-mono">{new Date(tx.date).toLocaleDateString('en-US', { year: '2-digit', month: '2-digit', day: '2-digit' })}</td>
                                     <td className="px-3 py-2">
                                         <div className="flex items-center space-x-2">
@@ -789,7 +811,7 @@ function SkuDetailsPageContent() {
                                     <td className="px-3 py-2 text-right">
                                         <span className={cn(
                                             "text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-sm",
-                                            isPendingProduction(tx) ? "text-amber-500/70 bg-amber-50 line-through" :
+                                            (isPendingProduction(tx) || isUnfulfilledConsumption(tx)) ? "text-amber-500/70 bg-amber-50 line-through" :
                                             tx.quantity > 0 ? "text-emerald-700 bg-emerald-50" : "text-rose-700 bg-rose-50"
                                         )}>{tx.quantity > 0 ? '+' : ''}{tx.quantity}</span>
                                     </td>
@@ -806,10 +828,10 @@ function SkuDetailsPageContent() {
                                         ) : <span className="text-[10px] text-slate-300">-</span>}
                                     </td>
                                     <td className="px-3 py-2 text-right text-[10px] font-bold text-slate-900 font-mono">
-                                        {isPendingProduction(tx) ? <span className="text-slate-300">-</span> : tx.balance.toLocaleString()}
+                                        {(isPendingProduction(tx) || isUnfulfilledConsumption(tx)) ? <span className="text-slate-300">-</span> : tx.balance.toLocaleString()}
                                     </td>
                                     <td className="px-3 py-2 text-right text-[10px] text-slate-600 font-mono">
-                                        {isPendingProduction(tx) ? <span className="text-slate-300">-</span> : (tx.cost ? `$${tx.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}` : '-')}
+                                        {(isPendingProduction(tx) || isUnfulfilledConsumption(tx)) ? <span className="text-slate-300">-</span> : (tx.cost ? `$${tx.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}` : '-')}
                                     </td>
                                 </tr>
                             ))}
