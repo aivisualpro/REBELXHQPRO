@@ -11,8 +11,7 @@ import {
   Printer,
   RefreshCw,
   Loader2,
-  Package,
-  Eye
+  Package
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -939,28 +938,11 @@ function SaleOrdersContent() {
                 return (
                   <tr
                     key={order._id}
-                    className="group relative z-0 bg-background transition-colors duration-150"
+                    onClick={() => router.push(`/sales/wholesale-orders/${order._id}`)}
+                    className="group relative z-0 bg-background transition-colors duration-150 cursor-pointer hover:bg-secondary/30"
                   >
                     <td className="px-2 py-1.5 border-r border-border group-hover:border-l-2 group-hover:border-l-primary transition-all">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-[10px] font-bold text-foreground tracking-tight font-mono whitespace-nowrap overflow-hidden text-ellipsis max-w-[60px]">{order.label || '-'}</span>
-                        <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => router.push(`/sales/wholesale-orders/${order._id}`)}
-                            className="p-1 text-muted-foreground hover:text-primary hover:bg-secondary rounded transition-colors cursor-pointer"
-                            title="View Order"
-                          >
-                            <Eye className="w-3 h-3" />
-                          </button>
-                          <button
-                            onClick={(e) => handleEditClick(e, order)}
-                            className="p-1 text-muted-foreground hover:text-primary hover:bg-secondary rounded transition-colors cursor-pointer"
-                            title="Edit Order"
-                          >
-                            <Pencil className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
+                      <span className="text-[10px] font-bold text-foreground tracking-tight font-mono whitespace-nowrap overflow-hidden text-ellipsis max-w-[60px]">{order.label || '-'}</span>
                     </td>
                     <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono border-r border-border">{formatDate(order.createdAt)}</td>
                     <td className="px-2 py-1.5 text-[10px] text-foreground font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px] border-r border-border">{renderClient(order)}</td>

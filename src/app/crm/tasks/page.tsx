@@ -420,22 +420,21 @@ function TasksContent() {
 
     // Header Portal Content
     const headerContent = (
-        <div className="flex items-center w-full h-full px-4 space-x-2">
-            <h1 className="text-sm font-bold text-foreground uppercase tracking-tight">Tasks</h1>
+        <div className="flex items-center w-full h-full space-x-1">
             <button
                 onClick={handleAutoGenerate}
                 disabled={generating}
-                className="p-1 rounded bg-primary text-primary-foreground hover:opacity-90 transition-all disabled:opacity-50 cursor-pointer"
+                className="h-9 w-9 flex items-center justify-center bg-primary text-primary-foreground hover:opacity-90 transition-all disabled:opacity-50 cursor-pointer"
                 title="Auto-Generate Tasks"
             >
-                {generating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
+                {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
             </button>
             <button
                 onClick={() => setIsNewTaskModalOpen(true)}
-                className="p-1 rounded bg-yellow-400 hover:bg-yellow-500 transition-colors cursor-pointer"
+                className="h-9 w-9 flex items-center justify-center bg-yellow-400 hover:bg-yellow-500 transition-colors cursor-pointer"
                 title="New Task"
             >
-                <Plus className="w-3 h-3 text-black" />
+                <Plus className="w-4 h-4 text-black" />
             </button>
         </div>
     );
