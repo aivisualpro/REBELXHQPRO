@@ -3,6 +3,7 @@ import dbConnect from '@/lib/mongoose';
 import PurchaseOrder from '@/models/PurchaseOrder';
 import Sku from '@/models/Sku';
 import Vendor from '@/models/Vendor';
+import mongoose from 'mongoose';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,11 +29,46 @@ export async function GET(
             return NextResponse.json({ error: 'Order not found' }, { status: 404 });
         }
 
+        // Fix unpopulated SKUs due to String/ObjectId type mismatch
+        if (order.lineItems?.length) {
+            const unpopulatedItems = order.lineItems.filter(
+                (item: any) => item.sku && typeof item.sku === 'string'
+            );
+            if (unpopulatedItems.length > 0) {
+                const skuIds = unpopulatedItems.map((item: any) => item.sku);
+                const db = mongoose.connection.db!;
+                // Try both String and ObjectId lookups
+                const objectIds = skuIds
+                    .filter((id: string) => mongoose.Types.ObjectId.isValid(id))
+                    .map((id: string) => new mongoose.Types.ObjectId(id));
+                const skuDocs = await db.collection('skus').find({
+                    $or: [
+                        { _id: { $in: skuIds } },
+                        ...(objectIds.length > 0 ? [{ _id: { $in: objectIds } }] : [])
+                    ]
+                }, { projection: { _id: 1, name: 1 } }).toArray();
+
+                const skuMap = new Map<string, string>();
+                skuDocs.forEach((s: any) => skuMap.set(s._id.toString(), s.name));
+
+                order.lineItems = order.lineItems.map((item: any) => {
+                    if (item.sku && typeof item.sku === 'string') {
+                        const name = skuMap.get(item.sku);
+                        if (name) {
+                            return { ...item, sku: { _id: item.sku, name } };
+                        }
+                    }
+                    return item;
+                });
+            }
+        }
+
         return NextResponse.json(order);
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
+
 
 export async function PATCH(
     request: NextRequest,
