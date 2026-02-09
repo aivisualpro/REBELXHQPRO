@@ -25,7 +25,6 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
         return {
             title: 'Wholesale Orders',
             actions: [
-                { label: 'Sync Costs', icon: RefreshCw, href: '/sales/wholesale-orders?syncCosts=true', variant: 'outline' },
                 { label: 'Add', icon: Plus, href: '/sales/wholesale-orders?createNew=true', variant: 'primary' },
             ]
         };

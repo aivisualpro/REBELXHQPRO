@@ -53,6 +53,10 @@ export default function SettingsPage() {
     const importLineItemsRef = useRef<HTMLInputElement>(null);
     const importPaymentsRef = useRef<HTMLInputElement>(null);
 
+    // Sync Costs State
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [syncStatus, setSyncStatus] = useState('');
+
     // Warehouse Import Refs
     const importSkusRef = useRef<HTMLInputElement>(null);
     const importVariancesRef = useRef<HTMLInputElement>(null);
@@ -680,6 +684,113 @@ export default function SettingsPage() {
                                                     </div>
                                                 </div>
                                             </div>
+                                        </div>
+
+                                        {/* Sync Costs Section */}
+                                        <div className="space-y-4">
+                                            <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">Cost Synchronization</h2>
+                                            
+                                            <div className="p-4 border border-amber-200 bg-amber-50 rounded-lg flex items-start space-x-4 mb-4">
+                                                <div className="shrink-0 mt-0.5">
+                                                    <RefreshCw className="w-5 h-5 text-amber-600" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-amber-800">Sync Costs</h4>
+                                                    <p className="text-xs text-amber-700 mt-1">
+                                                        Scan all wholesale orders and update line item costs by matching SKU lot numbers from Opening Balances,
+                                                        Purchase Orders, Manufacturing, and Audit Adjustments. This process runs in batches of 500 orders.
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {/* Sync Status Display */}
+                                            {syncStatus && (
+                                                <div className={cn(
+                                                    "p-3 rounded-lg text-sm font-medium font-mono",
+                                                    syncStatus.startsWith('✓') ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
+                                                    syncStatus === 'Error' ? "bg-red-50 text-red-700 border border-red-200" :
+                                                    "bg-blue-50 text-blue-700 border border-blue-200"
+                                                )}>
+                                                    {isSyncing && <RefreshCw className="w-4 h-4 inline mr-2 animate-spin" />}
+                                                    {syncStatus}
+                                                </div>
+                                            )}
+
+                                            <button
+                                                onClick={async () => {
+                                                    if (isSyncing) return;
+                                                    setIsSyncing(true);
+                                                    setSyncStatus('Starting...');
+
+                                                    try {
+                                                        const countRes = await fetch('/api/wholesale/orders?limit=1');
+                                                        const countData = await countRes.json();
+                                                        const total = countData.total || 0;
+
+                                                        let skip = 0;
+                                                        const batchSize = 500;
+                                                        let hasMore = total > 0;
+
+                                                        let totalProcessed = 0;
+                                                        let totalLineItems = 0;
+                                                        let totalMatched = 0;
+                                                        let totalUpdated = 0;
+                                                        let sources = { openingBalance: 0, purchaseOrder: 0, manufacturing: 0, auditAdjustment: 0 };
+
+                                                        while (hasMore) {
+                                                            const perc = total > 0 ? Math.min(Math.round((skip / total) * 100), 99) : 0;
+                                                            setSyncStatus(`${perc}% | Orders: ${totalProcessed}/${total} | Items: ${totalLineItems} | Matched: ${totalMatched} | Updated: ${totalUpdated}`);
+
+                                                            const res = await fetch('/api/wholesale/orders/sync-costs', {
+                                                                method: 'POST',
+                                                                body: JSON.stringify({ skip, limit: batchSize }),
+                                                                headers: { 'Content-Type': 'application/json' }
+                                                            });
+
+                                                            if (!res.ok) throw new Error('Sync failed');
+                                                            const data = await res.json();
+
+                                                            totalProcessed += data.processed || 0;
+                                                            totalUpdated += data.updated || 0;
+                                                            if (data.stats) {
+                                                                totalLineItems += data.stats.totalLineItems || 0;
+                                                                totalMatched += data.stats.matchedItems || 0;
+                                                                if (data.stats.sources) {
+                                                                    sources.openingBalance += data.stats.sources.openingBalance || 0;
+                                                                    sources.purchaseOrder += data.stats.sources.purchaseOrder || 0;
+                                                                    sources.manufacturing += data.stats.sources.manufacturing || 0;
+                                                                    sources.auditAdjustment += data.stats.sources.auditAdjustment || 0;
+                                                                }
+                                                            }
+
+                                                            setSyncStatus(`${Math.min(Math.round((totalProcessed / total) * 100), 99)}% | Orders: ${totalProcessed}/${total} | Items: ${totalLineItems} | Matched: ${totalMatched} | Updated: ${totalUpdated}`);
+
+                                                            if (data.processed === 0) hasMore = false;
+                                                            skip += batchSize;
+                                                            if (data.processed < batchSize) hasMore = false;
+                                                        }
+
+                                                        setSyncStatus(`✓ Complete! Orders: ${totalProcessed} | Items: ${totalLineItems} | Matched: ${totalMatched} | Updated: ${totalUpdated} | OB:${sources.openingBalance} PO:${sources.purchaseOrder} MFG:${sources.manufacturing} ADJ:${sources.auditAdjustment}`);
+                                                        toast.success(`Cost Sync Complete! Updated ${totalUpdated} items.`);
+                                                        setTimeout(() => setSyncStatus(''), 8000);
+                                                    } catch (e) {
+                                                        toast.error('Sync process failed');
+                                                        setSyncStatus('Error');
+                                                    } finally {
+                                                        setIsSyncing(false);
+                                                    }
+                                                }}
+                                                disabled={isSyncing}
+                                                className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-amber-400 hover:bg-amber-50 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed w-full max-w-xs"
+                                            >
+                                                <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mb-3 group-hover:bg-amber-200 transition-colors">
+                                                    <RefreshCw className={cn("w-6 h-6 text-amber-600", isSyncing && "animate-spin")} />
+                                                </div>
+                                                <h4 className="text-sm font-bold text-slate-700">{isSyncing ? 'Syncing...' : 'Sync Costs'}</h4>
+                                                <p className="text-[10px] text-slate-500 mt-1 text-center">
+                                                    Update all order line item costs
+                                                </p>
+                                            </button>
                                         </div>
                                     </div>
                                 )}
