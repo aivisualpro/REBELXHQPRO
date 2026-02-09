@@ -5,16 +5,12 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Search,
   ArrowUpDown,
-  Edit2,
-  Trash2,
   Plus,
   X,
   Loader2,
   Package,
   Layers,
   Box,
-  Eye,
-  Pencil
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -421,8 +417,7 @@ function SkusPageContent() {
                 <td className="px-2 py-1 text-[9px] text-emerald-600 font-mono border-r border-border text-right">${(sku.revenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 <td className="px-2 py-1 text-[9px] text-muted-foreground font-mono border-r border-border text-right">${(sku.cogs || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 <td className="px-2 py-1 text-[9px] text-muted-foreground font-mono border-r border-border text-right">${(sku.cogm || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td className="px-2 py-1 text-[9px] font-black text-foreground font-mono text-right">$
-{(sku.grossProfit || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td className="px-2 py-1 text-[9px] font-black text-foreground font-mono text-right">${(sku.grossProfit || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
               </tr>
             ))}
           </tbody>
