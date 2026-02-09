@@ -191,7 +191,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
         void Client;
 
         const order = await SaleOrder.findById(id)
-            .populate('clientId', 'name')
+            .populate('clientId', 'name addresses phones emails contacts salesPerson description website facebookPage industry forecastedAmount defaultPaymentMethod defaultShippingTerms contactStatus contactType')
             .populate('lineItems.sku', 'name')
             .lean();
 
@@ -252,7 +252,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
             { $set: body },
             { new: true, runValidators: true }
         )
-        .populate('clientId', 'name')
+        .populate('clientId', 'name addresses phones emails contacts salesPerson description website facebookPage industry forecastedAmount defaultPaymentMethod defaultShippingTerms contactStatus contactType')
         .populate('lineItems.sku', 'name')
         .lean();
 
@@ -281,6 +281,35 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
                         }
                     } catch (err) {
                         console.error('Background AppSheet payment sync failed:', err);
+                    }
+                });
+            }
+
+            // Sync updated (edited) payments to AppSheet in background
+            const updatedPayments = updatedOrder.payments.filter((p: any) => {
+                const pid = p._id?.toString();
+                if (!existingPaymentIds.includes(pid)) return false; // new payment, already handled above
+                const oldPayment = existingPayments.find((ep: any) => ep._id?.toString() === pid);
+                if (!oldPayment) return false;
+                // Check if any relevant fields changed
+                return (
+                    oldPayment.paymentAmount !== p.paymentAmount ||
+                    oldPayment.createdBy !== p.createdBy ||
+                    String(oldPayment.createdAt) !== String(p.createdAt)
+                );
+            });
+            if (updatedPayments.length > 0) {
+                after(async () => {
+                    try {
+                        for (const payment of updatedPayments) {
+                            await syncPaymentToAppSheet(
+                                updatedOrder,
+                                payment,
+                                'Edit'
+                            );
+                        }
+                    } catch (err) {
+                        console.error('Background AppSheet payment edit sync failed:', err);
                     }
                 });
             }

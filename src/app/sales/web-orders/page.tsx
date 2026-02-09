@@ -94,7 +94,7 @@ export default function WebOrdersPage() {
     try {
       const params = new URLSearchParams({
         page: page.toString(),
-        limit: '20',
+        limit: '25',
         search: debouncedSearch,
         sortBy,
         sortOrder,
@@ -411,7 +411,7 @@ export default function WebOrdersPage() {
               <tr
                 key={order._id}
                 onClick={() => router.push(`/sales/web-orders/${order._id}`)}
-                className="hover:bg-secondary/40 hover:scale-[1.002] hover:shadow-md transition-all duration-200 group relative z-0 hover:z-10 bg-background"
+                className="hover:bg-secondary/40 hover:scale-[1.002] hover:shadow-md transition-all duration-200 group relative z-0 hover:z-10 bg-background cursor-pointer"
               >
                 <td className="px-3 py-1.5 border-r border-border">
                   <div className="flex flex-col">
@@ -487,7 +487,7 @@ export default function WebOrdersPage() {
           totalPages={totalPages}
           onPageChange={setPage}
           totalItems={totalOrders}
-          itemsPerPage={20}
+          itemsPerPage={25}
           itemName="Orders"
         />
       </div>

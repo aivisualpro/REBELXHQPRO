@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, CreditCard, Truck, Plus, X, Trash2, Pencil, User, MapPin, DollarSign, List, RefreshCw, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Calendar, CreditCard, Truck, Plus, X, Trash2, Pencil, User, MapPin, DollarSign, List, RefreshCw, MessageSquare, Phone, Mail } from 'lucide-react';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -42,7 +42,24 @@ interface Note {
 interface SaleOrder {
   _id: string;
   label: string;
-  clientId: { _id: string; name: string } | string;
+  clientId: {
+    _id: string;
+    name: string;
+    addresses?: { street?: string; city?: string; state?: string; postalCode?: string; country?: string; label?: string }[];
+    phones?: { value: string; label?: string }[];
+    emails?: { value: string; label?: string }[];
+    contacts?: { firstName?: string; lastName?: string; email?: string; phone?: string; role?: string }[];
+    salesPerson?: string;
+    description?: string;
+    website?: string;
+    facebookPage?: string;
+    industry?: string;
+    forecastedAmount?: number;
+    defaultPaymentMethod?: string;
+    defaultShippingTerms?: string;
+    contactStatus?: string;
+    contactType?: string;
+  } | string;
   salesRep: string;
   paymentMethod: string;
   orderStatus: string;
@@ -773,6 +790,133 @@ export default function SaleOrderDetailPage() {
                         </div>
                     </div>
                 </div>
+
+                {/* Client Details */}
+                {typeof order.clientId === 'object' && order.clientId && (() => {
+                    const c = order.clientId;
+                    return (
+                        <div>
+                            <h3 className="text-xs font-bold uppercase text-foreground tracking-widest mb-2 border-b border-border pb-2">Client Info</h3>
+                            <div className="space-y-0">
+                                <div className="flex items-center py-2 border-b border-border/50">
+                                    <span className="text-[11px] text-muted-foreground w-28 shrink-0">Name</span>
+                                    <Link href={`/crm/clients/${c._id}`} className="text-[11px] font-bold text-foreground hover:text-primary transition-colors">{c.name}</Link>
+                                </div>
+                                <div className="flex items-start py-2 border-b border-border/50">
+                                    <span className="text-[11px] text-muted-foreground w-28 shrink-0 pt-0.5">Address</span>
+                                    <span className="text-[11px] text-foreground leading-relaxed">
+                                        {c.addresses?.[0]?.street || <span className="text-muted-foreground italic">No address</span>}
+                                    </span>
+                                </div>
+                                <div className="flex items-center py-2 border-b border-border/50">
+                                    <span className="text-[11px] text-muted-foreground w-28 shrink-0">City</span>
+                                    <span className="text-[11px] text-foreground">{c.addresses?.[0]?.city || '-'}</span>
+                                </div>
+                                <div className="flex items-center py-2 border-b border-border/50">
+                                    <span className="text-[11px] text-muted-foreground w-28 shrink-0">State</span>
+                                    <span className="text-[11px] text-foreground">{c.addresses?.[0]?.state || '-'}</span>
+                                </div>
+                                <div className="flex items-center py-2 border-b border-border/50">
+                                    <span className="text-[11px] text-muted-foreground w-28 shrink-0">Postal Code</span>
+                                    <span className="text-[11px] text-foreground">{c.addresses?.[0]?.postalCode || '-'}</span>
+                                </div>
+                                <div className="flex items-center py-2 border-b border-border/50">
+                                    <span className="text-[11px] text-muted-foreground w-28 shrink-0">Phone</span>
+                                    <div className="flex items-center space-x-2">
+                                        <span className="text-[11px] font-bold text-foreground">
+                                            {c.phones?.[0]?.value || <span className="text-muted-foreground italic font-normal">None</span>}
+                                        </span>
+                                        {c.phones?.[0]?.value && (
+                                            <a href={`tel:${c.phones[0].value}`} className="p-1 rounded hover:bg-blue-100 text-blue-600 transition-colors" title="Call">
+                                                <Phone className="w-3 h-3" />
+                                            </a>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="flex items-center py-2 border-b border-border/50">
+                                    <span className="text-[11px] text-muted-foreground w-28 shrink-0">Email</span>
+                                    <div className="flex items-center space-x-2">
+                                        <span className="text-[11px] font-bold text-foreground truncate">
+                                            {c.emails?.[0]?.value || <span className="text-muted-foreground italic font-normal">None</span>}
+                                        </span>
+                                        {c.emails?.[0]?.value && (
+                                            <a href={`mailto:${c.emails[0].value}`} className="p-1 rounded hover:bg-purple-100 text-purple-600 transition-colors" title="Email">
+                                                <Mail className="w-3 h-3" />
+                                            </a>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Contacts */}
+                            {c.contacts && c.contacts.length > 0 && (
+                                <div className="mt-4">
+                                    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2 pb-1 border-b border-border">Contacts</div>
+                                    <table className="w-full text-[10px]">
+                                        <thead>
+                                            <tr className="border-b border-border">
+                                                <th className="text-left py-1.5 px-1 font-bold text-muted-foreground uppercase tracking-wider">Name</th>
+                                                <th className="text-center py-1.5 px-1 font-bold text-muted-foreground uppercase tracking-wider">📞</th>
+                                                <th className="text-center py-1.5 px-1 font-bold text-muted-foreground uppercase tracking-wider">✉️</th>
+                                                <th className="text-left py-1.5 px-1 font-bold text-muted-foreground uppercase tracking-wider">Role</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {c.contacts.map((ct, idx) => (
+                                                <tr key={idx} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
+                                                    <td className="py-1.5 px-1 text-foreground font-medium whitespace-nowrap">{[ct.firstName, ct.lastName].filter(Boolean).join(' ') || '-'}</td>
+                                                    <td className="py-1.5 px-1 text-center">
+                                                        {ct.phone ? (
+                                                            <a href={`tel:${ct.phone}`} className="p-0.5 rounded hover:bg-blue-100 text-blue-600 transition-colors inline-flex" title={ct.phone}>
+                                                                <Phone className="w-3 h-3" />
+                                                            </a>
+                                                        ) : <span className="text-muted-foreground">-</span>}
+                                                    </td>
+                                                    <td className="py-1.5 px-1 text-center">
+                                                        {ct.email ? (
+                                                            <a href={`mailto:${ct.email}`} className="p-0.5 rounded hover:bg-purple-100 text-purple-600 transition-colors inline-flex" title={ct.email}>
+                                                                <Mail className="w-3 h-3" />
+                                                            </a>
+                                                        ) : <span className="text-muted-foreground">-</span>}
+                                                    </td>
+                                                    <td className="py-1.5 px-1 text-foreground whitespace-nowrap">{ct.role || '-'}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+
+                            {/* Business Info */}
+                            <div className="mt-4">
+                                <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest pb-1 border-b border-border mb-1">Business Details</div>
+                                <div className="space-y-0">
+                                    {c.description && (
+                                        <p className="text-[11px] text-foreground leading-relaxed italic py-1.5 border-b border-border/50">{c.description}</p>
+                                    )}
+                                    {c.website && (
+                                        <div className="flex justify-between text-[11px] py-1.5 border-b border-border/50">
+                                            <span className="text-muted-foreground">Website</span>
+                                            <a href={c.website.startsWith('http') ? c.website : `https://${c.website}`} target="_blank" className="text-blue-600 font-bold truncate max-w-[160px] hover:underline">{c.website}</a>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between text-[11px] py-1.5 border-b border-border/50">
+                                        <span className="text-muted-foreground">Industry</span>
+                                        <span className="font-bold text-foreground">{c.industry || '-'}</span>
+                                    </div>
+                                    <div className="flex justify-between text-[11px] py-1.5 border-b border-border/50">
+                                        <span className="text-muted-foreground">Payment Terms</span>
+                                        <span className="font-bold text-foreground">{c.defaultPaymentMethod || '-'}</span>
+                                    </div>
+                                    <div className="flex justify-between text-[11px] py-1.5">
+                                        <span className="text-muted-foreground">Shipping Terms</span>
+                                        <span className="font-bold text-foreground">{c.defaultShippingTerms || '-'}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })()}
             </div>
 
             {/* Right Content: Tabs (70%) */}
