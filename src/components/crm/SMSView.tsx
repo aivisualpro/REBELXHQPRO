@@ -327,17 +327,7 @@ export default function SMSView({ clientId, clientPhone, onInitiateSMS }: SMSVie
           )}
 
           <button
-            onClick={() => {
-                // Always open the modal to log the activity
-                openModal();
-                // Additionally trigger Google Voice SMS if phone is available
-                if (onInitiateSMS) {
-                    onInitiateSMS();
-                } else if (clientPhone) {
-                    const cleanPhone = clientPhone.replace(/\D/g, '');
-                    window.open(`https://voice.google.com/u/0/messages?recipient=${cleanPhone}`, '_blank');
-                }
-            }}
+            onClick={() => openModal()}
             className="h-8 w-8 flex items-center justify-center bg-primary text-primary-foreground hover:bg-primary/90 transition-all rounded shadow-md cursor-pointer"
             title="Log SMS"
           >
@@ -432,7 +422,7 @@ export default function SMSView({ clientId, clientPhone, onInitiateSMS }: SMSVie
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-card w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh] border border-border">
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
+            <div className="flex items-center justify-between px-4 h-9 border-b border-border shrink-0">
               <h2 className="text-sm font-black uppercase tracking-widest text-foreground">
                 {editingActivity ? 'Edit SMS' : 'Log New SMS'}
               </h2>
@@ -472,11 +462,11 @@ export default function SMSView({ clientId, clientPhone, onInitiateSMS }: SMSVie
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-border bg-secondary/30 shrink-0 flex justify-end space-x-3">
+            <div className="px-4 h-9 border-t border-border bg-secondary/30 shrink-0 flex items-center justify-end space-x-3">
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
+                className="px-4 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer h-7"
               >
                 Cancel
               </button>
@@ -484,7 +474,7 @@ export default function SMSView({ clientId, clientPhone, onInitiateSMS }: SMSVie
                 type="submit"
                 form="activity-form"
                 disabled={isSubmitting}
-                className="px-6 py-2.5 bg-primary text-primary-foreground text-xs font-bold uppercase tracking-wider hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center space-x-2 cursor-pointer"
+                className="px-4 bg-primary text-primary-foreground text-xs font-bold uppercase tracking-wider hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center space-x-2 cursor-pointer h-7"
               >
                 {isSubmitting && <Loader2 className="w-3 h-3 animate-spin" />}
                 <span>{editingActivity ? 'Save Changes' : 'Log SMS'}</span>
