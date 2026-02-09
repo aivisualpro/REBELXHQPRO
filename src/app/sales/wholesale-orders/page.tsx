@@ -357,7 +357,7 @@ function SaleOrdersContent() {
     try {
       const params = new URLSearchParams({
         page: page.toString(),
-        limit: '20',
+        limit: '25',
         search: debouncedSearch,
         sortBy,
         sortOrder: sortOrder === 'desc' ? 'desc' : 'asc',
@@ -1001,7 +1001,7 @@ function SaleOrdersContent() {
             totalPages={totalPages}
             onPageChange={setPage}
             totalItems={totalOrders}
-            itemsPerPage={20}
+            itemsPerPage={25}
             itemName="Orders"
         />
       </div>
