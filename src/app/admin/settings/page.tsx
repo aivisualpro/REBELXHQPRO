@@ -31,7 +31,8 @@ import {
     FlaskConical,
     UtensilsCrossed,
     TicketCheck,
-    PackageCheck
+    PackageCheck,
+    MessageSquare
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -52,6 +53,7 @@ export default function SettingsPage() {
     const importOrdersRef = useRef<HTMLInputElement>(null);
     const importLineItemsRef = useRef<HTMLInputElement>(null);
     const importPaymentsRef = useRef<HTMLInputElement>(null);
+    const importNotesRef = useRef<HTMLInputElement>(null);
 
     // Sync Costs State
     const [isSyncing, setIsSyncing] = useState(false);
@@ -589,6 +591,13 @@ export default function SettingsPage() {
                                             ref={importPaymentsRef}
                                             onChange={(e) => handleImport(e, '/api/wholesale/orders/import-payments', 'Payments')}
                                         />
+                                        <input
+                                            type="file"
+                                            accept=".csv"
+                                            className="hidden"
+                                            ref={importNotesRef}
+                                            onChange={(e) => handleImport(e, '/api/wholesale/orders/import-notes', 'Notes')}
+                                        />
 
                                         <div className="space-y-4">
                                             <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">Wholesale Orders Import</h2>
@@ -665,6 +674,21 @@ export default function SettingsPage() {
                                                         Payment amounts, dates
                                                     </p>
                                                 </button>
+
+                                                {/* Import Notes */}
+                                                <button
+                                                    onClick={() => importNotesRef.current?.click()}
+                                                    disabled={isImporting}
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mb-3 group-hover:bg-blue-200 transition-colors">
+                                                        <MessageSquare className="w-6 h-6 text-blue-600" />
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-slate-700">Import Notes</h4>
+                                                    <p className="text-[10px] text-slate-500 mt-1 text-center">
+                                                        Order notes, comments
+                                                    </p>
+                                                </button>
                                             </div>
 
                                             <div className="mt-6 p-4 bg-slate-50 rounded-lg">
@@ -681,6 +705,10 @@ export default function SettingsPage() {
                                                     <div>
                                                         <span className="font-bold text-slate-700">Payments:</span>
                                                         <p>orderNumber (legacyId), paymentAmount, createdAt</p>
+                                                    </div>
+                                                    <div>
+                                                        <span className="font-bold text-slate-700">Notes:</span>
+                                                        <p>legacyId (parent order), note, createdBy, createdAt</p>
                                                     </div>
                                                 </div>
                                             </div>

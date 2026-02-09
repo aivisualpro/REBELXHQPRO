@@ -391,16 +391,12 @@ export async function syncPaymentToAppSheet(orderLabel: string, payment: any, ac
     }
 
     const row: Record<string, any> = {
+        'RecordID': payment._id?.toString() || '',
         'Order #': orderLabel || '',
         'Payment Date': payment.createdAt ? new Date(payment.createdAt).toLocaleDateString('en-US') : '',
         'Payment Amount': payment.paymentAmount || 0,
         'Create By': payment.createdBy || '',
     };
-
-    // Include _id for Edit/Delete actions
-    if (payment._id) {
-        row['_RowNumber'] = payment._id?.toString();
-    }
 
     const payload = {
         Action: action,

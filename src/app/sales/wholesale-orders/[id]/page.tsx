@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, CreditCard, Truck, Plus, X, Trash2, Pencil, User, MapPin, DollarSign, List, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Calendar, CreditCard, Truck, Plus, X, Trash2, Pencil, User, MapPin, DollarSign, List, RefreshCw, MessageSquare } from 'lucide-react';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -31,6 +31,14 @@ interface Payment {
   createdBy: string;
 }
 
+interface Note {
+  _id: string;
+  legacyId?: string;
+  note: string;
+  createdBy: string;
+  createdAt: string;
+}
+
 interface SaleOrder {
   _id: string;
   label: string;
@@ -50,6 +58,7 @@ interface SaleOrder {
   state?: string;
   lineItems?: LineItem[];
   payments?: Payment[];
+  notes?: Note[];
 }
 
 const PAYMENT_METHODS = [
@@ -88,7 +97,7 @@ const UOM_OPTIONS = [
     { label: 'Lb', value: 'Lb' },
 ];
 
-const TABS = ['Line Items', 'Payments'] as const;
+const TABS = ['Line Items', 'Payments', 'Notes'] as const;
 type TabType = typeof TABS[number];
 
 export default function SaleOrderDetailPage() {
@@ -123,6 +132,10 @@ export default function SaleOrderDetailPage() {
   // Edit Header Modal State
   const [isHeaderModalOpen, setIsHeaderModalOpen] = useState(false);
   const [editingHeader, setEditingHeader] = useState<any>(null);
+
+  // Note Modal State
+  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
+  const [newNoteText, setNewNoteText] = useState('');
 
   // Delete Order State
   const [isDeleting, setIsDeleting] = useState(false);
@@ -781,7 +794,7 @@ export default function SaleOrderDetailPage() {
                                     "px-1.5 py-0.5 rounded-none text-[9px] font-bold",
                                     activeTab === tab ? "bg-foreground text-background" : "bg-secondary text-muted-foreground"
                                 )}>
-                                    {tab === 'Line Items' ? order.lineItems?.length || 0 : order.payments?.length || 0}
+                                    {tab === 'Line Items' ? order.lineItems?.length || 0 : tab === 'Payments' ? order.payments?.length || 0 : order.notes?.length || 0}
                                 </span>
                             </button>
                         ))}
@@ -813,6 +826,18 @@ export default function SaleOrderDetailPage() {
                             >
                                 <Plus className="w-3 h-3" />
                                 <span>Add Payment</span>
+                            </button>
+                        )}
+                        {activeTab === 'Notes' && (
+                            <button
+                                onClick={() => {
+                                    setNewNoteText('');
+                                    setIsNoteModalOpen(true);
+                                }}
+                                className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center space-x-1 shadow-sm"
+                            >
+                                <Plus className="w-3 h-3" />
+                                <span>Add Note</span>
                             </button>
                         )}
                     </div>
@@ -978,6 +1003,73 @@ export default function SaleOrderDetailPage() {
                                     </tfoot>
                                 )}
                             </table>
+                        </div>
+                    )}
+
+                    {activeTab === 'Notes' && (
+                        <div className="animate-in fade-in duration-300 p-4 space-y-3">
+                            {(!order.notes || order.notes.length === 0) ? (
+                                <div className="flex flex-col items-center justify-center py-12 text-center">
+                                    <MessageSquare className="w-8 h-8 text-muted-foreground/30 mb-2" />
+                                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">No notes yet</p>
+                                </div>
+                            ) : (
+                                order.notes.map(note => (
+                                    <div key={note._id} className="border border-border rounded-md p-3 bg-secondary/20 hover:bg-secondary/40 transition-colors group">
+                                        <div className="flex items-start justify-between">
+                                            <p className="text-xs text-foreground whitespace-pre-wrap flex-1">{note.note}</p>
+                                            <button
+                                                onClick={() => {
+                                                    toast((t) => (
+                                                        <div className="flex flex-col gap-2">
+                                                            <p className="text-sm font-bold text-foreground">Delete this note?</p>
+                                                            <p className="text-xs text-muted-foreground">This action cannot be undone.</p>
+                                                            <div className="flex gap-2 mt-1">
+                                                                <button
+                                                                    onClick={() => toast.dismiss(t.id)}
+                                                                    className="flex-1 px-3 py-1.5 text-xs font-bold rounded border border-border bg-background text-foreground hover:bg-secondary transition-colors"
+                                                                >
+                                                                    Cancel
+                                                                </button>
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        toast.dismiss(t.id);
+                                                                        try {
+                                                                            const updatedNotes = order.notes?.filter(n => n._id !== note._id) || [];
+                                                                            const res = await fetch(`/api/wholesale/orders/${order._id}`, {
+                                                                                method: 'PATCH',
+                                                                                headers: { 'Content-Type': 'application/json' },
+                                                                                body: JSON.stringify({ notes: updatedNotes })
+                                                                            });
+                                                                            if (res.ok) {
+                                                                                const data = await res.json();
+                                                                                setOrder(data);
+                                                                                toast.success('Note deleted');
+                                                                            }
+                                                                        } catch (e) {
+                                                                            toast.error('Failed to delete note');
+                                                                        }
+                                                                    }}
+                                                                    className="flex-1 px-3 py-1.5 text-xs font-bold rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+                                                                >
+                                                                    Delete
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ), { duration: 10000, style: { maxWidth: '360px' } });
+                                                }}
+                                                className="p-1 text-muted-foreground hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100 shrink-0 ml-2"
+                                            >
+                                                <Trash2 className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                        <div className="flex items-center space-x-3 mt-2 pt-2 border-t border-border/50">
+                                            <span className="text-[9px] text-muted-foreground font-mono">{note.createdAt ? new Date(note.createdAt).toLocaleDateString() : '-'}</span>
+                                            <span className="text-[9px] text-muted-foreground">{getUserName(note.createdBy)}</span>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     )}
                 </div>
@@ -1364,6 +1456,64 @@ export default function SaleOrderDetailPage() {
                     <div className="px-4 border-t border-border bg-muted/20 flex items-center justify-end shrink-0 h-9">
                         <button onClick={handleSaveHeader} className="px-6 py-1.5 bg-[#FFEF5F] text-black text-xs font-bold uppercase rounded hover:opacity-90 transition-colors shadow-lg">
                             Save Changes
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* Add Note Modal */}
+        {isNoteModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                <div className="bg-card rounded-none shadow-2xl w-full max-w-lg animate-in fade-in zoom-in duration-200 flex flex-col border border-border overflow-hidden">
+                    <div className="flex items-center justify-between px-6 border-b border-border bg-muted/50 shrink-0 h-9">
+                        <h2 className="text-sm font-bold uppercase text-foreground">Add Note</h2>
+                        <button onClick={() => setIsNoteModalOpen(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                    <div className="p-4 bg-background">
+                        <textarea
+                            value={newNoteText}
+                            onChange={(e) => setNewNoteText(e.target.value)}
+                            placeholder="Enter note..."
+                            rows={5}
+                            className="w-full px-3 py-2 border border-input rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary/20 bg-background text-foreground resize-none"
+                        />
+                    </div>
+                    <div className="px-4 border-t border-border bg-muted/20 flex items-center justify-end shrink-0 h-9">
+                        <button
+                            onClick={async () => {
+                                if (!order || !newNoteText.trim()) return;
+                                try {
+                                    const newNote = {
+                                        note: newNoteText.trim(),
+                                        createdBy: (session?.user as any)?.id || '',
+                                        createdAt: new Date().toISOString()
+                                    };
+                                    const updatedNotes = [...(order.notes || []), newNote];
+                                    const res = await fetch(`/api/wholesale/orders/${order._id}`, {
+                                        method: 'PATCH',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ notes: updatedNotes })
+                                    });
+                                    if (res.ok) {
+                                        const data = await res.json();
+                                        setOrder(data);
+                                        setIsNoteModalOpen(false);
+                                        setNewNoteText('');
+                                        toast.success('Note added');
+                                    } else {
+                                        toast.error('Failed to add note');
+                                    }
+                                } catch (e) {
+                                    toast.error('Error adding note');
+                                }
+                            }}
+                            disabled={!newNoteText.trim()}
+                            className="px-6 py-1.5 bg-blue-600 text-white text-xs font-bold uppercase rounded hover:bg-blue-700 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Save Note
                         </button>
                     </div>
                 </div>

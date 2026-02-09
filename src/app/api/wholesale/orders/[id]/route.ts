@@ -215,13 +215,17 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         const { id } = await context.params;
         const body = await request.json();
 
-        // Capture existing payments before update (for detecting new ones)
+        // Capture existing payments before update (for detecting new/deleted ones)
         let existingPaymentIds: string[] = [];
+        let existingPayments: any[] = [];
+        let existingOrderLabel = '';
         if (body.payments && Array.isArray(body.payments)) {
-            const existingOrder = await SaleOrder.findById(id).select('payments label').lean();
+            const existingOrder = await SaleOrder.findById(id).select('payments label legacyId').lean();
             if (existingOrder?.payments) {
                 existingPaymentIds = existingOrder.payments.map((p: any) => p._id?.toString());
+                existingPayments = existingOrder.payments;
             }
+            existingOrderLabel = existingOrder?.label || existingOrder?.legacyId || id;
         }
 
         if (body.lineItems && Array.isArray(body.lineItems)) {
@@ -277,6 +281,27 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
                         }
                     } catch (err) {
                         console.error('Background AppSheet payment sync failed:', err);
+                    }
+                });
+            }
+
+            // Sync deleted payments to AppSheet in background
+            const updatedPaymentIds = updatedOrder.payments.map((p: any) => p._id?.toString());
+            const deletedPayments = existingPayments.filter(
+                (p: any) => !updatedPaymentIds.includes(p._id?.toString())
+            );
+            if (deletedPayments.length > 0) {
+                after(async () => {
+                    try {
+                        for (const payment of deletedPayments) {
+                            await syncPaymentToAppSheet(
+                                existingOrderLabel,
+                                payment,
+                                'Delete'
+                            );
+                        }
+                    } catch (err) {
+                        console.error('Background AppSheet payment delete sync failed:', err);
                     }
                 });
             }
