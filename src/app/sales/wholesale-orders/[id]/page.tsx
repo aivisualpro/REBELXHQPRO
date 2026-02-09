@@ -225,6 +225,7 @@ export default function SaleOrderDetailPage() {
           case 'Completed': return "bg-emerald-600/15 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 border-emerald-500/30";
           case 'Issued': return "bg-sky-500/15 text-sky-600 dark:bg-sky-500/20 dark:text-sky-400 border-sky-500/30";
           case 'Pending Payment': return "bg-amber-500/15 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 border-amber-500/30";
+          case 'Pending': return "bg-orange-500/15 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400 border-orange-500/30";
           case 'Shipping': return "bg-violet-500/15 text-violet-600 dark:bg-violet-500/20 dark:text-violet-400 border-violet-500/30";
           case 'Picking': return "bg-cyan-500/15 text-cyan-600 dark:bg-cyan-500/20 dark:text-cyan-400 border-cyan-500/30";
           default: return "bg-secondary text-muted-foreground border-border";
@@ -656,9 +657,10 @@ export default function SaleOrderDetailPage() {
                                 getStatusColor(order.orderStatus)
                             )}
                         >
+                            <option value="Pending">Pending</option>
                             <option value="Completed">Completed</option>
                             <option value="Issued">Issued</option>
-                            <option value="Pending Payment">Pending</option>
+                            <option value="Pending Payment">Pending Payment</option>
                             <option value="Shipping">Shipping</option>
                             <option value="Picking">Picking</option>
                         </select>
@@ -1334,6 +1336,7 @@ export default function SaleOrderDetailPage() {
                                             onChange={(e) => setEditingHeader({...editingHeader, orderStatus: e.target.value})}
                                             className="w-full h-[34px] px-3 border border-input rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary/20 bg-background text-foreground"
                                         >
+                                            <option value="Pending">Pending</option>
                                             <option value="Completed">Completed</option>
                                             <option value="Issued">Issued</option>
                                             <option value="Pending Payment">Pending Payment</option>

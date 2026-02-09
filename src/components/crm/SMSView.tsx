@@ -328,14 +328,14 @@ export default function SMSView({ clientId, clientPhone, onInitiateSMS }: SMSVie
 
           <button
             onClick={() => {
+                // Always open the modal to log the activity
+                openModal();
+                // Additionally trigger Google Voice SMS if phone is available
                 if (onInitiateSMS) {
                     onInitiateSMS();
                 } else if (clientPhone) {
                     const cleanPhone = clientPhone.replace(/\D/g, '');
                     window.open(`https://voice.google.com/u/0/messages?recipient=${cleanPhone}`, '_blank');
-                    openModal();
-                } else {
-                    openModal();
                 }
             }}
             className="h-8 w-8 flex items-center justify-center bg-primary text-primary-foreground hover:bg-primary/90 transition-all rounded shadow-md cursor-pointer"

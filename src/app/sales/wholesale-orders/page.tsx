@@ -976,6 +976,7 @@ function SaleOrdersContent() {
                         order.orderStatus === 'Completed' ? "bg-emerald-600/15 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 border border-emerald-500/30" :
                         order.orderStatus === 'Issued' ? "bg-sky-500/15 text-sky-600 dark:bg-sky-500/20 dark:text-sky-400 border border-sky-500/30" :
                         order.orderStatus === 'Pending Payment' ? "bg-amber-500/15 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 border border-amber-500/30" :
+                        order.orderStatus === 'Pending' ? "bg-orange-500/15 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400 border border-orange-500/30" :
                         order.orderStatus === 'Shipping' ? "bg-violet-500/15 text-violet-600 dark:bg-violet-500/20 dark:text-violet-400 border border-violet-500/30" :
                         order.orderStatus === 'Picking' ? "bg-cyan-500/15 text-cyan-600 dark:bg-cyan-500/20 dark:text-cyan-400 border border-cyan-500/30" :
                         "bg-muted text-muted-foreground border border-border"
@@ -1080,6 +1081,7 @@ function SaleOrdersContent() {
                                 <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Order Status</label>
                                 <SearchableSelect
                                     options={[
+                                      { label: 'Pending', value: 'Pending' },
                                       { label: 'Picking', value: 'Picking' },
                                       { label: 'Shipping', value: 'Shipping' },
                                       { label: 'Pending Payment', value: 'Pending Payment' },
