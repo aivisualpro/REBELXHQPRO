@@ -218,14 +218,14 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         // Capture existing payments before update (for detecting new/deleted ones)
         let existingPaymentIds: string[] = [];
         let existingPayments: any[] = [];
-        let existingOrderLabel = '';
+        let existingOrderData: any = null;
         if (body.payments && Array.isArray(body.payments)) {
             const existingOrder = await SaleOrder.findById(id).select('payments label legacyId').lean();
             if (existingOrder?.payments) {
                 existingPaymentIds = existingOrder.payments.map((p: any) => p._id?.toString());
                 existingPayments = existingOrder.payments;
             }
-            existingOrderLabel = existingOrder?.label || existingOrder?.legacyId || id;
+            existingOrderData = existingOrder;
         }
 
         if (body.lineItems && Array.isArray(body.lineItems)) {
@@ -274,7 +274,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
                     try {
                         for (const payment of newPayments) {
                             await syncPaymentToAppSheet(
-                                updatedOrder.label || updatedOrder.legacyId || updatedOrder._id?.toString(),
+                                updatedOrder,
                                 payment,
                                 'Add'
                             );
@@ -295,7 +295,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
                     try {
                         for (const payment of deletedPayments) {
                             await syncPaymentToAppSheet(
-                                existingOrderLabel,
+                                existingOrderData || { _id: id },
                                 payment,
                                 'Delete'
                             );

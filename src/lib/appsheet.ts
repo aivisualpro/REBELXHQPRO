@@ -381,7 +381,7 @@ export async function deleteOrderFromAppSheet(order: any) {
     }
 }
 
-export async function syncPaymentToAppSheet(orderLabel: string, payment: any, action: 'Add' | 'Edit' | 'Delete' = 'Add') {
+export async function syncPaymentToAppSheet(order: any, payment: any, action: 'Add' | 'Edit' | 'Delete' = 'Add') {
     const appId = process.env.APPSHEET_APP_ID;
     const accessKey = process.env.APPSHEET_ACCESS_KEY;
 
@@ -390,9 +390,13 @@ export async function syncPaymentToAppSheet(orderLabel: string, payment: any, ac
         return;
     }
 
+    // Use legacyId as Order # if exists (imported records), otherwise use _id (new records)
+    // This must match the 'Order #' sent in syncOrderToAppSheet
+    const orderIdentifier = order?.legacyId || order?._id?.toString() || '';
+
     const row: Record<string, any> = {
         'RecordID': payment._id?.toString() || '',
-        'Order #': orderLabel || '',
+        'Order #': orderIdentifier,
         'Payment Date': payment.createdAt ? new Date(payment.createdAt).toLocaleDateString('en-US') : '',
         'Payment Amount': payment.paymentAmount || 0,
         'Create By': payment.createdBy || '',

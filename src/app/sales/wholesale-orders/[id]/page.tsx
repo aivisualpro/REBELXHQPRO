@@ -776,7 +776,7 @@ export default function SaleOrderDetailPage() {
             {/* Right Content: Tabs (70%) */}
             <div className="w-[70%] bg-background flex flex-col overflow-hidden">
                 {/* Tabs & Actions */}
-                <div className="px-6 border-b border-border shrink-0 flex items-center justify-between bg-background z-10 h-9">
+                <div className="px-4 border-b border-border shrink-0 flex items-center justify-between bg-background z-10 h-9">
                     <div className="flex space-x-1 h-full">
                         {TABS.map(tab => (
                             <button
@@ -809,7 +809,7 @@ export default function SaleOrderDetailPage() {
                                         setEditingItem({ sku: '', lotNumber: '', qtyShipped: 1, price: 0, uom: 'Each' });
                                         setIsItemModalOpen(true);
                                     }}
-                                    className="px-3 h-9 text-[10px] font-black uppercase tracking-widest bg-amber-500 text-black hover:bg-amber-600 transition-colors flex items-center space-x-1 shadow-sm"
+                                    className="px-3 h-9 text-[10px] font-black uppercase tracking-widest bg-[#f2b61c] text-black hover:bg-[#d9a318] transition-colors flex items-center space-x-1 shadow-sm"
                                 >
                                     <Plus className="w-3 h-3" />
                                     <span>Add Item</span>

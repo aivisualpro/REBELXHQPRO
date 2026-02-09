@@ -84,13 +84,13 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #FFEF5F;
+  background: #f2b61c;
   border-radius: 10px;
   border: 2px solid var(--background);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #fde047; /* slightly darker yellow */
+  background: #f2b61c; /* slightly darker yellow */
 }
 
 .glass-header {

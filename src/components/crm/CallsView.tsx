@@ -478,29 +478,6 @@ export default function CallsView({ clientId, clientPhone, onInitiateCall }: Cal
                   />
                 </div>
 
-                <FormInput
-                  label="Date & Time"
-                  type="datetime-local"
-                  value={formData.createdAt}
-                  onChange={(v) => setFormData({ ...formData, createdAt: v })}
-                  disabled
-                />
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase">Sales Rep</label>
-                  <select
-                    className="w-full px-3 py-2 bg-secondary/50 border border-border text-sm focus:outline-none focus:border-primary focus:ring-0 transition-colors appearance-none text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
-                    value={formData.createdBy}
-                    onChange={(e) => setFormData({ ...formData, createdBy: e.target.value })}
-                    disabled
-                  >
-                    <option value="">Select Sales Person</option>
-                    {users.map(u => (
-                      <option key={u._id} value={u._id}>{u.firstName} {u.lastName}</option>
-                    ))}
-                  </select>
-                </div>
-
               </form>
             </div>
 
