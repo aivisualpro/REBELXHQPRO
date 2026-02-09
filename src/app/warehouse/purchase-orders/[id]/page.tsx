@@ -125,7 +125,7 @@ export default function PurchaseOrderDetailPage() {
     const handleOpenEditModal = (item: LineItem) => {
         setEditingId(item._id);
         setFormData({
-            sku: typeof item.sku === 'object' ? item.sku._id : item.sku,
+            sku: (typeof item.sku === 'object' && item.sku !== null) ? item.sku._id : (item.sku || ''),
             qtyOrdered: item.qtyOrdered,
             cost: item.cost,
             uom: item.uom || '',
@@ -144,7 +144,7 @@ export default function PurchaseOrderDetailPage() {
 
         let currentItems = (order.lineItems || []).map(item => ({
             _id: item._id,
-            sku: typeof item.sku === 'object' ? item.sku._id : item.sku,
+            sku: (typeof item.sku === 'object' && item.sku !== null) ? item.sku._id : (item.sku || ''),
             qtyOrdered: item.qtyOrdered,
             cost: item.cost,
             uom: item.uom,
@@ -210,7 +210,7 @@ export default function PurchaseOrderDetailPage() {
             .filter(item => item._id !== itemId)
             .map(item => ({
                 _id: item._id,
-                sku: typeof item.sku === 'object' ? item.sku._id : item.sku,
+                sku: (typeof item.sku === 'object' && item.sku !== null) ? item.sku._id : (item.sku || ''),
                 qtyOrdered: item.qtyOrdered,
                 cost: item.cost,
                 uom: item.uom,
@@ -422,7 +422,7 @@ export default function PurchaseOrderDetailPage() {
                                 <td colSpan={8} className="px-4 py-8 text-center text-xs text-slate-400 uppercase">No line items</td>
                             </tr>
                         ) : order.lineItems.map(item => {
-                            const skuName = typeof item.sku === 'object' ? item.sku?.name : item.sku;
+                            const skuName = (typeof item.sku === 'object' && item.sku !== null) ? item.sku?.name : (item.sku || '-');
                             const amount = (item.qtyOrdered || 0) * (item.cost || 0);
 
                             return (
@@ -488,7 +488,7 @@ export default function PurchaseOrderDetailPage() {
                                         .filter(s => {
                                             const isUsed = order?.lineItems?.some(item => {
                                                 if (editingId && item._id === editingId) return false;
-                                                const itemId = typeof item.sku === 'object' ? item.sku._id : item.sku;
+                                                const itemId = (typeof item.sku === 'object' && item.sku !== null) ? item.sku._id : (item.sku || '');
                                                 return itemId === s._id;
                                             });
                                             return !isUsed;

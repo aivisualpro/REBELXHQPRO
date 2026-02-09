@@ -17,11 +17,19 @@ export async function GET(
         void Vendor; // Ensure Vendor model is registered
 
         const { id } = await context.params;
+        const db = mongoose.connection.db!;
 
+        // Step 1: Get raw PO from native driver to preserve original sku strings
+        // (Mongoose populate silently nullifies sku due to String/ObjectId type mismatch)
+        const rawOrder = await db.collection('purchaseorders').findOne({ _id: new mongoose.Types.ObjectId(id) });
+        if (!rawOrder) {
+            return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+        }
+
+        // Step 2: Get the Mongoose-populated version (for vendor, createdBy, lineItems.createdBy)
         const order = await PurchaseOrder.findById(id)
             .populate('vendor', 'name')
             .populate('createdBy', 'firstName lastName')
-            .populate('lineItems.sku', 'name')
             .populate('lineItems.createdBy', 'firstName lastName')
             .lean();
 
@@ -29,34 +37,49 @@ export async function GET(
             return NextResponse.json({ error: 'Order not found' }, { status: 404 });
         }
 
-        // Fix unpopulated SKUs due to String/ObjectId type mismatch
-        if (order.lineItems?.length) {
-            const unpopulatedItems = order.lineItems.filter(
-                (item: any) => item.sku && typeof item.sku === 'string'
-            );
-            if (unpopulatedItems.length > 0) {
-                const skuIds = unpopulatedItems.map((item: any) => item.sku);
-                const db = mongoose.connection.db!;
-                // Try both String and ObjectId lookups
-                const objectIds = skuIds
-                    .filter((id: string) => mongoose.Types.ObjectId.isValid(id))
-                    .map((id: string) => new mongoose.Types.ObjectId(id));
+        // Step 3: Manually resolve SKUs using raw sku values from the native query
+        if (rawOrder.lineItems?.length) {
+            // Collect all raw sku references
+            const rawSkuRefs = rawOrder.lineItems
+                .map((item: any) => item.sku)
+                .filter((s: any) => s != null);
+
+            if (rawSkuRefs.length > 0) {
+                // Build ObjectId versions for refs that look like ObjectIds
+                const objectIds = rawSkuRefs
+                    .filter((ref: any) => typeof ref === 'string' && mongoose.Types.ObjectId.isValid(ref))
+                    .map((ref: string) => new mongoose.Types.ObjectId(ref));
+
+                const stringRefs = rawSkuRefs.map((ref: any) => ref.toString());
+
+                // Query skus by _id (both String and ObjectId types) AND legacyId
                 const skuDocs = await db.collection('skus').find({
                     $or: [
-                        { _id: { $in: skuIds } },
-                        ...(objectIds.length > 0 ? [{ _id: { $in: objectIds } }] : [])
+                        { _id: { $in: stringRefs } },
+                        ...(objectIds.length > 0 ? [{ _id: { $in: objectIds } }] : []),
+                        { legacyId: { $in: stringRefs } }
                     ]
-                }, { projection: { _id: 1, name: 1 } }).toArray();
+                }, { projection: { _id: 1, name: 1, legacyId: 1 } }).toArray();
 
-                const skuMap = new Map<string, string>();
-                skuDocs.forEach((s: any) => skuMap.set(s._id.toString(), s.name));
+                // Build lookup map keyed by _id (string) AND legacyId
+                const skuMap = new Map<string, { _id: string; name: string }>();
+                skuDocs.forEach((s: any) => {
+                    const entry = { _id: s._id.toString(), name: s.name };
+                    skuMap.set(s._id.toString(), entry);
+                    if (s.legacyId) skuMap.set(s.legacyId, entry);
+                });
 
-                order.lineItems = order.lineItems.map((item: any) => {
-                    if (item.sku && typeof item.sku === 'string') {
-                        const name = skuMap.get(item.sku);
-                        if (name) {
-                            return { ...item, sku: { _id: item.sku, name } };
+                // Merge raw sku refs into the populated order
+                order.lineItems = (order.lineItems || []).map((item: any, idx: number) => {
+                    const rawSku = rawOrder.lineItems[idx]?.sku;
+                    if (rawSku) {
+                        const rawSkuStr = rawSku.toString();
+                        const match = skuMap.get(rawSkuStr);
+                        if (match) {
+                            return { ...item, sku: { _id: match._id, name: match.name } };
                         }
+                        // Keep as string if no match found
+                        return { ...item, sku: rawSkuStr };
                     }
                     return item;
                 });
