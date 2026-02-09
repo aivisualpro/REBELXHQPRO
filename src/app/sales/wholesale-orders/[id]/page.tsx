@@ -59,6 +59,13 @@ interface SaleOrder {
     defaultShippingTerms?: string;
     contactStatus?: string;
     contactType?: string;
+    billing?: {
+      nameOnCard?: string;
+      ccNumber?: string;
+      expirationDate?: string;
+      securityCode?: string;
+      zipCode?: string;
+    };
   } | string;
   salesRep: string;
   paymentMethod: string;
@@ -659,8 +666,8 @@ export default function SaleOrderDetailPage() {
             <div className="w-[30%] border-r border-border bg-secondary/30 overflow-y-auto p-4 space-y-4">
                 {/* Identity Boxes */}
                 <div className="grid grid-cols-3 gap-2">
-                    <div className="border border-border rounded-md p-3 bg-background text-center">
-                        <div className="text-[11px] font-bold text-foreground">{order.label}</div>
+                    <div className="border border-border rounded-md p-3 bg-background text-center flex items-center justify-center">
+                        <div className="text-base font-black text-amber-500 tracking-tight font-mono">{order.label}</div>
                     </div>
                     <div
                         className="border border-border rounded-md p-3 bg-background text-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all"
@@ -920,6 +927,68 @@ export default function SaleOrderDetailPage() {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Credit Card */}
+                            {c.billing && (c.billing.ccNumber || c.billing.nameOnCard) && (() => {
+                                const getCardType = (number: string) => {
+                                    const n = number?.replace(/\D/g, '') || '';
+                                    if (n.startsWith('4')) return 'Visa';
+                                    if (/^5[1-5]/.test(n) || /^2(2\d{2}|[3-6]\d{2}|7[0-1]\d|720)/.test(n)) return 'MasterCard';
+                                    if (/^3[47]/.test(n)) return 'Amex';
+                                    if (/^6(?:011|5|4[4-9]|22)/.test(n)) return 'Discover';
+                                    return '';
+                                };
+                                const getCardTheme = (type: string) => {
+                                    switch (type.toLowerCase()) {
+                                        case 'visa': return 'from-[#1a1f71] to-[#00579f]';
+                                        case 'mastercard': return 'from-[#232323] to-[#4b4b4b]';
+                                        case 'amex': return 'from-[#007bc1] to-[#00a3e0]';
+                                        case 'discover': return 'from-[#f68121] to-[#ff9d4d]';
+                                        default: return 'from-slate-900 to-slate-800';
+                                    }
+                                };
+                                const ct = getCardType(c.billing.ccNumber || '');
+                                const theme = getCardTheme(ct);
+                                return (
+                                    <div className="mt-4">
+                                        <div className={cn("p-4 rounded-sm space-y-3 shadow-inner bg-gradient-to-br transition-all duration-500", theme)}>
+                                            <div className="flex items-center justify-between">
+                                                <div className="w-8 h-5.5 bg-gradient-to-br from-yellow-200 via-yellow-400 to-yellow-600 rounded-sm relative overflow-hidden shadow-inner flex shrink-0">
+                                                    <div className="absolute inset-0 border-[0.5px] border-black/10"></div>
+                                                    <div className="absolute top-1/2 left-0 w-full h-[0.5px] bg-black/20"></div>
+                                                    <div className="absolute top-0 left-1/2 w-[0.5px] h-full bg-black/20"></div>
+                                                </div>
+                                                {ct && (
+                                                    <div className="text-[9px] text-white/50 uppercase font-black tracking-widest">{ct}</div>
+                                                )}
+                                            </div>
+                                            <div className="space-y-1">
+                                                <div className="text-[12px] font-mono text-white tracking-[0.2em] truncate">
+                                                    •••• •••• •••• ••••
+                                                </div>
+                                            </div>
+                                            <div className="flex justify-between items-end">
+                                                <div className="space-y-1">
+                                                    <div className="text-[7px] text-white/40 uppercase font-black tracking-tighter">Card Holder</div>
+                                                    <div className="text-[9px] text-white font-bold uppercase tracking-wider truncate max-w-[100px]">
+                                                        {c.billing.nameOnCard || '-'}
+                                                    </div>
+                                                </div>
+                                                <div className="flex space-x-3">
+                                                    <div className="space-y-1">
+                                                        <div className="text-[7px] text-white/40 uppercase font-black tracking-tighter">Expires</div>
+                                                        <div className="text-[9px] text-white font-mono">{c.billing.expirationDate || '••/••'}</div>
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <div className="text-[7px] text-white/40 uppercase font-black tracking-tighter">CVV</div>
+                                                        <div className="text-[9px] text-white font-mono">•••</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
                         </div>
                     );
                 })()}

@@ -191,7 +191,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
         void Client;
 
         const order = await SaleOrder.findById(id)
-            .populate('clientId', 'name addresses phones emails contacts salesPerson description website facebookPage industry forecastedAmount defaultPaymentMethod defaultShippingTerms contactStatus contactType')
+            .populate('clientId', 'name addresses phones emails contacts salesPerson description website facebookPage industry forecastedAmount defaultPaymentMethod defaultShippingTerms contactStatus contactType billing')
             .populate('lineItems.sku', 'name')
             .lean();
 
@@ -252,7 +252,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
             { $set: body },
             { new: true, runValidators: true }
         )
-        .populate('clientId', 'name addresses phones emails contacts salesPerson description website facebookPage industry forecastedAmount defaultPaymentMethod defaultShippingTerms contactStatus contactType')
+        .populate('clientId', 'name addresses phones emails contacts salesPerson description website facebookPage industry forecastedAmount defaultPaymentMethod defaultShippingTerms contactStatus contactType billing')
         .populate('lineItems.sku', 'name')
         .lean();
 
