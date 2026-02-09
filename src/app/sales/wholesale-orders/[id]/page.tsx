@@ -286,12 +286,12 @@ export default function SaleOrderDetailPage() {
       if (!order) return;
       toast((t) => (
           <div className="flex flex-col gap-2">
-              <p className="text-sm font-bold text-foreground">Delete this item?</p>
-              <p className="text-xs text-muted-foreground">This action cannot be undone.</p>
+              <p className="text-sm font-bold text-white">Delete this item?</p>
+              <p className="text-xs text-gray-400">This action cannot be undone.</p>
               <div className="flex gap-2 mt-1">
                   <button
                       onClick={() => toast.dismiss(t.id)}
-                      className="flex-1 px-3 py-1.5 text-xs font-bold rounded border border-border bg-background text-foreground hover:bg-secondary transition-colors"
+                      className="flex-1 px-3 py-1.5 text-xs font-bold rounded border border-gray-600 bg-gray-800 text-white hover:bg-gray-700 transition-colors"
                   >
                       Cancel
                   </button>
@@ -323,7 +323,7 @@ export default function SaleOrderDetailPage() {
                   </button>
               </div>
           </div>
-      ), { duration: 10000, style: { maxWidth: '360px' } });
+      ), { duration: 10000, position: 'top-center', style: { maxWidth: '360px', background: '#1a1a1a', color: '#fff', marginTop: '40vh' } });
   };
 
   // Lot Selection
@@ -398,12 +398,12 @@ export default function SaleOrderDetailPage() {
       if (!order) return;
       toast((t) => (
           <div className="flex flex-col gap-2">
-              <p className="text-sm font-bold text-foreground">Delete this payment?</p>
-              <p className="text-xs text-muted-foreground">This action cannot be undone.</p>
+              <p className="text-sm font-bold text-white">Delete this payment?</p>
+              <p className="text-xs text-gray-400">This action cannot be undone.</p>
               <div className="flex gap-2 mt-1">
                   <button
                       onClick={() => toast.dismiss(t.id)}
-                      className="flex-1 px-3 py-1.5 text-xs font-bold rounded border border-border bg-background text-foreground hover:bg-secondary transition-colors"
+                      className="flex-1 px-3 py-1.5 text-xs font-bold rounded border border-gray-600 bg-gray-800 text-white hover:bg-gray-700 transition-colors"
                   >
                       Cancel
                   </button>
@@ -432,7 +432,7 @@ export default function SaleOrderDetailPage() {
                   </button>
               </div>
           </div>
-      ), { duration: 10000, style: { maxWidth: '360px' } });
+      ), { duration: 10000, position: 'top-center', style: { maxWidth: '360px', background: '#1a1a1a', color: '#fff', marginTop: '40vh' } });
   };
 
   const handleSaveHeader = async () => {
@@ -585,12 +585,12 @@ export default function SaleOrderDetailPage() {
                         onClick={() => {
                             toast((t) => (
                                 <div className="flex flex-col gap-2">
-                                    <p className="text-sm font-bold text-foreground">Delete this order?</p>
-                                    <p className="text-xs text-muted-foreground">This action cannot be undone.</p>
+                                    <p className="text-sm font-bold text-white">Delete this order?</p>
+                                    <p className="text-xs text-gray-400">This action cannot be undone.</p>
                                     <div className="flex gap-2 mt-1">
                                         <button
                                             onClick={() => toast.dismiss(t.id)}
-                                            className="flex-1 px-3 py-1.5 text-xs font-bold rounded border border-border bg-background text-foreground hover:bg-secondary transition-colors"
+                                            className="flex-1 px-3 py-1.5 text-xs font-bold rounded border border-gray-600 bg-gray-800 text-white hover:bg-gray-700 transition-colors"
                                         >
                                             Cancel
                                         </button>
@@ -621,7 +621,7 @@ export default function SaleOrderDetailPage() {
                                         </button>
                                     </div>
                                 </div>
-                            ), { duration: 10000, style: { maxWidth: '360px' } });
+                            ), { duration: 10000, position: 'top-center', style: { maxWidth: '360px', background: '#1a1a1a', color: '#fff', marginTop: '40vh' } });
                         }}
                         disabled={isDeleting}
                         className="flex items-center space-x-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded transition-all cursor-pointer border border-red-500/30 text-red-500 hover:text-white hover:bg-red-600 disabled:opacity-50"
@@ -809,7 +809,7 @@ export default function SaleOrderDetailPage() {
                                         setEditingItem({ sku: '', lotNumber: '', qtyShipped: 1, price: 0, uom: 'Each' });
                                         setIsItemModalOpen(true);
                                     }}
-                                    className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-foreground text-background hover:opacity-90 transition-colors flex items-center space-x-1 shadow-sm"
+                                    className="px-3 h-9 text-[10px] font-black uppercase tracking-widest bg-amber-500 text-black hover:bg-amber-600 transition-colors flex items-center space-x-1 shadow-sm"
                                 >
                                     <Plus className="w-3 h-3" />
                                     <span>Add Item</span>
@@ -822,7 +822,7 @@ export default function SaleOrderDetailPage() {
                                     setEditingPayment({ paymentAmount: 0, createdAt: new Date().toISOString().split('T')[0], createdBy: '' });
                                     setIsPaymentModalOpen(true);
                                 }}
-                                className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-emerald-600 text-white hover:bg-emerald-700 transition-colors flex items-center space-x-1 shadow-sm"
+                                className="px-3 h-9 text-[10px] font-black uppercase tracking-widest bg-emerald-600 text-white hover:bg-emerald-700 transition-colors flex items-center space-x-1 shadow-sm"
                             >
                                 <Plus className="w-3 h-3" />
                                 <span>Add Payment</span>
@@ -834,7 +834,7 @@ export default function SaleOrderDetailPage() {
                                     setNewNoteText('');
                                     setIsNoteModalOpen(true);
                                 }}
-                                className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center space-x-1 shadow-sm"
+                                className="px-3 h-9 text-[10px] font-black uppercase tracking-widest bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center space-x-1 shadow-sm"
                             >
                                 <Plus className="w-3 h-3" />
                                 <span>Add Note</span>
@@ -1022,12 +1022,12 @@ export default function SaleOrderDetailPage() {
                                                 onClick={() => {
                                                     toast((t) => (
                                                         <div className="flex flex-col gap-2">
-                                                            <p className="text-sm font-bold text-foreground">Delete this note?</p>
-                                                            <p className="text-xs text-muted-foreground">This action cannot be undone.</p>
+                                                            <p className="text-sm font-bold text-white">Delete this note?</p>
+                                                            <p className="text-xs text-gray-400">This action cannot be undone.</p>
                                                             <div className="flex gap-2 mt-1">
                                                                 <button
                                                                     onClick={() => toast.dismiss(t.id)}
-                                                                    className="flex-1 px-3 py-1.5 text-xs font-bold rounded border border-border bg-background text-foreground hover:bg-secondary transition-colors"
+                                                                    className="flex-1 px-3 py-1.5 text-xs font-bold rounded border border-gray-600 bg-gray-800 text-white hover:bg-gray-700 transition-colors"
                                                                 >
                                                                     Cancel
                                                                 </button>
@@ -1056,7 +1056,7 @@ export default function SaleOrderDetailPage() {
                                                                 </button>
                                                             </div>
                                                         </div>
-                                                    ), { duration: 10000, style: { maxWidth: '360px' } });
+                                                    ), { duration: 10000, position: 'top-center', style: { maxWidth: '360px', background: '#1a1a1a', color: '#fff', marginTop: '40vh' } });
                                                 }}
                                                 className="p-1 text-muted-foreground hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100 shrink-0 ml-2"
                                             >
