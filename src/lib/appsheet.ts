@@ -292,3 +292,91 @@ export async function syncOrderToAppSheet(order: any) {
         console.error('AppSheet Order Sync Error:', error);
     }
 }
+
+export async function deleteOrderFromAppSheet(order: any) {
+    const appId = process.env.APPSHEET_APP_ID;
+    const accessKey = process.env.APPSHEET_ACCESS_KEY;
+
+    if (!appId || !accessKey) {
+        console.error('AppSheet API credentials missing');
+        return;
+    }
+
+    const orderObj = order.toObject ? order.toObject() : order;
+    const orderKey = orderObj.legacyId || orderObj._id?.toString() || '';
+
+    if (!orderKey) {
+        console.error('No order key found for AppSheet deletion');
+        return;
+    }
+
+    // Helper function to fetch with timeout
+    const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs = 30000) => {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            const response = await fetch(url, { ...options, signal: controller.signal });
+            return response;
+        } finally {
+            clearTimeout(timeout);
+        }
+    };
+
+    try {
+        const promises: Promise<any>[] = [];
+
+        // Delete the Order row from AppSheet
+        const orderPayload = {
+            Action: 'Delete',
+            Properties: { Locale: 'en-US', Timezone: 'Eastern Standard Time' },
+            Rows: [{ 'Order #': orderKey }]
+        };
+
+        promises.push(
+            fetchWithTimeout(
+                `https://api.appsheet.com/api/v2/apps/${appId}/tables/Orders/Action`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'ApplicationAccessKey': accessKey },
+                    body: JSON.stringify(orderPayload),
+                }
+            ).then(res => res.json()).then(result => {
+                console.log('AppSheet Order Delete Result:', result);
+                return result;
+            })
+        );
+
+        // Delete all Order Detail rows from AppSheet
+        const lineItems = orderObj.lineItems || [];
+        if (lineItems.length > 0) {
+            const detailRows = lineItems.map((item: any) => ({
+                'RecordID': item._id?.toString() || item._id,
+            }));
+
+            const detailPayload = {
+                Action: 'Delete',
+                Properties: { Locale: 'en-US', Timezone: 'Eastern Standard Time' },
+                Rows: detailRows
+            };
+
+            promises.push(
+                fetchWithTimeout(
+                    `https://api.appsheet.com/api/v2/apps/${appId}/tables/Order Details/Action`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'ApplicationAccessKey': accessKey },
+                        body: JSON.stringify(detailPayload),
+                    }
+                ).then(res => res.json()).then(result => {
+                    console.log('AppSheet Order Details Delete Result:', result);
+                    return result;
+                })
+            );
+        }
+
+        const results = await Promise.all(promises);
+        return { orderResult: results[0], detailResult: results[1] || null };
+    } catch (error) {
+        console.error('AppSheet Order Delete Error:', error);
+    }
+}

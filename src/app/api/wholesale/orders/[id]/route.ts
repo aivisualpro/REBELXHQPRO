@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { after } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import SaleOrder from '@/models/SaleOrder';
 import Sku from '@/models/Sku';
@@ -7,6 +8,8 @@ import PurchaseOrder from '@/models/PurchaseOrder';
 import Manufacturing from '@/models/Manufacturing';
 import AuditAdjustment from '@/models/AuditAdjustment';
 import Client from '@/models/Client';
+import { deleteOrderFromAppSheet } from '@/lib/appsheet';
+
 
 export const dynamic = 'force-dynamic';
 
@@ -247,14 +250,28 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
         await dbConnect();
         const { id } = await context.params;
 
-        const deletedOrder = await SaleOrder.findByIdAndDelete(id);
+        // Fetch the order first so we have the data needed for AppSheet deletion
+        const order = await SaleOrder.findById(id).lean();
 
-        if (!deletedOrder) {
+        if (!order) {
             return NextResponse.json({ error: 'Order not found' }, { status: 404 });
         }
+
+        // Delete from MongoDB
+        await SaleOrder.findByIdAndDelete(id);
+
+        // Delete from AppSheet in background (non-blocking)
+        after(async () => {
+            try {
+                await deleteOrderFromAppSheet(order);
+            } catch (err) {
+                console.error('Background AppSheet delete failed:', err);
+            }
+        });
 
         return NextResponse.json({ message: 'Order deleted successfully' });
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
+

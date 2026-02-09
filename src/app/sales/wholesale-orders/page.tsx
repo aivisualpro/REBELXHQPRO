@@ -397,27 +397,23 @@ function SaleOrdersContent() {
     if (!orderId) return;
 
     try {
-      // Assuming GET DELETE endpoint exists or handles DELETE method
-      // If not explicitly created, I might need to add DELETE handling to the API route I just made.
-      // I'll assume standard REST: DELETE /api/wholesale/orders?id=... or /api/wholesale/orders/[id]
-      // Wait, the file I made `route.ts` only has GET and POST.
-      // I need to add DELETE logic or a [id] route. 
-      // I'll add the DELETE logic to the route I created in Step 2? No, conventional Next.js App Router uses [id]/route.ts for specific item operations.
-      // I'll skip DELETE implementation for now or just fake it, but user asked for "same like Purchase Orders".
-      // Purchase Orders uses `/api/purchase-orders/${orderId}`.
-      // I haven't created `/api/wholesale/orders/[id]/route.ts` yet. I should do that.
-      // For now, I will comment out the actual fetch call or try to use a query param on the main route if I modify it,
-      // but correct way is [id]/route.ts.
-      // I will proceed with creating this page first.
-      
-      // Temporary placeholder:
-      toast.error("Delete functionality not yet deployed (requires [id] api route)");
-      setDeleteConfirm({ isOpen: false, orderId: null });
-      
+      const res = await fetch(`/api/wholesale/orders/${orderId}`, {
+        method: 'DELETE'
+      });
+
+      if (res.ok) {
+        toast.success('Order deleted successfully');
+        setDeleteConfirm({ isOpen: false, orderId: null });
+        fetchOrders();
+      } else {
+        const data = await res.json();
+        toast.error(data.error || 'Failed to delete order');
+      }
     } catch (e) {
       toast.error('Error deleting order');
     }
   };
+
 
   const handleEditClick = (e: React.MouseEvent, order: SaleOrder) => {
     e.stopPropagation();
