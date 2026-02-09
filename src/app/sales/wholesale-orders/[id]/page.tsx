@@ -662,8 +662,14 @@ export default function SaleOrderDetailPage() {
                     <div className="border border-border rounded-md p-3 bg-background text-center">
                         <div className="text-[11px] font-bold text-foreground">{order.label}</div>
                     </div>
-                    <div className="border border-border rounded-md p-3 bg-background text-center">
-                        <div className="text-[11px] font-bold text-foreground break-words">{renderClient(order.clientId)}</div>
+                    <div
+                        className="border border-border rounded-md p-3 bg-background text-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all"
+                        onClick={() => {
+                            const clientId = typeof order.clientId === 'object' && order.clientId ? order.clientId._id : null;
+                            if (clientId) router.push(`/crm/clients/${clientId}`);
+                        }}
+                    >
+                        <div className="text-[11px] font-bold text-foreground break-words hover:text-primary transition-colors">{renderClient(order.clientId)}</div>
                     </div>
                     <div className="border border-border rounded-md p-3 bg-background text-center flex items-center justify-center">
                         <select
