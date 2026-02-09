@@ -223,6 +223,9 @@ export async function GET(
             .populate('finishedBy', 'firstName lastName email')
             .populate('labor.user', 'firstName lastName email')
             .populate('notes.createdBy', 'firstName lastName email')
+            .populate('qualityCheck.checkedBy', 'firstName lastName email')
+            .populate('qualityCheck.packagedBy', 'firstName lastName email')
+            .populate('qualityCheck.qualityCheckedBy', 'firstName lastName email')
             .populate('recipesId', 'name sku steps qty notes')
             .lean();
 
@@ -323,6 +326,9 @@ export async function PATCH(
             .populate('finishedBy', 'firstName lastName email')
             .populate('labor.user', 'firstName lastName email')
             .populate('notes.createdBy', 'firstName lastName email')
+            .populate('qualityCheck.checkedBy', 'firstName lastName email')
+            .populate('qualityCheck.packagedBy', 'firstName lastName email')
+            .populate('qualityCheck.qualityCheckedBy', 'firstName lastName email')
             .populate('recipesId', 'name sku steps qty notes')
             .lean();
 

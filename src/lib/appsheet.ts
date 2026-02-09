@@ -1,5 +1,62 @@
 import mongoose from 'mongoose';
 
+export async function syncSkuToAppSheet(sku: any, action: 'Add' | 'Edit' | 'Delete' = 'Edit') {
+    const appId = process.env.APPSHEET_APP_ID;
+    const accessKey = process.env.APPSHEET_ACCESS_KEY;
+
+    if (!appId || !accessKey) {
+        console.error('AppSheet API credentials missing');
+        return;
+    }
+
+    const skuObj = sku.toObject ? sku.toObject() : sku;
+
+    const row: Record<string, any> = {
+        'SKU': skuObj.legacyId || skuObj._id || '',
+        'Product': skuObj.name || '',
+        'Image': skuObj.image || '',
+        'Category': skuObj.category || '',
+        'Sub Category': skuObj.subCategory || '',
+        'Material Type': skuObj.materialType || '',
+        'UOM': skuObj.uom || '',
+        'Sale Price': skuObj.salePrice || 0,
+        'Order Up to': skuObj.orderUpto || 0,
+        'Re-Order Point': skuObj.reOrderPoint || 0,
+        'Kit Applied': skuObj.kitApplied ? 'Y' : 'N',
+        'isLotApplied': skuObj.isLotApplied ? 'Y' : 'N',
+    };
+
+    const payload = {
+        Action: action,
+        Properties: {
+            Locale: 'en-US',
+            Timezone: 'Eastern Standard Time',
+        },
+        Rows: [row]
+    };
+
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 30000);
+        const response = await fetch(`https://api.appsheet.com/api/v2/apps/${appId}/tables/SKUs/Action`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'ApplicationAccessKey': accessKey,
+            },
+            body: JSON.stringify(payload),
+            signal: controller.signal,
+        });
+        clearTimeout(timeout);
+
+        const result = await response.json();
+        console.log(`AppSheet SKU ${action} Result:`, result);
+        return result;
+    } catch (error) {
+        console.error('AppSheet SKU Sync Error:', error);
+    }
+}
+
 export async function syncClientToAppSheet(clients: any | any[]) {
     const appId = process.env.APPSHEET_APP_ID;
     const accessKey = process.env.APPSHEET_ACCESS_KEY;

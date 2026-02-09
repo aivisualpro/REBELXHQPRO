@@ -7,6 +7,7 @@ const LaborSchema = new mongoose.Schema({
     user: { type: String, ref: 'RXHQUsers' },
     duration: String, // Format: HH:MM:SS
     hourlyRate: Number,
+    createdBy: { type: String, ref: 'RXHQUsers' },
     createdAt: { type: Date, default: Date.now }
 });
 
@@ -51,6 +52,22 @@ const ManufacturingSchema = new mongoose.Schema({
     }],
 
     labor: [LaborSchema],
+
+    qualityCheck: [{
+        // _id auto-generated as ObjectId
+        checkedBy: { type: String, ref: 'RXHQUsers' },
+        packagedBy: { type: String, ref: 'RXHQUsers' },
+        label: { type: Boolean, default: false },
+        lot: { type: Boolean, default: false },
+        seal: { type: Boolean, default: false },
+        packageQuality: { type: Boolean, default: false },
+        repackaged: { type: Boolean, default: false },
+        weight: { type: Number, default: 0 },
+        target: { type: Number, default: 0 },
+        actualWeight: { type: Number, default: 0 },
+        qualityCheckedBy: { type: String, ref: 'RXHQUsers' },
+        createdAt: { type: Date, default: Date.now }
+    }],
 
     // Cost tracking fields
     materialCost: { type: Number, default: 0 },

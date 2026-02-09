@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import Sku from '@/models/Sku';
 import OpeningBalance from '@/models/OpeningBalance';
@@ -9,6 +9,7 @@ import AuditAdjustment from '@/models/AuditAdjustment';
 import WebOrder from '@/models/WebOrder';
 import { applyDateFilter } from '@/lib/global-settings';
 import { getSkuTiers } from '@/lib/sku-tiers';
+import { syncSkuToAppSheet } from '@/lib/appsheet';
 
 export const dynamic = 'force-dynamic';
 
@@ -375,6 +376,31 @@ export async function GET(request: Request) {
             totalPages: Math.ceil(total / limit)
         });
     } catch (error: any) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+}
+
+export async function POST(request: Request) {
+    try {
+        await dbConnect();
+        const body = await request.json();
+
+        const newSku = new Sku(body);
+        await newSku.save();
+
+        // Sync to AppSheet in background
+        after(async () => {
+            try {
+                await syncSkuToAppSheet(newSku, 'Add');
+                console.log('✅ New SKU synced to AppSheet:', newSku._id);
+            } catch (syncError) {
+                console.error('❌ Background AppSheet SKU sync failed:', syncError);
+            }
+        });
+
+        return NextResponse.json(newSku);
+    } catch (error: any) {
+        console.error('Create SKU error:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

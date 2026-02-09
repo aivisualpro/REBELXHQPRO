@@ -52,6 +52,21 @@ interface ManufacturingOrder {
     lineItems?: LineItem[];
     labor?: LaborEntry[];
     notes?: { _id: string; note: string; createdBy?: { _id: string; firstName: string; lastName: string } | string; createdAt: string }[];
+    qualityCheck?: {
+        _id: string;
+        checkedBy?: { _id: string; firstName: string; lastName: string } | string;
+        packagedBy?: { _id: string; firstName: string; lastName: string } | string;
+        label?: boolean;
+        lot?: boolean;
+        seal?: boolean;
+        packageQuality?: boolean;
+        repackaged?: boolean;
+        weight?: number;
+        target?: number;
+        actualWeight?: number;
+        qualityCheckedBy?: { _id: string; firstName: string; lastName: string } | string;
+        createdAt?: string;
+    }[];
 }
 
 const TABS = ['Items', 'Labor', 'WO Notes', 'Recipe Steps', 'Recipe Notes', 'SKU Notes', 'QC'] as const;
@@ -540,38 +555,17 @@ export default function ManufacturingDetailPage() {
 
             <div className="flex flex-1 overflow-hidden">
                 {/* Left Sidebar: Details (30%) */}
-                <div className="w-[30%] border-r border-slate-200 bg-slate-50/30 overflow-y-auto p-6 space-y-6 scrollbar-custom">
-                    {/* Status & Priority Chips */}
-                    <div className="flex items-center gap-2">
-                        <div className={cn(
-                            "px-2 py-1 text-[9px] font-black uppercase tracking-widest border rounded-none",
-                            order.status === 'Fulfilled' ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
-                            order.status === 'Processing' ? "bg-blue-50 text-blue-600 border-blue-100" :
-                            order.status === 'Ready to QC' ? "bg-amber-50 text-amber-600 border-amber-100" :
-                            "bg-slate-100 text-slate-500 border-slate-200"
-                        )}>
-                            {order.status}
-                        </div>
-                        <div className={cn(
-                            "px-2 py-1 text-[9px] font-black uppercase tracking-widest border rounded-none",
-                            order.priority === 'Extreme' ? "bg-red-50 text-red-600 border-red-100" :
-                            order.priority === 'High' ? "bg-orange-50 text-orange-600 border-orange-100" :
-                            "bg-slate-100 text-slate-500 border-slate-200"
-                        )}>
-                            {order.priority}
-                        </div>
-                    </div>
-
-                    {/* Header Row 2: SKU Name */}
-                    <div>
+                <div className="w-[30%] border-r border-slate-200 bg-white overflow-y-auto scrollbar-custom">
+                    {/* SKU Hero Section */}
+                    <div className="bg-gradient-to-b from-slate-50 to-white px-5 pt-5 pb-4">
                         <div 
-                            className="flex items-center space-x-3 mb-6 cursor-pointer group"
+                            className="flex items-start gap-4 cursor-pointer group"
                             onClick={() => {
                                 const skuId = typeof order.sku === 'object' && order.sku !== null ? (order.sku as any)._id : order.sku;
                                 if (skuId) router.push(`/warehouse/skus/${skuId}`);
                             }}
                         >
-                            <div className="w-14 h-14 bg-white border border-slate-200 flex items-center justify-center p-1 shadow-sm shrink-0 group-hover:border-blue-300 transition-colors">
+                            <div className="w-16 h-16 bg-white border border-slate-200 flex items-center justify-center p-1.5 shadow-sm shrink-0 group-hover:border-blue-400 group-hover:shadow-md transition-all">
                                 {skuImage ? (
                                     <img 
                                         src={skuImage} 
@@ -589,11 +583,11 @@ export default function ManufacturingDetailPage() {
                                     <Package className="w-6 h-6 text-slate-400" />
                                 )}
                             </div>
-                            <div>
-                                <div className="flex items-center space-x-2">
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 mb-1">
                                     {!!sidebarSkuTier && (
                                         <span className={cn(
-                                            "flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[12px] font-black text-white shadow-sm",
+                                            "flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-black text-white",
                                             sidebarSkuTier === 1 ? "bg-emerald-500" :
                                             sidebarSkuTier === 2 ? "bg-blue-500" :
                                             "bg-orange-500"
@@ -601,91 +595,138 @@ export default function ManufacturingDetailPage() {
                                             {sidebarSkuTier}
                                         </span>
                                     )}
-                                    <h1 className="text-xl font-black text-slate-900 tracking-tight leading-none group-hover:text-blue-600 transition-colors">{skuName}</h1>
+                                    <h1 className="text-base font-black text-slate-900 leading-tight group-hover:text-blue-600 transition-colors line-clamp-2">{skuName}</h1>
                                 </div>
-                            </div>
-                        </div>
-
-                        {/* Info Rows */}
-                        <div className="space-y-6">
-                            {/* Quantity Section */}
-                            <div className="space-y-3">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <div className="text-[10px] text-slate-400 uppercase tracking-widest mb-1 font-bold italic">Ordered Qty</div>
-                                        <div className="text-lg font-black text-slate-900">{order.qty} <span className="text-[10px] text-slate-400 font-bold uppercase">{order.uom}</span></div>
-                                    </div>
-                                    <div>
-                                        <div className="flex items-center justify-between mb-1">
-                                            <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold italic">Adjust Qty</div>
-                                            {isSubmittingDiff && (
-                                                <div className="text-[8px] text-blue-500 font-bold uppercase animate-pulse">Saving...</div>
-                                            )}
-                                        </div>
-                                        <div className="flex items-center bg-white border border-slate-200 h-8 p-1 focus-within:border-black transition-colors w-24">
-                                            <button 
-                                                disabled={isSubmittingDiff}
-                                                onClick={() => handleUpdateQtyDiff((order.qtyDifference || 0) - 1)}
-                                                className="w-6 h-full flex items-center justify-center text-slate-400 hover:text-black transition-all"
-                                            >
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                                            </button>
-                                            <input 
-                                                type="number"
-                                                value={order.qtyDifference || 0}
-                                                onChange={(e) => handleUpdateQtyDiff(parseInt(e.target.value) || 0)}
-                                                className="flex-1 text-center text-xs font-bold bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none min-w-0"
-                                            />
-                                            <button 
-                                                disabled={isSubmittingDiff}
-                                                onClick={() => handleUpdateQtyDiff((order.qtyDifference || 0) + 1)}
-                                                className="w-6 h-full flex items-center justify-center text-slate-400 hover:text-black transition-all"
-                                            >
-                                                <Plus className="w-3 h-3" strokeWidth={3} />
-                                            </button>
-                                        </div>
-                                    </div>
+                                <div className="flex items-center gap-1.5 mt-2">
+                                    <span className={cn(
+                                        "px-1.5 py-0.5 text-[8px] font-black uppercase tracking-widest",
+                                        order.status === 'Fulfilled' ? "bg-emerald-100 text-emerald-700" :
+                                        order.status === 'Processing' ? "bg-blue-100 text-blue-700" :
+                                        order.status === 'Ready to QC' ? "bg-amber-100 text-amber-700" :
+                                        "bg-slate-100 text-slate-600"
+                                    )}>
+                                        {order.status}
+                                    </span>
+                                    <span className={cn(
+                                        "px-1.5 py-0.5 text-[8px] font-black uppercase tracking-widest",
+                                        order.priority === 'Extreme' ? "bg-red-100 text-red-700" :
+                                        order.priority === 'High' ? "bg-orange-100 text-orange-700" :
+                                        "bg-slate-100 text-slate-600"
+                                    )}>
+                                        {order.priority}
+                                    </span>
                                 </div>
-                                <div className="bg-black/5 p-3 flex justify-between items-center">
-                                    <div className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Quantity Manufactured</div>
-                                    <div className="text-lg font-black text-slate-900">{costs.qtyManufactured} <span className="text-[10px] text-slate-400 font-bold uppercase">{order.uom}</span></div>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-y-4 gap-x-6">
-                                {infoRows.flat().map((item, idx) => (
-                                    <div key={idx}>
-                                        <div className="text-[10px] text-slate-400 uppercase tracking-widest mb-0.5 font-bold italic">{item.label}</div>
-                                        <div className="text-xs font-medium text-slate-700 whitespace-nowrap">{item.value}</div>
-                                    </div>
-                                ))}
                             </div>
                         </div>
                     </div>
 
-                    {/* Cost Breakdown */}
-                    <div>
-                        <h3 className="text-xs font-bold uppercase text-slate-900 tracking-widest mb-4 border-b border-slate-200 pb-2">Cost Analysis</h3>
-                        <div className="space-y-3">
-                             <div className="flex justify-between items-center group">
-                                 <span className="text-sm text-slate-500 group-hover:text-slate-900 transition-colors">Material Cost</span>
-                                <span className="text-sm font-mono font-medium text-slate-700">${costs.material.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
+                    {/* WO Label */}
+                    {order.label && (
+                        <div className="mx-5 mb-3 px-3 py-2 bg-slate-50 border border-slate-100">
+                            <div className="text-[8px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">WO / Lot Number</div>
+                            <div className="text-xs font-mono font-bold text-slate-800">{order.label}</div>
+                        </div>
+                    )}
+
+                    {/* Quantity Section */}
+                    <div className="mx-5 mb-4">
+                        <div className="grid grid-cols-2 gap-3 mb-3">
+                            <div className="bg-slate-50 border border-slate-100 p-3">
+                                <div className="text-[8px] text-slate-400 uppercase tracking-widest font-bold mb-1">Ordered</div>
+                                <div className="text-xl font-black text-slate-900 leading-none">{order.qty}</div>
+                                <div className="text-[9px] text-slate-400 font-bold uppercase mt-0.5">{order.uom}</div>
                             </div>
-                            <div className="flex justify-between items-center group">
-                                <span className="text-sm text-slate-500 group-hover:text-slate-900 transition-colors">Packaging Cost</span>
-                                <span className="text-sm font-mono font-medium text-slate-700">${costs.packaging.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
+                            <div className="bg-slate-50 border border-slate-100 p-3">
+                                <div className="flex items-center justify-between mb-1">
+                                    <div className="text-[8px] text-slate-400 uppercase tracking-widest font-bold">Adjust</div>
+                                    {isSubmittingDiff && (
+                                        <div className="text-[7px] text-blue-500 font-bold uppercase animate-pulse">Saving</div>
+                                    )}
+                                </div>
+                                <div className="flex items-center bg-white border border-slate-200 h-7 focus-within:border-black transition-colors">
+                                    <button 
+                                        disabled={isSubmittingDiff}
+                                        onClick={() => handleUpdateQtyDiff((order.qtyDifference || 0) - 1)}
+                                        className="w-7 h-full flex items-center justify-center text-slate-400 hover:text-black hover:bg-slate-50 transition-all border-r border-slate-200"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                    </button>
+                                    <input 
+                                        type="number"
+                                        value={order.qtyDifference || 0}
+                                        onChange={(e) => handleUpdateQtyDiff(parseInt(e.target.value) || 0)}
+                                        className="flex-1 text-center text-xs font-bold bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none min-w-0"
+                                    />
+                                    <button 
+                                        disabled={isSubmittingDiff}
+                                        onClick={() => handleUpdateQtyDiff((order.qtyDifference || 0) + 1)}
+                                        className="w-7 h-full flex items-center justify-center text-slate-400 hover:text-black hover:bg-slate-50 transition-all border-l border-slate-200"
+                                    >
+                                        <Plus className="w-2.5 h-2.5" strokeWidth={3} />
+                                    </button>
+                                </div>
                             </div>
-                            <div className="flex justify-between items-center group">
-                                <span className="text-sm text-slate-500 group-hover:text-slate-900 transition-colors">Labor Cost</span>
-                                <span className="text-sm font-mono font-medium text-slate-700">${costs.labor.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
+                        </div>
+                        <div className="bg-slate-900 text-white px-4 py-2.5 flex justify-between items-center">
+                            <div className="text-[9px] uppercase tracking-widest font-bold text-slate-400">Qty Manufactured</div>
+                            <div className="text-lg font-black">{costs.qtyManufactured} <span className="text-[9px] text-slate-400 font-bold uppercase">{order.uom}</span></div>
+                        </div>
+                    </div>
+
+                    {/* Metadata Grid */}
+                    <div className="mx-5 mb-4 border border-slate-100">
+                        {(() => {
+                            const lastQc = order.qualityCheck?.length ? order.qualityCheck[order.qualityCheck.length - 1] : null;
+                            return [
+                                { label: 'Scheduled Start', value: order.scheduledStart ? new Date(order.scheduledStart).toLocaleDateString() : '-' },
+                                { label: 'Scheduled Finish', value: order.scheduledFinish ? new Date(order.scheduledFinish).toLocaleDateString() : '-' },
+                                { label: 'Created By', value: formatUser(order.createdBy) },
+                                { label: 'Finished By', value: formatUser(order.finishedBy) },
+                                { label: 'Checked By', value: lastQc ? formatUser(lastQc.checkedBy) : '-' },
+                                { label: 'Packaged By', value: lastQc ? formatUser(lastQc.packagedBy) : '-' },
+                                { label: 'Created At', value: new Date(order.createdAt).toLocaleDateString() },
+                                { label: 'Recipe', value: (typeof order.recipesId === 'object' && order.recipesId) ? order.recipesId.name : (order.recipesId || '-') },
+                            ];
+                        })().map((item, idx) => (
+                            <div key={idx} className={cn(
+                                "flex items-center justify-between px-3 py-2",
+                                idx % 2 === 0 ? "bg-white" : "bg-slate-50/70"
+                            )}>
+                                <span className="text-[9px] text-slate-400 uppercase tracking-widest font-bold">{item.label}</span>
+                                <span className="text-[11px] font-medium text-slate-700 text-right max-w-[55%] truncate">{item.value}</span>
                             </div>
-                            <div className="flex justify-between items-center group pt-1">
-                                <span className="text-sm text-slate-500 group-hover:text-slate-900 transition-colors italic">Cost per Unit</span>
-                                <span className="text-sm font-mono font-medium text-slate-600 italic">${costs.perUnit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
+                        ))}
+                    </div>
+
+                    {/* Cost Analysis */}
+                    <div className="mx-5 mb-5">
+                        <div className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-3">Cost Breakdown</div>
+                        <div className="space-y-2">
+                            {[
+                                { label: 'Material', value: costs.material, color: 'bg-blue-500' },
+                                { label: 'Packaging', value: costs.packaging, color: 'bg-violet-500' },
+                                { label: 'Labor', value: costs.labor, color: 'bg-amber-500' },
+                            ].map((item, idx) => (
+                                <div key={idx} className="group">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className="text-[10px] text-slate-500 group-hover:text-slate-800 transition-colors font-medium">{item.label}</span>
+                                        <span className="text-[11px] font-mono font-semibold text-slate-700">${item.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    </div>
+                                    <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
+                                        <div className={cn("h-full rounded-full transition-all duration-500", item.color)} style={{ width: `${costs.total > 0 ? (item.value / costs.total * 100) : 0}%` }} />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="mt-3 pt-3 border-t border-slate-200 space-y-2">
+                            <div className="flex justify-between items-center">
+                                <span className="text-[10px] text-slate-400 font-medium italic">Per Unit</span>
+                                <span className="text-[11px] font-mono font-medium text-slate-500 italic">${costs.perUnit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</span>
                             </div>
-                            <div className="pt-3 mt-3 border-t border-slate-200 flex justify-between items-center">
-                                <span className="text-sm font-bold text-slate-900 uppercase tracking-wider">Total Cost</span>
-                                <span className="text-base font-mono font-bold text-emerald-600">${costs.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
+                            <div className="flex justify-between items-center bg-emerald-50 border border-emerald-100 px-3 py-2">
+                                <span className="text-[10px] font-black text-emerald-800 uppercase tracking-widest">Total Cost</span>
+                                <span className="text-base font-mono font-black text-emerald-700">${costs.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             </div>
                         </div>
                     </div>
@@ -704,7 +745,7 @@ export default function ManufacturingDetailPage() {
                                     'Recipe Steps': (typeof order.recipesId === 'object' && (order.recipesId as any)?.steps?.length) || 0,
                                     'Recipe Notes': (typeof order.recipesId === 'object' && (order.recipesId as any)?.notes) ? 1 : 0,
                                     'SKU Notes': 0,
-                                    'QC': 0,
+                                    'QC': order.qualityCheck?.length || 0,
                                 };
                                 return TABS.map(tab => (
                                     <button
@@ -1168,9 +1209,52 @@ export default function ManufacturingDetailPage() {
                 )}
 
                 {activeTab === 'QC' && (
-                    <div className="text-center py-12 text-slate-400 text-sm">
-                        <Clipboard className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                        Quality control coming soon
+                    <div className="animate-in fade-in duration-300">
+                        <table className="w-full border-collapse text-left">
+                            <thead className="bg-slate-50 border-y border-slate-100 sticky top-0 z-20">
+                                <tr>
+                                    {['Checked By', 'Packaged By', 'Label', 'Lot', 'Seal', 'Pkg Qty', 'Repackaged', 'Weight', 'Target', 'Actual Wt', 'QC By', 'Date'].map(col => (
+                                        <th key={col} className="px-3 py-1.5 text-[8px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                                            {col}
+                                        </th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {(!order.qualityCheck || order.qualityCheck.length === 0) ? (
+                                    <tr>
+                                        <td colSpan={12} className="px-3 py-6 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">No quality checks found</td>
+                                    </tr>
+                                ) : order.qualityCheck.map((qc, idx) => (
+                                    <tr key={qc._id || idx} className="hover:bg-slate-50 transition-colors">
+                                        <td className="px-3 py-1 text-[10px] text-slate-700">{formatUser(qc.checkedBy)}</td>
+                                        <td className="px-3 py-1 text-[10px] text-slate-700">{formatUser(qc.packagedBy)}</td>
+                                        <td className="px-3 py-1 text-[10px] text-center">
+                                            {qc.label ? <span className="text-emerald-500 font-bold">✓</span> : <span className="text-slate-300">✗</span>}
+                                        </td>
+                                        <td className="px-3 py-1 text-[10px] text-center">
+                                            {qc.lot ? <span className="text-emerald-500 font-bold">✓</span> : <span className="text-slate-300">✗</span>}
+                                        </td>
+                                        <td className="px-3 py-1 text-[10px] text-center">
+                                            {qc.seal ? <span className="text-emerald-500 font-bold">✓</span> : <span className="text-slate-300">✗</span>}
+                                        </td>
+                                        <td className="px-3 py-1 text-[10px] text-center">
+                                            {qc.packageQuality ? <span className="text-emerald-500 font-bold">✓</span> : <span className="text-slate-300">✗</span>}
+                                        </td>
+                                        <td className="px-3 py-1 text-[10px] text-center">
+                                            {qc.repackaged ? <span className="text-amber-500 font-bold">✓</span> : <span className="text-slate-300">✗</span>}
+                                        </td>
+                                        <td className="px-3 py-1 text-[10px] text-slate-700 font-mono">{qc.weight ?? 0}</td>
+                                        <td className="px-3 py-1 text-[10px] text-slate-700 font-mono">{qc.target ?? 0}</td>
+                                        <td className="px-3 py-1 text-[10px] text-slate-700 font-mono">{qc.actualWeight ?? 0}</td>
+                                        <td className="px-3 py-1 text-[10px] text-slate-700">{formatUser(qc.qualityCheckedBy)}</td>
+                                        <td className="px-3 py-1 text-[10px] text-slate-500 font-mono">
+                                            {qc.createdAt ? new Date(qc.createdAt).toLocaleDateString() : '—'}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                 )}
 

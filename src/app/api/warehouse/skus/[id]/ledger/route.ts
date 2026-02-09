@@ -66,18 +66,18 @@ export async function GET(
                 .select('_id createdAt lotNumber qty uom cost')
                 .lean(),
             PurchaseOrder.find({ "lineItems.sku": id, ...dateFilter })
-                .select('_id label createdAt lineItems')
+                .select('_id label createdAt lineItems status')
                 .populate('vendor', 'name')
                 .lean(),
             Manufacturing.find({ $or: [{ sku: id }, { "lineItems.sku": id }], ...dateFilter })
-                .select('_id sku qty qtyDifference uom lotNumber label scheduledStart scheduledFinish createdAt lineItems labor totalCost packagingCost')
+                .select('_id sku qty qtyDifference uom lotNumber label scheduledStart scheduledFinish createdAt lineItems labor totalCost packagingCost status')
                 .lean(),
             SaleOrder.find({ "lineItems.sku": id, ...dateFilter })
-                .select('_id label createdAt shippedDate lineItems')
+                .select('_id label createdAt shippedDate lineItems status')
                 .populate('clientId', 'name')
                 .lean(),
             AuditAdjustment.find({ sku: id, ...dateFilter })
-                .select('_id createdAt reference lotNumber qty cost')
+                .select('_id createdAt reference lotNumber qty cost status')
                 .lean(),
             WebOrder.find({
                 $or: [
@@ -212,7 +212,8 @@ export async function GET(
                 uom: ob.uom,
                 cost: round8(lotCosts.get(ob.lotNumber) || ob.cost || 0),
                 docId: ob._id,
-                link: `/warehouse/opening-balances/${ob._id}` 
+                link: `/warehouse/opening-balances/${ob._id}`,
+                status: 'Completed'
             });
         });
 
@@ -231,7 +232,8 @@ export async function GET(
                         uom: line.uom,
                         cost: round8(lotCosts.get(line.lotNumber) || line.cost || line.price || 0),
                         docId: po._id,
-                        link: `/warehouse/purchase-orders/${po._id}`
+                        link: `/warehouse/purchase-orders/${po._id}`,
+                        status: po.status || ''
                     });
                 }
             });
@@ -254,7 +256,8 @@ export async function GET(
                     uom: job.uom,
                     cost: round8(lotCosts.get(lot) || 0),
                     docId: job._id,
-                    link: `/warehouse/manufacturing/${job._id}`
+                    link: `/warehouse/manufacturing/${job._id}`,
+                    status: job.status || ''
                 });
             }
 
@@ -283,7 +286,8 @@ export async function GET(
                             uom: line.uom,
                             cost: round8(lotCosts.get(line.lotNumber) || line.cost || 0),
                             docId: job._id,
-                            link: `/warehouse/manufacturing/${job._id}`
+                            link: `/warehouse/manufacturing/${job._id}`,
+                            status: job.status || ''
                         });
                     }
                 }
@@ -308,7 +312,8 @@ export async function GET(
                         cost: round8(virtualCost !== undefined ? virtualCost : (line.cost || 0)),
                         salePrice: round8(line.price || 0),
                         docId: so._id,
-                        link: `/sales/wholesale-orders/${so._id}`
+                        link: `/sales/wholesale-orders/${so._id}`,
+                        status: so.status || ''
                     });
                 }
             });
@@ -326,7 +331,8 @@ export async function GET(
                 uom: sku.uom || 'Unit',
                 cost: round8(lotCosts.get(adj.lotNumber) || adj.cost || 0),
                 docId: adj._id,
-                link: `/warehouse/audit-adjustments/${adj._id}`
+                link: `/warehouse/audit-adjustments/${adj._id}`,
+                status: adj.status || 'Completed'
             });
         });
 
@@ -350,7 +356,8 @@ export async function GET(
                            docId: wo._id,
                            link: `/sales/web-orders/${wo._id}`,
                            varianceId: line.varianceId,
-                           website: line.website
+                           website: line.website,
+                           status: wo.status || ''
                         });
                   }
              });
@@ -369,8 +376,13 @@ export async function GET(
             monthlyStats.set(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`, { revenue:0, qty:0, productionQty: 0, productionCost: 0 });
         }
 
+        const isPendingProduction = (t: any) => t.type === 'Produced' && t.status === 'Pending';
+
         const filteredTransactions = (startDate ? transactions.filter(t => t.date >= startDate) : transactions).map(t => {
-            balance = round8(balance + t.quantity);
+            // Produced + Pending: show in table but don't count towards balance or stats
+            if (!isPendingProduction(t)) {
+                balance = round8(balance + t.quantity);
+            }
             const key = `${t.date.getFullYear()}-${String(t.date.getMonth()+1).padStart(2,'0')}`;
             
             if (t.type === 'Orders' || t.type === 'Web Order') {
@@ -382,7 +394,7 @@ export async function GET(
                     const s = monthlyStats.get(key)!;
                     s.revenue += rev; s.qty += qty;
                 }
-            } else if (t.type === 'Produced') {
+            } else if (t.type === 'Produced' && !isPendingProduction(t)) {
                 if (monthlyStats.has(key)) {
                     const s = monthlyStats.get(key)!;
                     s.productionQty += t.quantity;
@@ -393,7 +405,7 @@ export async function GET(
         });
 
         const cogmTotal = transactions
-            .filter(tx => tx.type === 'Produced')
+            .filter(tx => tx.type === 'Produced' && !isPendingProduction(tx))
             .reduce((acc, tx) => acc + (Math.abs(tx.quantity) * (tx.cost || 0)), 0);
 
         const cogpTotal = transactions

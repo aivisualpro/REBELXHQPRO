@@ -72,6 +72,7 @@ export default function SettingsPage() {
     const importMfgLineItemsRef = useRef<HTMLInputElement>(null);
     const importMfgLaborRef = useRef<HTMLInputElement>(null);
     const importMfgNotesRef = useRef<HTMLInputElement>(null);
+    const importMfgQualityChecksRef = useRef<HTMLInputElement>(null);
 
     const [settings, setSettings] = useState({
         companyName: 'RebelX Headquarters',
@@ -799,6 +800,13 @@ export default function SettingsPage() {
                                             ref={importMfgNotesRef}
                                             onChange={(e) => handleImport(e, '/api/manufacturing/import-notes', 'Manufacturing Notes')}
                                         />
+                                        <input
+                                            type="file"
+                                            accept=".csv"
+                                            className="hidden"
+                                            ref={importMfgQualityChecksRef}
+                                            onChange={(e) => handleImport(e, '/api/manufacturing/import-quality-checks', 'Manufacturing Quality Checks')}
+                                        />
 
                                         <div className="space-y-4">
                                             <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">System Defaults</h2>
@@ -1321,7 +1329,7 @@ export default function SettingsPage() {
                                                 </div>
                                             </div>
 
-                                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                                                 <button
                                                     onClick={() => importMfgOrdersRef.current?.click()}
                                                     disabled={isImporting}
@@ -1377,6 +1385,20 @@ export default function SettingsPage() {
                                                         WO notes
                                                     </p>
                                                 </button>
+
+                                                <button
+                                                    onClick={() => importMfgQualityChecksRef.current?.click()}
+                                                    disabled={isImporting}
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-violet-400 hover:bg-violet-50 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <div className="w-12 h-12 rounded-full bg-violet-100 flex items-center justify-center mb-3 group-hover:bg-violet-200 transition-colors">
+                                                        <ClipboardCheck className="w-6 h-6 text-violet-600" />
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-slate-700">Import QC</h4>
+                                                    <p className="text-[10px] text-slate-500 mt-1 text-center">
+                                                        Quality checks
+                                                    </p>
+                                                </button>
                                             </div>
 
                                             <div className="mt-4 p-4 bg-slate-50 rounded-lg">
@@ -1397,6 +1419,10 @@ export default function SettingsPage() {
                                                     <div>
                                                         <span className="font-bold text-slate-700">Notes:</span>
                                                         <p>woNumber (parent legacyId), note, createdBy, createdAt</p>
+                                                    </div>
+                                                    <div>
+                                                        <span className="font-bold text-slate-700">Quality Checks:</span>
+                                                        <p>woNumber (parent legacyId), checkedBy, packagedBy, label, lot, seal, packageQuality, repackaged, weight, target, actualWeight, qualityCheckedBy, createdAt</p>
                                                     </div>
                                                 </div>
                                             </div>
