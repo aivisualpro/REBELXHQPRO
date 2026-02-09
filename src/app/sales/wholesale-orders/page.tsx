@@ -530,9 +530,11 @@ function SaleOrdersContent() {
     try {
       let res;
       if (editingOrderId) {
-        // Needs [id] route
-         toast.error("Edit functionality requires [id] api route (coming soon)");
-         return;
+        res = await fetch(`/api/wholesale/orders/${editingOrderId}`, {
+          method: 'PATCH',
+          body: JSON.stringify(payload),
+          headers: { 'Content-Type': 'application/json' }
+        });
       } else {
         res = await fetch('/api/wholesale/orders', {
           method: 'POST',
