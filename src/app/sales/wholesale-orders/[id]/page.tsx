@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, CreditCard, Truck, Plus, X, Trash2, Pencil, User, MapPin, DollarSign, List, RefreshCw, MessageSquare, Phone, Mail } from 'lucide-react';
+import { ArrowLeft, Calendar, CreditCard, Truck, Plus, X, Trash2, Pencil, User, MapPin, DollarSign, List, RefreshCw, MessageSquare, Phone, Mail, Eye, EyeOff } from 'lucide-react';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -164,6 +164,13 @@ export default function SaleOrderDetailPage() {
   // Delete Order State
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Billing visibility state
+  const [showBillingDetails, setShowBillingDetails] = useState(false);
+  const [billingPasswordModal, setBillingPasswordModal] = useState(false);
+  const [billingPassword, setBillingPassword] = useState('');
+  const [billingPasswordError, setBillingPasswordError] = useState('');
+  const billingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const fetchOrder = async () => {
       try {
           const res = await fetch(`/api/wholesale/orders/${params.id}`);
@@ -242,6 +249,40 @@ export default function SaleOrderDetailPage() {
   const renderClient = (val: any) => {
       if (typeof val === 'object' && val !== null) return val.name;
       return val || '-';
+  };
+
+  const handleVerifyBillingPassword = async () => {
+      if (!billingPassword) {
+          setBillingPasswordError('Please enter your password');
+          return;
+      }
+      try {
+          const res = await fetch('/api/auth/verify-password', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ password: billingPassword })
+          });
+          if (res.ok) {
+              setBillingPasswordModal(false);
+              setBillingPassword('');
+              setBillingPasswordError('');
+              setShowBillingDetails(true);
+              toast.success('Verification successful');
+              if (billingTimeoutRef.current) {
+                  clearTimeout(billingTimeoutRef.current);
+              }
+              billingTimeoutRef.current = setTimeout(() => {
+                  setShowBillingDetails(false);
+                  toast('Billing details hidden for security', { icon: '🔒' });
+              }, 60000);
+          } else {
+              const data = await res.json();
+              setBillingPasswordError(data.error || 'Invalid password');
+          }
+      } catch (error) {
+          console.error('Password verification error:', error);
+          setBillingPasswordError('Failed to verify password');
+      }
   };
 
   const getStatusColor = (status: string) => {
@@ -678,14 +719,14 @@ export default function SaleOrderDetailPage() {
                     >
                         <div className="text-[11px] font-bold text-foreground break-words hover:text-primary transition-colors">{renderClient(order.clientId)}</div>
                     </div>
-                    <div className="border border-border rounded-md p-3 bg-background text-center flex items-center justify-center">
+                    <div className={cn(
+                        "border rounded-md p-3 text-center flex items-center justify-center transition-colors",
+                        getStatusColor(order.orderStatus)
+                    )}>
                         <select
                             value={order.orderStatus}
                             onChange={(e) => handleStatusChange(e.target.value)}
-                            className={cn(
-                                "text-[10px] font-black uppercase tracking-wider border rounded cursor-pointer outline-none appearance-none bg-transparent px-1 py-0.5 w-full text-center",
-                                getStatusColor(order.orderStatus)
-                            )}
+                            className="text-[10px] font-black uppercase tracking-wider cursor-pointer outline-none appearance-none bg-transparent px-1 py-0.5 w-full text-center text-inherit border-none"
                         >
                             <option value="Pending">Pending</option>
                             <option value="Completed">Completed</option>
@@ -958,13 +999,38 @@ export default function SaleOrderDetailPage() {
                                                     <div className="absolute top-1/2 left-0 w-full h-[0.5px] bg-black/20"></div>
                                                     <div className="absolute top-0 left-1/2 w-[0.5px] h-full bg-black/20"></div>
                                                 </div>
-                                                {ct && (
-                                                    <div className="text-[9px] text-white/50 uppercase font-black tracking-widest">{ct}</div>
-                                                )}
+                                                <div className="flex items-center space-x-2">
+                                                    {ct && (
+                                                        <div className="text-[9px] text-white/50 uppercase font-black tracking-widest">{ct}</div>
+                                                    )}
+                                                    <button
+                                                        onClick={() => {
+                                                            if (showBillingDetails) {
+                                                                setShowBillingDetails(false);
+                                                                if (billingTimeoutRef.current) {
+                                                                    clearTimeout(billingTimeoutRef.current);
+                                                                }
+                                                            } else {
+                                                                setBillingPasswordModal(true);
+                                                            }
+                                                        }}
+                                                        className="p-1 hover:bg-white/10 rounded transition-colors"
+                                                        title={showBillingDetails ? "Hide details" : "View details"}
+                                                    >
+                                                        {showBillingDetails ? (
+                                                            <EyeOff className="w-3.5 h-3.5 text-white/60" />
+                                                        ) : (
+                                                            <Eye className="w-3.5 h-3.5 text-white/60" />
+                                                        )}
+                                                    </button>
+                                                </div>
                                             </div>
                                             <div className="space-y-1">
                                                 <div className="text-[12px] font-mono text-white tracking-[0.2em] truncate">
-                                                    •••• •••• •••• ••••
+                                                    {showBillingDetails
+                                                        ? (c.billing.ccNumber || '•••• •••• •••• ••••')
+                                                        : '•••• •••• •••• ••••'
+                                                    }
                                                 </div>
                                             </div>
                                             <div className="flex justify-between items-end">
@@ -981,7 +1047,12 @@ export default function SaleOrderDetailPage() {
                                                     </div>
                                                     <div className="space-y-1">
                                                         <div className="text-[7px] text-white/40 uppercase font-black tracking-tighter">CVV</div>
-                                                        <div className="text-[9px] text-white font-mono">•••</div>
+                                                        <div className="text-[9px] text-white font-mono">
+                                                            {showBillingDetails
+                                                                ? (c.billing.securityCode || '•••')
+                                                                : '•••'
+                                                            }
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1754,6 +1825,77 @@ export default function SaleOrderDetailPage() {
             skuId={editingSkuId || ''}
             currentLotNumber={order?.lineItems?.find(i => i._id === editingLotItemId)?.lotNumber || ''}
         />
+
+        {/* Password Confirmation Modal for Billing */}
+        {billingPasswordModal && (
+            <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                <div className="bg-card border border-border rounded-lg shadow-2xl w-[380px] overflow-hidden animate-in zoom-in-95 duration-200">
+                    <div className="bg-slate-900 text-white px-5 py-3 flex items-center justify-between">
+                        <span className="text-[11px] font-black uppercase tracking-[0.15em]">Security Verification</span>
+                        <button
+                            onClick={() => {
+                                setBillingPasswordModal(false);
+                                setBillingPassword('');
+                                setBillingPasswordError('');
+                            }}
+                            className="hover:text-slate-300 transition-colors"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                    <div className="p-6 space-y-4">
+                        <div className="text-center space-y-2">
+                            <div className="w-12 h-12 bg-secondary rounded-full flex items-center justify-center mx-auto">
+                                <CreditCard className="w-6 h-6 text-muted-foreground" />
+                            </div>
+                            <p className="text-sm text-muted-foreground">Enter your password to view sensitive billing information</p>
+                        </div>
+                        <div className="space-y-2">
+                            <input
+                                type="password"
+                                placeholder="Enter your password"
+                                value={billingPassword}
+                                onChange={(e) => {
+                                    setBillingPassword(e.target.value);
+                                    setBillingPasswordError('');
+                                }}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        handleVerifyBillingPassword();
+                                    }
+                                }}
+                                className="w-full px-4 py-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                                autoFocus
+                            />
+                            {billingPasswordError && (
+                                <p className="text-xs text-red-500 font-medium">{billingPasswordError}</p>
+                            )}
+                        </div>
+                        <div className="flex space-x-3">
+                            <button
+                                onClick={() => {
+                                    setBillingPasswordModal(false);
+                                    setBillingPassword('');
+                                    setBillingPasswordError('');
+                                }}
+                                className="flex-1 px-4 py-2.5 border border-border text-muted-foreground text-[11px] font-bold uppercase tracking-widest rounded hover:bg-secondary transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleVerifyBillingPassword}
+                                className="flex-1 px-4 py-2.5 bg-slate-900 text-white text-[11px] font-bold uppercase tracking-widest rounded hover:bg-slate-800 transition-colors"
+                            >
+                                Verify
+                            </button>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground text-center">
+                            Details will auto-hide after 60 seconds
+                        </p>
+                    </div>
+                </div>
+            </div>
+        )}
     </div>
   );
 }

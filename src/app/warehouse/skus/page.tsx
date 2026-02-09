@@ -354,24 +354,23 @@ function SkusPageContent() {
               </th>
 
               {/* Gross Profit */}
-              <th className="border-r border-border">
+              <th className="px-2 py-1 border-r border-border">
                 <TableColumnHeader column="grossProfit" title="Gross Profit" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
               </th>
-              {/* Actions */}
-              <th className="px-2 py-1 text-[8px] font-bold text-muted-foreground uppercase tracking-widest text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border bg-background/50">
             {loading ? (
-              <tr><td colSpan={15} className="px-2 py-12 text-center text-[10px] text-slate-400">Loading SKUs...</td></tr>
+              <tr><td colSpan={14} className="px-2 py-12 text-center text-[10px] text-slate-400">Loading SKUs...</td></tr>
             ) : error ? (
-              <tr><td colSpan={15} className="px-2 py-12 text-center text-red-500 text-[10px] font-bold">{error}</td></tr>
+              <tr><td colSpan={14} className="px-2 py-12 text-center text-red-500 text-[10px] font-bold">{error}</td></tr>
             ) : skus.length === 0 ? (
-              <tr><td colSpan={15} className="px-2 py-12 text-center text-[10px] text-slate-400 uppercase font-bold tracking-tighter opacity-50">No SKUs found</td></tr>
+              <tr><td colSpan={14} className="px-2 py-12 text-center text-[10px] text-slate-400 uppercase font-bold tracking-tighter opacity-50">No SKUs found</td></tr>
             ) : skus.map(sku => (
               <tr 
                 key={sku._id} 
-                className="group relative z-0 bg-background hover:bg-secondary/40 transition-colors duration-150"
+                className="group relative z-0 bg-background hover:bg-secondary/40 transition-colors duration-150 cursor-pointer"
+                onClick={() => router.push(`/warehouse/skus/${sku._id}`)}
               >
                 <td className="px-2 py-1 border-r border-border group-hover:border-l-2 group-hover:border-l-primary transition-all">
                   <div className="w-6 h-6 rounded bg-secondary overflow-hidden relative border border-border">
@@ -422,33 +421,8 @@ function SkusPageContent() {
                 <td className="px-2 py-1 text-[9px] text-emerald-600 font-mono border-r border-border text-right">${(sku.revenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 <td className="px-2 py-1 text-[9px] text-muted-foreground font-mono border-r border-border text-right">${(sku.cogs || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 <td className="px-2 py-1 text-[9px] text-muted-foreground font-mono border-r border-border text-right">${(sku.cogm || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td className="px-2 py-1 text-[9px] font-black text-foreground font-mono text-right border-r border-border">${(sku.grossProfit || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                {/* Actions */}
-                <td className="px-2 py-1 text-right">
-                  <div className="flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => router.push(`/warehouse/skus/${sku._id}`)}
-                      className="p-1 text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10 rounded transition-colors cursor-pointer"
-                      title="View SKU"
-                    >
-                      <Eye className="w-3 h-3" />
-                    </button>
-                    <button
-                      onClick={() => openModal(sku)}
-                      className="p-1 text-muted-foreground hover:text-foreground hover:bg-secondary rounded transition-colors cursor-pointer"
-                      title="Edit SKU"
-                    >
-                      <Pencil className="w-3 h-3" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(sku._id)}
-                      className="p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors cursor-pointer"
-                      title="Delete SKU"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                </td>
+                <td className="px-2 py-1 text-[9px] font-black text-foreground font-mono text-right">$
+{(sku.grossProfit || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
               </tr>
             ))}
           </tbody>
