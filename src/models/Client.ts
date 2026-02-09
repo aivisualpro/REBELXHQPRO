@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const ClientSchema = new mongoose.Schema({
-    legacyId: { type: String, required: true, unique: true }, // Mapped from clientid (old business ID)
+    legacyId: { type: String, unique: true, sparse: true }, // Optional: only for imported legacy records
     name: { type: String, required: true },
     description: String,
     salesPerson: { type: String, ref: 'RXHQUsers' },
