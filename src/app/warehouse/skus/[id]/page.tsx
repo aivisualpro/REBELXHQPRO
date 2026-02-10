@@ -534,7 +534,7 @@ function SkuDetailsPageContent() {
                     </div>
 
                     {/* Stock Level - Premium */}
-                    <div className="px-4 py-5 border-b border-border">
+                    <div className="px-4 pb-4 border-b border-border">
                         <div className={cn(
                             "relative rounded-lg px-4 py-5 flex flex-col items-center overflow-hidden",
                             currentStock > (sku.reOrderPoint || 0)
@@ -583,7 +583,7 @@ function SkuDetailsPageContent() {
                         const pendingQty = pendingTxs.reduce((acc, tx) => acc + tx.quantity, 0);
                         const unfulfilledQty = unfulfilledTxs.reduce((acc, tx) => acc + Math.abs(tx.quantity), 0);
                         return (
-                            <>
+                            <div className="px-4 py-2">
                                 {pendingTxs.length > 0 && (
                                     <div
                                         className="w-full bg-red-500/10 border-b border-red-500/20 px-4 py-2.5 cursor-pointer hover:bg-red-500/20 transition-colors"
@@ -647,7 +647,7 @@ function SkuDetailsPageContent() {
                                         </div>
                                     </div>
                                 )}
-                            </>
+                            </div>
                         );
                     })()}
 
