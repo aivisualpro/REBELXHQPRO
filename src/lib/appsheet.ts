@@ -613,14 +613,56 @@ export async function syncManufacturingLineItemsToAppSheet(
     const parentCreatedAt = parentObj.createdAt ? new Date(parentObj.createdAt).toISOString() : '';
     const parentId = parentObj._id?.toString() || '';
 
-    const rows = lineItems.map((item: any) => {
-        // Resolve SKU ID: use legacyId if available (imported), otherwise _id
-        let rawMaterialId = '';
-        if (typeof item.sku === 'object' && item.sku !== null) {
-            rawMaterialId = item.sku.legacyId || item.sku._id?.toString() || '';
-        } else {
-            rawMaterialId = item.sku?.toString() || '';
+    // Bulk lookup SKUs to resolve legacyId for Raw Material
+    const skuIds = new Set<string>();
+    lineItems.forEach((item: any) => {
+        const skuId = typeof item.sku === 'object' && item.sku !== null
+            ? (item.sku._id?.toString() || '')
+            : (item.sku?.toString() || '');
+        if (skuId) skuIds.add(skuId);
+    });
+
+    // Build a map of skuId -> legacyId
+    const skuLegacyMap = new Map<string, string>();
+    if (skuIds.size > 0) {
+        try {
+            const db = mongoose.connection.db;
+            if (db) {
+                const objectIds = [...skuIds]
+                    .filter(id => mongoose.Types.ObjectId.isValid(id))
+                    .map(id => new mongoose.Types.ObjectId(id));
+                const skuDocs = await db.collection('skus').find({
+                    $or: [
+                        { _id: { $in: [...skuIds] } },
+                        { _id: { $in: objectIds } },
+                        { legacyId: { $in: [...skuIds] } }
+                    ]
+                } as any, { projection: { _id: 1, legacyId: 1 } }).toArray();
+                skuDocs.forEach((s: any) => {
+                    const id = String(s._id);
+                    if (s.legacyId) {
+                        skuLegacyMap.set(id, s.legacyId);
+                    }
+                    // Also map by legacyId in case sku reference is stored as legacyId
+                    if (s.legacyId) {
+                        skuLegacyMap.set(s.legacyId, s.legacyId);
+                    }
+                });
+            }
+        } catch (e) {
+            console.error('Failed to lookup SKU legacyIds for line items:', e);
         }
+    }
+
+    const rows = lineItems.map((item: any) => {
+        // Resolve SKU: use legacyId if available, otherwise _id
+        let skuRef = '';
+        if (typeof item.sku === 'object' && item.sku !== null) {
+            skuRef = item.sku._id?.toString() || '';
+        } else {
+            skuRef = item.sku?.toString() || '';
+        }
+        const rawMaterialId = skuLegacyMap.get(skuRef) || skuRef;
 
         return {
             'RecordID': item._id?.toString() || '',
