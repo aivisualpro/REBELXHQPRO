@@ -487,33 +487,49 @@ function SkuDetailsPageContent() {
                     </div>
                 </div>
                 <div className="flex items-center space-x-2">
-                    <button
-                        onClick={handleEditSku}
-                        className="flex items-center space-x-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded transition-all cursor-pointer border border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
-                    >
-                        <Pencil className="w-3.5 h-3.5" />
-                        <span>Edit</span>
-                    </button>
-                    <button
-                        onClick={handleDeleteSku}
-                        disabled={isDeleting}
-                        className="flex items-center space-x-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded transition-all cursor-pointer border border-red-500/30 text-red-500 hover:text-white hover:bg-red-600 disabled:opacity-50"
-                    >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
-                    </button>
                 </div>
             </div>
 
             {/* Shell Layer 2: Main Middle Content Band (Split view) */}
             <div className="flex-1 flex overflow-hidden min-h-0 bg-background">
                 {/* Left Column (30%) - Independent Scroll */}
-                <aside className="w-[30%] h-full overflow-y-auto border-r border-border bg-background shrink-0 scrollbar-custom">
-                    <div className="p-4">
-                        <div className="flex items-center justify-center mb-6 bg-secondary/50 p-4 h-48 border border-border border-dashed relative overflow-hidden rounded-lg">
-                            <img src={sku.image || fallbackImage} alt={sku.name} className="h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).src = fallbackImage; }} />
+                <aside className="w-[30%] h-full border-r border-border bg-background shrink-0 flex flex-col overflow-hidden">
+                    <div className="flex-1 overflow-y-auto scrollbar-custom">
+                    {/* SKU Hero Section - 3 Column: Image | Tier | Name */}
+                    <div className="px-4 pt-4 pb-4">
+                        <div className="flex items-stretch border border-border overflow-hidden">
+                            {/* Column 1: Image */}
+                            <div className="w-16 h-16 bg-secondary flex items-center justify-center shrink-0 border-r border-border overflow-hidden">
+                                {sku.image ? (
+                                    <img 
+                                        src={sku.image} 
+                                        alt={sku.name} 
+                                        className="w-full h-full object-cover" 
+                                        onError={(e) => { (e.target as HTMLImageElement).src = fallbackImage; }}
+                                    />
+                                ) : (
+                                    <img src={fallbackImage} alt="Fallback" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                                )}
+                            </div>
+                            {/* Column 2: Tier */}
+                            {!!sku.tier && (
+                                <div className={cn(
+                                    "w-10 flex items-center justify-center shrink-0 border-r border-border",
+                                    sku.tier === 1 ? "bg-emerald-500" :
+                                    sku.tier === 2 ? "bg-blue-500" :
+                                    "bg-orange-500"
+                                )}>
+                                    <span className="text-sm font-black text-white">{sku.tier}</span>
+                                </div>
+                            )}
+                            {/* Column 3: Name */}
+                            <div className="flex-1 bg-emerald-950/50 flex items-center justify-center px-3 min-w-0">
+                                <h1 className="text-sm font-black text-foreground leading-tight text-center line-clamp-2">{sku.name}</h1>
+                            </div>
                         </div>
+                    </div>
 
+                    <div className="p-4">
                         <div className="space-y-6 pt-2 pb-6 flex flex-col items-center border-b border-border">
                             <div className="flex flex-col items-center">
                                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] mb-4">Stock Level</label>
@@ -533,14 +549,14 @@ function SkuDetailsPageContent() {
                                 if (pendingTxs.length === 0) return null;
                                 const pendingQty = pendingTxs.reduce((acc, tx) => acc + tx.quantity, 0);
                                 return (
-                                    <div className="w-full mt-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5">
+                                    <div className="w-full mt-2 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2.5">
                                         <div className="flex items-start space-x-2">
-                                            <AlertTriangle className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
+                                            <AlertTriangle className="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" />
                                             <div>
-                                                <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wide">
+                                                <p className="text-[10px] font-bold text-red-400 uppercase tracking-wide">
                                                     {pendingTxs.length} Pending Production{pendingTxs.length > 1 ? 's' : ''}
                                                 </p>
-                                                <p className="text-[9px] text-amber-600 mt-0.5">
+                                                <p className="text-[9px] text-red-400/70 mt-0.5">
                                                     <span className="font-mono font-bold">+{pendingQty.toLocaleString()}</span> units not counted until fulfilled
                                                 </p>
                                             </div>
@@ -554,14 +570,14 @@ function SkuDetailsPageContent() {
                                 if (unfulfilledTxs.length === 0) return null;
                                 const unfulfilledQty = unfulfilledTxs.reduce((acc, tx) => acc + Math.abs(tx.quantity), 0);
                                 return (
-                                    <div className="w-full mt-2 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2.5">
+                                    <div className="w-full mt-2 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2.5">
                                         <div className="flex items-start space-x-2">
-                                            <AlertTriangle className="w-3.5 h-3.5 text-rose-500 mt-0.5 shrink-0" />
+                                            <AlertTriangle className="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" />
                                             <div>
-                                                <p className="text-[10px] font-bold text-rose-700 uppercase tracking-wide">
+                                                <p className="text-[10px] font-bold text-red-400 uppercase tracking-wide">
                                                     {unfulfilledTxs.length} Unfulfilled Consumption{unfulfilledTxs.length > 1 ? 's' : ''}
                                                 </p>
-                                                <p className="text-[9px] text-rose-600 mt-0.5">
+                                                <p className="text-[9px] text-red-400/70 mt-0.5">
                                                     <span className="font-mono font-bold">{unfulfilledQty.toLocaleString()}</span> units not counted until fulfilled
                                                 </p>
                                             </div>
@@ -742,9 +758,29 @@ function SkuDetailsPageContent() {
                                     <p className="text-[9px] text-muted-foreground italic">Raw material - consumed in manufacturing only</p>
                                 </div>
                             )}
-                            <div className="h-20" />
+                            <div className="h-4" />
                         </div>
                     )}
+                    </div>
+
+                    {/* Action Buttons at bottom */}
+                    <div className="border-t border-border px-4 py-4 shrink-0 flex items-center gap-2">
+                        <button
+                            onClick={handleEditSku}
+                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-secondary text-foreground border border-border hover:bg-secondary/80 transition-colors cursor-pointer"
+                        >
+                            <Pencil className="w-3.5 h-3.5" />
+                            <span>Edit</span>
+                        </button>
+                        <button
+                            onClick={handleDeleteSku}
+                            disabled={isDeleting}
+                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
+                        </button>
+                    </div>
                 </aside>
 
                 {/* Right Column: Ledger Workspace - Independent Scroll */}
@@ -970,21 +1006,7 @@ function SkuDetailsPageContent() {
                 </main>
             </div>
 
-            {/* Shell Layer 3: Shell Footer (Fixed at the bottom of the content band) */}
-            <div className="h-[24px] border-t border-border bg-secondary/50 shrink-0 flex items-center justify-between px-4 z-[50]">
-                <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-1.5">
-                        <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", isSaving ? "bg-blue-500" : "bg-emerald-500")} />
-                        <span className={cn("text-[9px] font-bold uppercase tracking-widest", isSaving ? "text-blue-500" : "text-muted-foreground")}>
-                            {isSaving ? "Saving..." : "System Ready"}
-                        </span>
-                    </div>
-                </div>
-                <div className="flex items-center space-x-4">
-                    <span className="text-[9px] text-muted-foreground font-mono uppercase tracking-tighter">SKU Detail Shell v2.0</span>
-                    <span className="text-[9px] text-muted-foreground font-mono uppercase tracking-tighter">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span>
-                </div>
-            </div>
+
             {/* Standard Lot Selection Modal */}
             {editingTx && sku && (
                 <LotSelectionModal
