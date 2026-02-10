@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import dbConnect from '@/lib/mongoose';
 import PurchaseOrder from '@/models/PurchaseOrder';
 import Sku from '@/models/Sku';
@@ -97,6 +99,14 @@ export async function POST(request: Request) {
     try {
         await dbConnect();
         const body = await request.json();
+
+        // Get logged-in user for createdBy
+        const session = await getServerSession(authOptions);
+        const userEmail = session?.user?.email || '';
+        if (session?.user && (session.user as any).id) {
+            body.createdBy = (session.user as any).id;
+        }
+
         const newItem = await PurchaseOrder.create(body);
 
         // Background sync to AppSheet (non-blocking)
@@ -105,8 +115,10 @@ export async function POST(request: Request) {
             .populate('createdBy', 'firstName lastName email')
             .lean();
         if (populated) {
+            // Override createdBy email from session (in case populate didn't resolve it)
+            const syncData = { ...populated, _sessionEmail: userEmail };
             const { syncPurchaseOrderToAppSheet } = await import('@/lib/appsheet');
-            syncPurchaseOrderToAppSheet(populated, 'Add').catch(err =>
+            syncPurchaseOrderToAppSheet(syncData, 'Add').catch(err =>
                 console.error('Background PO AppSheet sync failed:', err)
             );
         }

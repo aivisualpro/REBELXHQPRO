@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import dbConnect from '@/lib/mongoose';
 import PurchaseOrder from '@/models/PurchaseOrder';
 import Sku from '@/models/Sku';
@@ -157,13 +159,16 @@ export async function PATCH(
 
         // Background sync to AppSheet (non-blocking)
         if (updated) {
+            const session = await getServerSession(authOptions);
+            const userEmail = session?.user?.email || '';
             const populatedForSync = await PurchaseOrder.findById(id)
                 .populate('vendor', 'name legacyId')
                 .populate('createdBy', 'firstName lastName email')
                 .lean();
             if (populatedForSync) {
+                const syncData = { ...populatedForSync, _sessionEmail: userEmail };
                 const { syncPurchaseOrderToAppSheet } = await import('@/lib/appsheet');
-                syncPurchaseOrderToAppSheet(populatedForSync, 'Edit').catch(err =>
+                syncPurchaseOrderToAppSheet(syncData, 'Edit').catch(err =>
                     console.error('Background PO AppSheet edit sync failed:', err)
                 );
             }

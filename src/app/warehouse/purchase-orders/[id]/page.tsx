@@ -742,55 +742,78 @@ export default function PurchaseOrderDetailPage() {
             {isHeaderModalOpen && editingHeader && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-background border border-border rounded shadow-2xl w-full max-w-lg animate-in fade-in zoom-in duration-200">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-secondary/50">
-                            <h2 className="text-sm font-bold uppercase text-foreground tracking-wider">Edit Order Details</h2>
+                        <div className="flex items-center justify-between px-6 h-[36px] border-b border-border bg-secondary/50">
+                            <h2 className="text-sm font-black uppercase text-foreground tracking-widest">Edit Order Details</h2>
                             <button onClick={() => setIsHeaderModalOpen(false)} className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
                                 <X className="w-4 h-4" />
                             </button>
                         </div>
                         <div className="p-6 space-y-4">
-                            <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Vendor</label>
-                                <SearchableSelect
-                                    options={allVendors.map(v => ({ value: v._id, label: v.name }))}
-                                    value={editingHeader.vendor || ''}
-                                    onChange={(val) => setEditingHeader({ ...editingHeader, vendor: val })}
-                                    placeholder="Select Vendor..."
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Payment Terms</label>
-                                <input
-                                    type="text"
-                                    value={editingHeader.paymentTerms || ''}
-                                    onChange={(e) => setEditingHeader({ ...editingHeader, paymentTerms: e.target.value })}
-                                    className="w-full px-3 py-2 border border-border rounded text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/20"
-                                />
-                            </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Sched. Delivery</label>
+                                    <label className="text-[11px] font-black text-muted-foreground uppercase tracking-wider">Vendor <span className="text-red-500">*</span></label>
+                                    <SearchableSelect
+                                        triggerClassName="h-[36px]"
+                                        options={allVendors.map(v => ({ value: v._id, label: v.name }))}
+                                        value={editingHeader.vendor || ''}
+                                        onChange={(val) => setEditingHeader({ ...editingHeader, vendor: val })}
+                                        placeholder="Select Vendor..."
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[11px] font-black text-muted-foreground uppercase tracking-wider">Status</label>
+                                    <select
+                                        value={editingHeader.status || ''}
+                                        onChange={(e) => setEditingHeader({ ...editingHeader, status: e.target.value })}
+                                        className="w-full px-3 h-[36px] border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 bg-background text-foreground"
+                                    >
+                                        <option value="Pending">Pending</option>
+                                        <option value="Received">Received</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[11px] font-black text-muted-foreground uppercase tracking-wider">Payment Terms</label>
+                                    <SearchableSelect
+                                        triggerClassName="h-[36px]"
+                                        options={[
+                                            { label: 'Net 15', value: 'Net 15' },
+                                            { label: 'Net 30', value: 'Net 30' },
+                                            { label: 'Net 60', value: 'Net 60' },
+                                            { label: 'Due on Receipt', value: 'Due on Receipt' },
+                                            { label: 'ACH', value: 'ACH' },
+                                            { label: 'CC', value: 'CC' },
+                                            { label: 'ACH-Already Paid', value: 'ACH-Already Paid' },
+                                            { label: 'Credit Card', value: 'Credit Card' }
+                                        ]}
+                                        value={editingHeader.paymentTerms || ''}
+                                        onChange={(val) => setEditingHeader({ ...editingHeader, paymentTerms: val })}
+                                        placeholder="Select Terms..."
+                                        creatable
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[11px] font-black text-muted-foreground uppercase tracking-wider">Sched. Delivery</label>
                                     <input
                                         type="date"
                                         value={editingHeader.scheduledDelivery || ''}
                                         onChange={(e) => setEditingHeader({ ...editingHeader, scheduledDelivery: e.target.value })}
-                                        className="w-full px-3 py-2 border border-border rounded text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/20"
+                                        className="w-full px-3 h-[36px] border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 bg-background text-foreground"
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Received Date</label>
+                                    <label className="text-[11px] font-black text-muted-foreground uppercase tracking-wider">Received Date</label>
                                     <input
                                         type="date"
                                         value={editingHeader.receivedDate || ''}
                                         onChange={(e) => setEditingHeader({ ...editingHeader, receivedDate: e.target.value })}
-                                        className="w-full px-3 py-2 border border-border rounded text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/20"
+                                        className="w-full px-3 h-[36px] border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 bg-background text-foreground"
                                     />
                                 </div>
                             </div>
                             <div className="pt-2">
                                 <button
                                     onClick={handleSaveHeader}
-                                    className="w-full py-2.5 bg-primary text-primary-foreground text-xs font-bold uppercase rounded hover:opacity-90 transition-colors cursor-pointer"
+                                    className="w-full h-[28px] bg-primary text-black text-[10px] font-black uppercase tracking-widest rounded hover:opacity-90 transition-all shadow-md cursor-pointer"
                                 >
                                     Save Changes
                                 </button>

@@ -854,31 +854,33 @@ export async function syncPurchaseOrderToAppSheet(order: any, action: 'Add' | 'E
 
     const orderObj = order.toObject ? order.toObject() : order;
 
-    // Resolve vendor name
-    let vendorName = '';
+    // Resolve vendor ID (legacyId preferred, fallback to _id)
+    let vendorId = '';
     if (typeof orderObj.vendor === 'object' && orderObj.vendor !== null) {
-        vendorName = orderObj.vendor.name || orderObj.vendor.legacyId || orderObj.vendor._id?.toString() || '';
+        vendorId = orderObj.vendor.legacyId || orderObj.vendor._id?.toString() || '';
     } else {
-        vendorName = orderObj.vendor?.toString() || '';
+        vendorId = orderObj.vendor?.toString() || '';
     }
 
-    // Resolve createdBy email
-    let createdByEmail = '';
-    if (typeof orderObj.createdBy === 'object' && orderObj.createdBy !== null) {
-        createdByEmail = orderObj.createdBy.email || `${orderObj.createdBy.firstName || ''} ${orderObj.createdBy.lastName || ''}`.trim() || '';
-    } else if (typeof orderObj.createdBy === 'string') {
-        createdByEmail = orderObj.createdBy;
+    // Resolve createdBy email — prefer session email passed directly
+    let createdByEmail = orderObj._sessionEmail || '';
+    if (!createdByEmail) {
+        if (typeof orderObj.createdBy === 'object' && orderObj.createdBy !== null) {
+            createdByEmail = orderObj.createdBy.email || `${orderObj.createdBy.firstName || ''} ${orderObj.createdBy.lastName || ''}`.trim() || '';
+        } else if (typeof orderObj.createdBy === 'string') {
+            createdByEmail = orderObj.createdBy;
+        }
     }
 
     const orderRow: Record<string, any> = {
         'PO #': orderObj.legacyId || orderObj._id?.toString() || '',
         '10000': orderObj.label || '',
-        'Vendor': vendorName,
+        'Vendor': vendorId,
         'Payment Terms': orderObj.paymentTerms || '',
         'Created By': createdByEmail,
         'Status': orderObj.status || '',
-        'Date Scheduled': orderObj.scheduledDelivery ? new Date(orderObj.scheduledDelivery).toISOString() : '',
-        'Received Date': orderObj.receivedDate ? new Date(orderObj.receivedDate).toISOString() : '',
+        'Date Scheduled': orderObj.scheduledDelivery ? new Date(orderObj.scheduledDelivery).toLocaleDateString('en-US') : '',
+        'Received Date': orderObj.receivedDate ? new Date(orderObj.receivedDate).toLocaleDateString('en-US') : '',
         'TimeStamp': orderObj.createdAt ? new Date(orderObj.createdAt).toISOString() : '',
     };
 
@@ -889,6 +891,10 @@ export async function syncPurchaseOrderToAppSheet(order: any, action: 'Add' | 'E
     };
 
     // Map Line Items to "PO lineitems" table
+    console.log(`[PO AppSheet Sync] Line items count: ${(orderObj.lineItems || []).length}`);
+    // Build parent PO key for Ref column (PO table key = PO #)
+    const parentPOKey = orderObj.legacyId || orderObj._id?.toString() || '';
+
     const detailRows = (orderObj.lineItems || []).map((item: any) => {
         let productId = '';
         if (typeof item.sku === 'object' && item.sku !== null) {
@@ -899,6 +905,7 @@ export async function syncPurchaseOrderToAppSheet(order: any, action: 'Add' | 'E
 
         return {
             'Record ID': item.legacyId || item._id?.toString() || '',
+            'PO #': parentPOKey,
             'OldPO #': item.poNumber || orderObj.legacyId || '',
             'Product Id': productId,
             'Lot #': item.lotNumber || '',
@@ -911,6 +918,7 @@ export async function syncPurchaseOrderToAppSheet(order: any, action: 'Add' | 'E
         };
     });
 
+    console.log(`[PO AppSheet Sync] Detail rows payload:`, JSON.stringify(detailRows, null, 2));
     const detailPayload = {
         Action: action,
         Properties: { Locale: 'en-US', Timezone: 'Eastern Standard Time' },
@@ -930,26 +938,50 @@ export async function syncPurchaseOrderToAppSheet(order: any, action: 'Add' | 'E
     };
 
     try {
-        // Run both API calls in PARALLEL for faster sync
-        const promises: Promise<any>[] = [];
+        // Sync PO FIRST (line items reference it via PO # Ref, so parent must exist first)
+        const orderResult = await fetchWithTimeout(
+            `https://api.appsheet.com/api/v2/apps/${appId}/tables/PO/Action`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'ApplicationAccessKey': accessKey },
+                body: JSON.stringify(orderPayload),
+            }
+        ).then(res => res.json()).then(async result => {
+            console.log(`AppSheet PO ${action} Result:`, result);
+            // If Add fails because key already exists, retry with Edit
+            if (action === 'Add' && result?.Errors) {
+                console.log('PO Add failed, retrying with Edit...');
+                const editPayload = { ...orderPayload, Action: 'Edit' };
+                return fetchWithTimeout(
+                    `https://api.appsheet.com/api/v2/apps/${appId}/tables/PO/Action`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'ApplicationAccessKey': accessKey },
+                        body: JSON.stringify(editPayload),
+                    }
+                ).then(r => r.json());
+            }
+            return result;
+        });
 
-        // PO sync promise
-        promises.push(
-            fetchWithTimeout(
-                `https://api.appsheet.com/api/v2/apps/${appId}/tables/PO/Action`,
+        // THEN sync Line Items (only after PO exists in AppSheet)
+        let detailResult = null;
+        if (detailRows.length > 0) {
+            detailResult = await fetchWithTimeout(
+                `https://api.appsheet.com/api/v2/apps/${appId}/tables/PO lineitems/Action`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'ApplicationAccessKey': accessKey },
-                    body: JSON.stringify(orderPayload),
+                    body: JSON.stringify(detailPayload),
                 }
-            ).then(res => res.json()).then(result => {
-                console.log(`AppSheet PO ${action} Result:`, result);
-                // If Add fails because key already exists, retry with Edit
+            ).then(res => res.json()).then(async result => {
+                console.log(`AppSheet PO LineItems ${action} Result:`, result);
+                // If Add fails, retry with Edit
                 if (action === 'Add' && result?.Errors) {
-                    console.log('PO Add failed, retrying with Edit...');
-                    const editPayload = { ...orderPayload, Action: 'Edit' };
+                    console.log('PO LineItems Add failed, retrying with Edit...');
+                    const editPayload = { ...detailPayload, Action: 'Edit' };
                     return fetchWithTimeout(
-                        `https://api.appsheet.com/api/v2/apps/${appId}/tables/PO/Action`,
+                        `https://api.appsheet.com/api/v2/apps/${appId}/tables/PO lineitems/Action`,
                         {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', 'ApplicationAccessKey': accessKey },
@@ -958,42 +990,10 @@ export async function syncPurchaseOrderToAppSheet(order: any, action: 'Add' | 'E
                     ).then(r => r.json());
                 }
                 return result;
-            })
-        );
-
-        // PO Line Items sync promise (only if there are line items)
-        if (detailRows.length > 0) {
-            promises.push(
-                fetchWithTimeout(
-                    `https://api.appsheet.com/api/v2/apps/${appId}/tables/PO lineitems/Action`,
-                    {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'ApplicationAccessKey': accessKey },
-                        body: JSON.stringify(detailPayload),
-                    }
-                ).then(res => res.json()).then(result => {
-                    console.log(`AppSheet PO LineItems ${action} Result:`, result);
-                    // If Add fails, retry with Edit
-                    if (action === 'Add' && result?.Errors) {
-                        console.log('PO LineItems Add failed, retrying with Edit...');
-                        const editPayload = { ...detailPayload, Action: 'Edit' };
-                        return fetchWithTimeout(
-                            `https://api.appsheet.com/api/v2/apps/${appId}/tables/PO lineitems/Action`,
-                            {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', 'ApplicationAccessKey': accessKey },
-                                body: JSON.stringify(editPayload),
-                            }
-                        ).then(r => r.json());
-                    }
-                    return result;
-                })
-            );
+            });
         }
 
-        // Wait for all in parallel
-        const results = await Promise.all(promises);
-        return { orderResult: results[0], detailResult: results[1] || null };
+        return { orderResult, detailResult };
     } catch (error) {
         console.error('AppSheet PO Sync Error:', error);
     }
@@ -1030,11 +1030,14 @@ export async function deletePurchaseOrderFromAppSheet(order: any) {
     try {
         const promises: Promise<any>[] = [];
 
-        // Delete the PO row
+        // Delete the PO row — key column is PO #
         const orderPayload = {
             Action: 'Delete',
             Properties: { Locale: 'en-US', Timezone: 'Eastern Standard Time' },
-            Rows: [{ 'PO #': orderKey }]
+            Rows: [{
+                'PO #': orderKey,
+                'TimeStamp': orderObj.createdAt ? new Date(orderObj.createdAt).toISOString() : '',
+            }]
         };
 
         promises.push(
@@ -1056,6 +1059,7 @@ export async function deletePurchaseOrderFromAppSheet(order: any) {
         if (lineItems.length > 0) {
             const detailRows = lineItems.map((item: any) => ({
                 'Record ID': item.legacyId || item._id?.toString() || '',
+                'TimeStamp': item.createdAt ? new Date(item.createdAt).toISOString() : '',
             }));
 
             const detailPayload = {
@@ -1107,6 +1111,7 @@ export async function syncPOLineItemToAppSheet(order: any, lineItem: any, action
 
     const row: Record<string, any> = {
         'Record ID': lineItem.legacyId || lineItem._id?.toString() || '',
+        'PO #': orderObj.legacyId || orderObj._id?.toString() || '',
         'OldPO #': lineItem.poNumber || orderObj.legacyId || '',
         'Product Id': productId,
         'Lot #': lineItem.lotNumber || '',
