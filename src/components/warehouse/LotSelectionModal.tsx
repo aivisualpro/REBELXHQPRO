@@ -127,19 +127,19 @@ export function LotSelectionModal({
             key={lot.lotNumber}
             onClick={() => onSelect(lot.lotNumber, lot.cost)}
             className={cn(
-                "w-full flex items-center justify-between px-6 py-3 transition-colors text-left group hover:bg-slate-50",
-                isSelected ? "bg-blue-50/50" : "",
-                isSuggested && !isSelected ? "bg-amber-50/50" : ""
+                "w-full flex items-center justify-between px-6 py-3 transition-colors text-left group hover:bg-secondary/50",
+                isSelected ? "bg-blue-500/10" : "",
+                isSuggested && !isSelected ? "bg-amber-500/10" : ""
             )}
         >
             <div className="flex items-center gap-3">
                 <div className={cn(
-                    "w-8 h-8 flex items-center justify-center text-xs font-bold transition-colors border",
+                    "w-8 h-8 flex items-center justify-center text-xs font-bold transition-colors border rounded",
                     isSelected 
                         ? "bg-blue-500 text-white border-blue-500"
                         : isSuggested 
                             ? "bg-amber-500 text-white border-amber-500" 
-                            : "bg-white text-slate-500 border-slate-200 group-hover:border-slate-300"
+                            : "bg-secondary text-muted-foreground border-border group-hover:border-muted-foreground"
                 )}>
                     {isSelected ? <Check className="w-4 h-4" /> : isSuggested ? '★' : `#${idx + 1}`}
                 </div>
@@ -147,17 +147,17 @@ export function LotSelectionModal({
                     <div className="flex items-center gap-2">
                         <p className={cn(
                             "text-sm font-bold transition-colors",
-                            isSelected ? "text-blue-700" : isSuggested ? "text-amber-700" : "text-slate-900"
+                            isSelected ? "text-blue-500" : isSuggested ? "text-amber-500" : "text-foreground"
                         )}>
                             {lot.lotNumber}
                         </p>
                         {isSelected && (
-                            <span className="px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider bg-blue-100 text-blue-700 border border-blue-200">
+                            <span className="px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider bg-blue-500/20 text-blue-500 border border-blue-500/30 rounded">
                                 Selected
                             </span>
                         )}
                         {isSuggested && !isSelected && (
-                            <span className="px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider bg-amber-100 text-amber-700 border border-amber-200">
+                            <span className="px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-500 border border-amber-500/30 rounded">
                                 Suggested
                             </span>
                         )}
@@ -165,16 +165,16 @@ export function LotSelectionModal({
                     <div className="flex items-center gap-2 mt-0.5">
                         <span className={cn(
                             "text-[10px] uppercase font-bold tracking-wider",
-                            isSelected ? "text-blue-500" : isSuggested ? "text-amber-500" : "text-slate-500"
+                            isSelected ? "text-blue-500/70" : isSuggested ? "text-amber-500/70" : "text-muted-foreground"
                         )}>
                             {lot.source || 'Unknown'}
                         </span>
                         {lot.date && (
                             <>
-                                <span className="text-[10px] text-slate-300">•</span>
+                                <span className="text-[10px] text-muted-foreground/50">•</span>
                                 <span className={cn(
                                     "text-[10px] font-medium",
-                                    isSelected ? "text-blue-400" : isSuggested ? "text-amber-400" : "text-slate-400"
+                                    isSelected ? "text-blue-500/60" : isSuggested ? "text-amber-500/60" : "text-muted-foreground"
                                 )}>
                                     {formatDate(lot.date)}
                                 </span>
@@ -182,10 +182,10 @@ export function LotSelectionModal({
                         )}
                         {lot.cost !== undefined && (
                             <>
-                                <span className="text-[10px] text-slate-300">•</span>
+                                <span className="text-[10px] text-muted-foreground/50">•</span>
                                 <span className={cn(
                                     "text-[10px] font-mono font-medium",
-                                    isSelected ? "text-blue-500" : isSuggested ? "text-amber-500" : "text-green-600"
+                                    isSelected ? "text-blue-500" : isSuggested ? "text-amber-500" : "text-emerald-500"
                                 )}>
                                     ${lot.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
                                 </span>
@@ -196,18 +196,18 @@ export function LotSelectionModal({
             </div>
             <div className="text-right">
                 <span className={cn(
-                    "block px-2.5 py-1 text-xs font-bold border transition-colors mb-1",
+                    "block px-2.5 py-1 text-xs font-bold border transition-colors mb-1 rounded",
                     isSelected 
-                        ? "bg-blue-100 text-blue-700 border-blue-200"
+                        ? "bg-blue-500/20 text-blue-500 border-blue-500/30"
                         : isSuggested
-                            ? "bg-amber-100 text-amber-700 border-amber-200" 
-                            : "bg-emerald-50 text-emerald-600 border-emerald-100"
+                            ? "bg-amber-500/20 text-amber-500 border-amber-500/30" 
+                            : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
                 )}>
                     {lot.balance.toLocaleString()}
                 </span>
                 <span className={cn(
                     "text-[9px] uppercase font-bold tracking-widest",
-                    isSelected ? "text-blue-300" : isSuggested ? "text-amber-300" : "text-slate-300"
+                    isSelected ? "text-blue-500/40" : isSuggested ? "text-amber-500/40" : "text-muted-foreground/50"
                 )}>
                     Available
                 </span>
@@ -217,28 +217,28 @@ export function LotSelectionModal({
 
     return (
         <div className="fixed inset-0 z-[2001] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white shadow-2xl max-w-md w-full overflow-hidden scale-100 transition-transform">
+            <div className="bg-card shadow-2xl max-w-md w-full overflow-hidden scale-100 transition-transform border border-border rounded-lg">
                 {/* Header */}
-                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                    <h3 className="font-bold text-slate-900">{title}</h3>
+                <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-secondary/50">
+                    <h3 className="font-bold text-foreground">{title}</h3>
                     <button 
                         onClick={onClose} 
-                        className="text-slate-400 hover:text-black transition-colors p-1 hover:bg-slate-100"
+                        className="text-muted-foreground hover:text-foreground transition-colors p-1 hover:bg-secondary rounded"
                     >
                         <X className="w-5 h-5" />
                     </button>
                 </div>
                 
                 {/* Search Bar */}
-                <div className="p-4 border-b border-slate-100 bg-white">
+                <div className="p-4 border-b border-border bg-card">
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                         <input 
                             type="text"
                             placeholder="Search lot numbers..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-9 pr-4 py-2 border border-slate-200 text-sm focus:outline-none focus:border-black transition-colors"
+                            className="w-full pl-9 pr-4 py-2 border border-border rounded-md text-sm bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring transition-colors"
                         />
                     </div>
                 </div>
@@ -247,11 +247,11 @@ export function LotSelectionModal({
                 <div className="max-h-[400px] overflow-y-auto">
                     {loading ? (
                         <div className="text-center py-12">
-                            <div className="animate-spin w-6 h-6 border-2 border-slate-200 border-t-blue-500 rounded-full mx-auto mb-2"></div>
-                            <p className="text-xs text-slate-400">Loading inventory...</p>
+                            <div className="animate-spin w-6 h-6 border-2 border-border border-t-primary rounded-full mx-auto mb-2"></div>
+                            <p className="text-xs text-muted-foreground">Loading inventory...</p>
                         </div>
                     ) : error ? (
-                        <div className="text-center py-8 text-red-500">
+                        <div className="text-center py-8 text-destructive">
                             <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
                             <p className="text-sm font-medium">{error}</p>
                         </div>
@@ -261,51 +261,51 @@ export function LotSelectionModal({
                             <button
                                 onClick={() => onSelect('', 0)}
                                 className={cn(
-                                    "w-full flex items-center justify-between px-6 py-3 transition-colors text-left group border-b border-slate-50",
+                                    "w-full flex items-center justify-between px-6 py-3 transition-colors text-left group border-b border-border",
                                     !currentLotNumber 
-                                        ? "bg-blue-50 border-blue-100" 
-                                        : "hover:bg-slate-50"
+                                        ? "bg-blue-500/10 border-blue-500/20" 
+                                        : "hover:bg-secondary/50"
                                 )}
                             >
                                 <div className="flex items-center gap-3">
                                     <div className={cn(
-                                        "w-8 h-8 flex items-center justify-center text-xs font-bold transition-colors border",
+                                        "w-8 h-8 flex items-center justify-center text-xs font-bold transition-colors border rounded",
                                         !currentLotNumber 
                                             ? "bg-blue-500 text-white border-blue-500" 
-                                            : "bg-white text-slate-400 border-slate-200 group-hover:border-slate-300"
+                                            : "bg-secondary text-muted-foreground border-border group-hover:border-muted-foreground"
                                     )}>
                                         {!currentLotNumber ? <Check className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
                                     </div>
                                     <div>
                                         <p className={cn(
                                             "text-sm font-bold transition-colors",
-                                            !currentLotNumber ? "text-blue-700" : "text-slate-600"
+                                            !currentLotNumber ? "text-blue-500" : "text-muted-foreground"
                                         )}>
                                             (N/A)
                                         </p>
-                                        <p className="text-[10px] text-slate-400">Clear selection</p>
+                                        <p className="text-[10px] text-muted-foreground">Clear selection</p>
                                     </div>
                                 </div>
                             </button>
 
                             {/* Show currently selected lot first (if any) */}
                             {selectedLot && (
-                                <div className="border-b border-slate-100">
+                                <div className="border-b border-border">
                                     {renderLotItem(selectedLot, 0, true)}
                                 </div>
                             )}
 
                             {filteredLots.length === 0 ? (
                                 <div className="text-center py-12">
-                                    <p className="text-slate-500 text-sm mb-2 font-medium">No results found</p>
+                                    <p className="text-muted-foreground text-sm mb-2 font-medium">No results found</p>
                                     {searchQuery ? (
-                                        <p className="text-[10px] text-slate-400">Try a different search term</p>
+                                        <p className="text-[10px] text-muted-foreground">Try a different search term</p>
                                     ) : (
-                                        <p className="text-[10px] text-slate-400">Inventory might be 0 for this SKU</p>
+                                        <p className="text-[10px] text-muted-foreground">Inventory might be 0 for this SKU</p>
                                     )}
                                 </div>
                             ) : (
-                                <div className="divide-y divide-slate-50">
+                                <div className="divide-y divide-border">
                                     {otherLots.map((lot, idx) => renderLotItem(lot, idx + (selectedLot ? 1 : 0), false, lot.lotNumber === suggestedLotNumber))}
                                 </div>
                             )}
@@ -313,9 +313,9 @@ export function LotSelectionModal({
                     )}
                 </div>
                 
-                <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 text-center flex items-center justify-center gap-2">
+                <div className="px-6 py-3 bg-secondary/50 border-t border-border text-center flex items-center justify-center gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                    <p className="text-[10px] text-slate-400 font-medium">
+                    <p className="text-[10px] text-muted-foreground font-medium">
                         Showing lots with positive inventory balance
                     </p>
                 </div>

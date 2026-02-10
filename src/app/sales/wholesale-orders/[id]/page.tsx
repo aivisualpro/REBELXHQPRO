@@ -328,23 +328,30 @@ export default function SaleOrderDetailPage() {
           updatedItems = [...(order.lineItems || []), { ...editingItem, _id: Date.now().toString() }];
       }
 
+      const payload = { lineItems: updatedItems.map(i => ({
+          ...i,
+          sku: (typeof i.sku === 'object' && i.sku !== null) ? i.sku._id : i.sku
+      })) };
+
       try {
           const res = await fetch(`/api/wholesale/orders/${order._id}`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ lineItems: updatedItems.map(i => ({
-                  ...i,
-                  sku: typeof i.sku === 'object' ? i.sku._id : i.sku
-              })) })
+              body: JSON.stringify(payload)
           });
           if (res.ok) {
               const data = await res.json();
               setOrder(data);
               toast.success(editingItem._id ? 'Item updated' : 'Item added');
               setIsItemModalOpen(false);
+          } else {
+              const err = await res.json().catch(() => null);
+              console.error('Save item failed:', res.status, err);
+              toast.error(err?.error || `Failed to save item (${res.status})`);
           }
-      } catch (e) {
-          toast.error('Failed to save item');
+      } catch (e: any) {
+          console.error('Save item error:', e);
+          toast.error(`Failed to save item: ${e.message || e}`);
       }
   };
 
@@ -366,7 +373,7 @@ export default function SaleOrderDetailPage() {
                           toast.dismiss(t.id);
                           const updatedItems = order.lineItems?.filter(i => i._id !== itemId).map(i => ({
                               ...i,
-                              sku: typeof i.sku === 'object' ? i.sku._id : i.sku
+                              sku: (typeof i.sku === 'object' && i.sku !== null) ? i.sku._id : i.sku
                           })) || [];
                           try {
                               const res = await fetch(`/api/wholesale/orders/${order._id}`, {
@@ -572,7 +579,7 @@ export default function SaleOrderDetailPage() {
                 body: JSON.stringify({ 
                     lineItems: updatedItems.map(i => ({
                         ...i,
-                        sku: typeof i.sku === 'object' ? i.sku._id : i.sku
+                        sku: (typeof i.sku === 'object' && i.sku !== null) ? i.sku._id : i.sku
                     })) 
                 })
             });
@@ -1377,72 +1384,73 @@ export default function SaleOrderDetailPage() {
         {/* Item Modal */}
         {isItemModalOpen && editingItem && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                <div className="bg-card rounded-lg shadow-2xl w-full max-w-lg animate-in fade-in zoom-in duration-200">
-                    <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-secondary/50">
-                        <h2 className="text-sm font-bold uppercase text-foreground">{editingItem._id ? 'Edit Item' : 'Add Item'}</h2>
-                        <button onClick={() => setIsItemModalOpen(false)} className="text-muted-foreground hover:text-foreground">
+                <div className="bg-card rounded-lg shadow-2xl w-full max-w-lg animate-in fade-in zoom-in duration-200 flex flex-col">
+                    {/* Header - matches main header height */}
+                    <div className="flex items-center justify-between px-4 h-[48px] border-b border-border bg-secondary/50 shrink-0 rounded-t-lg">
+                        <h2 className="text-sm font-bold uppercase text-foreground tracking-wider">{editingItem._id ? 'Edit Item' : 'Add Item'}</h2>
+                        <button onClick={() => setIsItemModalOpen(false)} className="w-7 h-7 flex items-center justify-center rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
                             <X className="w-4 h-4" />
                         </button>
                     </div>
-                    <div className="p-6 space-y-4">
+
+                    {/* Body */}
+                    <div className="p-4 space-y-3">
+                        {/* SKU */}
                         <div className="space-y-1.5">
                             <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">SKU</label>
-                            <SearchableSelect
-                                options={(() => {
-                                    const opts = allSkus.map(s => ({ value: s._id, label: s.name }));
-                                    // Add current value if missing (Legacy ID support)
-                                    if (editingItem.sku && !allSkus.find(s => s._id === editingItem.sku)) {
-                                        const label = editingItem.productDescription || editingItem.name || `Legacy: ${editingItem.sku}`;
-                                        opts.push({ value: editingItem.sku, label });
-                                    }
-                                    return opts;
-                                })()}
-                                value={editingItem.sku}
-                                onChange={async (val) => {
-                                    const sku = allSkus.find(s => s._id === val);
-                                    // 1. Update SKU and Price
-                                    setEditingItem((prev: any) => ({ 
-                                        ...prev, 
-                                        sku: val, 
-                                        price: sku?.salePrice || prev.price,
-                                        lotNumber: '' // Reset lot on SKU change
-                                    }));
-                                    
-                                    // 2. Auto-Suggest Lot (FIFO: Oldest with Balance > 0)
-                                    if (val) {
-                                        try {
-                                            const res = await fetch(`/api/warehouse/skus/${val}/lots`);
-                                            if (res.ok) {
-                                                const data = await res.json();
-                                                const lots = data.lots || [];
-                                                // Sort by Date (Oldest First)
-                                                // Assuming 'date' is ISO string
-                                                const sorted = lots.sort((a: any, b: any) => {
-                                                    const dateA = a.date ? new Date(a.date).getTime() : 0;
-                                                    const dateB = b.date ? new Date(b.date).getTime() : 0;
-                                                    return dateA - dateB;
-                                                });
-                                                
-                                                // Find first with positive balance
-                                                const suggested = sorted.find((l: any) => l.balance > 0);
-                                                
-                                                if (suggested) {
-                                                    setEditingItem((prev: any) => ({ 
-                                                        ...prev, 
-                                                        sku: val, // Ensure SKU is set (async race condition safety)
-                                                        lotNumber: suggested.lotNumber,
-                                                        cost: suggested.cost || 0
-                                                    }));
-                                                    toast.success(`Auto-selected Lot: ${suggested.lotNumber}`, { position: 'bottom-center', duration: 2000 });
-                                                }
-                                            }
-                                        } catch(e) {
-                                            console.error("Auto-suggest lot failed", e);
+                            <div className="h-[44px]">
+                                <SearchableSelect
+                                    className="h-full"
+                                    options={(() => {
+                                        const opts = allSkus.map(s => ({ value: s._id, label: s.name }));
+                                        if (editingItem.sku && !allSkus.find(s => s._id === editingItem.sku)) {
+                                            const label = editingItem.productDescription || editingItem.name || `Legacy: ${editingItem.sku}`;
+                                            opts.push({ value: editingItem.sku, label });
                                         }
-                                    }
-                                }}
-                                placeholder="Select SKU..."
-                            />
+                                        return opts;
+                                    })()}
+                                    value={editingItem.sku}
+                                    onChange={async (val) => {
+                                        const sku = allSkus.find(s => s._id === val);
+                                        setEditingItem((prev: any) => ({ 
+                                            ...prev, 
+                                            sku: val, 
+                                            price: sku?.salePrice || prev.price,
+                                            lotNumber: ''
+                                        }));
+                                        
+                                        if (val) {
+                                            try {
+                                                const res = await fetch(`/api/warehouse/skus/${val}/lots`);
+                                                if (res.ok) {
+                                                    const data = await res.json();
+                                                    const lots = data.lots || [];
+                                                    const sorted = lots.sort((a: any, b: any) => {
+                                                        const dateA = a.date ? new Date(a.date).getTime() : 0;
+                                                        const dateB = b.date ? new Date(b.date).getTime() : 0;
+                                                        return dateA - dateB;
+                                                    });
+                                                    
+                                                    const suggested = sorted.find((l: any) => l.balance > 0);
+                                                    
+                                                    if (suggested) {
+                                                        setEditingItem((prev: any) => ({ 
+                                                            ...prev, 
+                                                            sku: val,
+                                                            lotNumber: suggested.lotNumber,
+                                                            cost: suggested.cost || 0
+                                                        }));
+                                                        toast.success(`Auto-selected Lot: ${suggested.lotNumber}`, { position: 'bottom-center', duration: 2000 });
+                                                    }
+                                                }
+                                            } catch(e) {
+                                                console.error("Auto-suggest lot failed", e);
+                                            }
+                                        }
+                                    }}
+                                    placeholder="Select SKU..."
+                                />
+                            </div>
                         </div>
 
                         {/* Nested Lot Selection Modal for Item Modal */}
@@ -1459,9 +1467,11 @@ export default function SaleOrderDetailPage() {
                                 title="Select Lot Number"
                             />
                         )}
-                        <div className="grid grid-cols-2 gap-4">
+
+                        {/* Lot # */}
+                        <div className="space-y-1.5">
                             <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Lot #</label>
-                            <div className="relative">
+                            <div className="relative h-[44px]">
                                 <input
                                     type="text"
                                     readOnly
@@ -1470,23 +1480,30 @@ export default function SaleOrderDetailPage() {
                                         if (editingItem.sku) setIsItemLotModalOpen(true);
                                         else toast.error('Please select a SKU first');
                                     }}
-                                    className="w-full px-3 py-2 border border-border rounded text-sm focus:outline-none cursor-pointer hover:bg-secondary"
+                                    className="w-full h-full px-3 border border-border rounded-md text-sm focus:outline-none cursor-pointer hover:bg-secondary bg-background"
                                     placeholder={editingItem.sku ? "Select Lot..." : "Select SKU first"}
                                 />
-                                <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
                                     <List className="w-4 h-4" />
                                 </div>
                             </div>
                         </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">UOM</label>
+
+                        {/* UOM */}
+                        <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">UOM</label>
+                            <div className="h-[44px]">
                                 <SearchableSelect
+                                    className="h-full"
                                     options={UOM_OPTIONS}
                                     value={editingItem.uom || 'Each'}
                                     onChange={(val) => setEditingItem({ ...editingItem, uom: val })}
                                     creatable
                                 />
                             </div>
+                        </div>
+
+                        {/* Qty + Price side by side */}
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1.5">
                                 <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Qty</label>
@@ -1495,24 +1512,28 @@ export default function SaleOrderDetailPage() {
                                     min="1"
                                     value={editingItem.qtyShipped || 1}
                                     onChange={(e) => setEditingItem({ ...editingItem, qtyShipped: parseInt(e.target.value) || 0 })}
-                                    className="w-full px-3 py-2 border border-border rounded text-sm focus:outline-none"
+                                    className="w-full h-[44px] px-3 border border-border rounded-md text-sm focus:outline-none bg-background"
                                 />
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Price</label>
-                                <div className="relative">
+                                <div className="relative h-[44px]">
                                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">$</span>
                                     <input
                                         type="number"
                                         step="0.01"
                                         value={editingItem.price || 0}
                                         onChange={(e) => setEditingItem({ ...editingItem, price: parseFloat(e.target.value) || 0 })}
-                                        className="w-full pl-6 pr-3 py-2 border border-border rounded text-sm focus:outline-none"
+                                        className="w-full h-full pl-6 pr-3 border border-border rounded-md text-sm focus:outline-none bg-background"
                                     />
                                 </div>
                             </div>
                         </div>
-                        <button onClick={handleSaveItem} className="w-full py-2.5 bg-foreground text-background text-xs font-bold uppercase rounded hover:opacity-90 transition-colors">
+                    </div>
+
+                    {/* Footer - matches main header height */}
+                    <div className="px-4 h-[48px] border-t border-border flex items-center shrink-0 rounded-b-lg">
+                        <button onClick={handleSaveItem} className="w-full h-[36px] bg-foreground text-background text-xs font-bold uppercase tracking-wider rounded-md hover:opacity-90 transition-colors">
                             {editingItem._id ? 'Save Changes' : 'Add Item'}
                         </button>
                     </div>

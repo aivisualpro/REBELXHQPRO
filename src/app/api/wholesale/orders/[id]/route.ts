@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { after } from 'next/server';
+import mongoose from 'mongoose';
 import dbConnect from '@/lib/mongoose';
 import SaleOrder from '@/models/SaleOrder';
 import Sku from '@/models/Sku';
@@ -8,10 +9,66 @@ import PurchaseOrder from '@/models/PurchaseOrder';
 import Manufacturing from '@/models/Manufacturing';
 import AuditAdjustment from '@/models/AuditAdjustment';
 import Client from '@/models/Client';
-import { deleteOrderFromAppSheet, syncPaymentToAppSheet } from '@/lib/appsheet';
+import { deleteOrderFromAppSheet, syncPaymentToAppSheet, syncOrderLineItemToAppSheet } from '@/lib/appsheet';
 
 
 export const dynamic = 'force-dynamic';
+
+/**
+ * Manual SKU populate for line items.
+ * Mongoose's built-in populate fails due to BSON type mismatch:
+ * - Sku model declares _id as String
+ * - DB stores _id as ObjectId
+ * This helper bypasses Mongoose and uses the native driver with $or queries.
+ */
+async function manualPopulateSkus(order: any) {
+    if (!order?.lineItems?.length) return order;
+    
+    const db = mongoose.connection.db;
+    if (!db) return order;
+    
+    // Collect unique SKU IDs from line items
+    const skuIds = new Set<string>();
+    for (const item of order.lineItems) {
+        if (item.sku) {
+            skuIds.add(item.sku.toString());
+        }
+    }
+    
+    if (skuIds.size === 0) return order;
+    
+    // Build $or query with both String and ObjectId types for each ID
+    const orConditions: any[] = [];
+    for (const id of skuIds) {
+        orConditions.push({ _id: id }); // String match
+        if (/^[0-9a-fA-F]{24}$/.test(id)) {
+            orConditions.push({ _id: new mongoose.Types.ObjectId(id) }); // ObjectId match
+        }
+    }
+    
+    const skuDocs = await db.collection('skus').find(
+        { $or: orConditions },
+        { projection: { _id: 1, name: 1, legacyId: 1 } }
+    ).toArray();
+    
+    // Build lookup map: string ID -> { _id, name }
+    const skuMap = new Map<string, any>();
+    for (const doc of skuDocs) {
+        skuMap.set(doc._id.toString(), { _id: doc._id.toString(), name: doc.name, legacyId: doc.legacyId });
+    }
+    
+    // Replace sku references with populated objects
+    order.lineItems = order.lineItems.map((item: any) => {
+        if (item.sku) {
+            const skuIdStr = item.sku.toString();
+            const skuDoc = skuMap.get(skuIdStr);
+            return { ...item, sku: skuDoc || item.sku }; // Keep original ref if not found
+        }
+        return item;
+    });
+    
+    return order;
+}
 
 // Helper to parse duration "HH:MM:SS" to decimal hours
 const parseDuration = (duration: string): number => {
@@ -190,10 +247,12 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
         void Sku;
         void Client;
 
-        const order = await SaleOrder.findById(id)
+        let order = await SaleOrder.findById(id)
             .populate('clientId', 'name addresses phones emails contacts salesPerson description website facebookPage industry forecastedAmount defaultPaymentMethod defaultShippingTerms contactStatus contactType billing')
-            .populate('lineItems.sku', 'name')
             .lean();
+
+        // Manual SKU populate (bypasses Mongoose's String vs ObjectId type mismatch)
+        order = await manualPopulateSkus(order);
 
         if (!order) {
             return NextResponse.json({ error: 'Order not found' }, { status: 404 });
@@ -215,17 +274,27 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         const { id } = await context.params;
         const body = await request.json();
 
-        // Capture existing payments before update (for detecting new/deleted ones)
+        // Capture existing data before update (for detecting new/deleted items)
         let existingPaymentIds: string[] = [];
         let existingPayments: any[] = [];
+        let existingLineItemIds: string[] = [];
+        let existingLineItems: any[] = [];
         let existingOrderData: any = null;
-        if (body.payments && Array.isArray(body.payments)) {
-            const existingOrder = await SaleOrder.findById(id).select('payments label legacyId').lean();
-            if (existingOrder?.payments) {
-                existingPaymentIds = existingOrder.payments.map((p: any) => p._id?.toString());
-                existingPayments = existingOrder.payments;
+
+        const needsSnapshot = (body.payments && Array.isArray(body.payments)) || (body.lineItems && Array.isArray(body.lineItems));
+        if (needsSnapshot) {
+            const existingOrder = await SaleOrder.findById(id).select('payments lineItems label legacyId').lean();
+            if (existingOrder) {
+                existingOrderData = existingOrder;
+                if (existingOrder.payments) {
+                    existingPaymentIds = existingOrder.payments.map((p: any) => p._id?.toString());
+                    existingPayments = existingOrder.payments;
+                }
+                if (existingOrder.lineItems) {
+                    existingLineItemIds = existingOrder.lineItems.map((li: any) => li._id?.toString());
+                    existingLineItems = existingOrder.lineItems;
+                }
             }
-            existingOrderData = existingOrder;
         }
 
         if (body.lineItems && Array.isArray(body.lineItems)) {
@@ -255,14 +324,16 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
             });
         }
 
-        const updatedOrder = await SaleOrder.findByIdAndUpdate(
+        let updatedOrder = await SaleOrder.findByIdAndUpdate(
             id,
             { $set: body },
             { new: true, runValidators: true }
         )
         .populate('clientId', 'name addresses phones emails contacts salesPerson description website facebookPage industry forecastedAmount defaultPaymentMethod defaultShippingTerms contactStatus contactType billing')
-        .populate('lineItems.sku', 'name')
         .lean();
+
+        // Manual SKU populate (bypasses Mongoose's String vs ObjectId type mismatch)
+        updatedOrder = await manualPopulateSkus(updatedOrder);
 
         if (!updatedOrder) {
             return NextResponse.json({ error: 'Order not found' }, { status: 404 });
@@ -296,10 +367,9 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
             // Sync updated (edited) payments to AppSheet in background
             const updatedPayments = updatedOrder.payments.filter((p: any) => {
                 const pid = p._id?.toString();
-                if (!existingPaymentIds.includes(pid)) return false; // new payment, already handled above
+                if (!existingPaymentIds.includes(pid)) return false;
                 const oldPayment = existingPayments.find((ep: any) => ep._id?.toString() === pid);
                 if (!oldPayment) return false;
-                // Check if any relevant fields changed
                 return (
                     oldPayment.paymentAmount !== p.paymentAmount ||
                     oldPayment.createdBy !== p.createdBy ||
@@ -339,6 +409,80 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
                         }
                     } catch (err) {
                         console.error('Background AppSheet payment delete sync failed:', err);
+                    }
+                });
+            }
+        }
+
+        // Sync line items to AppSheet "Order Details" table in background
+        if (body.lineItems && Array.isArray(updatedOrder.lineItems)) {
+            // New line items
+            const newLineItems = updatedOrder.lineItems.filter(
+                (li: any) => !existingLineItemIds.includes(li._id?.toString())
+            );
+            if (newLineItems.length > 0) {
+                after(async () => {
+                    try {
+                        for (const lineItem of newLineItems) {
+                            await syncOrderLineItemToAppSheet(
+                                updatedOrder,
+                                lineItem,
+                                'Add'
+                            );
+                        }
+                    } catch (err) {
+                        console.error('Background AppSheet line item sync failed:', err);
+                    }
+                });
+            }
+
+            // Edited line items
+            const editedLineItems = updatedOrder.lineItems.filter((li: any) => {
+                const lid = li._id?.toString();
+                if (!existingLineItemIds.includes(lid)) return false;
+                const oldItem = existingLineItems.find((eli: any) => eli._id?.toString() === lid);
+                if (!oldItem) return false;
+                return (
+                    oldItem.lotNumber !== li.lotNumber ||
+                    oldItem.qtyShipped !== li.qtyShipped ||
+                    oldItem.price !== li.price ||
+                    oldItem.uom !== li.uom ||
+                    String(oldItem.sku) !== String(li.sku)
+                );
+            });
+            if (editedLineItems.length > 0) {
+                after(async () => {
+                    try {
+                        for (const lineItem of editedLineItems) {
+                            await syncOrderLineItemToAppSheet(
+                                updatedOrder,
+                                lineItem,
+                                'Edit'
+                            );
+                        }
+                    } catch (err) {
+                        console.error('Background AppSheet line item edit sync failed:', err);
+                    }
+                });
+            }
+
+            // Deleted line items
+            const updatedLineItemIds = updatedOrder.lineItems.map((li: any) => li._id?.toString());
+            const deletedLineItems = existingLineItems.filter(
+                (li: any) => !updatedLineItemIds.includes(li._id?.toString())
+            );
+            if (deletedLineItems.length > 0) {
+                after(async () => {
+                    try {
+                        for (const lineItem of deletedLineItems) {
+                            await syncOrderLineItemToAppSheet(
+                                existingOrderData || { _id: id },
+                                lineItem,
+                                'Delete'
+                            );
+                        }
+                    } catch (err) {
+                        console.error('Background AppSheet line item delete sync failed:', err);
                     }
                 });
             }
