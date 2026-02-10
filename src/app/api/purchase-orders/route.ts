@@ -41,7 +41,6 @@ export async function GET(request: Request) {
 
             query.$or = [
                 { label: { $regex: search, $options: 'i' } },
-                { _id: { $regex: search, $options: 'i' } },
                 { legacyId: { $regex: search, $options: 'i' } },
                 { paymentTerms: { $regex: search, $options: 'i' } },
                 { status: { $regex: search, $options: 'i' } },
