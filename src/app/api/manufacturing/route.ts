@@ -141,6 +141,26 @@ export async function POST(request: Request) {
     try {
         await dbConnect();
         const body = await request.json();
+
+        // Auto-generate label: find the highest numeric label and increment
+        if (!body.label) {
+            const lastOrder = await Manufacturing.findOne({}, { label: 1 })
+                .sort({ label: -1 })
+                .lean() as any;
+            
+            if (lastOrder?.label) {
+                // Extract numeric part from label (handles "123" or "WO-123" formats)
+                const match = String(lastOrder.label).match(/(\d+)/);
+                if (match) {
+                    body.label = String(parseInt(match[1]) + 1);
+                } else {
+                    body.label = '1';
+                }
+            } else {
+                body.label = '1';
+            }
+        }
+
         const newItem = await Manufacturing.create(body);
         return NextResponse.json(newItem);
     } catch (error: any) {

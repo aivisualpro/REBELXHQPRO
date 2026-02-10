@@ -174,8 +174,8 @@ function ManufacturingContent() {
               >
                 <td className="px-2 py-1.5 text-[10px] font-bold text-foreground tracking-tight font-mono group-hover:border-l-2 group-hover:border-l-primary transition-all">{order.label || '-'}</td>
                 <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono">{new Date(order.createdAt).toLocaleDateString()}</td>
-                <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-medium whitespace-nowrap">
-                   <div className="flex items-center space-x-1.5">
+                <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-medium">
+                   <div className="flex items-center gap-1.5">
                       {(() => {
                         if (!order.sku || typeof order.sku !== 'object') return null;
                         const tier = (order.sku as any)?.tier;
@@ -191,7 +191,7 @@ function ManufacturingContent() {
                           </span>
                         );
                       })()}
-                      <span className="max-w-[150px] overflow-hidden text-ellipsis">
+                      <span className="truncate">
                         {typeof order.sku === 'object' && order.sku !== null ? (order.sku as any)?.name : (order.sku || '-')}
                       </span>
                    </div>

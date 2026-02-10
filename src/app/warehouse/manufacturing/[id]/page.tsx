@@ -325,7 +325,7 @@ export default function ManufacturingDetailPage() {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-[calc(100vh-48px)] bg-white">
+            <div className="flex items-center justify-center h-[calc(100vh-48px)] bg-background">
                 <LoadingSpinner size="lg" message="Loading Manufacturing Order" />
             </div>
         );
@@ -333,8 +333,8 @@ export default function ManufacturingDetailPage() {
 
     if (!order) {
         return (
-            <div className="flex items-center justify-center h-[calc(100vh-48px)] bg-white">
-                <div className="text-sm text-slate-400">Order not found</div>
+            <div className="flex items-center justify-center h-[calc(100vh-48px)] bg-background">
+                <div className="text-sm text-muted-foreground">Order not found</div>
             </div>
         );
     }
@@ -362,6 +362,75 @@ export default function ManufacturingDetailPage() {
 
     const skuImage = (typeof order.sku === 'object' && order.sku !== null && order.sku.image) ? order.sku.image : skuList.find(s => s._id === (typeof order.sku === 'string' ? order.sku : (order.sku as any)?._id))?.image;
 
+    const STATUSES = ['Pending', 'Processing', 'Ready to QC', 'Fulfilled'];
+    const PRIORITIES = ['Normal', 'High', 'Extreme'];
+
+    const handleStatusChange = async (newStatus: string) => {
+        try {
+            const res = await fetch(`/api/manufacturing/${order._id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            });
+            if (res.ok) {
+                const updated = await res.json();
+                setOrder(updated);
+                toast.success(`Status → ${newStatus}`);
+            }
+        } catch (e) { toast.error('Failed to update status'); }
+    };
+
+    const handlePriorityChange = async (newPriority: string) => {
+        try {
+            const res = await fetch(`/api/manufacturing/${order._id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ priority: newPriority })
+            });
+            if (res.ok) {
+                const updated = await res.json();
+                setOrder(updated);
+                toast.success(`Priority → ${newPriority}`);
+            }
+        } catch (e) { toast.error('Failed to update priority'); }
+    };
+
+    const handleDeleteOrder = () => {
+        toast((t) => (
+            <div className="flex flex-col gap-2">
+                <p className="text-sm font-bold text-white">Delete this manufacturing order?</p>
+                <p className="text-xs text-gray-400">This action cannot be undone.</p>
+                <div className="flex gap-2 mt-1">
+                    <button
+                        onClick={() => toast.dismiss(t.id)}
+                        className="flex-1 px-3 py-1.5 text-xs font-bold rounded border border-gray-600 bg-gray-800 text-white hover:bg-gray-700 transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={async () => {
+                            toast.dismiss(t.id);
+                            try {
+                                const res = await fetch(`/api/manufacturing/${order._id}`, { method: 'DELETE' });
+                                if (res.ok) {
+                                    toast.success('Order deleted');
+                                    router.push('/warehouse/manufacturing');
+                                } else {
+                                    toast.error('Failed to delete');
+                                }
+                            } catch (e) {
+                                toast.error('Error deleting order');
+                            }
+                        }}
+                        className="flex-1 px-3 py-1.5 text-xs font-bold rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+                    >
+                        Delete
+                    </button>
+                </div>
+            </div>
+        ), { duration: 10000, position: 'top-center', style: { maxWidth: '360px', background: '#1a1a1a', color: '#fff', marginTop: '40vh' } });
+    };
+
     const handleUpdateQtyDiff = (diffValue: number) => {
         if (!order) return;
         
@@ -380,13 +449,7 @@ export default function ManufacturingDetailPage() {
                     body: JSON.stringify({ qtyDifference: diffValue })
                 });
                 if (res.ok) {
-                    const data = await res.json();
-                    // We don't overwrite the whole order here because if user is still typing, 
-                    // we might revert their current local changes. 
-                    // Instead, just confirm it's synced.
-                    // Actually, getting the data back is good for refreshing costs if they changed on server.
-                    // But we've already updated costs locally.
-                    // Let's just update the order state with data ONLY if it's the latest value.
+                    // synced
                 } else {
                     toast.error('Failed to sync quantity to database');
                 }
@@ -395,10 +458,8 @@ export default function ManufacturingDetailPage() {
             } finally {
                 setIsSubmittingDiff(false);
             }
-        }, 1500); // 1.5 second debounce
+        }, 1500);
     };
-
-
 
     const handleEditLot = (itemId: string, skuId: string) => {
         setEditingLotItemId(itemId);
@@ -435,8 +496,6 @@ export default function ManufacturingDetailPage() {
         }
     };
     
-    // Helper to calculate required qty for a line item (for lot suggestion)
-    // Using regular function instead of useCallback to avoid hooks order issues
     const getRequiredQtyForItem = (item: LineItem | null): number => {
         if (!item || !order) return 0;
         const bomQty = (item.recipeQty || 0) * (order.qty || 0);
@@ -447,11 +506,9 @@ export default function ManufacturingDetailPage() {
         return bomQty + qtyExtra + qtyScrapped;
     };
     
-    // Helper to get current lot for highlighting
     const currentEditingItem = order?.lineItems?.find(i => i._id === editingLotItemId);
     const currentEditingItemRequiredQty = getRequiredQtyForItem(currentEditingItem || null);
 
-    // Edit Item Handlers
     const handleOpenEditModal = (item: LineItem) => {
         setEditingItem({ ...item });
         setIsEditModalOpen(true);
@@ -468,12 +525,10 @@ export default function ManufacturingDetailPage() {
         try {
             let updatedLineItems;
             if (editingItem._id) {
-                // Edit existing item
                 updatedLineItems = order.lineItems?.map(item => 
                     item._id === editingItem._id ? editingItem : item
                 ) || [];
             } else {
-                // Add new item
                 const newItem = {
                     ...editingItem,
                     createdAt: new Date().toISOString()
@@ -524,40 +579,33 @@ export default function ManufacturingDetailPage() {
         }
     };
 
-    // deleted the misplaced memo from here
-
     return (
-        <div className="flex flex-col h-[calc(100vh-40px)] bg-white overflow-hidden">
-            {/* Header */}
-            <div className="sticky top-0 z-30 bg-white border-b border-slate-200 px-4 flex items-center justify-between shrink-0 h-10 shadow-sm">
-                <div className="flex items-center space-x-3">
-                    <button
-                        onClick={() => router.push('/warehouse/manufacturing')}
-                        className="p-1 hover:bg-slate-100 rounded-full transition-colors"
-                    >
-                        <ArrowLeft className="w-4 h-4 text-slate-500" />
-                    </button>
-                    <div className="flex items-baseline space-x-3">
-                        <h1 className="text-sm font-bold text-slate-900 uppercase tracking-tight">Manufacturing Details</h1>
-                        <p className="text-[10px] text-slate-400 font-mono uppercase">{order.label || order._id}</p>
-                    </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                    <Link 
-                        href={`/warehouse/skus/${typeof order.sku === 'object' && order.sku !== null ? (order.sku as any)._id : order.sku}?lot=${encodeURIComponent(order.label || order._id)}`}
-                        className="px-3 py-1 bg-slate-100 border border-slate-200 text-slate-600 rounded text-[10px] font-bold uppercase hover:bg-slate-200 transition-colors flex items-center gap-1.5"
-                    >
-                        <Layers className="w-3 h-3" />
-                        <span>View Ledger</span>
-                    </Link>
-                </div>
-            </div>
+        <div className="flex flex-col h-[calc(100vh-48px)] bg-background overflow-hidden relative">
 
             <div className="flex flex-1 overflow-hidden">
                 {/* Left Sidebar: Details (30%) */}
-                <div className="w-[30%] border-r border-slate-200 bg-white overflow-y-auto scrollbar-custom">
+                <div className="w-[30%] border-r border-border bg-background overflow-y-auto scrollbar-custom flex flex-col">
+                    {/* Back + Actions Bar */}
+                    <div className="flex items-center justify-between px-4 py-2 border-b border-border shrink-0">
+                        <button
+                            onClick={() => router.push('/warehouse/manufacturing')}
+                            className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                            <ArrowLeft className="w-3.5 h-3.5" />
+                            <span>Back</span>
+                        </button>
+                        <Link 
+                            href={`/warehouse/skus/${typeof order.sku === 'object' && order.sku !== null ? (order.sku as any)._id : order.sku}?lot=${encodeURIComponent(order.label || order._id)}`}
+                            className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                            <Layers className="w-3 h-3" />
+                            <span>Ledger</span>
+                        </Link>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto scrollbar-custom">
                     {/* SKU Hero Section */}
-                    <div className="bg-gradient-to-b from-slate-50 to-white px-5 pt-5 pb-4">
+                    <div className="px-5 pt-5 pb-4">
                         <div 
                             className="flex items-start gap-4 cursor-pointer group"
                             onClick={() => {
@@ -565,7 +613,7 @@ export default function ManufacturingDetailPage() {
                                 if (skuId) router.push(`/warehouse/skus/${skuId}`);
                             }}
                         >
-                            <div className="w-16 h-16 bg-white border border-slate-200 flex items-center justify-center p-1.5 shadow-sm shrink-0 group-hover:border-blue-400 group-hover:shadow-md transition-all">
+                            <div className="w-16 h-16 bg-secondary border border-border flex items-center justify-center p-1.5 shadow-sm shrink-0 group-hover:border-primary group-hover:shadow-md transition-all">
                                 {skuImage ? (
                                     <img 
                                         src={skuImage} 
@@ -580,7 +628,7 @@ export default function ManufacturingDetailPage() {
                                 ) : globalSettings?.missingSkuImage ? (
                                     <img src={globalSettings.missingSkuImage} alt="Fallback" className="max-w-full max-h-full object-contain" />
                                 ) : (
-                                    <Package className="w-6 h-6 text-slate-400" />
+                                    <Package className="w-6 h-6 text-muted-foreground" />
                                 )}
                             </div>
                             <div className="flex-1 min-w-0">
@@ -595,59 +643,93 @@ export default function ManufacturingDetailPage() {
                                             {sidebarSkuTier}
                                         </span>
                                     )}
-                                    <h1 className="text-base font-black text-slate-900 leading-tight group-hover:text-blue-600 transition-colors line-clamp-2">{skuName}</h1>
+                                    <h1 className="text-base font-black text-foreground leading-tight group-hover:text-primary transition-colors line-clamp-2">{skuName}</h1>
                                 </div>
-                                <div className="flex items-center gap-1.5 mt-2">
-                                    <span className={cn(
-                                        "px-1.5 py-0.5 text-[8px] font-black uppercase tracking-widest",
-                                        order.status === 'Fulfilled' ? "bg-emerald-100 text-emerald-700" :
-                                        order.status === 'Processing' ? "bg-blue-100 text-blue-700" :
-                                        order.status === 'Ready to QC' ? "bg-amber-100 text-amber-700" :
-                                        "bg-slate-100 text-slate-600"
-                                    )}>
-                                        {order.status}
-                                    </span>
-                                    <span className={cn(
-                                        "px-1.5 py-0.5 text-[8px] font-black uppercase tracking-widest",
-                                        order.priority === 'Extreme' ? "bg-red-100 text-red-700" :
-                                        order.priority === 'High' ? "bg-orange-100 text-orange-700" :
-                                        "bg-slate-100 text-slate-600"
-                                    )}>
-                                        {order.priority}
-                                    </span>
-                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Status & Priority Buttons */}
+                    <div className="mx-5 mb-3 flex items-center gap-2">
+                        <div className="relative group/status flex-1">
+                            <button className={cn(
+                                "w-full px-2 py-1.5 text-[8px] font-black uppercase tracking-widest text-center cursor-pointer transition-all",
+                                order.status === 'Fulfilled' ? "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25" :
+                                order.status === 'Processing' ? "bg-blue-500/15 text-blue-400 hover:bg-blue-500/25" :
+                                order.status === 'Ready to QC' ? "bg-amber-500/15 text-amber-400 hover:bg-amber-500/25" :
+                                "bg-secondary text-muted-foreground hover:bg-secondary/80"
+                            )}>
+                                {order.status}
+                            </button>
+                            <div className="hidden group-hover/status:block absolute top-full left-0 right-0 mt-0.5 bg-popover border border-border shadow-lg z-30">
+                                {STATUSES.map(s => (
+                                    <button
+                                        key={s}
+                                        onClick={() => handleStatusChange(s)}
+                                        className={cn(
+                                            "w-full text-left px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider hover:bg-secondary transition-colors",
+                                            order.status === s ? "text-foreground bg-secondary" : "text-muted-foreground"
+                                        )}
+                                    >
+                                        {s}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="relative group/priority flex-1">
+                            <button className={cn(
+                                "w-full px-2 py-1.5 text-[8px] font-black uppercase tracking-widest text-center cursor-pointer transition-all",
+                                order.priority === 'Extreme' ? "bg-red-500/15 text-red-400 hover:bg-red-500/25" :
+                                order.priority === 'High' ? "bg-orange-500/15 text-orange-400 hover:bg-orange-500/25" :
+                                "bg-secondary text-muted-foreground hover:bg-secondary/80"
+                            )}>
+                                {order.priority}
+                            </button>
+                            <div className="hidden group-hover/priority:block absolute top-full left-0 right-0 mt-0.5 bg-popover border border-border shadow-lg z-30">
+                                {PRIORITIES.map(p => (
+                                    <button
+                                        key={p}
+                                        onClick={() => handlePriorityChange(p)}
+                                        className={cn(
+                                            "w-full text-left px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider hover:bg-secondary transition-colors",
+                                            order.priority === p ? "text-foreground bg-secondary" : "text-muted-foreground"
+                                        )}
+                                    >
+                                        {p}
+                                    </button>
+                                ))}
                             </div>
                         </div>
                     </div>
 
                     {/* WO Label */}
                     {order.label && (
-                        <div className="mx-5 mb-3 px-3 py-2 bg-slate-50 border border-slate-100">
-                            <div className="text-[8px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">WO / Lot Number</div>
-                            <div className="text-xs font-mono font-bold text-slate-800">{order.label}</div>
+                        <div className="mx-5 mb-3 px-3 py-2 bg-secondary border border-border">
+                            <div className="text-[8px] text-muted-foreground uppercase tracking-widest font-bold mb-0.5">WO / Lot Number</div>
+                            <div className="text-xs font-mono font-bold text-foreground">{order.label}</div>
                         </div>
                     )}
 
                     {/* Quantity Section */}
                     <div className="mx-5 mb-4">
                         <div className="grid grid-cols-2 gap-3 mb-3">
-                            <div className="bg-slate-50 border border-slate-100 p-3">
-                                <div className="text-[8px] text-slate-400 uppercase tracking-widest font-bold mb-1">Ordered</div>
-                                <div className="text-xl font-black text-slate-900 leading-none">{order.qty}</div>
-                                <div className="text-[9px] text-slate-400 font-bold uppercase mt-0.5">{order.uom}</div>
+                            <div className="bg-secondary border border-border p-3">
+                                <div className="text-[8px] text-muted-foreground uppercase tracking-widest font-bold mb-1">Ordered</div>
+                                <div className="text-xl font-black text-foreground leading-none">{order.qty}</div>
+                                <div className="text-[9px] text-muted-foreground font-bold uppercase mt-0.5">{order.uom}</div>
                             </div>
-                            <div className="bg-slate-50 border border-slate-100 p-3">
+                            <div className="bg-secondary border border-border p-3">
                                 <div className="flex items-center justify-between mb-1">
-                                    <div className="text-[8px] text-slate-400 uppercase tracking-widest font-bold">Adjust</div>
+                                    <div className="text-[8px] text-muted-foreground uppercase tracking-widest font-bold">Adjust</div>
                                     {isSubmittingDiff && (
                                         <div className="text-[7px] text-blue-500 font-bold uppercase animate-pulse">Saving</div>
                                     )}
                                 </div>
-                                <div className="flex items-center bg-white border border-slate-200 h-7 focus-within:border-black transition-colors">
+                                <div className="flex items-center bg-background border border-border h-7 focus-within:border-foreground transition-colors">
                                     <button 
                                         disabled={isSubmittingDiff}
                                         onClick={() => handleUpdateQtyDiff((order.qtyDifference || 0) - 1)}
-                                        className="w-7 h-full flex items-center justify-center text-slate-400 hover:text-black hover:bg-slate-50 transition-all border-r border-slate-200"
+                                        className="w-7 h-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-all border-r border-border"
                                     >
                                         <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
                                     </button>
@@ -655,26 +737,26 @@ export default function ManufacturingDetailPage() {
                                         type="number"
                                         value={order.qtyDifference || 0}
                                         onChange={(e) => handleUpdateQtyDiff(parseInt(e.target.value) || 0)}
-                                        className="flex-1 text-center text-xs font-bold bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none min-w-0"
+                                        className="flex-1 text-center text-xs font-bold bg-transparent text-foreground outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none min-w-0"
                                     />
                                     <button 
                                         disabled={isSubmittingDiff}
                                         onClick={() => handleUpdateQtyDiff((order.qtyDifference || 0) + 1)}
-                                        className="w-7 h-full flex items-center justify-center text-slate-400 hover:text-black hover:bg-slate-50 transition-all border-l border-slate-200"
+                                        className="w-7 h-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-all border-l border-border"
                                     >
                                         <Plus className="w-2.5 h-2.5" strokeWidth={3} />
                                     </button>
                                 </div>
                             </div>
                         </div>
-                        <div className="bg-slate-900 text-white px-4 py-2.5 flex justify-between items-center">
-                            <div className="text-[9px] uppercase tracking-widest font-bold text-slate-400">Qty Manufactured</div>
-                            <div className="text-lg font-black">{costs.qtyManufactured} <span className="text-[9px] text-slate-400 font-bold uppercase">{order.uom}</span></div>
+                        <div className="bg-foreground text-background px-4 py-2.5 flex justify-between items-center">
+                            <div className="text-[9px] uppercase tracking-widest font-bold text-background/50">Qty Manufactured</div>
+                            <div className="text-lg font-black">{costs.qtyManufactured} <span className="text-[9px] text-background/50 font-bold uppercase">{order.uom}</span></div>
                         </div>
                     </div>
 
                     {/* Metadata Grid */}
-                    <div className="mx-5 mb-4 border border-slate-100">
+                    <div className="mx-5 mb-4 border border-border">
                         {(() => {
                             const lastQc = order.qualityCheck?.length ? order.qualityCheck[order.qualityCheck.length - 1] : null;
                             return [
@@ -690,17 +772,17 @@ export default function ManufacturingDetailPage() {
                         })().map((item, idx) => (
                             <div key={idx} className={cn(
                                 "flex items-center justify-between px-3 py-2",
-                                idx % 2 === 0 ? "bg-white" : "bg-slate-50/70"
+                                idx % 2 === 0 ? "bg-background" : "bg-secondary/50"
                             )}>
-                                <span className="text-[9px] text-slate-400 uppercase tracking-widest font-bold">{item.label}</span>
-                                <span className="text-[11px] font-medium text-slate-700 text-right max-w-[55%] truncate">{item.value}</span>
+                                <span className="text-[9px] text-muted-foreground uppercase tracking-widest font-bold">{item.label}</span>
+                                <span className="text-[11px] font-medium text-muted-foreground text-right max-w-[55%] truncate">{item.value}</span>
                             </div>
                         ))}
                     </div>
 
                     {/* Cost Analysis */}
                     <div className="mx-5 mb-5">
-                        <div className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-3">Cost Breakdown</div>
+                        <div className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-3">Cost Breakdown</div>
                         <div className="space-y-2">
                             {[
                                 { label: 'Material', value: costs.material, color: 'bg-blue-500' },
@@ -709,26 +791,45 @@ export default function ManufacturingDetailPage() {
                             ].map((item, idx) => (
                                 <div key={idx} className="group">
                                     <div className="flex justify-between items-center mb-1">
-                                        <span className="text-[10px] text-slate-500 group-hover:text-slate-800 transition-colors font-medium">{item.label}</span>
-                                        <span className="text-[11px] font-mono font-semibold text-slate-700">${item.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span className="text-[10px] text-muted-foreground group-hover:text-foreground transition-colors font-medium">{item.label}</span>
+                                        <span className="text-[11px] font-mono font-semibold text-muted-foreground">${item.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
-                                    <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
+                                    <div className="h-1 bg-secondary rounded-full overflow-hidden">
                                         <div className={cn("h-full rounded-full transition-all duration-500", item.color)} style={{ width: `${costs.total > 0 ? (item.value / costs.total * 100) : 0}%` }} />
                                     </div>
                                 </div>
                             ))}
                         </div>
 
-                        <div className="mt-3 pt-3 border-t border-slate-200 space-y-2">
+                        <div className="mt-3 pt-3 border-t border-border space-y-2">
                             <div className="flex justify-between items-center">
-                                <span className="text-[10px] text-slate-400 font-medium italic">Per Unit</span>
-                                <span className="text-[11px] font-mono font-medium text-slate-500 italic">${costs.perUnit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</span>
+                                <span className="text-[10px] text-muted-foreground font-medium italic">Per Unit</span>
+                                <span className="text-[11px] font-mono font-medium text-muted-foreground italic">${costs.perUnit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</span>
                             </div>
-                            <div className="flex justify-between items-center bg-emerald-50 border border-emerald-100 px-3 py-2">
-                                <span className="text-[10px] font-black text-emerald-800 uppercase tracking-widest">Total Cost</span>
-                                <span className="text-base font-mono font-black text-emerald-700">${costs.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            <div className="flex justify-between items-center bg-emerald-500/10 border border-emerald-500/20 px-3 py-2">
+                                <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Total Cost</span>
+                                <span className="text-base font-mono font-black text-emerald-400">${costs.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             </div>
                         </div>
+                    </div>
+                    </div>
+
+                    {/* Action Buttons at bottom */}
+                    <div className="border-t border-border px-5 py-3 shrink-0 flex items-center gap-2">
+                        <button
+                            onClick={() => router.push(`/warehouse/manufacturing/${order._id}/edit`)}
+                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-secondary text-foreground border border-border hover:bg-secondary/80 transition-colors"
+                        >
+                            <Pencil className="w-3.5 h-3.5" />
+                            <span>Edit</span>
+                        </button>
+                        <button
+                            onClick={handleDeleteOrder}
+                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors"
+                        >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Delete</span>
+                        </button>
                     </div>
                 </div>
 
