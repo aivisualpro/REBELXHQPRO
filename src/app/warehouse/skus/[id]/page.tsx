@@ -136,6 +136,10 @@ function SkuDetailsPageContent() {
     const [isEditSaving, setIsEditSaving] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
 
+    // Warning click -> highlight ledger rows
+    const [highlightedTxIds, setHighlightedTxIds] = useState<Set<string>>(new Set());
+    const mainScrollRef = useRef<HTMLElement>(null);
+
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
             if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
@@ -529,27 +533,77 @@ function SkuDetailsPageContent() {
                         </div>
                     </div>
 
-                    <div className="p-4">
-                        <div className="space-y-6 pt-2 pb-6 flex flex-col items-center border-b border-border">
-                            <div className="flex flex-col items-center">
-                                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] mb-4">Stock Level</label>
-                                <div className="flex items-baseline space-x-2">
-                                    <span className={cn(
-                                        "text-4xl font-black tracking-tighter",
-                                        currentStock > (sku.reOrderPoint || 0) ? "text-foreground" : "text-orange-600"
-                                    )}>
-                                        {currentStock.toLocaleString(undefined, { maximumFractionDigits: 3 })}
-                                    </span>
-                                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{sku.uom || 'Unit'}</span>
-                                </div>
+                    {/* Stock Level - Premium */}
+                    <div className="px-4 py-5 border-b border-border">
+                        <div className={cn(
+                            "relative rounded-lg px-4 py-5 flex flex-col items-center overflow-hidden",
+                            currentStock > (sku.reOrderPoint || 0)
+                                ? "bg-gradient-to-b from-emerald-950/40 to-emerald-950/10 border border-emerald-500/20"
+                                : "bg-gradient-to-b from-orange-950/40 to-orange-950/10 border border-orange-500/20"
+                        )}>
+                            {/* Subtle glow behind number */}
+                            <div className={cn(
+                                "absolute inset-0 opacity-20 blur-2xl",
+                                currentStock > (sku.reOrderPoint || 0)
+                                    ? "bg-emerald-500/30"
+                                    : "bg-orange-500/30"
+                            )} />
+                            <div className="relative flex items-center gap-2 mb-2">
+                                <div className={cn(
+                                    "w-2 h-2 rounded-full animate-pulse",
+                                    currentStock > (sku.reOrderPoint || 0) ? "bg-emerald-400" : "bg-orange-400"
+                                )} />
+                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-[0.25em]">Stock Level</label>
                             </div>
-                            {/* Pending Production Warning */}
-                            {(() => {
-                                const pendingTxs = transactions.filter(tx => tx.type === 'Produced' && tx.status === 'Pending');
-                                if (pendingTxs.length === 0) return null;
-                                const pendingQty = pendingTxs.reduce((acc, tx) => acc + tx.quantity, 0);
-                                return (
-                                    <div className="w-full mt-2 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2.5">
+                            <div className="relative flex items-baseline space-x-2">
+                                <span className={cn(
+                                    "text-4xl font-black tracking-tighter",
+                                    currentStock > (sku.reOrderPoint || 0) ? "text-emerald-400" : "text-orange-400"
+                                )}>
+                                    {currentStock.toLocaleString(undefined, { maximumFractionDigits: 3 })}
+                                </span>
+                                <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{sku.uom || 'Unit'}</span>
+                            </div>
+                            {sku.reOrderPoint != null && sku.reOrderPoint > 0 && (
+                                <p className={cn(
+                                    "relative text-[9px] font-medium mt-2 uppercase tracking-wider",
+                                    currentStock > sku.reOrderPoint ? "text-emerald-500/60" : "text-orange-500/60"
+                                )}>
+                                    {currentStock > sku.reOrderPoint ? '✓ Above' : '⚠ Below'} reorder point ({sku.reOrderPoint.toLocaleString()})
+                                </p>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Warnings Section - stacked flush */}
+                    {(() => {
+                        const pendingTxs = transactions.filter(tx => tx.type === 'Produced' && tx.status === 'Pending');
+                        const unfulfilledTxs = transactions.filter(tx => tx.type === 'Consumption' && tx.status !== 'Fulfilled');
+                        if (pendingTxs.length === 0 && unfulfilledTxs.length === 0) return null;
+                        const pendingQty = pendingTxs.reduce((acc, tx) => acc + tx.quantity, 0);
+                        const unfulfilledQty = unfulfilledTxs.reduce((acc, tx) => acc + Math.abs(tx.quantity), 0);
+                        return (
+                            <>
+                                {pendingTxs.length > 0 && (
+                                    <div
+                                        className="w-full bg-red-500/10 border-b border-red-500/20 px-4 py-2.5 cursor-pointer hover:bg-red-500/20 transition-colors"
+                                        onClick={() => {
+                                            const ids = new Set(pendingTxs.map(tx => tx._id));
+                                            setHighlightedTxIds(ids);
+                                            // Ensure all are loaded
+                                            const maxIdx = Math.max(...pendingTxs.map(tx => displayTransactions.findIndex(d => d._id === tx._id)));
+                                            if (maxIdx >= visibleCount) setVisibleCount(maxIdx + 5);
+                                            // Scroll to first match after render
+                                            setTimeout(() => {
+                                                const el = document.querySelector(`[data-tx-id="${pendingTxs[0]._id}"]`);
+                                                if (el && mainScrollRef.current) {
+                                                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                                }
+                                            }, 100);
+                                            // Clear highlight after 3s
+                                            setTimeout(() => setHighlightedTxIds(new Set()), 3000);
+                                        }}
+                                    >
                                         <div className="flex items-start space-x-2">
                                             <AlertTriangle className="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" />
                                             <div>
@@ -562,15 +616,24 @@ function SkuDetailsPageContent() {
                                             </div>
                                         </div>
                                     </div>
-                                );
-                            })()}
-                            {/* Unfulfilled Consumption Warning */}
-                            {(() => {
-                                const unfulfilledTxs = transactions.filter(tx => tx.type === 'Consumption' && tx.status !== 'Fulfilled');
-                                if (unfulfilledTxs.length === 0) return null;
-                                const unfulfilledQty = unfulfilledTxs.reduce((acc, tx) => acc + Math.abs(tx.quantity), 0);
-                                return (
-                                    <div className="w-full mt-2 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2.5">
+                                )}
+                                {unfulfilledTxs.length > 0 && (
+                                    <div
+                                        className="w-full bg-red-500/10 border-b border-red-500/20 px-4 py-2.5 cursor-pointer hover:bg-red-500/20 transition-colors"
+                                        onClick={() => {
+                                            const ids = new Set(unfulfilledTxs.map(tx => tx._id));
+                                            setHighlightedTxIds(ids);
+                                            const maxIdx = Math.max(...unfulfilledTxs.map(tx => displayTransactions.findIndex(d => d._id === tx._id)));
+                                            if (maxIdx >= visibleCount) setVisibleCount(maxIdx + 5);
+                                            setTimeout(() => {
+                                                const el = document.querySelector(`[data-tx-id="${unfulfilledTxs[0]._id}"]`);
+                                                if (el && mainScrollRef.current) {
+                                                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                                }
+                                            }, 100);
+                                            setTimeout(() => setHighlightedTxIds(new Set()), 3000);
+                                        }}
+                                    >
                                         <div className="flex items-start space-x-2">
                                             <AlertTriangle className="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" />
                                             <div>
@@ -583,10 +646,10 @@ function SkuDetailsPageContent() {
                                             </div>
                                         </div>
                                     </div>
-                                );
-                            })()}
-                        </div>
-                    </div>
+                                )}
+                            </>
+                        );
+                    })()}
 
                     {/* Lots Summary Section */}
                     {lots.length > 0 && (
@@ -784,7 +847,7 @@ function SkuDetailsPageContent() {
                 </aside>
 
                 {/* Right Column: Ledger Workspace - Independent Scroll */}
-                <main className="flex-1 h-full overflow-y-auto bg-background relative scrollbar-custom">
+                <main ref={mainScrollRef} className="flex-1 h-full overflow-y-auto bg-background relative scrollbar-custom">
                     {/* Nested Sticky Layer 1: Toolbar */}
                     <div className="sticky top-0 z-[30] bg-background border-b border-border px-4 h-10 flex items-center justify-between gap-4">
                         <div className="flex items-center space-x-3">
@@ -932,7 +995,7 @@ function SkuDetailsPageContent() {
                         </thead>
                         <tbody className="divide-y divide-border">
                             {paginatedTransactions.map((tx) => (
-                                <tr key={tx._id} className={cn("hover:bg-secondary/50 transition-colors group cursor-pointer", (isPendingProduction(tx) || isUnfulfilledConsumption(tx)) && "!bg-rose-950/20 hover:!bg-rose-950/30 border-l-2 border-l-rose-400")} onClick={() => router.push(tx.link)}>
+                                <tr key={tx._id} data-tx-id={tx._id} className={cn("hover:bg-secondary/50 transition-colors group cursor-pointer", (isPendingProduction(tx) || isUnfulfilledConsumption(tx)) && "!bg-rose-950/20 hover:!bg-rose-950/30 border-l-2 border-l-rose-400", highlightedTxIds.has(tx._id) && "ledger-row-flash")} onClick={() => router.push(tx.link)}>
                                     <td className="px-3 py-2 text-[10px] text-muted-foreground font-mono">{new Date(tx.date).toLocaleDateString('en-US', { year: '2-digit', month: '2-digit', day: '2-digit' })}</td>
                                     <td className="px-3 py-2">
                                         <div className="flex items-center space-x-2">

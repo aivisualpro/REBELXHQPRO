@@ -250,3 +250,13 @@ body {
   0%, 100% { opacity: 0.4; color: var(--muted-foreground); }
   50%      { opacity: 1;   color: #f2b61c; }
 }
+
+/* ── Ledger Row Flash (Warning click highlight) ─────────── */
+.ledger-row-flash {
+  animation: ledger-flash 0.6s ease-in-out 3;
+}
+
+@keyframes ledger-flash {
+  0%, 100% { background-color: transparent; }
+  50%      { background-color: rgba(239, 68, 68, 0.25); }
+}
