@@ -15,7 +15,6 @@ import {
   X,
   Pencil,
   AlertCircle,
-  Eye
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { cn } from '@/lib/utils';
@@ -23,6 +22,7 @@ import toast from 'react-hot-toast';
 import { Pagination } from '@/components/ui/Pagination';
 import { MultiSelectFilter } from '@/components/ui/filters/MultiSelectFilter';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { TableColumnHeader } from '@/components/ui/TableColumnHeader';
 
 interface LineItem {
   _id: string;
@@ -439,101 +439,183 @@ function PurchaseOrdersContent() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-48px)] bg-background transition-colors duration-300 relative">
+    <div className="flex flex-col h-[calc(100vh-36px)] bg-background relative transition-colors duration-300">
 
       <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
         <div className="min-w-full px-2 py-2">
             <table className="w-full text-left border-separate border-spacing-0 relative z-0">
           <thead className="sticky top-0 bg-secondary/80 z-10 border-b border-border backdrop-blur-md transition-colors">
             <tr>
-              {[
-                { key: 'label', label: 'PO #' },
-                { key: 'vendor', label: 'Vendor' },
-                { key: 'paymentTerms', label: 'Payment Terms' },
-                { key: 'status', label: 'Status' },
-                { key: 'scheduledDelivery', label: 'Sched. Delivery' },
-                { key: 'receivedDate', label: 'Received' },
-                { key: 'createdAt', label: 'Created At' },
-                { key: 'createdBy', label: 'Created By' },
-                { key: 'totalAmount', label: 'Total Amount' },
-              ].map(col => (
-                <th
-                  key={col.key}
-                  onClick={() => handleSort(col.key)}
-                  className="px-4 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary transition-colors border-r border-border last:border-0"
-                >
-                  <div className="flex items-center space-x-1.5">
-                    <span>{col.label}</span>
-                    <ArrowUpDown className={cn("w-2.5 h-2.5", sortBy === col.key ? "text-foreground" : "text-muted-foreground")} />
-                  </div>
-                </th>
-              ))}
-              <th className="px-4 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-center border-l border-border">Items</th>
-              <th className="px-4 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-right">Actions</th>
+              {/* PO # - Text search */}
+              <th className="border-r border-border">
+                <TableColumnHeader
+                  column="label"
+                  title="PO #"
+                  currentSortBy={sortBy}
+                  currentSortOrder={sortOrder}
+                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
+                  textFilter={search}
+                  onTextFilterChange={(_key, value) => {
+                    const url = new URL(window.location.href);
+                    if (value) url.searchParams.set('search', value);
+                    else url.searchParams.delete('search');
+                    router.replace(url.pathname + url.search, { scroll: false });
+                  }}
+                  className="text-muted-foreground"
+                />
+              </th>
+              {/* Vendor - Multi-select */}
+              <th className="border-r border-border">
+                <TableColumnHeader
+                  column="vendor"
+                  title="Vendor"
+                  currentSortBy={sortBy}
+                  currentSortOrder={sortOrder}
+                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
+                  filterOptions={vendorOptions}
+                  selectedFilters={selectedVendors}
+                  onFilterChange={(_key, values) => setSelectedVendors(values)}
+                  className="text-muted-foreground"
+                />
+              </th>
+              {/* Payment Terms */}
+              <th className="border-r border-border">
+                <TableColumnHeader
+                  column="paymentTerms"
+                  title="Payment Terms"
+                  currentSortBy={sortBy}
+                  currentSortOrder={sortOrder}
+                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
+                  className="text-muted-foreground"
+                />
+              </th>
+              {/* Status - Multi-select */}
+              <th className="border-r border-border">
+                <TableColumnHeader
+                  column="status"
+                  title="Status"
+                  currentSortBy={sortBy}
+                  currentSortOrder={sortOrder}
+                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
+                  filterOptions={statusOptions}
+                  selectedFilters={selectedStatuses}
+                  onFilterChange={(_key, values) => setSelectedStatuses(values)}
+                  className="text-muted-foreground"
+                />
+              </th>
+              {/* Sched. Delivery - Date range */}
+              <th className="border-r border-border">
+                <TableColumnHeader
+                  column="scheduledDelivery"
+                  title="Sched. Delivery"
+                  currentSortBy={sortBy}
+                  currentSortOrder={sortOrder}
+                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
+                  isDate
+                  dateFrom={dateRange.from}
+                  dateTo={dateRange.to}
+                  onDateFilterChange={(_key, from, to) => setDateRange({ from, to })}
+                  className="text-muted-foreground"
+                />
+              </th>
+              {/* Received */}
+              <th className="border-r border-border">
+                <TableColumnHeader
+                  column="receivedDate"
+                  title="Received"
+                  currentSortBy={sortBy}
+                  currentSortOrder={sortOrder}
+                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
+                  className="text-muted-foreground"
+                />
+              </th>
+              {/* Created At */}
+              <th className="border-r border-border">
+                <TableColumnHeader
+                  column="createdAt"
+                  title="Created At"
+                  currentSortBy={sortBy}
+                  currentSortOrder={sortOrder}
+                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
+                  className="text-muted-foreground"
+                />
+              </th>
+              {/* Created By */}
+              <th className="border-r border-border">
+                <TableColumnHeader
+                  column="createdBy"
+                  title="Created By"
+                  currentSortBy={sortBy}
+                  currentSortOrder={sortOrder}
+                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
+                  className="text-muted-foreground"
+                />
+              </th>
+              {/* Total Amount */}
+              <th className="border-r border-border">
+                <TableColumnHeader
+                  column="totalAmount"
+                  title="Total Amount"
+                  currentSortBy={sortBy}
+                  currentSortOrder={sortOrder}
+                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
+                  className="text-muted-foreground"
+                />
+              </th>
+              {/* Items */}
+              <th className="border-r border-border last:border-0">
+                <TableColumnHeader
+                  column="itemCount"
+                  title="Items"
+                  currentSortBy={sortBy}
+                  currentSortOrder={sortOrder}
+                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
+                  className="text-muted-foreground"
+                />
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border bg-background/50">
             {loading ? (
-              <tr><td colSpan={11} className="px-4 py-12 text-center text-xs text-slate-400">Loading Orders...</td></tr>
+              <tr><td colSpan={10} className="px-4 py-12 text-center text-xs text-slate-400">Loading Orders...</td></tr>
             ) : error ? (
-              <tr><td colSpan={11} className="px-4 py-12 text-center text-red-500 text-xs font-bold">{error}</td></tr>
+              <tr><td colSpan={10} className="px-4 py-12 text-center text-red-500 text-xs font-bold">{error}</td></tr>
             ) : orders.length === 0 ? (
-              <tr><td colSpan={11} className="px-4 py-12 text-center text-xs text-slate-400 uppercase font-bold tracking-tighter opacity-50">No Orders found</td></tr>
+              <tr><td colSpan={10} className="px-4 py-12 text-center text-xs text-slate-400 uppercase font-bold tracking-tighter opacity-50">No Orders found</td></tr>
             ) : orders.map(order => (
               <tr
                 key={order._id}
-                className="hover:bg-secondary/40 transition-all duration-200 group relative z-0 hover:z-10 bg-background"
+                onClick={() => router.push(`/warehouse/purchase-orders/${order._id}`)}
+                className="group relative z-0 bg-background transition-colors duration-150 cursor-pointer hover:bg-secondary/30"
               >
-                <td className="px-4 py-2 text-[11px] font-bold text-foreground tracking-tight border-r border-border">{order.label || '-'}</td>
-                <td className="px-4 py-2 text-[11px] text-foreground font-medium border-r border-border">{renderVendor(order)}</td>
-                <td className="px-4 py-2 text-[10px] text-muted-foreground border-r border-border">{order.paymentTerms || '-'}</td>
-                <td className="px-4 py-2 border-r border-border">
+                <td className="px-2 py-1.5 border-r border-border group-hover:border-l-2 group-hover:border-l-primary transition-all">
+                  <span className="text-[10px] font-bold text-foreground tracking-tight font-mono whitespace-nowrap overflow-hidden text-ellipsis max-w-[100px]">{order.label || '-'}</span>
+                </td>
+                <td className="px-2 py-1.5 text-[10px] text-foreground font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px] border-r border-border">{renderVendor(order)}</td>
+                <td className="px-2 py-1.5 text-[10px] text-muted-foreground border-r border-border">{order.paymentTerms || '-'}</td>
+                <td className="px-2 py-1.5 border-r border-border text-center">
                   <span className={cn(
-                    "px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest",
-                    order.status === 'Received' ? "bg-emerald-500/10 text-emerald-500" :
-                      order.status === 'Ordered' ? "bg-blue-500/10 text-blue-500" :
-                        order.status === 'Partial' ? "bg-amber-500/10 text-amber-500" :
-                          "bg-secondary text-muted-foreground"
+                    "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider",
+                    order.status === 'Received' ? "bg-emerald-600/15 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 border border-emerald-500/30" :
+                    order.status === 'Ordered' ? "bg-sky-500/15 text-sky-600 dark:bg-sky-500/20 dark:text-sky-400 border border-sky-500/30" :
+                    order.status === 'Partial' ? "bg-amber-500/15 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 border border-amber-500/30" :
+                    order.status === 'Pending' ? "bg-orange-500/15 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400 border border-orange-500/30" :
+                    "bg-muted text-muted-foreground border border-border"
                   )}>
                     {order.status}
                   </span>
                 </td>
-                <td className="px-4 py-2 text-[11px] text-muted-foreground border-r border-border">{formatDate(order.scheduledDelivery)}</td>
-                <td className="px-4 py-2 text-[11px] text-muted-foreground border-r border-border">{formatDate(order.receivedDate)}</td>
-                <td className="px-4 py-2 text-[11px] text-muted-foreground border-r border-border font-mono">{formatDate(order.createdAt)}</td>
-                <td className="px-4 py-2 text-[11px] text-foreground border-r border-border">
+                <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono border-r border-border">{formatDate(order.scheduledDelivery)}</td>
+                <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono border-r border-border">{formatDate(order.receivedDate)}</td>
+                <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono border-r border-border">{formatDate(order.createdAt)}</td>
+                <td className="px-2 py-1.5 text-[10px] text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px] border-r border-border">
                   {order.createdBy ? `${order.createdBy.firstName} ${order.createdBy.lastName}` : '-'}
                 </td>
-                <td className="px-4 py-2 text-[11px] font-bold text-foreground border-r border-border">
+                <td className="px-2 py-1.5 text-[10px] font-bold text-foreground font-mono text-right border-r border-border">
                   {formatCurrency(calculateTotal(order))}
                 </td>
-                <td className="px-4 py-2 text-center text-[11px] font-bold text-muted-foreground border-r border-border">
+                <td className="px-2 py-1.5 text-[10px] font-bold text-muted-foreground text-center">
                   {order.lineItems?.length || 0}
-                </td>
-                <td className="px-4 py-2 text-right">
-                  <div className="flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => router.push(`/warehouse/purchase-orders/${order._id}`)}
-                      className="p-1 text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10 rounded transition-colors cursor-pointer"
-                      title="View Order"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={(e) => handleEditClick(e, order)}
-                      className="p-1 text-muted-foreground hover:text-foreground hover:bg-secondary rounded transition-colors cursor-pointer"
-                      title="Edit Order"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={(e) => handleDeleteClick(e, order._id)}
-                      className="p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors cursor-pointer"
-                      title="Delete Order"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
                 </td>
               </tr>
             ))}
@@ -760,7 +842,7 @@ function PurchaseOrdersContent() {
           totalPages={totalPages}
           onPageChange={setPage}
           totalItems={totalOrders}
-          itemsPerPage={20}
+          itemsPerPage={25}
           itemName="Orders"
         />
       </div>

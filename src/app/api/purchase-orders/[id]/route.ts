@@ -21,7 +21,16 @@ export async function GET(
 
         // Step 1: Get raw PO from native driver to preserve original sku strings
         // (Mongoose populate silently nullifies sku due to String/ObjectId type mismatch)
-        const rawOrder = await db.collection('purchaseorders').findOne({ _id: new mongoose.Types.ObjectId(id) });
+        // Try ObjectId first (new docs), then string fallback (legacy docs)
+        let rawOrder: any = null;
+        try {
+            rawOrder = await db.collection('purchaseorders').findOne({ _id: new mongoose.Types.ObjectId(id) as any });
+        } catch {
+            // Invalid ObjectId format, skip
+        }
+        if (!rawOrder) {
+            rawOrder = await db.collection('purchaseorders').findOne({ _id: id as any });
+        }
         if (!rawOrder) {
             return NextResponse.json({ error: 'Order not found' }, { status: 404 });
         }

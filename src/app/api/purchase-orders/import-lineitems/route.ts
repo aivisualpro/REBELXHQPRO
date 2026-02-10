@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import PurchaseOrder from '@/models/PurchaseOrder';
 import Sku from '@/models/Sku';
-import mongoose from 'mongoose';
 
 export async function POST(request: Request) {
     try {
@@ -60,7 +59,8 @@ export async function POST(request: Request) {
                         update: {
                             $push: {
                                 lineItems: {
-                                    _id: item._id || new mongoose.Types.ObjectId().toString(),
+                                    legacyId: item.legacyId || item._id || undefined,
+                                    poNumber: item.poNumber,
                                     sku: resolvedSku,
                                     lotNumber: item.lotNumber,
                                     qtyOrdered: qtyOrdered,
