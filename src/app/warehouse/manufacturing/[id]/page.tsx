@@ -653,7 +653,7 @@ export default function ManufacturingDetailPage() {
                                     const skuId = typeof order.sku === 'object' && order.sku !== null ? (order.sku as any)._id : order.sku;
                                     if (skuId) router.push(`/warehouse/skus/${skuId}`);
                                 }}
-                                className="flex-1 bg-emerald-950/50 hover:bg-emerald-950/70 transition-colors flex items-center justify-center px-3 min-w-0"
+                                className="flex-1 bg-emerald-950/50 hover:bg-emerald-950/70 transition-colors flex items-center justify-center px-3 min-w-0 cursor-pointer"
                             >
                                 <h1 className="text-sm font-black text-foreground leading-tight text-center line-clamp-2">{skuName}</h1>
                             </button>

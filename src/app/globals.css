@@ -240,3 +240,13 @@ body {
     transform: translate(-50%, -50%) translate(var(--sparkle-x, 0px), var(--sparkle-y, 0px)) scale(0);
   }
 }
+
+/* ── Loading Text Pulse ─────────────────────────────────────── */
+.loading-text-pulse {
+  animation: loading-text-glow 2s ease-in-out infinite;
+}
+
+@keyframes loading-text-glow {
+  0%, 100% { opacity: 0.4; color: var(--muted-foreground); }
+  50%      { opacity: 1;   color: #f2b61c; }
+}
