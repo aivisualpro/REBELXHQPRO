@@ -614,21 +614,16 @@ export default function ManufacturingDetailPage() {
                     </div>
 
                     <div className="flex-1 overflow-y-auto scrollbar-custom">
-                    {/* SKU Hero Section */}
-                    <div className="px-5 pt-5 pb-4">
-                        <div 
-                            className="flex items-start gap-4 cursor-pointer group"
-                            onClick={() => {
-                                const skuId = typeof order.sku === 'object' && order.sku !== null ? (order.sku as any)._id : order.sku;
-                                if (skuId) router.push(`/warehouse/skus/${skuId}`);
-                            }}
-                        >
-                            <div className="w-16 h-16 bg-secondary border border-border flex items-center justify-center p-1.5 shadow-sm shrink-0 group-hover:border-primary group-hover:shadow-md transition-all">
+                    {/* SKU Hero Section - 3 Column: Image | Tier | Name */}
+                    <div className="px-4 pt-4 pb-4">
+                        <div className="flex items-stretch border border-border overflow-hidden">
+                            {/* Column 1: Image */}
+                            <div className="w-16 h-16 bg-secondary flex items-center justify-center shrink-0 border-r border-border overflow-hidden">
                                 {skuImage ? (
                                     <img 
                                         src={skuImage} 
                                         alt={skuName} 
-                                        className="max-w-full max-h-full object-contain" 
+                                        className="w-full h-full object-cover" 
                                         onError={(e) => {
                                             if (globalSettings?.missingSkuImage) {
                                                 (e.target as HTMLImageElement).src = globalSettings.missingSkuImage;
@@ -636,31 +631,37 @@ export default function ManufacturingDetailPage() {
                                         }}
                                     />
                                 ) : globalSettings?.missingSkuImage ? (
-                                    <img src={globalSettings.missingSkuImage} alt="Fallback" className="max-w-full max-h-full object-contain" />
+                                    <img src={globalSettings.missingSkuImage} alt="Fallback" className="w-full h-full object-cover" />
                                 ) : (
                                     <Package className="w-6 h-6 text-muted-foreground" />
                                 )}
                             </div>
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-1.5 mb-1">
-                                    {!!sidebarSkuTier && (
-                                        <span className={cn(
-                                            "flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-black text-white",
-                                            sidebarSkuTier === 1 ? "bg-emerald-500" :
-                                            sidebarSkuTier === 2 ? "bg-blue-500" :
-                                            "bg-orange-500"
-                                        )} title={`Tier ${sidebarSkuTier}`}>
-                                            {sidebarSkuTier}
-                                        </span>
-                                    )}
-                                    <h1 className="text-base font-black text-foreground leading-tight group-hover:text-primary transition-colors line-clamp-2">{skuName}</h1>
+                            {/* Column 2: Tier */}
+                            {!!sidebarSkuTier && (
+                                <div className={cn(
+                                    "w-10 flex items-center justify-center shrink-0 border-r border-border",
+                                    sidebarSkuTier === 1 ? "bg-emerald-500" :
+                                    sidebarSkuTier === 2 ? "bg-blue-500" :
+                                    "bg-orange-500"
+                                )}>
+                                    <span className="text-sm font-black text-white">{sidebarSkuTier}</span>
                                 </div>
-                            </div>
+                            )}
+                            {/* Column 3: Name (clickable) */}
+                            <button
+                                onClick={() => {
+                                    const skuId = typeof order.sku === 'object' && order.sku !== null ? (order.sku as any)._id : order.sku;
+                                    if (skuId) router.push(`/warehouse/skus/${skuId}`);
+                                }}
+                                className="flex-1 bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-950/70 transition-colors flex items-center justify-center px-3 min-w-0"
+                            >
+                                <h1 className="text-sm font-black text-foreground leading-tight text-center line-clamp-2">{skuName}</h1>
+                            </button>
                         </div>
                     </div>
 
                     {/* Status & Priority Buttons */}
-                    <div className="mx-5 mb-3 flex items-center gap-2">
+                    <div className="mx-4 mb-3 flex items-center gap-2">
                         <div className="relative flex-1">
                             <button 
                                 onClick={() => { setStatusDropdownOpen(!statusDropdownOpen); setPriorityDropdownOpen(false); }}
@@ -731,7 +732,7 @@ export default function ManufacturingDetailPage() {
 
 
                     {/* Quantity Section */}
-                    <div className="mx-5 mb-4">
+                    <div className="mx-4 mb-4">
                         <div className="grid grid-cols-2 gap-3 mb-3">
                             <div className="bg-secondary border border-border p-3">
                                 <div className="text-[8px] text-muted-foreground uppercase tracking-widest font-bold mb-1">Ordered</div>
@@ -769,14 +770,14 @@ export default function ManufacturingDetailPage() {
                                 </div>
                             </div>
                         </div>
-                        <div className="bg-emerald-950/50 border border-emerald-800/30 px-4 py-2.5 flex justify-between items-center">
-                            <div className="text-[9px] uppercase tracking-widest font-bold text-emerald-400">Qty Manufactured</div>
-                            <div className="text-lg font-black text-emerald-400">{costs.qtyManufactured} <span className="text-[9px] text-emerald-400/60 font-bold uppercase">{order.uom}</span></div>
+                        <div className="bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800/30 px-4 py-2.5 flex justify-between items-center">
+                            <div className="text-[9px] uppercase tracking-widest font-bold text-emerald-600 dark:text-emerald-400">Qty Manufactured</div>
+                            <div className="text-lg font-black text-emerald-600 dark:text-emerald-400">{costs.qtyManufactured} <span className="text-[9px] text-emerald-500/60 dark:text-emerald-400/60 font-bold uppercase">{order.uom}</span></div>
                         </div>
                     </div>
 
                     {/* Metadata Grid */}
-                    <div className="mx-5 mb-4 border border-border">
+                    <div className="mx-4 mb-4 border border-border">
                         {(() => {
                             const lastQc = order.qualityCheck?.length ? order.qualityCheck[order.qualityCheck.length - 1] : null;
                             return [
@@ -801,7 +802,7 @@ export default function ManufacturingDetailPage() {
                     </div>
 
                     {/* Cost Analysis */}
-                    <div className="mx-5 mb-5">
+                    <div className="mx-4 mb-4">
                         <div className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-3">Cost Breakdown</div>
                         <div className="space-y-2">
                             {[
@@ -826,16 +827,16 @@ export default function ManufacturingDetailPage() {
                                 <span className="text-[10px] text-muted-foreground font-medium italic">Per Unit</span>
                                 <span className="text-[11px] font-mono font-medium text-muted-foreground italic">${costs.perUnit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</span>
                             </div>
-                            <div className="flex justify-between items-center bg-emerald-500/10 border border-emerald-500/20 px-3 py-2">
-                                <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Total Cost</span>
-                                <span className="text-base font-mono font-black text-emerald-400">${costs.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            <div className="flex justify-between items-center bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 px-3 py-2">
+                                <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">Total Cost</span>
+                                <span className="text-base font-mono font-black text-emerald-600 dark:text-emerald-400">${costs.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             </div>
                         </div>
                     </div>
                     </div>
 
                     {/* Action Buttons at bottom */}
-                    <div className="border-t border-border px-5 py-3 shrink-0 flex items-center gap-2">
+                    <div className="border-t border-border px-4 py-4 shrink-0 flex items-center gap-2">
                         <button
                             onClick={() => router.push(`/warehouse/manufacturing/${order._id}/edit`)}
                             className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-secondary text-foreground border border-border hover:bg-secondary/80 transition-colors"
@@ -906,7 +907,7 @@ export default function ManufacturingDetailPage() {
                                         setSkuSearch('');
                                         setIsEditModalOpen(true);
                                     }}
-                                    className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors flex items-center space-x-1"
+                                    className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors flex items-center space-x-1"
                                 >
                                     <Plus className="w-3 h-3" />
                                     <span>Add Item</span>
@@ -919,7 +920,7 @@ export default function ManufacturingDetailPage() {
                                         setUserSearch('');
                                         setIsLaborModalOpen(true);
                                     }}
-                                    className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors flex items-center space-x-1"
+                                    className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors flex items-center space-x-1"
                                 >
                                     <Plus className="w-3 h-3" />
                                     <span>Add Labor</span>
