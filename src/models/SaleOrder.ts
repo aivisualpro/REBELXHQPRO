@@ -23,6 +23,7 @@ const SaleOrderSchema = new mongoose.Schema({
 
     lineItems: [{
         // _id auto-generated as ObjectId
+        legacyId: { type: String, sparse: true }, // For import matching from AppSheet
         orderNumber: String, // As per request, reference to sales order _id or label
         sku: { type: mongoose.Schema.Types.ObjectId, ref: 'Sku' },
         productDescription: String, // Product description from import
@@ -37,6 +38,7 @@ const SaleOrderSchema = new mongoose.Schema({
 
     payments: [{
         // _id auto-generated as ObjectId
+        legacyId: { type: String, sparse: true }, // For AppSheet sync (delete/update)
         orderNumber: String, // Ref to order
         paymentAmount: Number,
         createdAt: { type: Date, default: Date.now },

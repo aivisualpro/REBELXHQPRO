@@ -395,7 +395,7 @@ export async function syncPaymentToAppSheet(order: any, payment: any, action: 'A
     const orderIdentifier = order?.legacyId || order?._id?.toString() || '';
 
     const row: Record<string, any> = {
-        'RecordID': payment._id?.toString() || '',
+        'RecordID': payment.legacyId || payment._id?.toString() || '',
         'Order #': orderIdentifier,
         'Payment Date': payment.createdAt ? new Date(payment.createdAt).toLocaleDateString('en-US') : '',
         'Payment Amount': payment.paymentAmount || 0,

@@ -229,10 +229,18 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         }
 
         if (body.lineItems && Array.isArray(body.lineItems)) {
-            body.lineItems = body.lineItems.map((item: any) => ({
-                ...item,
-                total: (item.qtyShipped || 0) * (item.price || 0)
-            }));
+            body.lineItems = body.lineItems.map((item: any) => {
+                const cleaned = {
+                    ...item,
+                    total: (item.qtyShipped || 0) * (item.price || 0)
+                };
+                // Strip client-generated string _ids for new entries (same as payments)
+                if (cleaned._id && typeof cleaned._id === 'string' && !/^[0-9a-fA-F]{24}$/.test(cleaned._id)) {
+                    const { _id, ...rest } = cleaned;
+                    return rest;
+                }
+                return cleaned;
+            });
         }
 
         // For payments, strip out client-generated string _ids for new entries

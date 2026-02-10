@@ -44,8 +44,9 @@ export async function POST(request: Request) {
         const orderRefs = new Set<string>();
 
         for (const row of lineItemsData) {
-            // Your CSV uses 'legacyId' as the parent order reference
-            const ref = row.legacyId || row.orderNumber || row.orderId || row.label || row['Order ID'] || row['Order Number'];
+            // orderNumber is the parent order reference (legacyId or label of the SaleOrder)
+            // row.legacyId is the LINE ITEM's own legacyId, NOT the parent order ref
+            const ref = row.orderNumber || row.orderId || row.label || row['Order ID'] || row['Order Number'];
             if (!ref) continue;
             
             const refStr = String(ref);
@@ -62,15 +63,18 @@ export async function POST(request: Request) {
         }
 
         // Fetch all related orders in one go (search by legacyId, label, and _id)
+        const orderRefsArray = Array.from(orderRefs);
+        console.log(`[import-lineitems] Looking up ${orderRefsArray.length} unique order references. First 5:`, orderRefsArray.slice(0, 5));
+        
         const orders = await SaleOrder.find({
             $or: [
-                { legacyId: { $in: Array.from(orderRefs) } },
-                { label: { $in: Array.from(orderRefs) } },
-                { _id: { $in: Array.from(orderRefs).filter(r => r.match(/^[a-f\d]{24}$/i)) } } // Only valid ObjectIds
+                { legacyId: { $in: orderRefsArray } },
+                { label: { $in: orderRefsArray } },
+                { _id: { $in: orderRefsArray.filter(r => r.match(/^[a-f\d]{24}$/i)) } } // Only valid ObjectIds
             ]
         });
 
-        console.log(`Found ${orders.length} orders matching ${orderRefs.size} unique references`);
+        console.log(`[import-lineitems] Found ${orders.length} orders matching ${orderRefs.size} unique references`);
 
         const bulkOps = [];
         let addedCount = 0;
@@ -126,6 +130,7 @@ export async function POST(request: Request) {
                 const qty = parseNumber(row.qtyShipped || row.Qty || row['Qty Shipped'] || row.Quantity || row.quantity);
                 const price = parseNumber(row.price || row.Price || row['Unit Price'] || row['unit price'] || row['Sale Price'] || row['sale price'] || row.Rate || row.rate);
                 const lotNumber = row.lotNumber || row['Lot Number'] || '';
+                const lineItemLegacyId = row.legacyId || row.lineItemLegacyId || row.lineItemId || row['Line Item ID'] || row['Line Item Legacy ID'] || '';
 
                 // Construct Item
                 const newLineItem: any = {
@@ -140,6 +145,11 @@ export async function POST(request: Request) {
                     createdAt: row.createdAt ? new Date(row.createdAt) : new Date()
                 };
 
+                // Only include legacyId if provided (not for UI-created items)
+                if (lineItemLegacyId) {
+                    newLineItem.legacyId = lineItemLegacyId;
+                }
+
                 // Skip if SKU couldn't be resolved to an ObjectId
                 if (!skuId) {
                     console.log('[import-lineitems] Skipping line item - SKU not found:', skuRef);
@@ -147,9 +157,20 @@ export async function POST(request: Request) {
                     continue;
                 }
 
-                // Check for duplicate by SKU + lotNumber
+                // Check for duplicate by legacyId first, then by SKU + lotNumber
+                let existingIndex: number | undefined;
                 const itemKey = `${skuId.toString()}_${lotNumber}`.toLowerCase();
-                const existingIndex = existingItemsMap.get(itemKey);
+                
+                if (lineItemLegacyId) {
+                    // First try matching by legacyId (most precise)
+                    const legacyIdx = currentLineItems.findIndex((item: any) => item.legacyId === lineItemLegacyId);
+                    if (legacyIdx >= 0) existingIndex = legacyIdx;
+                }
+                
+                if (existingIndex === undefined) {
+                    // Fallback to SKU + lotNumber dedup
+                    existingIndex = existingItemsMap.get(itemKey);
+                }
 
                 if (existingIndex !== undefined && existingIndex >= 0) {
                     // Update existing line item

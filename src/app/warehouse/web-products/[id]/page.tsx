@@ -104,6 +104,12 @@ export default function WebProductDetailsPage() {
         label: `${sku._id} - ${sku.name}`
     }));
 
+    // Helper to resolve SKU ID to name
+    const getSkuName = (skuId: string) => {
+        const sku = skuList.find(s => s._id === skuId);
+        return sku ? sku.name : skuId;
+    };
+
     // Shell Viewport Lock
     useEffect(() => {
         const originalBodyStyle = document.body.style.overflow;
@@ -216,10 +222,10 @@ export default function WebProductDetailsPage() {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-[calc(100vh-48px)] bg-white">
+            <div className="flex items-center justify-center h-[calc(100vh-48px)] bg-background">
                 <div className="text-center">
-                    <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Synchronizing Web Intel...</p>
+                    <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Synchronizing Web Intel...</p>
                 </div>
             </div>
         );
@@ -227,10 +233,10 @@ export default function WebProductDetailsPage() {
 
     if (!product) {
         return (
-            <div className="flex flex-col items-center justify-center h-[calc(100vh-48px)] bg-slate-50">
-                <Package className="w-12 h-12 text-slate-200 mb-4" />
-                <p className="text-sm font-bold text-slate-400 uppercase">Product not found</p>
-                <button onClick={() => router.back()} className="mt-4 text-[10px] font-black uppercase text-blue-600 hover:underline">Go Back</button>
+            <div className="flex flex-col items-center justify-center h-[calc(100vh-48px)] bg-background">
+                <Package className="w-12 h-12 text-muted-foreground/30 mb-4" />
+                <p className="text-sm font-bold text-muted-foreground uppercase">Product not found</p>
+                <button onClick={() => router.back()} className="mt-4 text-[10px] font-black uppercase text-primary hover:underline">Go Back</button>
             </div>
         );
     }
@@ -240,12 +246,12 @@ export default function WebProductDetailsPage() {
         : [{ id: 0, src: product.image || '/sku-placeholder.png', name: 'Placeholder', alt: 'Placeholder' }];
 
     return (
-        <div className="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-white">
+        <div className="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-background">
             {/* Shell Layer 1: Route Header */}
-            <div className="sticky top-0 z-30 bg-white border-b border-slate-200 px-4 flex items-center justify-between shrink-0 h-12 shadow-sm">
+            <div className="sticky top-0 z-30 bg-card border-b border-border px-4 flex items-center justify-between shrink-0 h-12">
                 <div className="flex items-center space-x-4">
-                    <button onClick={() => router.back()} className="hover:bg-slate-100 transition-colors p-1.5 rounded-full group">
-                        <ArrowLeft className="w-4 h-4 text-slate-400 group-hover:text-black" />
+                    <button onClick={() => router.back()} className="hover:bg-secondary transition-colors p-1.5 rounded-full group">
+                        <ArrowLeft className="w-4 h-4 text-muted-foreground group-hover:text-foreground" />
                     </button>
                     <div className="flex items-baseline space-x-3">
                         <div className="flex items-center space-x-2">
@@ -253,9 +259,9 @@ export default function WebProductDetailsPage() {
                                 "flex-shrink-0 px-2 py-0.5 rounded-full text-[9px] font-black text-white shadow-sm uppercase tracking-widest",
                                 product.website?.includes('KING') ? "bg-amber-500" : "bg-emerald-500"
                             )}>{product.website}</span>
-                             <h1 className="text-sm font-black text-slate-900 uppercase tracking-tighter">{product.name}</h1>
+                             <h1 className="text-sm font-black text-foreground uppercase tracking-tighter">{product.name}</h1>
                         </div>
-                        <p className="text-[10px] text-slate-400 font-mono italic">WEB-{product.webId}</p>
+                        <p className="text-[10px] text-muted-foreground font-mono italic">WEB-{product.webId}</p>
                     </div>
                 </div>
                 
@@ -264,7 +270,7 @@ export default function WebProductDetailsPage() {
                         href={product.permalink} 
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className="flex items-center space-x-2 px-3 py-1.5 bg-black text-white rounded text-[9px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-md group"
+                        className="flex items-center space-x-2 px-3 py-1.5 bg-foreground text-background rounded text-[9px] font-black uppercase tracking-widest hover:opacity-90 transition-all shadow-md group"
                     >
                         <span>Live Preview</span>
                         <ExternalLink className="w-3 h-3 group-hover:scale-110 transition-transform" />
@@ -273,13 +279,13 @@ export default function WebProductDetailsPage() {
             </div>
 
             {/* Shell Layer 2: Content Split View */}
-            <div className="flex-1 flex overflow-hidden min-h-0 bg-white">
+            <div className="flex-1 flex overflow-hidden min-h-0 bg-background">
                 
                 {/* Left Column (30%) - Web Identity Sidebar */}
-                <aside className="w-[30%] h-full overflow-y-auto border-r border-slate-100 bg-white shrink-0 scrollbar-custom">
+                <aside className="w-[30%] h-full overflow-y-auto border-r border-border bg-secondary/30 shrink-0 scrollbar-custom">
                     <div className="p-6">
                         {/* Carousel Section */}
-                        <div className="relative aspect-square bg-slate-50 border border-slate-100 border-dashed rounded-xl overflow-hidden group mb-8">
+                        <div className="relative aspect-square bg-background border border-border border-dashed rounded-xl overflow-hidden group mb-8">
                             <div className="w-full h-full p-4">
                                 <img 
                                     src={images[currentImageIndex].src} 
@@ -292,13 +298,13 @@ export default function WebProductDetailsPage() {
                                 <>
                                     <button 
                                         onClick={() => setCurrentImageIndex(prev => (prev > 0 ? prev - 1 : images.length - 1))}
-                                        className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-white/95 text-slate-900 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all border border-slate-100"
+                                        className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-card text-foreground rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all border border-border"
                                     >
                                         <ChevronLeft className="w-4 h-4" />
                                     </button>
                                     <button 
                                         onClick={() => setCurrentImageIndex(prev => (prev < images.length - 1 ? prev + 1 : 0))}
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-white/95 text-slate-900 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all border border-slate-100"
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-card text-foreground rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all border border-border"
                                     >
                                         <ChevronRight className="w-4 h-4" />
                                     </button>
@@ -308,7 +314,7 @@ export default function WebProductDetailsPage() {
                                                 key={idx}
                                                 className={cn(
                                                     "w-1.5 h-1.5 rounded-full transition-all duration-300",
-                                                    idx === currentImageIndex ? "bg-black w-4" : "bg-slate-200"
+                                                    idx === currentImageIndex ? "bg-foreground w-4" : "bg-muted-foreground/30"
                                                 )}
                                             />
                                         ))}
@@ -318,11 +324,11 @@ export default function WebProductDetailsPage() {
                         </div>
 
                         {/* Financial Header */}
-                        <div className="space-y-6 mb-10 pb-10 border-b border-slate-50">
+                        <div className="space-y-6 mb-10 pb-10 border-b border-border">
                             <div className="flex flex-col items-center">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Market Placement</label>
+                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-4">Market Placement</label>
                                 <div className="flex flex-col items-center">
-                                    <span className="text-4xl font-black tracking-tighter text-slate-900">
+                                    <span className="text-4xl font-black tracking-tighter text-foreground">
                                         ${product.salePrice?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                     </span>
                                     {product.regularPrice > product.salePrice && (
@@ -336,15 +342,15 @@ export default function WebProductDetailsPage() {
 
                         {/* SKU Mapping Section - For Simple Products */}
                         {product.type !== 'variable' && (
-                            <div className="mb-10 pb-10 border-b border-slate-50">
+                            <div className="mb-10 pb-10 border-b border-border">
                                 <section>
-                                    <h3 className="text-[9px] font-black text-slate-900 uppercase tracking-[0.15em] mb-4 flex items-center space-x-2">
+                                    <h3 className="text-[9px] font-black text-foreground uppercase tracking-[0.15em] mb-4 flex items-center space-x-2">
                                         <Link2 className="w-3.5 h-3.5 text-purple-500" />
                                         <span>SKU Mapping</span>
                                     </h3>
-                                    <div className="space-y-3 bg-slate-50/50 p-4 rounded-xl border border-slate-100 border-dashed">
+                                    <div className="space-y-3 bg-background p-4 rounded-xl border border-border border-dashed">
                                         <div className="flex flex-col space-y-2">
-                                            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Link to Physical SKU</label>
+                                            <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Link to Physical SKU</label>
                                             <SearchableSelect
                                                 options={skuOptions}
                                                 value={linkedSkuId || ''}
@@ -356,10 +362,10 @@ export default function WebProductDetailsPage() {
                                             />
                                         </div>
                                         {linkedSkuId && (
-                                            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                                                <span className="text-[9px] font-bold text-slate-400 uppercase">Linked SKU</span>
-                                                <span className="text-[10px] font-mono font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">
-                                                    {linkedSkuId}
+                                            <div className="flex items-center justify-between pt-2 border-t border-border">
+                                                <span className="text-[9px] font-bold text-muted-foreground uppercase">Linked SKU</span>
+                                                <span className="text-[10px] font-mono font-bold text-emerald-600 bg-emerald-500/10 px-2 py-1 rounded">
+                                                    {getSkuName(linkedSkuId)}
                                                 </span>
                                             </div>
                                         )}
@@ -380,7 +386,7 @@ export default function WebProductDetailsPage() {
                             {product.variations && product.variations.length > 0 && (
                                 <section>
                                     <div className="flex items-center justify-between mb-4">
-                                        <h3 className="text-[9px] font-black text-slate-900 uppercase tracking-[0.15em] flex items-center space-x-2">
+                                        <h3 className="text-[9px] font-black text-foreground uppercase tracking-[0.15em] flex items-center space-x-2">
                                             <Layers className="w-3.5 h-3.5 text-blue-500" />
                                             <span>Variations</span>
                                         </h3>
@@ -393,18 +399,18 @@ export default function WebProductDetailsPage() {
                                             </button>
                                         )}
                                     </div>
-                                    <div className="border border-slate-100 bg-white rounded-lg shadow-xs overflow-x-auto">
+                                    <div className="border border-border bg-card rounded-lg shadow-xs overflow-x-auto">
                                         <table className="w-full text-left border-collapse min-w-[500px]">
-                                            <thead className="bg-slate-50/50 border-b border-slate-100">
+                                            <thead className="bg-secondary/50 border-b border-border">
                                                 <tr>
-                                                    <th className="px-2 py-1.5 text-[7px] font-black text-slate-400 uppercase tracking-widest sticky left-0 bg-slate-50 z-10 w-[120px]">Variation</th>
-                                                    <th className="px-2 py-1.5 text-[7px] font-black text-slate-400 uppercase tracking-widest w-[180px]">Linked SKU</th>
-                                                    <th className="px-2 py-1.5 text-[7px] font-black text-slate-400 uppercase tracking-widest text-right w-[60px]">Price</th>
-                                                    <th className="px-2 py-1.5 text-[7px] font-black text-slate-400 uppercase tracking-widest text-right w-[40px]">Stock</th>
-                                                    <th className="px-2 py-1.5 text-[7px] font-black text-slate-400 uppercase tracking-widest text-center w-[40px]">Status</th>
+                                                    <th className="px-2 py-1.5 text-[7px] font-black text-muted-foreground uppercase tracking-widest sticky left-0 bg-secondary/50 z-10 w-[120px]">Variation</th>
+                                                    <th className="px-2 py-1.5 text-[7px] font-black text-muted-foreground uppercase tracking-widest w-[180px]">Linked SKU</th>
+                                                    <th className="px-2 py-1.5 text-[7px] font-black text-muted-foreground uppercase tracking-widest text-right w-[60px]">Price</th>
+                                                    <th className="px-2 py-1.5 text-[7px] font-black text-muted-foreground uppercase tracking-widest text-right w-[40px]">Stock</th>
+                                                    <th className="px-2 py-1.5 text-[7px] font-black text-muted-foreground uppercase tracking-widest text-center w-[40px]">Status</th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="divide-y divide-slate-50">
+                                            <tbody className="divide-y divide-border/50">
                                                 {product.variations.map((v, idx) => (
                                                     <tr 
                                                         key={v._id || v.id || idx} 
@@ -414,21 +420,21 @@ export default function WebProductDetailsPage() {
                                                         }}
                                                         className={cn(
                                                             "transition-colors cursor-pointer group",
-                                                            (variationFilter !== null && variationFilter === (v.id || v._id)) ? "bg-blue-50/50" : "hover:bg-slate-50/50"
+                                                            (variationFilter !== null && variationFilter === (v.id || v._id)) ? "bg-blue-500/10" : "hover:bg-secondary/50"
                                                         )}
                                                     >
-                                                        <td className="px-2 py-1.5 sticky left-0 bg-white group-hover:bg-inherit z-10 shadow-[1px_0_0_0_rgba(241,245,249,1)]">
+                                                        <td className="px-2 py-1.5 sticky left-0 bg-card group-hover:bg-inherit z-10 shadow-[1px_0_0_0_hsl(var(--border))]">
                                                             <div className="flex items-center space-x-2">
-                                                                <div className="w-6 h-6 rounded border border-slate-100 bg-white overflow-hidden shrink-0">
+                                                                <div className="w-6 h-6 rounded border border-border bg-background overflow-hidden shrink-0">
                                                                     <img src={v.image || '/sku-placeholder.png'} className="w-full h-full object-cover" alt="" />
                                                                 </div>
                                                                 <div className="flex flex-col">
-                                                                    <span className="text-[7px] text-slate-400 font-black font-mono leading-none mb-1">
+                                                                    <span className="text-[7px] text-muted-foreground font-black font-mono leading-none mb-1">
                                                                         ID-{v.id || v._id?.toString().slice(-5)}
                                                                     </span>
                                                                     <span className={cn(
                                                                         "text-[9px] font-bold uppercase leading-none truncate max-w-[80px]",
-                                                                        (variationFilter !== null && variationFilter === (v.id || v._id)) ? "text-blue-600" : "text-slate-700"
+                                                                        (variationFilter !== null && variationFilter === (v.id || v._id)) ? "text-blue-500" : "text-foreground"
                                                                     )}>
                                                                         {v.name.replace(new RegExp(`^${product.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*-\\s*`, 'i'), '')}
                                                                     </span>
@@ -440,17 +446,17 @@ export default function WebProductDetailsPage() {
                                                                 <div className="flex items-center space-x-2">
                                                                     <button 
                                                                         onClick={() => router.push(`/warehouse/skus/${v.linkedSkuId}`)}
-                                                                        className="flex items-center space-x-2 px-2 py-1 bg-emerald-50 text-emerald-700 rounded border border-emerald-100 hover:bg-emerald-100 transition-colors group/sku"
+                                                                        className="flex items-center space-x-2 px-2 py-1 bg-emerald-500/10 text-emerald-600 rounded border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors group/sku"
                                                                     >
                                                                         <Package className="w-3 h-3" />
-                                                                        <span className="text-[9px] font-bold font-mono">{v.linkedSkuId}</span>
+                                                                        <span className="text-[9px] font-bold font-mono">{getSkuName(v.linkedSkuId)}</span>
                                                                         <ExternalLink className="w-2.5 h-2.5 opacity-0 group-hover/sku:opacity-100 transition-opacity" />
                                                                     </button>
                                                                     <button 
                                                                         onClick={() => {
                                                                             handleLinkSku('', v.id || v._id);
                                                                         }}
-                                                                        className="p-1 text-slate-300 hover:text-rose-500 transition-colors"
+                                                                        className="p-1 text-muted-foreground hover:text-rose-500 transition-colors"
                                                                         title="Unlink SKU"
                                                                     >
                                                                         <span className="sr-only">Unlink</span>
@@ -472,12 +478,12 @@ export default function WebProductDetailsPage() {
                                                             )}
                                                         </td>
                                                         <td className="px-2 py-1.5 text-right">
-                                                            <span className="text-[9px] font-bold text-slate-900 font-mono">${(v.salePrice || v.price || 0).toLocaleString()}</span>
+                                                            <span className="text-[9px] font-bold text-foreground font-mono">${(v.salePrice || v.price || 0).toLocaleString()}</span>
                                                         </td>
                                                         <td className="px-2 py-1.5 text-right">
                                                             <span className={cn(
                                                                 "text-[9px] font-bold font-mono",
-                                                                (v.stockQuantity || 0) > 0 ? "text-slate-600" : "text-rose-500"
+                                                                (v.stockQuantity || 0) > 0 ? "text-muted-foreground" : "text-rose-500"
                                                             )}>
                                                                 {v.stockQuantity || 0}
                                                             </span>
@@ -485,7 +491,7 @@ export default function WebProductDetailsPage() {
                                                         <td className="px-2 py-1.5 text-center">
                                                             <div className={cn(
                                                                 "w-1.5 h-1.5 rounded-full mx-auto",
-                                                                v.status === 'publish' ? "bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.5)]" : "bg-slate-300"
+                                                                v.status === 'publish' ? "bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.5)]" : "bg-muted-foreground/40"
                                                             )} title={v.status} />
                                                         </td>
                                                     </tr>
@@ -497,13 +503,13 @@ export default function WebProductDetailsPage() {
                             )}
                             {/* Categories */}
                             <section>
-                                <h3 className="text-[9px] font-black text-slate-900 uppercase tracking-[0.15em] mb-4 flex items-center space-x-2">
+                                <h3 className="text-[9px] font-black text-foreground uppercase tracking-[0.15em] mb-4 flex items-center space-x-2">
                                     <Tag className="w-3.5 h-3.5 text-blue-500" />
                                     <span>Store Categories</span>
                                 </h3>
                                 <div className="flex flex-wrap gap-2">
                                     {product.webCategories?.map((cat, idx) => (
-                                        <span key={cat.id || cat._id || idx} className="px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-md text-[9px] font-black text-slate-600 uppercase tracking-tight shadow-sm">
+                                        <span key={cat.id || cat._id || idx} className="px-2.5 py-1 bg-secondary border border-border rounded-md text-[9px] font-black text-foreground uppercase tracking-tight shadow-sm">
                                             {typeof cat === 'string' ? cat : (cat.name || 'Unknown')}
                                         </span>
                                     ))}
@@ -512,20 +518,20 @@ export default function WebProductDetailsPage() {
 
                             {/* Attributes */}
                             <section>
-                                <h3 className="text-[9px] font-black text-slate-900 uppercase tracking-[0.15em] mb-4 flex items-center space-x-2">
+                                <h3 className="text-[9px] font-black text-foreground uppercase tracking-[0.15em] mb-4 flex items-center space-x-2">
                                     <Layers className="w-3.5 h-3.5 text-purple-500" />
                                     <span>Product Variance Specs</span>
                                 </h3>
-                                <div className="space-y-5 bg-slate-50/50 p-4 rounded-xl border border-slate-100 border-dashed">
+                                <div className="space-y-5 bg-background p-4 rounded-xl border border-border border-dashed">
                                     {product.webAttributes?.map(attr => (
                                         <div key={attr.id || attr.name} className="space-y-2">
-                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center justify-between">
+                                            <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest flex items-center justify-between">
                                                 <span>{attr.name}</span>
-                                                <span className="h-px bg-slate-200 flex-1 ml-4" />
+                                                <span className="h-px bg-border flex-1 ml-4" />
                                             </p>
                                             <div className="flex flex-wrap gap-1.5">
                                                 {attr.options?.map(opt => (
-                                                    <span key={opt} className="px-2 py-0.5 bg-white text-slate-900 rounded border border-slate-200 text-[9px] font-bold shadow-xs">
+                                                    <span key={opt} className="px-2 py-0.5 bg-card text-foreground rounded border border-border text-[9px] font-bold shadow-xs">
                                                         {opt}
                                                     </span>
                                                 ))}
@@ -533,18 +539,18 @@ export default function WebProductDetailsPage() {
                                         </div>
                                     ))}
                                     {(!product.webAttributes || product.webAttributes.length === 0) && (
-                                        <p className="text-[10px] text-slate-400 italic font-medium">No specialized attributes defined</p>
+                                        <p className="text-[10px] text-muted-foreground italic font-medium">No specialized attributes defined</p>
                                     )}
                                 </div>
                             </section>
 
                             {/* Market & Catalog Intel */}
                             <section>
-                                <h3 className="text-[9px] font-black text-slate-900 uppercase tracking-[0.15em] mb-4 flex items-center space-x-2">
+                                <h3 className="text-[9px] font-black text-foreground uppercase tracking-[0.15em] mb-4 flex items-center space-x-2">
                                     <ShoppingBag className="w-3.5 h-3.5 text-emerald-500" />
                                     <span>Market Placement</span>
                                 </h3>
-                                <div className="space-y-3 bg-slate-50/50 p-4 rounded-xl border border-slate-100 border-dashed">
+                                <div className="space-y-3 bg-background p-4 rounded-xl border border-border border-dashed">
                                     {[
                                         { label: 'Featured', value: product.featured ? 'Yes' : 'No', highlight: product.featured ? 'text-amber-500 font-black' : '' },
                                         { label: 'Visibility', value: product.catalogVisibility },
@@ -553,8 +559,8 @@ export default function WebProductDetailsPage() {
                                         { label: 'Purchasable', value: product.purchasable ? 'Yes' : 'No' }
                                     ].map((item, idx) => (
                                         <div key={idx} className="flex justify-between items-center text-[10px]">
-                                            <span className="font-bold text-slate-400 uppercase tracking-tighter">{item.label}</span>
-                                            <span className={cn("uppercase tracking-tight", item.highlight || "text-slate-900 font-bold")}>
+                                            <span className="font-bold text-muted-foreground uppercase tracking-tighter">{item.label}</span>
+                                            <span className={cn("uppercase tracking-tight", item.highlight || "text-foreground font-bold")}>
                                                 {item.value}
                                             </span>
                                         </div>
@@ -566,40 +572,40 @@ export default function WebProductDetailsPage() {
 
                             {/* Logistics & Fulfillment */}
                             <section>
-                                <h3 className="text-[9px] font-black text-slate-900 uppercase tracking-[0.15em] mb-4 flex items-center space-x-2">
+                                <h3 className="text-[9px] font-black text-foreground uppercase tracking-[0.15em] mb-4 flex items-center space-x-2">
                                     <Package className="w-3.5 h-3.5 text-orange-500" />
                                     <span>Logistics & Fulfillment</span>
                                 </h3>
                                 <div className="space-y-3">
                                     <div className="flex justify-between items-center text-[10px] py-1">
-                                        <span className="font-bold text-slate-400 uppercase tracking-tighter">Weight</span>
-                                        <span className="font-bold text-slate-900 truncate max-w-[100px]">{product.weight || 'N/A'}</span>
+                                        <span className="font-bold text-muted-foreground uppercase tracking-tighter">Weight</span>
+                                        <span className="font-bold text-foreground truncate max-w-[100px]">{product.weight || 'N/A'}</span>
                                     </div>
-                                    <div className="flex justify-between items-center text-[10px] py-1 border-t border-slate-50">
-                                        <span className="font-bold text-slate-400 uppercase tracking-tighter">Dimensions</span>
-                                        <span className="font-bold text-slate-900 font-mono">
+                                    <div className="flex justify-between items-center text-[10px] py-1 border-t border-border/50">
+                                        <span className="font-bold text-muted-foreground uppercase tracking-tighter">Dimensions</span>
+                                        <span className="font-bold text-foreground font-mono">
                                             {product.dimensions?.length || 0}x{product.dimensions?.width || 0}x{product.dimensions?.height || 0}
                                         </span>
                                     </div>
-                                    <div className="flex justify-between items-center text-[10px] py-1 border-t border-slate-50">
-                                        <span className="font-bold text-slate-400 uppercase tracking-tighter">Shipping Class</span>
-                                        <span className="font-bold text-slate-900 uppercase">{product.shippingClass || 'Standard'}</span>
+                                    <div className="flex justify-between items-center text-[10px] py-1 border-t border-border/50">
+                                        <span className="font-bold text-muted-foreground uppercase tracking-tighter">Shipping Class</span>
+                                        <span className="font-bold text-foreground uppercase">{product.shippingClass || 'Standard'}</span>
                                     </div>
-                                    <div className="flex justify-between items-center text-[10px] py-1 border-t border-slate-50">
-                                        <span className="font-bold text-slate-400 uppercase tracking-tighter">Tax Status</span>
-                                        <span className="font-bold text-slate-900 uppercase">{product.taxStatus}</span>
+                                    <div className="flex justify-between items-center text-[10px] py-1 border-t border-border/50">
+                                        <span className="font-bold text-muted-foreground uppercase tracking-tighter">Tax Status</span>
+                                        <span className="font-bold text-foreground uppercase">{product.taxStatus}</span>
                                     </div>
                                 </div>
                             </section>
 
                             {/* URL Intel */}
                             <section>
-                                <h3 className="text-[9px] font-black text-slate-900 uppercase tracking-[0.15em] mb-4 flex items-center space-x-2">
+                                <h3 className="text-[9px] font-black text-foreground uppercase tracking-[0.15em] mb-4 flex items-center space-x-2">
                                     <Globe className="w-3.5 h-3.5 text-blue-500" />
                                     <span>Canonical Intel</span>
                                 </h3>
-                                <div className="bg-slate-50/50 p-3 rounded-lg border border-slate-100 overflow-hidden">
-                                     <p className="text-[9px] font-mono text-blue-600 break-all leading-relaxed uppercase">
+                                <div className="bg-background p-3 rounded-lg border border-border overflow-hidden">
+                                     <p className="text-[9px] font-mono text-blue-500 break-all leading-relaxed uppercase">
                                         {product.permalink}
                                      </p>
                                 </div>
@@ -607,73 +613,73 @@ export default function WebProductDetailsPage() {
 
                             {/* Short Description */}
                             <section className="space-y-4">
-                                <h3 className="text-[9px] font-black text-slate-900 uppercase tracking-[0.15em] flex items-center space-x-2">
-                                    <Info className="w-3.5 h-3.5 text-slate-500" />
+                                <h3 className="text-[9px] font-black text-foreground uppercase tracking-[0.15em] flex items-center space-x-2">
+                                    <Info className="w-3.5 h-3.5 text-muted-foreground" />
                                     <span>Editorial Summary</span>
                                 </h3>
                                 <div 
-                                    className="text-[10px] text-slate-500 italic leading-relaxed prose prose-sm prose-slate max-w-none"
+                                    className="text-[10px] text-muted-foreground italic leading-relaxed prose prose-sm max-w-none"
                                     dangerouslySetInnerHTML={{ __html: product.shortDescription || 'No summary version available.' }}
                                 />
                             </section>
 
                             {/* Main Description */}
                             <section className="space-y-4">
-                                <h3 className="text-[9px] font-black text-slate-900 uppercase tracking-[0.15em] flex items-center space-x-2">
+                                <h3 className="text-[9px] font-black text-foreground uppercase tracking-[0.15em] flex items-center space-x-2">
                                     <Briefcase className="w-3.5 h-3.5 text-indigo-500" />
                                     <span>Product Documentation</span>
                                 </h3>
                                 <div 
-                                    className="text-[11px] text-slate-700 leading-relaxed prose prose-slate max-w-none prose-p:font-medium prose-p:my-2"
+                                    className="text-[11px] text-muted-foreground leading-relaxed prose max-w-none prose-p:font-medium prose-p:my-2"
                                     dangerouslySetInnerHTML={{ __html: product.description || 'Global documentation not provided.' }}
                                 />
                             </section>
 
                             {/* Relationships & Clusters */}
                             <section>
-                                <h3 className="text-[9px] font-black text-slate-900 uppercase tracking-[0.15em] mb-4 flex items-center space-x-2">
+                                <h3 className="text-[9px] font-black text-foreground uppercase tracking-[0.15em] mb-4 flex items-center space-x-2">
                                     <Blocks className="w-3.5 h-3.5 text-indigo-500" />
                                     <span>Product Clusters</span>
                                 </h3>
                                 <div className="space-y-3">
                                     <div>
-                                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-2">Upsell Cluster</p>
+                                        <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-2">Upsell Cluster</p>
                                         <div className="flex flex-wrap gap-1">
                                             {product.upsellIds?.map(id => (
-                                                <span key={id} className="px-1.5 py-0.5 bg-indigo-50 text-indigo-600 rounded text-[9px] font-bold border border-indigo-100">#{id}</span>
+                                                <span key={id} className="px-1.5 py-0.5 bg-indigo-500/10 text-indigo-400 rounded text-[9px] font-bold border border-indigo-500/20">#{id}</span>
                                             ))}
-                                            {(!product.upsellIds || product.upsellIds.length === 0) && <span className="text-[9px] text-slate-300 italic">None defined</span>}
+                                            {(!product.upsellIds || product.upsellIds.length === 0) && <span className="text-[9px] text-muted-foreground/50 italic">None defined</span>}
                                         </div>
                                     </div>
                                     <div>
-                                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-2 mt-3">Tags</p>
+                                        <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-2 mt-3">Tags</p>
                                         <div className="flex flex-wrap gap-1">
                                             {product.tags?.map((tag, idx) => (
-                                                <span key={tag.id || tag._id || idx} className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-[9px] font-bold border border-slate-200 uppercase tracking-tighter shadow-sm">
+                                                <span key={tag.id || tag._id || idx} className="px-1.5 py-0.5 bg-secondary text-foreground rounded text-[9px] font-bold border border-border uppercase tracking-tighter shadow-sm">
                                                     {typeof tag === 'string' ? tag : (tag.name || 'Unknown')}
                                                 </span>
                                             ))}
-                                            {(!product.tags || product.tags.length === 0) && <span className="text-[9px] text-slate-300 italic">No tags</span>}
+                                            {(!product.tags || product.tags.length === 0) && <span className="text-[9px] text-muted-foreground/50 italic">No tags</span>}
                                         </div>
                                     </div>
                                 </div>
                             </section>
 
                             <section>
-                                <h3 className="text-[9px] font-black text-slate-900 uppercase tracking-[0.15em] mb-4 flex items-center space-x-2">
+                                <h3 className="text-[9px] font-black text-foreground uppercase tracking-[0.15em] mb-4 flex items-center space-x-2">
                                     <Hash className="w-3.5 h-3.5 text-rose-500" />
                                     <span>Sync Intelligence</span>
                                 </h3>
-                                <div className="space-y-3 p-3 bg-rose-50/30 rounded-lg border border-rose-100/50">
+                                <div className="space-y-3 p-3 bg-rose-500/5 rounded-lg border border-rose-500/10">
                                     <div className="flex justify-between text-[9px]">
-                                        <span className="font-bold text-slate-400 uppercase">Synced Created</span>
-                                        <span className="font-mono text-slate-600 font-medium">
+                                        <span className="font-bold text-muted-foreground uppercase">Synced Created</span>
+                                        <span className="font-mono text-foreground font-medium">
                                             {product.dateCreated ? new Date(product.dateCreated).toLocaleDateString() : 'N/A'}
                                         </span>
                                     </div>
-                                    <div className="flex justify-between text-[9px] pt-2 border-t border-rose-100/30">
-                                        <span className="font-bold text-slate-400 uppercase">Site Modified</span>
-                                        <span className="font-mono text-slate-600 font-medium">
+                                    <div className="flex justify-between text-[9px] pt-2 border-t border-rose-500/10">
+                                        <span className="font-bold text-muted-foreground uppercase">Site Modified</span>
+                                        <span className="font-mono text-foreground font-medium">
                                             {product.dateModified ? new Date(product.dateModified).toLocaleDateString() : 'N/A'}
                                         </span>
                                     </div>
@@ -686,7 +692,7 @@ export default function WebProductDetailsPage() {
                 </aside>
 
                 {/* Right Column: Content Architecture & Descriptions */}
-                <main className="flex-1 h-full overflow-y-auto bg-white relative scrollbar-custom">
+                <main className="flex-1 h-full overflow-y-auto bg-background relative scrollbar-custom">
                     
                     <div className="p-8 max-w-none space-y-12">
                         {/* Related Web Orders */}
@@ -696,15 +702,15 @@ export default function WebProductDetailsPage() {
             </div>
 
             {/* Shell Layer 3: Shell Footer */}
-            <div className="h-[24px] border-t border-slate-200 bg-slate-50 shrink-0 flex items-center justify-between px-4 z-[50]">
+            <div className="h-[24px] border-t border-border bg-secondary shrink-0 flex items-center justify-between px-4 z-[50]">
                 <div className="flex items-center space-x-4">
                     <div className="flex items-center space-x-1.5">
                         <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Global Web Console v3.1</span>
+                        <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Global Web Console v3.1</span>
                     </div>
                 </div>
                 <div className="flex items-center space-x-4 font-mono">
-                    <span className="text-[9px] text-slate-300 uppercase tracking-tighter">Instance ID: {product._id}</span>
+                    <span className="text-[9px] text-muted-foreground/50 uppercase tracking-tighter">Instance ID: {product._id}</span>
                 </div>
             </div>
         </div>
@@ -742,10 +748,10 @@ function RelatedSaleOrders({ skuId }: { skuId: string }) {
 
     const getStatusColor = (status: string) => {
         switch (status?.toLowerCase()) {
-            case 'completed': case 'shipped': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-            case 'processing': case 'pending': return 'bg-amber-100 text-amber-700 border-amber-200';
-            case 'cancelled': return 'bg-rose-100 text-rose-700 border-rose-200';
-            default: return 'bg-slate-100 text-slate-600 border-slate-200';
+            case 'completed': case 'shipped': return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20';
+            case 'processing': case 'pending': return 'bg-amber-500/10 text-amber-600 border-amber-500/20';
+            case 'cancelled': return 'bg-rose-500/10 text-rose-600 border-rose-500/20';
+            default: return 'bg-secondary text-muted-foreground border-border';
         }
     };
 
@@ -753,14 +759,14 @@ function RelatedSaleOrders({ skuId }: { skuId: string }) {
         return (
             <section>
                 <div className="flex items-center space-x-4 mb-6">
-                    <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-widest flex items-center space-x-2">
+                    <h3 className="text-[11px] font-black text-foreground uppercase tracking-widest flex items-center space-x-2">
                         <Briefcase className="w-4 h-4 text-purple-500" />
                         <span>Related Sales Orders</span>
                     </h3>
-                    <div className="h-px bg-slate-100 flex-1" />
+                    <div className="h-px bg-border flex-1" />
                 </div>
                 <div className="flex items-center justify-center py-8">
-                    <Loader2 className="w-5 h-5 animate-spin text-slate-300" />
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground/50" />
                 </div>
             </section>
         );
@@ -770,14 +776,14 @@ function RelatedSaleOrders({ skuId }: { skuId: string }) {
         return (
             <section>
                 <div className="flex items-center space-x-4 mb-6">
-                    <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-widest flex items-center space-x-2">
+                    <h3 className="text-[11px] font-black text-foreground uppercase tracking-widest flex items-center space-x-2">
                         <Briefcase className="w-4 h-4 text-purple-500" />
                         <span>Related Sales Orders</span>
                     </h3>
-                    <div className="h-px bg-slate-100 flex-1" />
-                    <span className="text-[9px] font-bold text-slate-300 uppercase">0 Items</span>
+                    <div className="h-px bg-border flex-1" />
+                    <span className="text-[9px] font-bold text-muted-foreground/50 uppercase">0 Items</span>
                 </div>
-                <div className="text-center py-8 text-[10px] text-slate-300 italic">No wholesale orders found for this product</div>
+                <div className="text-center py-8 text-[10px] text-muted-foreground/50 italic">No wholesale orders found for this product</div>
             </section>
         );
     }
@@ -785,46 +791,46 @@ function RelatedSaleOrders({ skuId }: { skuId: string }) {
     return (
         <section>
             <div className="flex items-center space-x-4 mb-6">
-                <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-widest flex items-center space-x-2">
+                <h3 className="text-[11px] font-black text-foreground uppercase tracking-widest flex items-center space-x-2">
                     <Briefcase className="w-4 h-4 text-purple-500" />
                     <span>Related Sales Orders</span>
                 </h3>
-                <div className="h-px bg-slate-100 flex-1" />
-                <span className="text-[9px] font-bold text-slate-400 uppercase">{lineItems.length} Items</span>
+                <div className="h-px bg-border flex-1" />
+                <span className="text-[9px] font-bold text-muted-foreground uppercase">{lineItems.length} Items</span>
             </div>
-            <div className="border border-slate-100 rounded-xl overflow-hidden shadow-sm">
+            <div className="border border-border rounded-xl overflow-hidden shadow-sm">
                 <table className="w-full text-left border-collapse">
-                    <thead className="bg-slate-50/80 backdrop-blur-sm border-b border-slate-100">
+                    <thead className="bg-secondary/50 backdrop-blur-sm border-b border-border">
                         <tr>
-                            <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-[0.15em]">Order #</th>
-                            <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-[0.15em]">Date</th>
-                            <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-[0.15em]">Client</th>
-                            <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-[0.15em]">Status</th>
-                            <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-[0.15em]">Lot #</th>
-                            <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] text-center">Qty</th>
-                            <th className="px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] text-right">Total</th>
+                            <th className="px-4 py-3 text-[9px] font-black text-muted-foreground uppercase tracking-[0.15em]">Order #</th>
+                            <th className="px-4 py-3 text-[9px] font-black text-muted-foreground uppercase tracking-[0.15em]">Date</th>
+                            <th className="px-4 py-3 text-[9px] font-black text-muted-foreground uppercase tracking-[0.15em]">Client</th>
+                            <th className="px-4 py-3 text-[9px] font-black text-muted-foreground uppercase tracking-[0.15em]">Status</th>
+                            <th className="px-4 py-3 text-[9px] font-black text-muted-foreground uppercase tracking-[0.15em]">Lot #</th>
+                            <th className="px-4 py-3 text-[9px] font-black text-muted-foreground uppercase tracking-[0.15em] text-center">Qty</th>
+                            <th className="px-4 py-3 text-[9px] font-black text-muted-foreground uppercase tracking-[0.15em] text-right">Total</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-50">
+                    <tbody className="divide-y divide-border/50">
                         {lineItems.map((item, idx) => (
                             <tr 
                                 key={item._id || idx} 
-                                className="hover:bg-purple-50/30 transition-colors cursor-pointer group"
+                                className="hover:bg-purple-500/5 transition-colors cursor-pointer group"
                                 onClick={() => router.push(`/sales/orders/${item.orderId}`)}
                             >
                                 <td className="px-4 py-3">
-                                    <span className="text-[11px] font-black text-purple-600 group-hover:text-purple-800">#{item.orderLabel || item.orderId}</span>
+                                    <span className="text-[11px] font-black text-purple-500 group-hover:text-purple-400">#{item.orderLabel || item.orderId}</span>
                                 </td>
-                                <td className="px-4 py-3 text-[10px] text-slate-500 font-mono">
+                                <td className="px-4 py-3 text-[10px] text-muted-foreground font-mono">
                                     {item.orderDate ? new Date(item.orderDate).toLocaleDateString() : '-'}
                                 </td>
                                 <td className="px-4 py-3">
                                     <div className="flex flex-col">
-                                        <span className="text-[10px] font-bold text-slate-700">
+                                        <span className="text-[10px] font-bold text-foreground">
                                             {item.client?.clientName || item.client?.companyName || 'Unknown'}
                                         </span>
                                         {item.client?.email && (
-                                            <span className="text-[8px] text-slate-400">{item.client.email}</span>
+                                            <span className="text-[8px] text-muted-foreground">{item.client.email}</span>
                                         )}
                                     </div>
                                 </td>
@@ -836,13 +842,13 @@ function RelatedSaleOrders({ skuId }: { skuId: string }) {
                                         {item.orderStatus || 'Pending'}
                                     </span>
                                 </td>
-                                <td className="px-4 py-3 text-[10px] font-mono text-slate-500">{item.lotNumber || '-'}</td>
+                                <td className="px-4 py-3 text-[10px] font-mono text-muted-foreground">{item.lotNumber || '-'}</td>
                                 <td className="px-4 py-3 text-center">
-                                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-purple-100 text-[9px] font-black text-purple-700">
+                                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-purple-500/10 text-[9px] font-black text-purple-500">
                                         {item.qtyShipped || 0}
                                     </span>
                                 </td>
-                                <td className="px-4 py-3 text-right text-[11px] font-black text-slate-900 font-mono">
+                                <td className="px-4 py-3 text-right text-[11px] font-black text-foreground font-mono">
                                     ${(item.total || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                 </td>
                             </tr>
@@ -1017,12 +1023,12 @@ function RelatedWebOrders({ productWebId, website, baseProductName, variationId,
 
     const getStatusBadge = (status: string) => {
         switch (status) {
-            case 'completed': return <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-sm text-[9px] font-bold uppercase">Completed</span>;
-            case 'processing': return <span className="text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded-sm text-[9px] font-bold uppercase">Processing</span>;
-            case 'on-hold': return <span className="text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-sm text-[9px] font-bold uppercase">On Hold</span>;
-            case 'pending': return <span className="text-yellow-700 bg-yellow-50 px-1.5 py-0.5 rounded-sm text-[9px] font-bold uppercase">Pending</span>;
-            case 'cancelled': case 'refunded': case 'failed': return <span className="text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded-sm text-[9px] font-bold uppercase">{status}</span>;
-            default: return <span className="text-slate-600 bg-slate-50 px-1.5 py-0.5 rounded-sm text-[9px] font-bold uppercase">{status || '-'}</span>;
+            case 'completed': return <span className="text-emerald-600 bg-emerald-500/10 px-1.5 py-0.5 rounded-sm text-[9px] font-bold uppercase">Completed</span>;
+            case 'processing': return <span className="text-blue-500 bg-blue-500/10 px-1.5 py-0.5 rounded-sm text-[9px] font-bold uppercase">Processing</span>;
+            case 'on-hold': return <span className="text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-sm text-[9px] font-bold uppercase">On Hold</span>;
+            case 'pending': return <span className="text-yellow-600 bg-yellow-500/10 px-1.5 py-0.5 rounded-sm text-[9px] font-bold uppercase">Pending</span>;
+            case 'cancelled': case 'refunded': case 'failed': return <span className="text-rose-600 bg-rose-500/10 px-1.5 py-0.5 rounded-sm text-[9px] font-bold uppercase">{status}</span>;
+            default: return <span className="text-muted-foreground bg-secondary px-1.5 py-0.5 rounded-sm text-[9px] font-bold uppercase">{status || '-'}</span>;
         }
     };
 
@@ -1031,23 +1037,23 @@ function RelatedWebOrders({ productWebId, website, baseProductName, variationId,
     return (
         <section className="-mx-8 -mt-8">
             {/* Toolbar */}
-            <div className="sticky top-0 z-[30] bg-white border-b border-slate-100 px-4 h-10 flex items-center justify-between gap-4">
+            <div className="sticky top-0 z-[30] bg-card border-b border-border px-4 h-10 flex items-center justify-between gap-4">
                 <div className="flex items-center space-x-2">
-                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Web Orders Ledger</h3>
+                    <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">Web Orders Ledger</h3>
                     {variationId && (
-                        <span className="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full font-black uppercase tracking-widest border border-blue-100">
+                        <span className="text-[9px] bg-blue-500/10 text-blue-500 px-1.5 py-0.5 rounded-full font-black uppercase tracking-widest border border-blue-500/20">
                             Variation Focus
                         </span>
                     )}
                 </div>
                 <div className="flex items-center space-x-3">
                     {fetchingMore && <Loader2 className="w-3 h-3 animate-spin text-blue-500" />}
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
                         {loading && page === 1 ? 'Loading...' : (
                             <>
-                                <span className="text-slate-900">{lineItems.length}</span>
+                                <span className="text-foreground">{lineItems.length}</span>
                                 <span className="mx-1">/</span>
-                                <span className="text-slate-900">{totalRecords}</span>
+                                <span className="text-foreground">{totalRecords}</span>
                                 <span className="ml-1">Records</span>
                             </>
                         )}
@@ -1057,29 +1063,29 @@ function RelatedWebOrders({ productWebId, website, baseProductName, variationId,
 
             {/* Table Header - Sticky below toolbar */}
             <table className="w-full text-left border-collapse">
-                <thead className="sticky top-10 z-[20] bg-slate-50/90 backdrop-blur-sm border-b border-slate-100">
+                <thead className="sticky top-10 z-[20] bg-secondary/80 backdrop-blur-sm border-b border-border">
                     <tr>
-                        <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100/50">Date</th>
-                        <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100/50">Order #</th>
-                        <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100/50">Variation</th>
-                        <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100/50">Lot #</th>
-                        <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100/50">Customer</th>
-                        <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right border-r border-slate-100/50">Qty</th>
-                        <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right border-r border-slate-100/50">Price</th>
-                        <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right border-r border-slate-100/50">Total</th>
-                        <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
+                        <th className="px-3 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border/50">Date</th>
+                        <th className="px-3 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border/50">Order #</th>
+                        <th className="px-3 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border/50">Variation</th>
+                        <th className="px-3 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border/50">Lot #</th>
+                        <th className="px-3 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border/50">Customer</th>
+                        <th className="px-3 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-right border-r border-border/50">Qty</th>
+                        <th className="px-3 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-right border-r border-border/50">Price</th>
+                        <th className="px-3 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-right border-r border-border/50">Total</th>
+                        <th className="px-3 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Status</th>
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50">
+                <tbody className="divide-y divide-border/50">
                     {loading && page === 1 ? (
                         <tr>
                             <td colSpan={9} className="px-3 py-8 text-center">
-                                <Loader2 className="w-5 h-5 animate-spin text-slate-300 mx-auto" />
+                                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground/50 mx-auto" />
                             </td>
                         </tr>
                     ) : filteredItems.length === 0 ? (
                         <tr>
-                            <td colSpan={9} className="px-3 py-8 text-center text-[10px] text-slate-300 italic">
+                            <td colSpan={9} className="px-3 py-8 text-center text-[10px] text-muted-foreground/50 italic">
                                 {variationId ? 'No orders found for this variation' : 'No web orders found for this product'}
                             </td>
                         </tr>
@@ -1089,17 +1095,17 @@ function RelatedWebOrders({ productWebId, website, baseProductName, variationId,
                                 <tr
                                     key={item._id || idx}
                                     onClick={() => router.push(`/sales/web-orders/${item.orderId}`)}
-                                    className="hover:bg-slate-50/50 transition-colors group cursor-pointer"
+                                    className="hover:bg-secondary/50 transition-colors group cursor-pointer"
                                 >
-                                    <td className="px-3 py-2 text-[10px] text-slate-500 font-mono">
+                                    <td className="px-3 py-2 text-[10px] text-muted-foreground font-mono">
                                         {item.orderDate ? new Date(item.orderDate).toLocaleDateString('en-US', { year: '2-digit', month: '2-digit', day: '2-digit' }) : '-'}
                                     </td>
-                                    <td className="px-3 py-2 text-[10px] text-slate-600 truncate max-w-[80px]">
+                                    <td className="px-3 py-2 text-[10px] text-muted-foreground truncate max-w-[80px]">
                                         #{item.orderNumber}
                                     </td>
                                     <td className="px-3 py-2">
                                         <div className="flex flex-col leading-tight">
-                                            <span className="text-[9px] text-slate-700 font-bold uppercase tracking-tight line-clamp-2 max-w-[180px]">
+                                            <span className="text-[9px] text-foreground font-bold uppercase tracking-tight line-clamp-2 max-w-[180px]">
                                                 {item.productName.replace(new RegExp(`^${baseProductName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*-\\s*`, 'i'), '')}
                                             </span>
                                         </div>
@@ -1110,14 +1116,14 @@ function RelatedWebOrders({ productWebId, website, baseProductName, variationId,
                                                 <span className={cn(
                                                     "text-[9px] font-mono px-1.5 py-0.5 line-clamp-1 max-w-[80px] flex items-center space-x-1",
                                                     item.lotIsSuggested 
-                                                        ? "text-amber-700 bg-amber-50 border border-amber-200" 
-                                                        : "text-emerald-700 bg-emerald-50"
+                                                        ? "text-amber-600 bg-amber-500/10 border border-amber-500/20" 
+                                                        : "text-emerald-600 bg-emerald-500/10"
                                                 )}>
                                                     {item.lotIsSuggested && <span className="text-[7px]">★</span>}
                                                     <span>{item.lotNumber}</span>
                                                 </span>
                                             ) : (
-                                                <span className="text-[9px] text-slate-400 bg-slate-50 italic px-1.5 py-0.5">
+                                                <span className="text-[9px] text-muted-foreground bg-secondary italic px-1.5 py-0.5">
                                                     N/A
                                                 </span>
                                             )}
@@ -1127,8 +1133,8 @@ function RelatedWebOrders({ productWebId, website, baseProductName, variationId,
                                                     handleEditLot(item);
                                                 }}
                                                 className={cn(
-                                                    "p-0.5 hover:bg-slate-100 transition-colors",
-                                                    item.linkedSkuId ? "text-slate-400 hover:text-blue-600" : "text-slate-200"
+                                                    "p-0.5 hover:bg-secondary transition-colors",
+                                                    item.linkedSkuId ? "text-muted-foreground hover:text-blue-500" : "text-muted-foreground/30"
                                                 )}
                                                 title={item.linkedSkuId ? "Select Lot" : "Link SKU first"}
                                             >
@@ -1136,18 +1142,18 @@ function RelatedWebOrders({ productWebId, website, baseProductName, variationId,
                                             </button>
                                         </div>
                                     </td>
-                                    <td className="px-3 py-2 text-[10px] text-slate-600 truncate max-w-[120px]" title={item.customer?.email}>
+                                    <td className="px-3 py-2 text-[10px] text-muted-foreground truncate max-w-[120px]" title={item.customer?.email}>
                                         {item.customer?.name || 'Unknown'}
                                     </td>
                                     <td className="px-3 py-2 text-right">
-                                        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-sm text-rose-700 bg-rose-50">
+                                        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-sm text-rose-600 bg-rose-500/10">
                                             -{item.quantity || 0}
                                         </span>
                                     </td>
-                                    <td className="px-3 py-2 text-right text-[10px] text-slate-600 font-mono">
+                                    <td className="px-3 py-2 text-right text-[10px] text-muted-foreground font-mono">
                                         ${(item.price || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                     </td>
-                                    <td className="px-3 py-2 text-right text-[10px] font-bold text-slate-900 font-mono">
+                                    <td className="px-3 py-2 text-right text-[10px] font-bold text-foreground font-mono">
                                         ${(item.total || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                     </td>
                                     <td className="px-3 py-2">
@@ -1158,9 +1164,9 @@ function RelatedWebOrders({ productWebId, website, baseProductName, variationId,
                             {/* Infinite Scroll Trigger */}
                             <tr ref={loaderRef}>
                                 <td colSpan={8} className="py-4 text-center">
-                                    {fetchingMore && <Loader2 className="w-4 h-4 animate-spin text-slate-300 mx-auto" />}
+                                    {fetchingMore && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground/50 mx-auto" />}
                                     {!hasMore && filteredItems.length > 0 && (
-                                        <span className="text-[8px] font-black text-slate-300 uppercase tracking-[0.2em]">End of Records</span>
+                                        <span className="text-[8px] font-black text-muted-foreground/30 uppercase tracking-[0.2em]">End of Records</span>
                                     )}
                                 </td>
                             </tr>
