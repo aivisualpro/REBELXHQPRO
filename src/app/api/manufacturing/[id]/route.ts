@@ -10,7 +10,7 @@ import AuditAdjustment from '@/models/AuditAdjustment';
 import User from '@/models/User';
 import { Recipe } from '@/models/Recipe';
 import { getSkuTiers } from '@/lib/sku-tiers';
-import { syncManufacturingToAppSheet, deleteManufacturingFromAppSheet } from '@/lib/appsheet';
+import { syncManufacturingToAppSheet, deleteManufacturingFromAppSheet, syncManufacturingLineItemsToAppSheet, deleteManufacturingLineItemsFromAppSheet } from '@/lib/appsheet';
 
 export const dynamic = 'force-dynamic';
 
@@ -322,6 +322,10 @@ export async function PATCH(
         const { id } = await context.params;
         const body = await request.json();
 
+        // Fetch the old order BEFORE update to detect line item changes
+        const oldOrder: any = await Manufacturing.findById(id).lean();
+        const oldLineItemIds = new Set((oldOrder?.lineItems || []).map((li: any) => li._id?.toString()));
+
         const order = await Manufacturing.findByIdAndUpdate(id, body, { new: true })
             .populate('createdBy', 'firstName lastName email')
             .populate('finishedBy', 'firstName lastName email')
@@ -409,9 +413,42 @@ export async function PATCH(
 
         // Background sync to AppSheet (Edit action, match by TimeStamp)
         const orderIdStr = (order as any)._id?.toString();
+        const hasLineItemsInBody = body.lineItems !== undefined;
         if (orderIdStr) {
             after(async () => {
-                await syncManufacturingOrderToAppSheet(orderIdStr, 'Edit');
+                try {
+                    await syncManufacturingOrderToAppSheet(orderIdStr, 'Edit');
+
+                    // If lineItems were part of this update, sync them too
+                    if (hasLineItemsInBody) {
+                        await dbConnect();
+                        const freshOrder: any = await Manufacturing.findById(orderIdStr).lean();
+                        if (freshOrder) {
+                            const newLineItems = freshOrder.lineItems || [];
+                            const newLineItemIds = new Set(newLineItems.map((li: any) => li._id?.toString()));
+
+                            // Detect deleted line items
+                            const deletedIds = [...oldLineItemIds].filter(id => !newLineItemIds.has(id)) as string[];
+                            if (deletedIds.length > 0) {
+                                await deleteManufacturingLineItemsFromAppSheet(deletedIds);
+                            }
+
+                            // Detect added line items (new _id not in old set)
+                            const addedItems = newLineItems.filter((li: any) => !oldLineItemIds.has(li._id?.toString()));
+                            if (addedItems.length > 0) {
+                                await syncManufacturingLineItemsToAppSheet(freshOrder, addedItems, 'Add');
+                            }
+
+                            // Detect updated line items (existing _id in both old and new)
+                            const updatedItems = newLineItems.filter((li: any) => oldLineItemIds.has(li._id?.toString()));
+                            if (updatedItems.length > 0) {
+                                await syncManufacturingLineItemsToAppSheet(freshOrder, updatedItems, 'Edit');
+                            }
+                        }
+                    }
+                } catch (syncError) {
+                    console.error('❌ Background AppSheet Manufacturing sync failed:', syncError);
+                }
             });
         }
 
@@ -426,8 +463,8 @@ async function syncManufacturingOrderToAppSheet(orderId: string, action: 'Add' |
     try {
         await dbConnect();
         const populatedOrder = await Manufacturing.findById(orderId)
-            .populate('createdBy', 'firstName lastName')
-            .populate('finishedBy', 'firstName lastName')
+            .populate('createdBy', 'firstName lastName email')
+            .populate('finishedBy', 'firstName lastName email')
             .lean();
 
         if (populatedOrder) {
@@ -456,8 +493,8 @@ export async function DELETE(
 
         // Fetch the order BEFORE deleting so we have createdAt for AppSheet key matching
         const orderToDelete = await Manufacturing.findById(id)
-            .populate('createdBy', 'firstName lastName')
-            .populate('finishedBy', 'firstName lastName')
+            .populate('createdBy', 'firstName lastName email')
+            .populate('finishedBy', 'firstName lastName email')
             .lean();
 
         if (!orderToDelete) {
@@ -469,8 +506,16 @@ export async function DELETE(
         // Background sync: delete from AppSheet matching by TimeStamp
         after(async () => {
             try {
+                // Delete parent order from AppSheet
                 await deleteManufacturingFromAppSheet(orderToDelete);
-                console.log('✅ Manufacturing order deleted from AppSheet:', id);
+
+                // Delete all line items from AppSheet
+                const lineItemIds = (orderToDelete.lineItems || []).map((li: any) => li._id?.toString()).filter(Boolean);
+                if (lineItemIds.length > 0) {
+                    await deleteManufacturingLineItemsFromAppSheet(lineItemIds);
+                }
+
+                console.log('✅ Manufacturing order + line items deleted from AppSheet:', id);
             } catch (syncError) {
                 console.error('❌ Background AppSheet Manufacturing delete failed:', syncError);
             }

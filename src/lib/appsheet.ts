@@ -455,20 +455,20 @@ export async function syncManufacturingToAppSheet(
         finishedProductId = orderObj.sku?.toString() || '';
     }
 
-    // Resolve createdBy name
-    let createdByName = '';
+    // Resolve createdBy email
+    let createdByEmail = '';
     if (typeof orderObj.createdBy === 'object' && orderObj.createdBy !== null) {
-        createdByName = `${orderObj.createdBy.firstName || ''} ${orderObj.createdBy.lastName || ''}`.trim();
+        createdByEmail = orderObj.createdBy.email || '';
     } else if (typeof orderObj.createdBy === 'string') {
-        createdByName = orderObj.createdBy;
+        createdByEmail = orderObj.createdBy;
     }
 
-    // Resolve finishedBy name
-    let finishedByName = '';
+    // Resolve finishedBy email
+    let finishedByEmail = '';
     if (typeof orderObj.finishedBy === 'object' && orderObj.finishedBy !== null) {
-        finishedByName = `${orderObj.finishedBy.firstName || ''} ${orderObj.finishedBy.lastName || ''}`.trim();
+        finishedByEmail = orderObj.finishedBy.email || '';
     } else if (typeof orderObj.finishedBy === 'string') {
-        finishedByName = orderObj.finishedBy;
+        finishedByEmail = orderObj.finishedBy;
     }
 
     // Resolve recipe ID
@@ -479,11 +479,11 @@ export async function syncManufacturingToAppSheet(
         recipesId = orderObj.recipesId?.toString() || '';
     }
 
-    // For CREATE: use _id as Key (no legacyId)
-    // For EDIT/DELETE: match by TimeStamp (createdAt) which is the key in AppSheet
+    // TimeStamp (createdAt) is the KEY column in AppSheet
+    // For ADD: also send Key (_id) and WO # (label) 
+    // For EDIT: only TimeStamp to identify the row + updatable fields
     const row: Record<string, any> = {
-        'Key': orderObj._id?.toString() || '',
-        'WO #': orderObj.label || '',
+        'TimeStamp': orderObj.createdAt ? new Date(orderObj.createdAt).toISOString() : '',
         'Finished Product ID': finishedProductId,
         'RecipesID': recipesId,
         'WO Qty': orderObj.qty || 0,
@@ -493,10 +493,15 @@ export async function syncManufacturingToAppSheet(
         'Scheduled Finish': orderObj.scheduledFinish ? new Date(orderObj.scheduledFinish).toISOString() : '',
         'Priority': orderObj.priority || 'Normal',
         'Status': orderObj.status || 'Pending',
-        'Create By': createdByName,
-        'Finish By': finishedByName,
-        'TimeStamp': orderObj.createdAt ? new Date(orderObj.createdAt).toISOString() : '',
+        'Create By': createdByEmail,
+        'Finish By': finishedByEmail,
     };
+
+    // WO # and Key are only sent on Add (not updatable in AppSheet)
+    if (action === 'Add') {
+        row['Key'] = orderObj._id?.toString() || '';
+        row['WO #'] = orderObj.label || '';
+    }
 
     const payload = {
         Action: action,
