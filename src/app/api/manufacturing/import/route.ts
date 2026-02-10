@@ -101,8 +101,16 @@ export async function POST(request: Request) {
                 }
 
                 // Resolve qty with multiple header name fallbacks
+                // Strip commas from formatted numbers (e.g. "2,500.00" -> "2500.00") before parsing
+                const parseNum = (v: string | undefined): number => {
+                    if (!v) return 0;
+                    const cleaned = v.replace(/,/g, '').trim();
+                    const n = parseFloat(cleaned);
+                    return isNaN(n) ? 0 : n;
+                };
+
                 const rawQty = getVal(row, 'qty', 'Qty', 'Qty Mfg', 'Qty Mfg.', 'quantity', 'Quantity');
-                const parsedQty = rawQty ? parseFloat(rawQty) : 0;
+                const parsedQty = parseNum(rawQty);
 
                 // Resolve qtyDifference with fallbacks
                 const rawQtyDiff = getVal(row, 'qtyDifference', 'Qty Difference', 'qtyDiff');
@@ -113,8 +121,8 @@ export async function POST(request: Request) {
                     sku: resolvedSku || skuInput,
                     recipesId: resolvedRecipe,
                     uom: getVal(row, 'uom', 'UOM', 'Unit') || undefined,
-                    qty: isNaN(parsedQty) ? 0 : parsedQty,
-                    qtyDifference: rawQtyDiff !== undefined ? parseFloat(rawQtyDiff) : undefined,
+                    qty: parsedQty,
+                    qtyDifference: rawQtyDiff !== undefined ? parseNum(rawQtyDiff) : undefined,
                     scheduledStart: getVal(row, 'scheduledStart', 'Scheduled Start') ? new Date(getVal(row, 'scheduledStart', 'Scheduled Start')!) : undefined,
                     scheduledFinish: getVal(row, 'scheduledFinish', 'Scheduled Finish') ? new Date(getVal(row, 'scheduledFinish', 'Scheduled Finish')!) : undefined,
                     priority: getVal(row, 'priority', 'Priority') || 'Medium',
