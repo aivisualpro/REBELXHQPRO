@@ -676,7 +676,6 @@ export async function syncManufacturingLineItemsToAppSheet(
             'Qty Extra Consumed': item.qtyExtra || 0,
             'Qty Scrapped': item.qtyScrapped || 0,
             'TimeStamp': item.createdAt ? new Date(item.createdAt).toISOString() : '',
-            'OldWO #': parentId,
         };
     });
 
