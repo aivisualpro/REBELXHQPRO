@@ -18,7 +18,10 @@ import {
     Calendar,
     DollarSign,
     Loader2,
-    Pencil
+    Pencil,
+    Trash2,
+    X,
+    Save
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -32,12 +35,15 @@ interface Sku {
     description?: string;
     category?: string;
     subCategory?: string;
+    materialType?: string;
     uom?: string;
     image?: string;
     salePrice?: number;
     cost?: number;
     reOrderPoint?: number;
     orderUpto?: number;
+    kitApplied?: boolean;
+    isLotApplied?: boolean;
     createdAt?: string;
     variances?: {
         _id: string;
@@ -123,6 +129,12 @@ function SkuDetailsPageContent() {
     const [isLotModalOpen, setIsLotModalOpen] = useState(false);
     const [isUpdating, setIsUpdating] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+
+    // Edit/Delete state
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editForm, setEditForm] = useState<any>(null);
+    const [isEditSaving, setIsEditSaving] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
@@ -373,22 +385,123 @@ function SkuDetailsPageContent() {
 
     const currentStock = transactions.length > 0 ? transactions[0].balance : 0;
 
+    const handleEditSku = () => {
+        setEditForm({
+            name: sku.name || '',
+            image: sku.image || '',
+            category: sku.category || '',
+            subCategory: sku.subCategory || '',
+            materialType: sku.materialType || '',
+            uom: sku.uom || '',
+            salePrice: sku.salePrice || 0,
+            orderUpto: sku.orderUpto || 0,
+            reOrderPoint: sku.reOrderPoint || 0,
+            kitApplied: sku.kitApplied || false,
+            isLotApplied: sku.isLotApplied || false,
+        });
+        setIsEditModalOpen(true);
+    };
+
+    const handleSaveEdit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editForm?.name) return toast.error('Name is required');
+        setIsEditSaving(true);
+        try {
+            const res = await fetch(`/api/skus/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(editForm)
+            });
+            if (res.ok) {
+                toast.success('SKU updated');
+                setIsEditModalOpen(false);
+                fetchSkuDetails(true);
+            } else {
+                const data = await res.json();
+                toast.error(data.error || 'Failed to update SKU');
+            }
+        } catch (e) {
+            toast.error('Error updating SKU');
+        } finally {
+            setIsEditSaving(false);
+        }
+    };
+
+    const handleDeleteSku = () => {
+        toast((t) => (
+            <div className="flex flex-col gap-2">
+                <p className="text-sm font-bold text-white">Delete this SKU?</p>
+                <p className="text-xs text-gray-400">This action cannot be undone.</p>
+                <div className="flex gap-2 mt-1">
+                    <button
+                        onClick={() => toast.dismiss(t.id)}
+                        className="flex-1 px-3 py-1.5 text-xs font-bold rounded border border-gray-600 bg-gray-800 text-white hover:bg-gray-700 transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={async () => {
+                            toast.dismiss(t.id);
+                            setIsDeleting(true);
+                            try {
+                                const res = await fetch(`/api/skus/${id}`, { method: 'DELETE' });
+                                if (res.ok) {
+                                    toast.success('SKU deleted');
+                                    router.push('/warehouse/skus');
+                                } else {
+                                    const data = await res.json();
+                                    toast.error(data.error || 'Failed to delete SKU');
+                                }
+                            } catch (e) {
+                                toast.error('Error deleting SKU');
+                            } finally {
+                                setIsDeleting(false);
+                            }
+                        }}
+                        className="flex-1 px-3 py-1.5 text-xs font-bold rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+                    >
+                        Delete
+                    </button>
+                </div>
+            </div>
+        ), { duration: 10000, position: 'top-center', style: { maxWidth: '360px', background: '#1a1a1a', color: '#fff', marginTop: '40vh' } });
+    };
+
     return (
         <div className="flex flex-col h-[calc(100vh-40px)] overflow-hidden bg-background">
             {/* Shell Layer 1: Route Header (Sticky at top of content band) */}
-            <div className="sticky top-0 z-[10] bg-background border-b border-border px-4 flex items-center space-x-3 shrink-0 h-10 shadow-sm">
-                <button onClick={() => router.back()} className="hover:bg-secondary transition-colors p-1 rounded-full">
-                    <ArrowLeft className="w-4 h-4 text-muted-foreground" />
-                </button>
-                <div className="flex items-baseline space-x-3">
-                    {sku.tier && (
-                        <span className={cn(
-                            "flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-black text-white shadow-sm",
-                            sku.tier === 1 ? "bg-emerald-500" : sku.tier === 2 ? "bg-blue-500" : "bg-orange-500"
-                        )}>{sku.tier}</span>
-                    )}
-                    <h1 className="text-sm font-bold text-foreground uppercase tracking-tight">{sku.name}</h1>
-                    <p className="text-[10px] text-muted-foreground font-mono">{sku._id}</p>
+            <div className="sticky top-0 z-[10] bg-background border-b border-border px-4 flex items-center justify-between shrink-0 h-10 shadow-sm">
+                <div className="flex items-center space-x-3">
+                    <button onClick={() => router.back()} className="hover:bg-secondary transition-colors p-1 rounded-full cursor-pointer">
+                        <ArrowLeft className="w-4 h-4 text-muted-foreground" />
+                    </button>
+                    <div className="flex items-baseline space-x-3">
+                        {sku.tier && (
+                            <span className={cn(
+                                "flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-black text-white shadow-sm",
+                                sku.tier === 1 ? "bg-emerald-500" : sku.tier === 2 ? "bg-blue-500" : "bg-orange-500"
+                            )}>{sku.tier}</span>
+                        )}
+                        <h1 className="text-sm font-bold text-foreground uppercase tracking-tight">{sku.name}</h1>
+                        <p className="text-[10px] text-muted-foreground font-mono">{sku._id}</p>
+                    </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                    <button
+                        onClick={handleEditSku}
+                        className="flex items-center space-x-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded transition-all cursor-pointer border border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
+                    >
+                        <Pencil className="w-3.5 h-3.5" />
+                        <span>Edit</span>
+                    </button>
+                    <button
+                        onClick={handleDeleteSku}
+                        disabled={isDeleting}
+                        className="flex items-center space-x-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded transition-all cursor-pointer border border-red-500/30 text-red-500 hover:text-white hover:bg-red-600 disabled:opacity-50"
+                    >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
+                    </button>
                 </div>
             </div>
 
@@ -885,6 +998,141 @@ function SkuDetailsPageContent() {
                     currentLotNumber={editingTx.lotNumber}
                     title={`Update Lot for ${editingTx.type} #${editingTx.reference}`}
                 />
+            )}
+
+            {/* Edit SKU Modal */}
+            {isEditModalOpen && editForm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsEditModalOpen(false)} />
+                    <div className="relative z-10 w-full max-w-2xl mx-4 bg-background border border-border shadow-2xl rounded-lg overflow-hidden max-h-[90vh] flex flex-col">
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between px-5 h-10 border-b border-border bg-secondary/30 shrink-0">
+                            <h2 className="text-sm font-bold text-foreground uppercase tracking-tight">Edit SKU</h2>
+                            <button onClick={() => setIsEditModalOpen(false)} className="p-1.5 hover:bg-secondary rounded-full transition-colors cursor-pointer">
+                                <X className="w-4 h-4 text-muted-foreground" />
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="flex-1 overflow-y-auto p-5 scrollbar-custom">
+                            <form id="edit-sku-form" onSubmit={handleSaveEdit} className="space-y-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Name <span className="text-destructive">*</span></label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={editForm.name}
+                                        onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                                        className="w-full h-9 px-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors"
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Image URL</label>
+                                    <input
+                                        type="text"
+                                        value={editForm.image}
+                                        onChange={e => setEditForm({ ...editForm, image: e.target.value })}
+                                        className="w-full h-9 px-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors"
+                                        placeholder="https://..."
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Category</label>
+                                        <select
+                                            className="w-full h-9 px-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors appearance-none cursor-pointer"
+                                            value={editForm.category}
+                                            onChange={e => setEditForm({ ...editForm, category: e.target.value })}
+                                        >
+                                            <option value="">Select</option>
+                                            {["Finished Goods", "High Priority", "Lab Testing", "Maintenance", "Packaging", "Part", "Shipping Category"].map(o => <option key={o} value={o}>{o}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Sub Category</label>
+                                        <select
+                                            className="w-full h-9 px-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors appearance-none cursor-pointer"
+                                            value={editForm.subCategory}
+                                            onChange={e => setEditForm({ ...editForm, subCategory: e.target.value })}
+                                        >
+                                            <option value="">Select</option>
+                                            {["Bags", "Bottle And Lids", "Display Boxes", "Disposable Vape", "Edibles", "Flavors", "Hemp", "Kava", "Kratom", "Kratom Extract", "Kratom Powder", "Labels/Shrink-Bands", "Marketing Material", "Packagings", "R&D (Research And Developement)", "Raw Ingredients", "Simple", "Variable"].map(o => <option key={o} value={o}>{o}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Material Type</label>
+                                        <select
+                                            className="w-full h-9 px-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors appearance-none cursor-pointer"
+                                            value={editForm.materialType}
+                                            onChange={e => setEditForm({ ...editForm, materialType: e.target.value })}
+                                        >
+                                            <option value="">Select</option>
+                                            {["Bag", "Bottle", "Box", "Capsule", "Clings", "Crystal", "Dropper", "Edible", "Extracts", "Label", "Lid/Top", "Liquid", "Oils", "Postcards", "Posters", "Powder", "Sample Boxes", "Seal", "Shipping Boxes", "Shrinkband", "Smokables", "Stickers", "Suppository", "SWAG", "Table Tents", "Tablets", "Terpenes", "Topicals"].map(o => <option key={o} value={o}>{o}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-4 gap-4">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">UOM</label>
+                                        <input
+                                            list="edit-uom-options"
+                                            className="w-full h-9 px-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors"
+                                            value={editForm.uom}
+                                            onChange={e => setEditForm({ ...editForm, uom: e.target.value })}
+                                            placeholder="Select or Type..."
+                                        />
+                                        <datalist id="edit-uom-options">
+                                            {["EA", "G", "GAL", "HR", "KG", "L", "LBS", "MG", "ML", "OZ"].map(o => <option key={o} value={o} />)}
+                                        </datalist>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Sale Price ($)</label>
+                                        <input type="number" step="any" value={editForm.salePrice || ''} onChange={e => setEditForm({ ...editForm, salePrice: parseFloat(e.target.value) || 0 })} className="w-full h-9 px-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Order Upto</label>
+                                        <input type="number" step="any" value={editForm.orderUpto || ''} onChange={e => setEditForm({ ...editForm, orderUpto: parseFloat(e.target.value) || 0 })} className="w-full h-9 px-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Re-Order Point</label>
+                                        <input type="number" step="any" value={editForm.reOrderPoint || ''} onChange={e => setEditForm({ ...editForm, reOrderPoint: parseFloat(e.target.value) || 0 })} className="w-full h-9 px-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors" />
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center space-x-6 pt-2">
+                                    <label className="flex items-center space-x-2 cursor-pointer">
+                                        <input type="checkbox" className="w-4 h-4 accent-primary" checked={editForm.kitApplied} onChange={e => setEditForm({ ...editForm, kitApplied: e.target.checked })} />
+                                        <span className="text-xs font-bold uppercase text-muted-foreground">Kit Applied</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 cursor-pointer">
+                                        <input type="checkbox" className="w-4 h-4 accent-primary" checked={editForm.isLotApplied} onChange={e => setEditForm({ ...editForm, isLotApplied: e.target.checked })} />
+                                        <span className="text-xs font-bold uppercase text-muted-foreground">Lot Applied (Traceability)</span>
+                                    </label>
+                                </div>
+                            </form>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="flex items-center justify-end space-x-3 px-5 h-10 border-t border-border bg-secondary/30 shrink-0">
+                            <button onClick={() => setIsEditModalOpen(false)} className="px-4 py-1.5 text-[10px] font-bold text-muted-foreground hover:text-foreground uppercase tracking-widest transition-colors cursor-pointer">Cancel</button>
+                            <button
+                                form="edit-sku-form"
+                                type="submit"
+                                disabled={isEditSaving}
+                                className={cn(
+                                    "flex items-center space-x-2 px-5 py-1.5 bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-widest rounded-md hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50 cursor-pointer",
+                                    isEditSaving && "cursor-not-allowed"
+                                )}
+                            >
+                                <Save className="w-3.5 h-3.5" />
+                                <span>{isEditSaving ? 'Saving...' : 'Save Changes'}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

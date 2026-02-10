@@ -29,7 +29,6 @@ export default function NewManufacturingOrderPage() {
     const [scheduledStart, setScheduledStart] = useState('');
     const [scheduledFinish, setScheduledFinish] = useState('');
     const [priority, setPriority] = useState('Normal');
-    const [label, setLabel] = useState('');
     
     // Data Options
     const [skus, setSkus] = useState<any[]>([]);
@@ -42,7 +41,7 @@ export default function NewManufacturingOrderPage() {
         const fetchData = async () => {
             try {
                 const [skusRes, recipesRes] = await Promise.all([
-                    fetch('/api/skus?limit=0&ignoreDate=true'),
+                    fetch('/api/skus?limit=0&ignoreDate=true&simple=true'),
                     fetch('/api/recipes?limit=0')
                 ]);
                 
@@ -95,7 +94,6 @@ export default function NewManufacturingOrderPage() {
                 scheduledStart: scheduledStart || undefined,
                 scheduledFinish: scheduledFinish || undefined,
                 priority,
-                label,
                 status: 'Pending',
                 createdBy: (session?.user as any)?.id || session?.user?.email,
                 createdAt: new Date().toISOString(),
@@ -215,18 +213,7 @@ export default function NewManufacturingOrderPage() {
                                         <h3 className="text-[10px] font-black uppercase text-foreground tracking-widest">Quantity & Tracking</h3>
                                     </div>
 
-                                    <div className="grid grid-cols-3 gap-4">
-                                        <div className="space-y-1.5">
-                                            <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Work Order Label</label>
-                                            <input
-                                                type="text"
-                                                value={label}
-                                                onChange={e => setLabel(e.target.value)}
-                                                className="w-full h-9 px-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors"
-                                                placeholder="e.g. BATCH-2023-001"
-                                            />
-                                            <p className="text-[8px] text-muted-foreground">If blank, an ID will be generated</p>
-                                        </div>
+                                    <div className="grid grid-cols-2 gap-4">
 
                                         <div className="space-y-1.5">
                                             <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Planned Quantity <span className="text-destructive">*</span></label>

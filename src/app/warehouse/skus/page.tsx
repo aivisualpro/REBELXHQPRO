@@ -420,35 +420,52 @@ function SkusPageContent() {
 
       {/* Add/Edit Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white w-full max-w-2xl shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
+          <div className="relative z-10 w-full max-w-2xl mx-4 bg-background border border-border shadow-2xl rounded-lg overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
-              <h2 className="text-sm font-black uppercase tracking-widest text-slate-900">
+            <div className="flex items-center justify-between px-5 h-10 border-b border-border bg-secondary/30 shrink-0">
+              <h2 className="text-sm font-bold uppercase tracking-tight text-foreground">
                 {editingSku ? 'Edit SKU' : 'Add New SKU'}
               </h2>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-black transition-colors"
+                className="p-1.5 hover:bg-secondary rounded-full transition-colors cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4 text-muted-foreground" />
               </button>
             </div>
 
             {/* Body */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
-              <form id="sku-form" onSubmit={handleSubmit} className="space-y-6">
-                <div className="space-y-4">
-                  <FormInput label="Name" value={formData.name} onChange={v => setFormData({ ...formData, name: v })} required />
+            <div className="flex-1 overflow-y-auto p-5 space-y-4 scrollbar-custom">
+              <form id="sku-form" onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Name <span className="text-destructive">*</span></label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.name}
+                    onChange={e => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full h-9 px-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors"
+                  />
                 </div>
 
-                <FormInput label="Image URL" value={formData.image} onChange={v => setFormData({ ...formData, image: v })} placeholder="https://..." />
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Image URL</label>
+                  <input
+                    type="text"
+                    value={formData.image}
+                    onChange={e => setFormData({ ...formData, image: e.target.value })}
+                    placeholder="https://..."
+                    className="w-full h-9 px-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors"
+                  />
+                </div>
 
                 <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Category</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Category</label>
                     <select
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:border-black focus:ring-0 transition-colors"
+                      className="w-full h-9 px-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors appearance-none cursor-pointer"
                       value={formData.category}
                       onChange={e => setFormData({ ...formData, category: e.target.value })}
                     >
@@ -460,26 +477,26 @@ function SkusPageContent() {
                     </select>
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Sub Category</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Sub Category</label>
                     <select
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:border-black focus:ring-0 transition-colors"
+                      className="w-full h-9 px-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors appearance-none cursor-pointer"
                       value={formData.subCategory}
                       onChange={e => setFormData({ ...formData, subCategory: e.target.value })}
                     >
                       <option value="">Select Sub-Category</option>
                       {[
-                        "Bags", "Bottle and Lids", "Display Boxes", "Disposable Vape", "Edibles", "Flavors", "Hemp",
+                        "Bags", "Bottle And Lids", "Display Boxes", "Disposable Vape", "Edibles", "Flavors", "Hemp",
                         "Kava", "Kratom", "Kratom Extract", "Kratom Powder", "Labels/Shrink-Bands", "Marketing Material",
-                        "Packagings", "R&D (Research and Developement)", "Raw Ingredients", "simple", "variable"
+                        "Packagings", "R&D (Research And Developement)", "Raw Ingredients", "Simple", "Variable"
                       ].map(opt => <option key={opt} value={opt}>{opt}</option>)}
                     </select>
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Material Type</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Material Type</label>
                     <select
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:border-black focus:ring-0 transition-colors"
+                      className="w-full h-9 px-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors appearance-none cursor-pointer"
                       value={formData.materialType}
                       onChange={e => setFormData({ ...formData, materialType: e.target.value })}
                     >
@@ -495,44 +512,53 @@ function SkusPageContent() {
                 </div>
 
                 <div className="grid grid-cols-4 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">UOM</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">UOM</label>
                     <input
                       list="uom-options"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:border-black focus:ring-0 transition-colors"
+                      className="w-full h-9 px-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors"
                       value={formData.uom}
                       onChange={e => setFormData({ ...formData, uom: e.target.value })}
                       placeholder="Select or Type..."
                     />
                     <datalist id="uom-options">
-                      {["Bottle", "Box", "Case", "EA", "Grams", "Hour", "Kg", "Kit", "Liter", "Meter", "Pallet", "Roll"].map(opt => (
+                      {["EA", "G", "GAL", "HR", "KG", "L", "LBS", "MG", "ML", "OZ"].map(opt => (
                         <option key={opt} value={opt} />
                       ))}
                     </datalist>
                   </div>
-                  <FormInput label="Sale Price ($)" type="number" value={formData.salePrice} onChange={v => setFormData({ ...formData, salePrice: Number(v) })} />
-                  <FormInput label="Order Upto" type="number" value={formData.orderUpto} onChange={v => setFormData({ ...formData, orderUpto: Number(v) })} />
-                  <FormInput label="Re-Order Point" type="number" value={formData.reOrderPoint} onChange={v => setFormData({ ...formData, reOrderPoint: Number(v) })} />
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Sale Price ($)</label>
+                    <input type="number" step="any" value={formData.salePrice || ''} onChange={e => setFormData({ ...formData, salePrice: Number(e.target.value) })} className="w-full h-9 px-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Order Upto</label>
+                    <input type="number" step="any" value={formData.orderUpto || ''} onChange={e => setFormData({ ...formData, orderUpto: Number(e.target.value) })} className="w-full h-9 px-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Re-Order Point</label>
+                    <input type="number" step="any" value={formData.reOrderPoint || ''} onChange={e => setFormData({ ...formData, reOrderPoint: Number(e.target.value) })} className="w-full h-9 px-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors" />
+                  </div>
                 </div>
 
                 <div className="flex items-center space-x-6 pt-2">
                   <label className="flex items-center space-x-2 cursor-pointer">
                     <input
                       type="checkbox"
-                      className="w-4 h-4 text-black border-slate-300 rounded focus:ring-black"
+                      className="w-4 h-4 accent-primary"
                       checked={formData.kitApplied}
                       onChange={e => setFormData({ ...formData, kitApplied: e.target.checked })}
                     />
-                    <span className="text-xs font-bold uppercase text-slate-600">Kit Applied</span>
+                    <span className="text-xs font-bold uppercase text-muted-foreground">Kit Applied</span>
                   </label>
                   <label className="flex items-center space-x-2 cursor-pointer">
                     <input
                       type="checkbox"
-                      className="w-4 h-4 text-black border-slate-300 rounded focus:ring-black"
+                      className="w-4 h-4 accent-primary"
                       checked={formData.isLotApplied}
                       onChange={e => setFormData({ ...formData, isLotApplied: e.target.checked })}
                     />
-                    <span className="text-xs font-bold uppercase text-slate-600">Lot Applied (Traceability)</span>
+                    <span className="text-xs font-bold uppercase text-muted-foreground">Lot Applied (Traceability)</span>
                   </label>
                 </div>
 
@@ -540,11 +566,11 @@ function SkusPageContent() {
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 shrink-0 flex justify-end space-x-3">
+            <div className="flex items-center justify-end space-x-3 px-5 h-10 border-t border-border bg-secondary/30 shrink-0">
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-black hover:bg-slate-100 transition-colors"
+                className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -552,7 +578,7 @@ function SkusPageContent() {
                 type="submit"
                 form="sku-form"
                 disabled={isSubmitting}
-                className="px-6 py-2.5 bg-primary text-primary-foreground text-xs font-bold uppercase tracking-wider hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center space-x-2 cursor-pointer"
+                className="px-5 py-1.5 bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-widest rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center space-x-2 cursor-pointer"
               >
                 {isSubmitting && <Loader2 className="w-3 h-3 animate-spin" />}
                 <span>{editingSku ? 'Save Changes' : 'Create SKU'}</span>
@@ -569,17 +595,17 @@ function SkusPageContent() {
 
 // Helpers
 const FormInput = ({ label, value, onChange, type = "text", required = false, placeholder = "" }: { label: string, value: any, onChange: (val: any) => void, type?: string, required?: boolean, placeholder?: string }) => (
-  <div className="space-y-1">
-    <label className="text-[10px] font-bold text-slate-500 uppercase">{label} {required && <span className="text-red-500">*</span>}</label>
+  <div className="space-y-1.5">
+    <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">{label} {required && <span className="text-destructive">*</span>}</label>
     <input
       type={type}
       required={required}
       value={value}
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
-      readOnly={label.includes('SKU') && required === false} // Make SKU readonly in edit mode if required is false (logic in parent)
+      readOnly={label.includes('SKU') && required === false}
       className={cn(
-        "w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:border-black focus:ring-0 transition-colors",
+        "w-full h-9 px-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors",
         label.includes('SKU') && required === false && "opacity-50 cursor-not-allowed"
       )}
     />

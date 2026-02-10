@@ -49,14 +49,30 @@ export async function GET(request: Request) {
 
         const skip = (page - 1) * limit;
 
-        const recipes = await Recipe.find(query)
-            .populate('sku', 'name')
+        const recipesRaw = await Recipe.find(query)
             .populate('createdBy', 'firstName lastName')
             .sort({ [sortBy]: sortOrder })
             .skip(skip)
-            .limit(limit);
+            .limit(limit)
+            .lean();
 
         const total = await Recipe.countDocuments(query);
+
+        // Manual SKU hydration (handles String vs ObjectId mismatch)
+        const skuIds = [...new Set(recipesRaw.map((r: any) => r.sku).filter(Boolean))];
+        const skuDocs = skuIds.length > 0 
+            ? await Sku.find({ _id: { $in: skuIds } }).select('_id name').lean()
+            : [];
+        const skuMap = new Map(skuDocs.map((s: any) => [s._id.toString(), s]));
+
+        const recipes = recipesRaw.map((r: any) => {
+            const skuId = r.sku?.toString();
+            const skuDoc = skuId ? skuMap.get(skuId) : null;
+            return {
+                ...r,
+                sku: skuDoc ? { _id: skuDoc._id, name: skuDoc.name } : r.sku
+            };
+        });
 
         return NextResponse.json({
             recipes,

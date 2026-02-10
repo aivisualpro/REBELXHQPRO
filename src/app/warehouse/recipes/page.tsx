@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import {
@@ -67,6 +68,12 @@ export default function RecipesPage() {
 
   const [skus, setSkus] = useState<Sku[]>([]);
   const [saving, setSaving] = useState(false);
+  const [headerPortalTarget, setHeaderPortalTarget] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const target = document.getElementById('header-portal-target');
+    if (target) setHeaderPortalTarget(target);
+  }, []);
 
 
 
@@ -118,7 +125,7 @@ export default function RecipesPage() {
   };
 
   const fetchSkus = () => {
-    fetch('/api/skus?limit=0')
+    fetch('/api/skus?limit=0&simple=true&ignoreDate=true')
       .then(res => res.json())
       .then(data => {
         if (data && Array.isArray(data.skus)) {
@@ -237,11 +244,11 @@ export default function RecipesPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-48px)] bg-background transition-colors duration-300 relative">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 h-11 border-b border-border bg-secondary/50 transition-colors">
-        <div className="flex items-center space-x-4">
-          <h1 className="text-sm font-bold text-foreground uppercase tracking-tighter shrink-0">Recipes</h1>
-          <div className="relative">
+      {/* Header Portal */}
+      {headerPortalTarget && createPortal(
+        <>
+          <h1 className="text-sm font-bold text-foreground uppercase tracking-tight">Recipes</h1>
+          <div className="relative ml-4">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
             <input
               type="text"
@@ -251,38 +258,14 @@ export default function RecipesPage() {
               className="pl-8 pr-3 h-8 w-64 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
             />
           </div>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          {/* Filters */}
-          <div className="relative">
-            <Filter className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Filter SKU..."
-              value={skuFilter}
-              onChange={(e) => setSkuFilter(e.target.value)}
-              className="pl-6 pr-3 h-8 w-32 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
-            />
-          </div>
-          <div className="relative">
-            <Filter className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Filter Creator..."
-              value={createdByFilter}
-              onChange={(e) => setCreatedByFilter(e.target.value)}
-              className="pl-6 pr-3 h-8 w-32 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
-            />
-          </div>
-
-
-          <button onClick={() => openModal('create')} className="h-8 px-3 bg-primary text-black hover:opacity-90 transition-all rounded shadow-md flex items-center space-x-1.5 ml-1 cursor-pointer">
+          <div className="flex-1" />
+          <button onClick={() => openModal('create')} className="h-8 px-3 bg-primary text-black hover:opacity-90 transition-all rounded shadow-md flex items-center space-x-1.5 cursor-pointer">
             <Plus className="w-3 h-3" />
             <span className="hidden sm:inline text-[10px] font-black uppercase tracking-widest">New</span>
           </button>
-        </div>
-      </div>
+        </>,
+        headerPortalTarget
+      )}
 
       <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
         <div className="min-w-full px-2 py-2">
@@ -309,8 +292,7 @@ export default function RecipesPage() {
                 </th>
               ))}
               <th className="px-4 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-center border-r border-border min-w-[60px]">Items</th>
-               <th className="px-4 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-center border-r border-border min-w-[60px]">Steps</th>
-              <th className="px-4 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-right">Actions</th>
+               <th className="px-4 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-center min-w-[60px]">Steps</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border bg-background/50">
@@ -333,32 +315,7 @@ export default function RecipesPage() {
                   {recipe.createdBy ? `${recipe.createdBy.firstName} ${recipe.createdBy.lastName}` : '-'}
                 </td>
                 <td className="px-4 py-2 text-center text-[11px] font-bold text-muted-foreground border-r border-border">{recipe.lineItems?.length || 0}</td>
-                <td className="px-4 py-2 text-center text-[11px] font-bold text-muted-foreground border-r border-border">{recipe.steps?.length || 0}</td>
-                <td className="px-4 py-2 text-right" onClick={e => e.stopPropagation()}>
-                  <div className="flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => openModal('edit', recipe)}
-                      className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded transition-colors"
-                      title="Edit Details"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => openModal('copy', recipe)}
-                      className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded transition-colors"
-                      title="Copy Recipe"
-                    >
-                      <Copy className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(recipe._id)}
-                      className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </td>
+                <td className="px-4 py-2 text-center text-[11px] font-bold text-muted-foreground">{recipe.steps?.length || 0}</td>
               </tr>
             ))}
           </tbody>
