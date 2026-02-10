@@ -628,7 +628,7 @@ function PurchaseOrdersContent() {
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-background w-full max-w-4xl overflow-hidden animate-in fade-in zoom-in duration-200 border border-border flex flex-col max-h-[90vh] rounded shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-secondary/50 shrink-0">
+            <div className="flex items-center justify-between px-6 h-[36px] border-b border-border bg-secondary/50 shrink-0">
               <h2 className="text-sm font-black uppercase tracking-widest text-foreground">{editingOrderId ? 'Edit Purchase Order' : 'Create Purchase Order'}</h2>
               <button
                 onClick={() => setIsCreateModalOpen(false)}
@@ -650,12 +650,13 @@ function PurchaseOrdersContent() {
                       disabled
                       value={newOrder.label}
                       onChange={e => setNewOrder({ ...newOrder, label: e.target.value })}
-                      className="w-full px-3 py-2 border border-border rounded text-sm bg-secondary text-muted-foreground cursor-not-allowed focus:outline-none"
+                      className="w-full px-3 h-[36px] border border-border rounded text-sm bg-secondary text-muted-foreground cursor-not-allowed focus:outline-none"
                     />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-black text-muted-foreground uppercase tracking-wider">Vendor <span className="text-red-500">*</span></label>
                     <SearchableSelect
+                      triggerClassName="h-[36px]"
                       options={allVendors.map(v => ({ value: v._id, label: v.name }))}
                       value={newOrder.vendor}
                       onChange={(val) => setNewOrder({ ...newOrder, vendor: val })}
@@ -668,7 +669,7 @@ function PurchaseOrdersContent() {
                     <select
                       value={newOrder.status}
                       onChange={e => setNewOrder({ ...newOrder, status: e.target.value })}
-                      className="w-full px-3 py-2 border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 bg-background text-foreground"
+                      className="w-full px-3 h-[36px] border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 bg-background text-foreground"
                     >
                       <option value="Pending">Pending</option>
                       <option value="Received">Received</option>
@@ -677,6 +678,7 @@ function PurchaseOrdersContent() {
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-black text-muted-foreground uppercase tracking-wider">Payment Terms</label>
                     <SearchableSelect
+                      triggerClassName="h-[36px]"
                       options={[
                         { label: 'Net 15', value: 'Net 15' },
                         { label: 'Net 30', value: 'Net 30' },
@@ -699,7 +701,7 @@ function PurchaseOrdersContent() {
                       type="date"
                       value={newOrder.scheduledDelivery}
                       onChange={e => setNewOrder({ ...newOrder, scheduledDelivery: e.target.value })}
-            className="w-full px-3 py-2 border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 bg-background text-foreground"
+            className="w-full px-3 h-[36px] border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 bg-background text-foreground"
                     />
                   </div>
                 </div>
@@ -734,6 +736,7 @@ function PurchaseOrdersContent() {
                         <div key={item.id} className="grid grid-cols-12 gap-2 items-start bg-secondary/20 p-2 rounded border border-border">
                           <div className="col-span-4">
                             <SearchableSelect
+                              triggerClassName="h-[36px]"
                               options={allSkus
                                 .filter(s => !newLineItems.some(i => i.id !== item.id && i.sku === s._id))
                                 .map(s => ({ value: s._id, label: s.name }))
@@ -746,6 +749,7 @@ function PurchaseOrdersContent() {
                           </div>
                           <div className="col-span-2">
                             <SearchableSelect
+                              triggerClassName="h-[36px]"
                               options={UOM_OPTIONS}
                               value={item.uom}
                               onChange={(val) => updateLineItem(item.id, 'uom', val)}
@@ -759,7 +763,7 @@ function PurchaseOrdersContent() {
                               min="1"
                               value={item.qtyOrdered}
                               onChange={(e) => updateLineItem(item.id, 'qtyOrdered', parseInt(e.target.value) || 0)}
-                              className="w-full px-2 py-2 border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 bg-background text-foreground"
+                              className="w-full px-2 h-[36px] border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 bg-background text-foreground"
                             />
                           </div>
                           <div className="col-span-3">
@@ -771,7 +775,7 @@ function PurchaseOrdersContent() {
                                 step="0.00000001"
                                 value={item.cost}
                                 onChange={(e) => updateLineItem(item.id, 'cost', parseFloat(e.target.value) || 0)}
-                                className="w-full pl-5 pr-2 py-2 border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 bg-background text-foreground font-mono"
+                                className="w-full pl-5 pr-2 h-[36px] border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 bg-background text-foreground font-mono"
                               />
                             </div>
                           </div>
@@ -792,11 +796,11 @@ function PurchaseOrdersContent() {
               </form>
             </div>
 
-            <div className="p-4 border-t border-border bg-secondary/50 flex justify-end shrink-0">
+            <div className="px-6 h-[36px] border-t border-border bg-secondary/50 flex items-center justify-end shrink-0">
               <button
                 type="submit"
                 form="create-po-form"
-                className="px-8 h-10 bg-primary text-black text-[11px] font-black uppercase tracking-widest rounded hover:opacity-90 transition-all shadow-md cursor-pointer"
+                className="px-8 h-[28px] bg-primary text-black text-[10px] font-black uppercase tracking-widest rounded hover:opacity-90 transition-all shadow-md cursor-pointer"
               >
                 {editingOrderId ? 'Save Changes' : 'Create Order'}
               </button>
@@ -808,19 +812,19 @@ function PurchaseOrdersContent() {
       {/* Delete Confirmation Modal */}
       {deleteConfirm.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+          <div className="bg-background border border-border rounded-lg shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
             <div className="p-6 text-center">
-              <div className="w-10 h-10 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-10 h-10 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Trash2 className="w-5 h-5 text-red-500" />
               </div>
-              <h3 className="text-sm font-bold text-slate-900 uppercase mb-2">Confirm Delete</h3>
-              <p className="text-xs text-slate-500 mb-6 leading-relaxed">
+              <h3 className="text-sm font-bold text-foreground uppercase mb-2">Confirm Delete</h3>
+              <p className="text-xs text-muted-foreground mb-6 leading-relaxed">
                 Are you sure you want to delete this order? This action cannot be undone.
               </p>
               <div className="flex items-center justify-center space-x-3">
                 <button
                   onClick={() => setDeleteConfirm({ isOpen: false, orderId: null })}
-                  className="px-4 py-2 border border-slate-200 rounded text-xs font-bold text-slate-600 uppercase hover:bg-slate-50 transition-colors min-w-[80px]"
+                  className="px-4 py-2 border border-border rounded text-xs font-bold text-muted-foreground uppercase hover:bg-secondary/50 transition-colors min-w-[80px]"
                 >
                   Cancel
                 </button>
