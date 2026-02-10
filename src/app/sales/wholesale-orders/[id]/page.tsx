@@ -369,26 +369,37 @@ export default function SaleOrderDetailPage() {
                       Cancel
                   </button>
                   <button
-                      onClick={async () => {
+                      onClick={() => {
                           toast.dismiss(t.id);
-                          const updatedItems = order.lineItems?.filter(i => i._id !== itemId).map(i => ({
+
+                          // Optimistic: immediately remove item from UI
+                          const previousOrder = { ...order };
+                          const optimisticLineItems = order.lineItems?.filter(i => i._id !== itemId) || [];
+                          setOrder({ ...order, lineItems: optimisticLineItems });
+                          toast.success('Item deleted');
+
+                          // Background: persist to server
+                          const updatedItems = optimisticLineItems.map(i => ({
                               ...i,
                               sku: (typeof i.sku === 'object' && i.sku !== null) ? i.sku._id : i.sku
-                          })) || [];
-                          try {
-                              const res = await fetch(`/api/wholesale/orders/${order._id}`, {
-                                  method: 'PATCH',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ lineItems: updatedItems })
-                              });
+                          }));
+                          fetch(`/api/wholesale/orders/${order._id}`, {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ lineItems: updatedItems })
+                          }).then(res => {
                               if (res.ok) {
-                                  const data = await res.json();
-                                  setOrder(data);
-                                  toast.success('Item deleted');
+                                  res.json().then(data => setOrder(data));
+                              } else {
+                                  // Revert on failure
+                                  setOrder(previousOrder);
+                                  toast.error('Failed to delete item — reverted');
                               }
-                          } catch (e) {
-                              toast.error('Failed to delete');
-                          }
+                          }).catch(() => {
+                              // Revert on network error
+                              setOrder(previousOrder);
+                              toast.error('Failed to delete item — reverted');
+                          });
                       }}
                       className="flex-1 px-3 py-1.5 text-xs font-bold rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
                   >
