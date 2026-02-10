@@ -43,48 +43,85 @@ export async function POST(request: Request) {
         let count = 0;
         const errors: string[] = [];
 
+        // Build a normalized key lookup helper for each row
+        // This handles CSV headers like "Qty", "Qty Mfg.", "quantity", etc.
+        const getVal = (row: any, ...keys: string[]): string | undefined => {
+            // Direct match first
+            for (const k of keys) {
+                if (row[k] !== undefined && row[k] !== '') return String(row[k]);
+            }
+            // Case-insensitive fallback
+            const rowKeys = Object.keys(row);
+            for (const k of keys) {
+                const lower = k.toLowerCase();
+                const match = rowKeys.find(rk => rk.toLowerCase() === lower);
+                if (match && row[match] !== undefined && row[match] !== '') return String(row[match]);
+            }
+            // Partial match fallback (starts with)
+            for (const k of keys) {
+                const lower = k.toLowerCase();
+                const match = rowKeys.find(rk => rk.toLowerCase().startsWith(lower));
+                if (match && row[match] !== undefined && row[match] !== '') return String(row[match]);
+            }
+            return undefined;
+        };
+
+        // Debug: log first row keys so we can see what the CSV headers are
+        if (data.length > 0) {
+            console.log('Manufacturing Import - CSV Headers:', Object.keys(data[0]));
+            console.log('Manufacturing Import - First row:', JSON.stringify(data[0]));
+        }
+
         const bulkOps: any[] = [];
 
         for (let i = 0; i < data.length; i++) {
             const row = data[i];
             try {
-                const legacyId = row.legacyId || row._id || row.id || '';
+                const legacyId = getVal(row, 'legacyId', '_id', 'id') || '';
 
                 // Resolve SKU by legacyId
-                const skuInput = String(row.sku || '').trim();
+                const skuInput = (getVal(row, 'sku', 'SKU') || '').trim();
                 const resolvedSku = skuMap.get(skuInput);
                 if (!resolvedSku && skuInput) {
                     errors.push(`Row ${i + 1}: SKU '${skuInput}' not found`);
                 }
 
                 // Resolve Recipe by legacyId
-                const recipeInput = String(row.recipesId || '').trim();
+                const recipeInput = (getVal(row, 'recipesId', 'recipeId', 'recipe') || '').trim();
                 const resolvedRecipe = recipeMap.get(recipeInput) || recipeInput || undefined;
 
                 // Map createBy -> createdBy
-                const createdBy = row.createdBy || row.createBy || '';
+                const createdBy = getVal(row, 'createdBy', 'createBy', 'Created By') || '';
 
                 // Transform notes from string to array of objects if needed
                 let notes: any[] = [];
-                if (typeof row.notes === 'string' && row.notes.trim()) {
-                    notes = [{ note: row.notes, createdAt: new Date() }];
+                const rawNotes = getVal(row, 'notes', 'Notes');
+                if (rawNotes && rawNotes.trim()) {
+                    notes = [{ note: rawNotes, createdAt: new Date() }];
                 }
+
+                // Resolve qty with multiple header name fallbacks
+                const rawQty = getVal(row, 'qty', 'Qty', 'Qty Mfg', 'Qty Mfg.', 'quantity', 'Quantity');
+                const parsedQty = rawQty ? parseFloat(rawQty) : 0;
+
+                // Resolve qtyDifference with fallbacks
+                const rawQtyDiff = getVal(row, 'qtyDifference', 'Qty Difference', 'qtyDiff');
 
                 const doc: any = {
                     legacyId: legacyId ? String(legacyId) : undefined,
-                    label: row.label || undefined,
+                    label: getVal(row, 'label', 'Label', 'WO#', 'WO') || undefined,
                     sku: resolvedSku || skuInput,
                     recipesId: resolvedRecipe,
-                    uom: row.uom || undefined,
-                    qty: parseFloat(row.qty) || 0,
-                    qtyDifference: row.qtyDifference !== undefined && row.qtyDifference !== '' ? parseFloat(row.qtyDifference) : undefined,
-                    scheduledStart: row.scheduledStart ? new Date(row.scheduledStart) : undefined,
-                    scheduledFinish: row.scheduledFinish ? new Date(row.scheduledFinish) : undefined,
-                    priority: row.priority || 'Medium',
-                    status: row.status || 'Draft',
+                    uom: getVal(row, 'uom', 'UOM', 'Unit') || undefined,
+                    qty: isNaN(parsedQty) ? 0 : parsedQty,
+                    qtyDifference: rawQtyDiff !== undefined ? parseFloat(rawQtyDiff) : undefined,
+                    scheduledStart: getVal(row, 'scheduledStart', 'Scheduled Start') ? new Date(getVal(row, 'scheduledStart', 'Scheduled Start')!) : undefined,
+                    scheduledFinish: getVal(row, 'scheduledFinish', 'Scheduled Finish') ? new Date(getVal(row, 'scheduledFinish', 'Scheduled Finish')!) : undefined,
+                    priority: getVal(row, 'priority', 'Priority') || 'Medium',
+                    status: getVal(row, 'status', 'Status') || 'Draft',
                     createdBy,
-                    finishedBy: row.finishedBy || undefined,
-                    createdAt: row.createdAt ? new Date(row.createdAt) : new Date(),
+                    finishedBy: getVal(row, 'finishedBy', 'Finished By') || undefined,
+                    createdAt: getVal(row, 'createdAt', 'Created At', 'createdDate') ? new Date(getVal(row, 'createdAt', 'Created At', 'createdDate')!) : new Date(),
                     lineItems: [],
                     labor: []
                 };

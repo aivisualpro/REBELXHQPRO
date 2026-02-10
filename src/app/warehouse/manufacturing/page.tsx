@@ -81,6 +81,7 @@ function ManufacturingContent() {
     try {
       const params = new URLSearchParams({
         page: page.toString(),
+        limit: '25',
         search: debouncedSearch,
         sortBy,
         sortOrder,
@@ -229,7 +230,7 @@ function ManufacturingContent() {
         totalPages={totalPages}
         onPageChange={setPage}
         totalItems={totalOrders}
-        itemsPerPage={20}
+        itemsPerPage={25}
         itemName="Orders"
       />
     </div>

@@ -107,6 +107,7 @@ function SkusPageContent() {
     try {
       const params = new URLSearchParams({
         page: page.toString(),
+        limit: '25',
         search: debouncedSearch,
         sortBy,
         sortOrder,
@@ -412,7 +413,7 @@ function SkusPageContent() {
           totalPages={totalPages}
           onPageChange={setPage}
           totalItems={totalSkus}
-          itemsPerPage={20}
+          itemsPerPage={25}
           itemName="SKUs"
         />
       </div>
