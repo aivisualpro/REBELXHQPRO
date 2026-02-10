@@ -12,52 +12,54 @@ async function hydrateRecipeSkus(recipe: any) {
 
     // Collect all SKU IDs (root + lineItems)
     const allSkuIds = new Set<string>();
-    if (recipe.sku) allSkuIds.add(recipe.sku.toString());
+    if (recipe.sku) allSkuIds.add(String(recipe.sku));
     recipe.lineItems?.forEach((li: any) => {
-        if (li.sku) allSkuIds.add(li.sku.toString());
+        if (li.sku) allSkuIds.add(String(li.sku));
     });
 
     if (allSkuIds.size === 0) return recipe;
 
     const skuIdArr = Array.from(allSkuIds);
-    const db = mongoose.connection.db!;
-    const skusCol = db.collection('skus');
 
-    // Hybrid lookup: try both String and ObjectId types
+    // Hybrid lookup via native driver on the Sku model's collection
     const orConditions: any[] = [
         { _id: { $in: skuIdArr } }
     ];
-    const validOids = skuIdArr.filter(id => mongoose.Types.ObjectId.isValid(id));
+    const validOids = skuIdArr.filter(id => /^[0-9a-f]{24}$/i.test(id));
     if (validOids.length > 0) {
         orConditions.push({ _id: { $in: validOids.map(id => new mongoose.Types.ObjectId(id)) } });
     }
 
-    const skuDocs = await skusCol.find(
-        { $or: orConditions },
-        { projection: { _id: 1, name: 1 } }
-    ).toArray();
+    try {
+        const skuDocs = await Sku.collection.find(
+            { $or: orConditions },
+            { projection: { _id: 1, name: 1 } }
+        ).toArray();
 
-    const skuMap = new Map<string, { _id: string; name: string }>();
-    skuDocs.forEach((s: any) => {
-        skuMap.set(s._id.toString(), { _id: s._id.toString(), name: s.name });
-    });
+        const skuMap = new Map<string, { _id: string; name: string }>();
+        skuDocs.forEach((s: any) => {
+            skuMap.set(String(s._id), { _id: String(s._id), name: s.name });
+        });
 
-    // Hydrate root SKU
-    const rootSkuId = recipe.sku?.toString();
-    const rootSkuDoc = rootSkuId ? skuMap.get(rootSkuId) : null;
-    if (rootSkuDoc) {
-        recipe.sku = { _id: rootSkuDoc._id, name: rootSkuDoc.name };
+        // Hydrate root SKU
+        const rootSkuId = recipe.sku ? String(recipe.sku) : null;
+        const rootSkuDoc = rootSkuId ? skuMap.get(rootSkuId) : null;
+        if (rootSkuDoc) {
+            recipe.sku = { _id: rootSkuDoc._id, name: rootSkuDoc.name };
+        }
+
+        // Hydrate line item SKUs
+        recipe.lineItems = recipe.lineItems?.map((li: any) => {
+            const liSkuId = li.sku ? String(li.sku) : null;
+            const liSkuDoc = liSkuId ? skuMap.get(liSkuId) : null;
+            return {
+                ...li,
+                sku: liSkuDoc ? { _id: liSkuDoc._id, name: liSkuDoc.name } : li.sku
+            };
+        }) || [];
+    } catch (err) {
+        console.error('SKU hydration error:', err);
     }
-
-    // Hydrate line item SKUs
-    recipe.lineItems = recipe.lineItems?.map((li: any) => {
-        const liSkuId = li.sku?.toString();
-        const liSkuDoc = liSkuId ? skuMap.get(liSkuId) : null;
-        return {
-            ...li,
-            sku: liSkuDoc ? { _id: liSkuDoc._id, name: liSkuDoc.name } : li.sku
-        };
-    }) || [];
 
     return recipe;
 }
