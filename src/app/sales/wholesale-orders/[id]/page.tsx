@@ -624,77 +624,6 @@ export default function SaleOrderDetailPage() {
                         <ArrowLeft className="w-3.5 h-3.5" />
                         <span>Back</span>
                     </button>
-                    <button 
-                        onClick={() => {
-                            setEditingHeader({
-                                salesRep: typeof order.salesRep === 'object' && order.salesRep ? (order.salesRep as any)._id : order.salesRep,
-                                orderStatus: order.orderStatus,
-                                paymentMethod: order.paymentMethod,
-                                shippingMethod: order.shippingMethod,
-                                trackingNumber: order.trackingNumber,
-                                shippingCost: order.shippingCost,
-                                discount: order.discount,
-                                tax: order.tax,
-                                shippedDate: order.shippedDate ? new Date(order.shippedDate).toISOString().split('T')[0] : '',
-                                shippingAddress: order.shippingAddress,
-                                city: order.city,
-                                state: order.state
-                            });
-                            setIsHeaderModalOpen(true);
-                        }}
-                        className="flex items-center space-x-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded transition-all cursor-pointer border border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
-                    >
-                        <Pencil className="w-3.5 h-3.5" />
-                        <span>Edit</span>
-                    </button>
-                    <button 
-                        onClick={() => {
-                            toast((t) => (
-                                <div className="flex flex-col gap-2">
-                                    <p className="text-sm font-bold text-white">Delete this order?</p>
-                                    <p className="text-xs text-gray-400">This action cannot be undone.</p>
-                                    <div className="flex gap-2 mt-1">
-                                        <button
-                                            onClick={() => toast.dismiss(t.id)}
-                                            className="flex-1 px-3 py-1.5 text-xs font-bold rounded border border-gray-600 bg-gray-800 text-white hover:bg-gray-700 transition-colors"
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            onClick={async () => {
-                                                toast.dismiss(t.id);
-                                                setIsDeleting(true);
-                                                try {
-                                                    const res = await fetch(`/api/wholesale/orders/${order._id}`, {
-                                                        method: 'DELETE'
-                                                    });
-                                                    if (res.ok) {
-                                                        toast.success('Order deleted');
-                                                        router.push('/sales/wholesale-orders');
-                                                    } else {
-                                                        const data = await res.json();
-                                                        toast.error(data.error || 'Failed to delete order');
-                                                    }
-                                                } catch (e) {
-                                                    toast.error('Error deleting order');
-                                                } finally {
-                                                    setIsDeleting(false);
-                                                }
-                                            }}
-                                            className="flex-1 px-3 py-1.5 text-xs font-bold rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
-                                        >
-                                            Delete
-                                        </button>
-                                    </div>
-                                </div>
-                            ), { duration: 10000, position: 'top-center', style: { maxWidth: '360px', background: '#1a1a1a', color: '#fff', marginTop: '40vh' } });
-                        }}
-                        disabled={isDeleting}
-                        className="flex items-center space-x-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded transition-all cursor-pointer border border-red-500/30 text-red-500 hover:text-white hover:bg-red-600 disabled:opacity-50"
-                    >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
-                    </button>
                 </div>
             </>,
             headerPortal
@@ -704,7 +633,8 @@ export default function SaleOrderDetailPage() {
 
         <div className="flex flex-1 overflow-hidden">
             {/* Left Sidebar: Details (30%) */}
-            <div className="w-[30%] border-r border-border bg-secondary/30 overflow-y-auto p-4 space-y-4">
+            <div className="w-[30%] border-r border-border bg-secondary/30 flex flex-col overflow-hidden">
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {/* Identity Boxes */}
                 <div className="grid grid-cols-3 gap-2">
                     <div className="border border-border rounded-md p-3 bg-background text-center flex items-center justify-center">
@@ -1063,6 +993,82 @@ export default function SaleOrderDetailPage() {
                         </div>
                     );
                 })()}
+            </div>
+
+                {/* Action Buttons at bottom */}
+                <div className="border-t border-border px-4 py-4 shrink-0 flex items-center gap-2">
+                    <button
+                        onClick={() => {
+                            setEditingHeader({
+                                salesRep: typeof order.salesRep === 'object' && order.salesRep ? (order.salesRep as any)._id : order.salesRep,
+                                orderStatus: order.orderStatus,
+                                paymentMethod: order.paymentMethod,
+                                shippingMethod: order.shippingMethod,
+                                trackingNumber: order.trackingNumber,
+                                shippingCost: order.shippingCost,
+                                discount: order.discount,
+                                tax: order.tax,
+                                shippedDate: order.shippedDate ? new Date(order.shippedDate).toISOString().split('T')[0] : '',
+                                shippingAddress: order.shippingAddress,
+                                city: order.city,
+                                state: order.state
+                            });
+                            setIsHeaderModalOpen(true);
+                        }}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-secondary text-foreground border border-border hover:bg-secondary/80 transition-colors cursor-pointer"
+                    >
+                        <Pencil className="w-3.5 h-3.5" />
+                        <span>Edit</span>
+                    </button>
+                    <button
+                        onClick={() => {
+                            toast((t) => (
+                                <div className="flex flex-col gap-2">
+                                    <p className="text-sm font-bold text-white">Delete this order?</p>
+                                    <p className="text-xs text-gray-400">This action cannot be undone.</p>
+                                    <div className="flex gap-2 mt-1">
+                                        <button
+                                            onClick={() => toast.dismiss(t.id)}
+                                            className="flex-1 px-3 py-1.5 text-xs font-bold rounded border border-gray-600 bg-gray-800 text-white hover:bg-gray-700 transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={async () => {
+                                                toast.dismiss(t.id);
+                                                setIsDeleting(true);
+                                                try {
+                                                    const res = await fetch(`/api/wholesale/orders/${order._id}`, {
+                                                        method: 'DELETE'
+                                                    });
+                                                    if (res.ok) {
+                                                        toast.success('Order deleted');
+                                                        router.push('/sales/wholesale-orders');
+                                                    } else {
+                                                        const data = await res.json();
+                                                        toast.error(data.error || 'Failed to delete order');
+                                                    }
+                                                } catch (e) {
+                                                    toast.error('Error deleting order');
+                                                } finally {
+                                                    setIsDeleting(false);
+                                                }
+                                            }}
+                                            className="flex-1 px-3 py-1.5 text-xs font-bold rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
+                                </div>
+                            ), { duration: 10000, position: 'top-center', style: { maxWidth: '360px', background: '#1a1a1a', color: '#fff', marginTop: '40vh' } });
+                        }}
+                        disabled={isDeleting}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
+                    </button>
+                </div>
             </div>
 
             {/* Right Content: Tabs (70%) */}
