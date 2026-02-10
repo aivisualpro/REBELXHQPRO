@@ -155,6 +155,20 @@ export async function PATCH(
 
         const updated = await PurchaseOrder.findByIdAndUpdate(id, body, { new: true });
 
+        // Background sync to AppSheet (non-blocking)
+        if (updated) {
+            const populatedForSync = await PurchaseOrder.findById(id)
+                .populate('vendor', 'name legacyId')
+                .populate('createdBy', 'firstName lastName email')
+                .lean();
+            if (populatedForSync) {
+                const { syncPurchaseOrderToAppSheet } = await import('@/lib/appsheet');
+                syncPurchaseOrderToAppSheet(populatedForSync, 'Edit').catch(err =>
+                    console.error('Background PO AppSheet edit sync failed:', err)
+                );
+            }
+        }
+
         // Propagate cost changes
         if (updated && updated.lineItems) {
             const { propagateCostChange } = await import('@/lib/cost-propagation');
@@ -182,9 +196,20 @@ export async function DELETE(
         await dbConnect();
         const { id } = await context.params;
 
+        // Fetch PO before deleting (need data for AppSheet deletion)
+        const orderToDelete = await PurchaseOrder.findById(id).lean();
+
         const deleted = await PurchaseOrder.findByIdAndDelete(id);
         if (!deleted) {
             return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+        }
+
+        // Background delete from AppSheet (non-blocking)
+        if (orderToDelete) {
+            const { deletePurchaseOrderFromAppSheet } = await import('@/lib/appsheet');
+            deletePurchaseOrderFromAppSheet(orderToDelete).catch(err =>
+                console.error('Background PO AppSheet delete failed:', err)
+            );
         }
 
         return NextResponse.json({ message: 'Order deleted' });

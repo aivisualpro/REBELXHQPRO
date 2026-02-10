@@ -838,3 +838,317 @@ export async function deleteManufacturingLineItemsFromAppSheet(lineItemIds: stri
         console.error('AppSheet Manufacturing LineItems Delete Error:', error);
     }
 }
+
+// ═══════════════════════════════════════════════
+// Purchase Order → AppSheet Sync
+// ═══════════════════════════════════════════════
+
+export async function syncPurchaseOrderToAppSheet(order: any, action: 'Add' | 'Edit' | 'Delete' = 'Add') {
+    const appId = process.env.APPSHEET_APP_ID;
+    const accessKey = process.env.APPSHEET_ACCESS_KEY;
+
+    if (!appId || !accessKey) {
+        console.error('AppSheet API credentials missing');
+        return;
+    }
+
+    const orderObj = order.toObject ? order.toObject() : order;
+
+    // Resolve vendor name
+    let vendorName = '';
+    if (typeof orderObj.vendor === 'object' && orderObj.vendor !== null) {
+        vendorName = orderObj.vendor.name || orderObj.vendor.legacyId || orderObj.vendor._id?.toString() || '';
+    } else {
+        vendorName = orderObj.vendor?.toString() || '';
+    }
+
+    // Resolve createdBy email
+    let createdByEmail = '';
+    if (typeof orderObj.createdBy === 'object' && orderObj.createdBy !== null) {
+        createdByEmail = orderObj.createdBy.email || `${orderObj.createdBy.firstName || ''} ${orderObj.createdBy.lastName || ''}`.trim() || '';
+    } else if (typeof orderObj.createdBy === 'string') {
+        createdByEmail = orderObj.createdBy;
+    }
+
+    const orderRow: Record<string, any> = {
+        'PO #': orderObj.legacyId || orderObj._id?.toString() || '',
+        '10000': orderObj.label || '',
+        'Vendor': vendorName,
+        'Payment Terms': orderObj.paymentTerms || '',
+        'Created By': createdByEmail,
+        'Status': orderObj.status || '',
+        'Date Scheduled': orderObj.scheduledDelivery ? new Date(orderObj.scheduledDelivery).toISOString() : '',
+        'Received Date': orderObj.receivedDate ? new Date(orderObj.receivedDate).toISOString() : '',
+        'TimeStamp': orderObj.createdAt ? new Date(orderObj.createdAt).toISOString() : '',
+    };
+
+    const orderPayload = {
+        Action: action,
+        Properties: { Locale: 'en-US', Timezone: 'Eastern Standard Time' },
+        Rows: [orderRow]
+    };
+
+    // Map Line Items to "PO lineitems" table
+    const detailRows = (orderObj.lineItems || []).map((item: any) => {
+        let productId = '';
+        if (typeof item.sku === 'object' && item.sku !== null) {
+            productId = item.sku.legacyId || item.sku._id?.toString() || '';
+        } else {
+            productId = item.sku?.toString() || '';
+        }
+
+        return {
+            'Record ID': item.legacyId || item._id?.toString() || '',
+            'OldPO #': item.poNumber || orderObj.legacyId || '',
+            'Product Id': productId,
+            'Lot #': item.lotNumber || '',
+            'Qty': item.qtyOrdered || 0,
+            'Qty Received': item.qtyReceived || 0,
+            'UOM': item.uom || '',
+            'Cost': item.cost || 0,
+            'Amount': item.amount || 0,
+            'TimeStamp': item.createdAt ? new Date(item.createdAt).toISOString() : new Date().toISOString(),
+        };
+    });
+
+    const detailPayload = {
+        Action: action,
+        Properties: { Locale: 'en-US', Timezone: 'Eastern Standard Time' },
+        Rows: detailRows
+    };
+
+    // Helper function to fetch with timeout
+    const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs = 30000) => {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            const response = await fetch(url, { ...options, signal: controller.signal });
+            return response;
+        } finally {
+            clearTimeout(timeout);
+        }
+    };
+
+    try {
+        // Run both API calls in PARALLEL for faster sync
+        const promises: Promise<any>[] = [];
+
+        // PO sync promise
+        promises.push(
+            fetchWithTimeout(
+                `https://api.appsheet.com/api/v2/apps/${appId}/tables/PO/Action`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'ApplicationAccessKey': accessKey },
+                    body: JSON.stringify(orderPayload),
+                }
+            ).then(res => res.json()).then(result => {
+                console.log(`AppSheet PO ${action} Result:`, result);
+                // If Add fails because key already exists, retry with Edit
+                if (action === 'Add' && result?.Errors) {
+                    console.log('PO Add failed, retrying with Edit...');
+                    const editPayload = { ...orderPayload, Action: 'Edit' };
+                    return fetchWithTimeout(
+                        `https://api.appsheet.com/api/v2/apps/${appId}/tables/PO/Action`,
+                        {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'ApplicationAccessKey': accessKey },
+                            body: JSON.stringify(editPayload),
+                        }
+                    ).then(r => r.json());
+                }
+                return result;
+            })
+        );
+
+        // PO Line Items sync promise (only if there are line items)
+        if (detailRows.length > 0) {
+            promises.push(
+                fetchWithTimeout(
+                    `https://api.appsheet.com/api/v2/apps/${appId}/tables/PO lineitems/Action`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'ApplicationAccessKey': accessKey },
+                        body: JSON.stringify(detailPayload),
+                    }
+                ).then(res => res.json()).then(result => {
+                    console.log(`AppSheet PO LineItems ${action} Result:`, result);
+                    // If Add fails, retry with Edit
+                    if (action === 'Add' && result?.Errors) {
+                        console.log('PO LineItems Add failed, retrying with Edit...');
+                        const editPayload = { ...detailPayload, Action: 'Edit' };
+                        return fetchWithTimeout(
+                            `https://api.appsheet.com/api/v2/apps/${appId}/tables/PO lineitems/Action`,
+                            {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'ApplicationAccessKey': accessKey },
+                                body: JSON.stringify(editPayload),
+                            }
+                        ).then(r => r.json());
+                    }
+                    return result;
+                })
+            );
+        }
+
+        // Wait for all in parallel
+        const results = await Promise.all(promises);
+        return { orderResult: results[0], detailResult: results[1] || null };
+    } catch (error) {
+        console.error('AppSheet PO Sync Error:', error);
+    }
+}
+
+export async function deletePurchaseOrderFromAppSheet(order: any) {
+    const appId = process.env.APPSHEET_APP_ID;
+    const accessKey = process.env.APPSHEET_ACCESS_KEY;
+
+    if (!appId || !accessKey) {
+        console.error('AppSheet API credentials missing');
+        return;
+    }
+
+    const orderObj = order.toObject ? order.toObject() : order;
+    const orderKey = orderObj.legacyId || orderObj._id?.toString() || '';
+
+    if (!orderKey) {
+        console.error('No PO key found for AppSheet deletion');
+        return;
+    }
+
+    const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs = 30000) => {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            const response = await fetch(url, { ...options, signal: controller.signal });
+            return response;
+        } finally {
+            clearTimeout(timeout);
+        }
+    };
+
+    try {
+        const promises: Promise<any>[] = [];
+
+        // Delete the PO row
+        const orderPayload = {
+            Action: 'Delete',
+            Properties: { Locale: 'en-US', Timezone: 'Eastern Standard Time' },
+            Rows: [{ 'PO #': orderKey }]
+        };
+
+        promises.push(
+            fetchWithTimeout(
+                `https://api.appsheet.com/api/v2/apps/${appId}/tables/PO/Action`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'ApplicationAccessKey': accessKey },
+                    body: JSON.stringify(orderPayload),
+                }
+            ).then(res => res.json()).then(result => {
+                console.log('AppSheet PO Delete Result:', result);
+                return result;
+            })
+        );
+
+        // Delete all PO Line Item rows
+        const lineItems = orderObj.lineItems || [];
+        if (lineItems.length > 0) {
+            const detailRows = lineItems.map((item: any) => ({
+                'Record ID': item.legacyId || item._id?.toString() || '',
+            }));
+
+            const detailPayload = {
+                Action: 'Delete',
+                Properties: { Locale: 'en-US', Timezone: 'Eastern Standard Time' },
+                Rows: detailRows
+            };
+
+            promises.push(
+                fetchWithTimeout(
+                    `https://api.appsheet.com/api/v2/apps/${appId}/tables/PO lineitems/Action`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'ApplicationAccessKey': accessKey },
+                        body: JSON.stringify(detailPayload),
+                    }
+                ).then(res => res.json()).then(result => {
+                    console.log('AppSheet PO LineItems Delete Result:', result);
+                    return result;
+                })
+            );
+        }
+
+        const results = await Promise.all(promises);
+        return { orderResult: results[0], detailResult: results[1] || null };
+    } catch (error) {
+        console.error('AppSheet PO Delete Error:', error);
+    }
+}
+
+export async function syncPOLineItemToAppSheet(order: any, lineItem: any, action: 'Add' | 'Edit' | 'Delete' = 'Add') {
+    const appId = process.env.APPSHEET_APP_ID;
+    const accessKey = process.env.APPSHEET_ACCESS_KEY;
+
+    if (!appId || !accessKey) {
+        console.error('AppSheet API credentials missing');
+        return;
+    }
+
+    const orderObj = order.toObject ? order.toObject() : order;
+
+    // Resolve SKU to ProductID
+    let productId = '';
+    if (typeof lineItem.sku === 'object' && lineItem.sku !== null) {
+        productId = lineItem.sku.legacyId || lineItem.sku._id?.toString() || '';
+    } else {
+        productId = lineItem.sku?.toString() || '';
+    }
+
+    const row: Record<string, any> = {
+        'Record ID': lineItem.legacyId || lineItem._id?.toString() || '',
+        'OldPO #': lineItem.poNumber || orderObj.legacyId || '',
+        'Product Id': productId,
+        'Lot #': lineItem.lotNumber || '',
+        'Qty': lineItem.qtyOrdered || 0,
+        'Qty Received': lineItem.qtyReceived || 0,
+        'UOM': lineItem.uom || '',
+        'Cost': lineItem.cost || 0,
+        'Amount': lineItem.amount || 0,
+        'TimeStamp': lineItem.createdAt ? new Date(lineItem.createdAt).toISOString() : new Date().toISOString(),
+    };
+
+    const payload = {
+        Action: action,
+        Properties: { Locale: 'en-US', Timezone: 'Eastern Standard Time' },
+        Rows: [row]
+    };
+
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 30000);
+        const response = await fetch(`https://api.appsheet.com/api/v2/apps/${appId}/tables/PO lineitems/Action`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'ApplicationAccessKey': accessKey,
+            },
+            body: JSON.stringify(payload),
+            signal: controller.signal,
+        });
+        clearTimeout(timeout);
+
+        const result = await response.json();
+        console.log(`AppSheet PO LineItem ${action} Result:`, result);
+
+        // If Add fails because key already exists, retry with Edit
+        if (action === 'Add' && result?.Errors) {
+            console.log('PO LineItem Add failed, retrying with Edit...');
+            return syncPOLineItemToAppSheet(order, lineItem, 'Edit');
+        }
+
+        return result;
+    } catch (error) {
+        console.error('AppSheet PO LineItem Sync Error:', error);
+    }
+}

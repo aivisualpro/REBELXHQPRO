@@ -98,6 +98,19 @@ export async function POST(request: Request) {
         await dbConnect();
         const body = await request.json();
         const newItem = await PurchaseOrder.create(body);
+
+        // Background sync to AppSheet (non-blocking)
+        const populated = await PurchaseOrder.findById((newItem as any)._id)
+            .populate('vendor', 'name legacyId')
+            .populate('createdBy', 'firstName lastName email')
+            .lean();
+        if (populated) {
+            const { syncPurchaseOrderToAppSheet } = await import('@/lib/appsheet');
+            syncPurchaseOrderToAppSheet(populated, 'Add').catch(err =>
+                console.error('Background PO AppSheet sync failed:', err)
+            );
+        }
+
         return NextResponse.json(newItem);
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });
