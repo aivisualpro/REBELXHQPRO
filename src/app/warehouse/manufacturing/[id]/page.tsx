@@ -588,17 +588,25 @@ export default function ManufacturingDetailPage() {
                 {/* Left Sidebar: Details (30%) */}
                 <div className="w-[30%] border-r border-border bg-background overflow-y-auto scrollbar-custom flex flex-col">
                     {/* Back + Actions Bar */}
-                    <div className="flex items-center justify-between px-4 py-2 border-b border-border shrink-0">
-                        <button
-                            onClick={() => router.push('/warehouse/manufacturing')}
-                            className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                            <ArrowLeft className="w-3.5 h-3.5" />
-                            <span>Back</span>
-                        </button>
+                    <div className="flex items-center justify-between px-4 h-9 border-b border-border shrink-0">
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => router.push('/warehouse/manufacturing')}
+                                className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80 px-2.5 py-1 border border-border transition-colors"
+                            >
+                                <ArrowLeft className="w-3.5 h-3.5" />
+                                <span>Back</span>
+                            </button>
+                            {order.label && (
+                                <div className="flex items-center gap-1.5">
+                                    <span className="text-[9px] text-muted-foreground uppercase tracking-widest font-bold">WO #</span>
+                                    <span className="text-xs font-mono font-black text-foreground">{order.label}</span>
+                                </div>
+                            )}
+                        </div>
                         <Link 
                             href={`/warehouse/skus/${typeof order.sku === 'object' && order.sku !== null ? (order.sku as any)._id : order.sku}?lot=${encodeURIComponent(order.label || order._id)}`}
-                            className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors"
+                            className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80 px-2.5 py-1 border border-border transition-colors"
                         >
                             <Layers className="w-3 h-3" />
                             <span>Ledger</span>
@@ -721,13 +729,6 @@ export default function ManufacturingDetailPage() {
                         </div>
                     </div>
 
-                    {/* WO Label */}
-                    {order.label && (
-                        <div className="mx-5 mb-3 px-3 py-2 bg-secondary border border-border">
-                            <div className="text-[8px] text-muted-foreground uppercase tracking-widest font-bold mb-0.5">WO / Lot Number</div>
-                            <div className="text-xs font-mono font-bold text-foreground">{order.label}</div>
-                        </div>
-                    )}
 
                     {/* Quantity Section */}
                     <div className="mx-5 mb-4">
@@ -768,9 +769,9 @@ export default function ManufacturingDetailPage() {
                                 </div>
                             </div>
                         </div>
-                        <div className="bg-foreground text-background px-4 py-2.5 flex justify-between items-center">
-                            <div className="text-[9px] uppercase tracking-widest font-bold text-background/50">Qty Manufactured</div>
-                            <div className="text-lg font-black">{costs.qtyManufactured} <span className="text-[9px] text-background/50 font-bold uppercase">{order.uom}</span></div>
+                        <div className="bg-emerald-950/50 border border-emerald-800/30 px-4 py-2.5 flex justify-between items-center">
+                            <div className="text-[9px] uppercase tracking-widest font-bold text-emerald-400">Qty Manufactured</div>
+                            <div className="text-lg font-black text-emerald-400">{costs.qtyManufactured} <span className="text-[9px] text-emerald-400/60 font-bold uppercase">{order.uom}</span></div>
                         </div>
                     </div>
 
@@ -855,7 +856,7 @@ export default function ManufacturingDetailPage() {
                 {/* Right Content: Tabs (70%) */}
                 <div className="w-[70%] bg-background flex flex-col overflow-hidden">
                     {/* Tabs & Actions */}
-                    <div className="px-6 border-b border-border shrink-0 flex items-center justify-between bg-background z-10">
+                    <div className="px-4 border-b border-border shrink-0 flex items-center justify-between bg-background z-10 h-9">
                         <div className="flex space-x-1">
                             {(() => {
                                 const tabCounts: Record<string, number> = {
@@ -905,7 +906,7 @@ export default function ManufacturingDetailPage() {
                                         setSkuSearch('');
                                         setIsEditModalOpen(true);
                                     }}
-                                    className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-foreground text-background hover:opacity-80 transition-colors flex items-center space-x-1 shadow-sm"
+                                    className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors flex items-center space-x-1"
                                 >
                                     <Plus className="w-3 h-3" />
                                     <span>Add Item</span>
@@ -918,7 +919,7 @@ export default function ManufacturingDetailPage() {
                                         setUserSearch('');
                                         setIsLaborModalOpen(true);
                                     }}
-                                    className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-foreground text-background hover:opacity-80 transition-colors flex items-center space-x-1 shadow-sm"
+                                    className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors flex items-center space-x-1"
                                 >
                                     <Plus className="w-3 h-3" />
                                     <span>Add Labor</span>
@@ -930,7 +931,7 @@ export default function ManufacturingDetailPage() {
                                         setEditingNote({ note: '' });
                                         setIsNoteModalOpen(true);
                                     }}
-                                    className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-foreground text-background hover:opacity-80 transition-colors flex items-center space-x-1 shadow-sm"
+                                    className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors flex items-center space-x-1"
                                 >
                                     <Plus className="w-3 h-3" />
                                     <span>Add Note</span>
