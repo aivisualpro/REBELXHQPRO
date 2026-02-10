@@ -58,12 +58,33 @@ export async function GET(request: Request) {
 
         const total = await Recipe.countDocuments(query);
 
-        // Manual SKU hydration (handles String vs ObjectId mismatch)
-        const skuIds = [...new Set(recipesRaw.map((r: any) => r.sku).filter(Boolean))];
-        const skuDocs = skuIds.length > 0 
-            ? await Sku.find({ _id: { $in: skuIds } }).select('_id name').lean()
-            : [];
-        const skuMap = new Map(skuDocs.map((s: any) => [s._id.toString(), s]));
+        // Manual SKU hydration via native driver (handles String vs ObjectId mismatch)
+        const skuIds = [...new Set(recipesRaw.map((r: any) => r.sku?.toString()).filter(Boolean))];
+        const skuMap = new Map<string, { _id: string; name: string }>();
+
+        if (skuIds.length > 0) {
+            const mongoose = (await import('mongoose')).default;
+            const db = mongoose.connection.db!;
+            const skusCol = db.collection('skus');
+
+            // Build $or query to match both String and ObjectId _id types
+            const orConditions: any[] = [
+                { _id: { $in: skuIds } } // String match
+            ];
+            const validOids = skuIds.filter(id => mongoose.Types.ObjectId.isValid(id));
+            if (validOids.length > 0) {
+                orConditions.push({ _id: { $in: validOids.map(id => new mongoose.Types.ObjectId(id)) } });
+            }
+
+            const skuDocs = await skusCol.find(
+                { $or: orConditions },
+                { projection: { _id: 1, name: 1 } }
+            ).toArray();
+
+            skuDocs.forEach((s: any) => {
+                skuMap.set(s._id.toString(), { _id: s._id.toString(), name: s.name });
+            });
+        }
 
         const recipes = recipesRaw.map((r: any) => {
             const skuId = r.sku?.toString();
