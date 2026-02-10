@@ -113,6 +113,7 @@ export async function POST(request: Request) {
         const populated = await PurchaseOrder.findById((newItem as any)._id)
             .populate('vendor', 'name legacyId')
             .populate('createdBy', 'firstName lastName email')
+            .populate('lineItems.sku', 'name legacyId')
             .lean();
         if (populated) {
             // Override createdBy email from session (in case populate didn't resolve it)

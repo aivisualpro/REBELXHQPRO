@@ -164,6 +164,7 @@ export async function PATCH(
             const populatedForSync = await PurchaseOrder.findById(id)
                 .populate('vendor', 'name legacyId')
                 .populate('createdBy', 'firstName lastName email')
+                .populate('lineItems.sku', 'name legacyId')
                 .lean();
             if (populatedForSync) {
                 const syncData = { ...populatedForSync, _sessionEmail: userEmail };
