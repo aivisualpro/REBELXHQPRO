@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import Manufacturing from '@/models/Manufacturing';
 import mongoose from 'mongoose';
@@ -6,6 +6,7 @@ import Sku from '@/models/Sku';
 import User from '@/models/User';
 import { applyDateFilter } from '@/lib/global-settings';
 import { getSkuTiers } from '@/lib/sku-tiers';
+import { syncManufacturingToAppSheet, syncManufacturingLineItemsToAppSheet } from '@/lib/appsheet';
 
 export async function GET(request: Request) {
     try {
@@ -161,7 +162,40 @@ export async function POST(request: Request) {
             }
         }
 
-        const newItem = await Manufacturing.create(body);
+        const newItem: any = await Manufacturing.create(body);
+
+        // Background sync to AppSheet using Next.js after()
+        after(async () => {
+            try {
+                await dbConnect();
+                const populatedOrder: any = await Manufacturing.findById(newItem._id)
+                    .populate('createdBy', 'firstName lastName')
+                    .populate('finishedBy', 'firstName lastName')
+                    .lean();
+
+                if (populatedOrder) {
+                    // Hydrate SKU with legacyId for AppSheet mapping
+                    if (populatedOrder.sku) {
+                        const skuDoc = await Sku.findById(populatedOrder.sku).select('name legacyId').lean();
+                        if (skuDoc) {
+                            (populatedOrder as any).sku = skuDoc;
+                        }
+                    }
+                    // Sync parent order and line items in parallel
+                    const promises: Promise<any>[] = [
+                        syncManufacturingToAppSheet(populatedOrder, 'Add')
+                    ];
+                    if (populatedOrder.lineItems && populatedOrder.lineItems.length > 0) {
+                        promises.push(syncManufacturingLineItemsToAppSheet(populatedOrder, populatedOrder.lineItems, 'Add'));
+                    }
+                    await Promise.all(promises);
+                    console.log('✅ Manufacturing order + line items synced to AppSheet:', newItem._id);
+                }
+            } catch (syncError) {
+                console.error('❌ Background AppSheet Manufacturing sync failed:', syncError);
+            }
+        });
+
         return NextResponse.json(newItem);
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });

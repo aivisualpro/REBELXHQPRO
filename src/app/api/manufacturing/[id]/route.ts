@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import mongoose from 'mongoose';
 import Manufacturing from '@/models/Manufacturing';
@@ -10,6 +10,7 @@ import AuditAdjustment from '@/models/AuditAdjustment';
 import User from '@/models/User';
 import { Recipe } from '@/models/Recipe';
 import { getSkuTiers } from '@/lib/sku-tiers';
+import { syncManufacturingToAppSheet, deleteManufacturingFromAppSheet } from '@/lib/appsheet';
 
 export const dynamic = 'force-dynamic';
 
@@ -406,9 +407,42 @@ export async function PATCH(
             }
         });
 
+        // Background sync to AppSheet (Edit action, match by TimeStamp)
+        const orderIdStr = (order as any)._id?.toString();
+        if (orderIdStr) {
+            after(async () => {
+                await syncManufacturingOrderToAppSheet(orderIdStr, 'Edit');
+            });
+        }
+
         return NextResponse.json(order);
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+}
+
+// Shared helper: populate and sync manufacturing order to AppSheet
+async function syncManufacturingOrderToAppSheet(orderId: string, action: 'Add' | 'Edit') {
+    try {
+        await dbConnect();
+        const populatedOrder = await Manufacturing.findById(orderId)
+            .populate('createdBy', 'firstName lastName')
+            .populate('finishedBy', 'firstName lastName')
+            .lean();
+
+        if (populatedOrder) {
+            // Hydrate SKU with legacyId for AppSheet mapping
+            if (populatedOrder.sku) {
+                const skuDoc = await Sku.findById(populatedOrder.sku).select('name legacyId').lean();
+                if (skuDoc) {
+                    (populatedOrder as any).sku = skuDoc;
+                }
+            }
+            await syncManufacturingToAppSheet(populatedOrder, action);
+            console.log(`✅ Manufacturing order ${action} synced to AppSheet:`, orderId);
+        }
+    } catch (syncError) {
+        console.error('❌ Background AppSheet Manufacturing sync failed:', syncError);
     }
 }
 
@@ -419,10 +453,29 @@ export async function DELETE(
     try {
         await dbConnect();
         const { id } = await context.params;
-        const result = await Manufacturing.findByIdAndDelete(id);
-        if (!result) {
+
+        // Fetch the order BEFORE deleting so we have createdAt for AppSheet key matching
+        const orderToDelete = await Manufacturing.findById(id)
+            .populate('createdBy', 'firstName lastName')
+            .populate('finishedBy', 'firstName lastName')
+            .lean();
+
+        if (!orderToDelete) {
             return NextResponse.json({ error: 'Order not found' }, { status: 404 });
         }
+
+        await Manufacturing.findByIdAndDelete(id);
+
+        // Background sync: delete from AppSheet matching by TimeStamp
+        after(async () => {
+            try {
+                await deleteManufacturingFromAppSheet(orderToDelete);
+                console.log('✅ Manufacturing order deleted from AppSheet:', id);
+            } catch (syncError) {
+                console.error('❌ Background AppSheet Manufacturing delete failed:', syncError);
+            }
+        });
+
         return NextResponse.json({ message: 'Order deleted successfully' });
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });

@@ -95,6 +95,8 @@ export default function ManufacturingDetailPage() {
 
     // Labor Modal State
     const [isLaborModalOpen, setIsLaborModalOpen] = useState(false);
+    const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+    const [priorityDropdownOpen, setPriorityDropdownOpen] = useState(false);
     const [editingLabor, setEditingLabor] = useState<{ _id?: string; type: string; user: string; duration: string; hourlyRate: number } | null>(null);
 
     // Users list for Labor dropdown
@@ -651,54 +653,71 @@ export default function ManufacturingDetailPage() {
 
                     {/* Status & Priority Buttons */}
                     <div className="mx-5 mb-3 flex items-center gap-2">
-                        <div className="relative group/status flex-1">
-                            <button className={cn(
-                                "w-full px-2 py-1.5 text-[8px] font-black uppercase tracking-widest text-center cursor-pointer transition-all",
-                                order.status === 'Fulfilled' ? "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25" :
-                                order.status === 'Processing' ? "bg-blue-500/15 text-blue-400 hover:bg-blue-500/25" :
-                                order.status === 'Ready to QC' ? "bg-amber-500/15 text-amber-400 hover:bg-amber-500/25" :
-                                "bg-secondary text-muted-foreground hover:bg-secondary/80"
-                            )}>
+                        <div className="relative flex-1">
+                            <button 
+                                onClick={() => { setStatusDropdownOpen(!statusDropdownOpen); setPriorityDropdownOpen(false); }}
+                                className={cn(
+                                    "w-full px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-center cursor-pointer transition-all",
+                                    order.status === 'Fulfilled' ? "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25" :
+                                    order.status === 'Processing' ? "bg-blue-500/15 text-blue-400 hover:bg-blue-500/25" :
+                                    order.status === 'Ready to QC' ? "bg-amber-500/15 text-amber-400 hover:bg-amber-500/25" :
+                                    "bg-secondary text-muted-foreground hover:bg-secondary/80"
+                                )}
+                            >
                                 {order.status}
                             </button>
-                            <div className="hidden group-hover/status:block absolute top-full left-0 right-0 mt-0.5 bg-popover border border-border shadow-lg z-30">
-                                {STATUSES.map(s => (
-                                    <button
-                                        key={s}
-                                        onClick={() => handleStatusChange(s)}
-                                        className={cn(
-                                            "w-full text-left px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider hover:bg-secondary transition-colors",
-                                            order.status === s ? "text-foreground bg-secondary" : "text-muted-foreground"
-                                        )}
-                                    >
-                                        {s}
-                                    </button>
-                                ))}
-                            </div>
+                            {statusDropdownOpen && (
+                                <div className="absolute top-full left-0 right-0 mt-0.5 bg-[#1a1a1a] border border-border shadow-xl z-30">
+                                    {STATUSES.map(s => (
+                                        <button
+                                            key={s}
+                                            onClick={() => { handleStatusChange(s); setStatusDropdownOpen(false); }}
+                                            className={cn(
+                                                "w-full text-left px-3 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors",
+                                                s === 'Fulfilled' ? "text-emerald-400 hover:bg-emerald-500/15" :
+                                                s === 'Processing' ? "text-blue-400 hover:bg-blue-500/15" :
+                                                s === 'Ready to QC' ? "text-amber-400 hover:bg-amber-500/15" :
+                                                "text-muted-foreground hover:bg-secondary",
+                                                order.status === s && "bg-secondary/80"
+                                            )}
+                                        >
+                                            {s}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
-                        <div className="relative group/priority flex-1">
-                            <button className={cn(
-                                "w-full px-2 py-1.5 text-[8px] font-black uppercase tracking-widest text-center cursor-pointer transition-all",
-                                order.priority === 'Extreme' ? "bg-red-500/15 text-red-400 hover:bg-red-500/25" :
-                                order.priority === 'High' ? "bg-orange-500/15 text-orange-400 hover:bg-orange-500/25" :
-                                "bg-secondary text-muted-foreground hover:bg-secondary/80"
-                            )}>
+                        <div className="relative flex-1">
+                            <button 
+                                onClick={() => { setPriorityDropdownOpen(!priorityDropdownOpen); setStatusDropdownOpen(false); }}
+                                className={cn(
+                                    "w-full px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-center cursor-pointer transition-all",
+                                    order.priority === 'Extreme' ? "bg-red-500/15 text-red-400 hover:bg-red-500/25" :
+                                    order.priority === 'High' ? "bg-orange-500/15 text-orange-400 hover:bg-orange-500/25" :
+                                    "bg-secondary text-muted-foreground hover:bg-secondary/80"
+                                )}
+                            >
                                 {order.priority}
                             </button>
-                            <div className="hidden group-hover/priority:block absolute top-full left-0 right-0 mt-0.5 bg-popover border border-border shadow-lg z-30">
-                                {PRIORITIES.map(p => (
-                                    <button
-                                        key={p}
-                                        onClick={() => handlePriorityChange(p)}
-                                        className={cn(
-                                            "w-full text-left px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider hover:bg-secondary transition-colors",
-                                            order.priority === p ? "text-foreground bg-secondary" : "text-muted-foreground"
-                                        )}
-                                    >
-                                        {p}
-                                    </button>
-                                ))}
-                            </div>
+                            {priorityDropdownOpen && (
+                                <div className="absolute top-full left-0 right-0 mt-0.5 bg-[#1a1a1a] border border-border shadow-xl z-30">
+                                    {PRIORITIES.map(p => (
+                                        <button
+                                            key={p}
+                                            onClick={() => { handlePriorityChange(p); setPriorityDropdownOpen(false); }}
+                                            className={cn(
+                                                "w-full text-left px-3 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors",
+                                                p === 'Extreme' ? "text-red-400 hover:bg-red-500/15" :
+                                                p === 'High' ? "text-orange-400 hover:bg-orange-500/15" :
+                                                "text-muted-foreground hover:bg-secondary",
+                                                order.priority === p && "bg-secondary/80"
+                                            )}
+                                        >
+                                            {p}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -834,9 +853,9 @@ export default function ManufacturingDetailPage() {
                 </div>
 
                 {/* Right Content: Tabs (70%) */}
-                <div className="w-[70%] bg-white flex flex-col overflow-hidden">
+                <div className="w-[70%] bg-background flex flex-col overflow-hidden">
                     {/* Tabs & Actions */}
-                    <div className="px-6 border-b border-slate-100 shrink-0 flex items-center justify-between bg-white z-10">
+                    <div className="px-6 border-b border-border shrink-0 flex items-center justify-between bg-background z-10">
                         <div className="flex space-x-1">
                             {(() => {
                                 const tabCounts: Record<string, number> = {
@@ -855,15 +874,15 @@ export default function ManufacturingDetailPage() {
                                         className={cn(
                                             "px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors border-b-2 -mb-px outline-none flex items-center space-x-1.5",
                                             activeTab === tab
-                                                ? "text-black border-black"
-                                                : "text-slate-400 border-transparent hover:text-slate-600"
+                                                ? "text-foreground border-foreground"
+                                                : "text-muted-foreground border-transparent hover:text-foreground/70"
                                         )}
                                     >
                                         <span>{tab}</span>
                                         {tabCounts[tab] > 0 && (
                                             <span className={cn(
                                                 "px-1.5 py-0.5 rounded-none text-[9px] font-bold",
-                                                activeTab === tab ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-500"
+                                                activeTab === tab ? "bg-foreground text-background" : "bg-secondary text-muted-foreground"
                                             )}>
                                                 {tabCounts[tab]}
                                             </span>
@@ -886,7 +905,7 @@ export default function ManufacturingDetailPage() {
                                         setSkuSearch('');
                                         setIsEditModalOpen(true);
                                     }}
-                                    className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-black text-white hover:bg-slate-800 transition-colors flex items-center space-x-1 shadow-sm"
+                                    className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-foreground text-background hover:opacity-80 transition-colors flex items-center space-x-1 shadow-sm"
                                 >
                                     <Plus className="w-3 h-3" />
                                     <span>Add Item</span>
@@ -899,7 +918,7 @@ export default function ManufacturingDetailPage() {
                                         setUserSearch('');
                                         setIsLaborModalOpen(true);
                                     }}
-                                    className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-black text-white hover:bg-slate-800 transition-colors flex items-center space-x-1 shadow-sm"
+                                    className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-foreground text-background hover:opacity-80 transition-colors flex items-center space-x-1 shadow-sm"
                                 >
                                     <Plus className="w-3 h-3" />
                                     <span>Add Labor</span>
@@ -911,7 +930,7 @@ export default function ManufacturingDetailPage() {
                                         setEditingNote({ note: '' });
                                         setIsNoteModalOpen(true);
                                     }}
-                                    className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-black text-white hover:bg-slate-800 transition-colors flex items-center space-x-1 shadow-sm"
+                                    className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-foreground text-background hover:opacity-80 transition-colors flex items-center space-x-1 shadow-sm"
                                 >
                                     <Plus className="w-3 h-3" />
                                     <span>Add Note</span>
@@ -925,7 +944,7 @@ export default function ManufacturingDetailPage() {
                         {activeTab === 'Items' && (
                     <div className="animate-in fade-in duration-300">
                         <table className="w-full border-collapse text-left">
-                            <thead className="bg-slate-50 border-y border-slate-100 sticky top-0 z-20">
+                            <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
                                 <tr>
                                     {[
                                         { label: 'Date', width: 'w-[80px]' },
@@ -946,7 +965,7 @@ export default function ManufacturingDetailPage() {
                                         <th 
                                             key={col.key || col.label} 
                                             className={cn(
-                                                "px-3 py-1.5 text-[8px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap",
+                                                "px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap",
                                                 col.align || "text-left" 
                                             )}
                                         >
@@ -955,10 +974,10 @@ export default function ManufacturingDetailPage() {
                                     ))}
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100">
+                            <tbody className="divide-y divide-border">
                                 {(!order.lineItems || order.lineItems.length === 0) ? (
                                     <tr>
-                                        <td colSpan={13} className="px-3 py-6 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">No line items</td>
+                                        <td colSpan={13} className="px-3 py-6 text-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider">No line items</td>
                                     </tr>
                                 ) : order.lineItems.map(item => {
                                     const bomQty = (item.recipeQty || 0) * (order.qty || 0);
@@ -988,11 +1007,11 @@ export default function ManufacturingDetailPage() {
                                     }
 
                                     return (
-                                        <tr key={item._id} className="hover:bg-slate-50 transition-colors">
-                                            <td className="px-3 py-1 text-[10px] text-slate-500 font-mono">
+                                        <tr key={item._id} className="hover:bg-secondary/30 transition-colors">
+                                            <td className="px-3 py-1 text-[10px] text-muted-foreground font-mono">
                                                 {new Date(item.createdAt).toLocaleDateString()}
                                             </td>
-                                            <td className="px-3 py-1 text-[10px] text-slate-700 leading-tight">
+                                            <td className="px-3 py-1 text-[10px] text-foreground/80 leading-tight">
                                                 <div className="flex items-center space-x-1.5">
                                                     {!!displayTier && (
                                                         <span className={cn(
@@ -1026,16 +1045,16 @@ export default function ManufacturingDetailPage() {
                                                     </div>
                                                 ) : (
                                                     <div title={displayCategory}>
-                                                        <Layers className="w-3.5 h-3.5 text-slate-400" />
+                                                        <Layers className="w-3.5 h-3.5 text-muted-foreground" />
                                                     </div>
                                                 )}
                                             </td>
-                                            <td className="px-3 py-1 text-[10px] text-slate-500 group relative">
+                                            <td className="px-3 py-1 text-[10px] text-muted-foreground group relative">
                                                 <div className="flex items-center gap-1">
                                                     {item.lotNumber ? (
                                                         <Link 
                                                             href={`/warehouse/skus/${typeof item.sku === 'object' && item.sku !== null ? (item.sku as any)._id : item.sku}?lot=${encodeURIComponent(item.lotNumber)}`}
-                                                            className="hover:underline hover:text-blue-600 cursor-pointer text-slate-700 font-mono"
+                                                            className="hover:underline hover:text-blue-600 cursor-pointer text-foreground/80 font-mono"
                                                             onClick={(e) => e.stopPropagation()}
                                                         >
                                                             {item.lotNumber}
@@ -1045,37 +1064,37 @@ export default function ManufacturingDetailPage() {
                                                     )}
                                                     <button 
                                                         onClick={() => item.sku && handleEditLot(item._id, typeof item.sku === 'object' && item.sku !== null ? (item.sku as any)._id : item.sku)}
-                                                        className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-500 transition-all p-0.5"
+                                                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-blue-500 transition-all p-0.5"
                                                         title="Edit Lot #"
                                                     >
                                                         <Pencil className="w-2.5 h-2.5" />
                                                     </button>
                                                 </div>
                                             </td>
-                                            <td className="px-3 py-1 text-[9px] uppercase text-slate-400 text-center">{item.uom || '-'}</td>
-                                            <td className="px-3 py-1 text-[10px] text-slate-500 font-mono text-right">{item.recipeQty ?? '-'}</td>
-                                            <td className="px-3 py-1 text-[10px] text-slate-500 font-mono text-right">{bomQty.toLocaleString()}</td>
-                                            <td className="px-3 py-1 text-[10px] text-slate-500 font-mono text-center">{saPercent > 0 ? `${saPercent}%` : '-'}</td>
-                                            <td className="px-3 py-1 text-[10px] text-slate-700 font-mono bg-blue-50/20 text-right">{bomQty.toLocaleString()}</td>
-                                            <td className="px-3 py-1 text-[10px] text-slate-400 font-mono text-right">{qtyExtra > 0 ? qtyExtra.toFixed(2) : '-'}</td>
+                                            <td className="px-3 py-1 text-[9px] uppercase text-muted-foreground text-center">{item.uom || '-'}</td>
+                                            <td className="px-3 py-1 text-[10px] text-muted-foreground font-mono text-right">{item.recipeQty ?? '-'}</td>
+                                            <td className="px-3 py-1 text-[10px] text-muted-foreground font-mono text-right">{bomQty.toLocaleString()}</td>
+                                            <td className="px-3 py-1 text-[10px] text-muted-foreground font-mono text-center">{saPercent > 0 ? `${saPercent}%` : '-'}</td>
+                                            <td className="px-3 py-1 text-[10px] text-foreground/80 font-mono bg-blue-50/20 text-right">{bomQty.toLocaleString()}</td>
+                                            <td className="px-3 py-1 text-[10px] text-muted-foreground font-mono text-right">{qtyExtra > 0 ? qtyExtra.toFixed(2) : '-'}</td>
                                             <td className="px-3 py-1 text-[10px] text-red-500/70 font-mono text-right">{qtyScrapped || '-'}</td>
-                                            <td className="px-3 py-1 text-[10px] text-slate-700 bg-slate-50/30 text-right">
+                                            <td className="px-3 py-1 text-[10px] text-foreground/80 bg-secondary/30 text-right">
                                                 {totalQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                                             </td>
-                                            <td className="px-3 py-1 text-[10px] font-mono text-slate-700 bg-slate-50/10 whitespace-nowrap text-right">
+                                            <td className="px-3 py-1 text-[10px] font-mono text-foreground/80 bg-secondary/10 whitespace-nowrap text-right">
                                                 {item.cost !== undefined ? `$${(totalQty * item.cost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}` : '-'}
                                             </td>
                                             <td className="px-3 py-1 text-center relative group/actions">
-                                                <button className="p-1 hover:bg-slate-100 rounded text-slate-400">
+                                                <button className="p-1 hover:bg-secondary rounded text-muted-foreground">
                                                     <MoreVertical className="w-3.5 h-3.5" />
                                                 </button>
-                                                <div className="hidden group-hover/actions:block absolute right-0 top-full mt-1 w-24 bg-white shadow-md border border-slate-100 rounded z-20 py-1">
+                                                <div className="hidden group-hover/actions:block absolute right-0 top-full mt-1 w-24 bg-white shadow-md border border-border rounded z-20 py-1">
                                                     <button 
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             handleOpenEditModal(item);
                                                         }}
-                                                        className="w-full text-left px-3 py-1.5 text-[10px] text-slate-600 hover:bg-slate-50 hover:text-blue-600 flex items-center space-x-1"
+                                                        className="w-full text-left px-3 py-1.5 text-[10px] text-muted-foreground hover:bg-secondary hover:text-blue-600 flex items-center space-x-1"
                                                     >
                                                         <Pencil className="w-3 h-3" />
                                                         <span>Edit</span>
@@ -1085,7 +1104,7 @@ export default function ManufacturingDetailPage() {
                                                             e.stopPropagation();
                                                             handleDeleteItem(item._id);
                                                         }}
-                                                        className="w-full text-left px-3 py-1.5 text-[10px] text-slate-600 hover:bg-red-50 hover:text-red-600 flex items-center space-x-1"
+                                                        className="w-full text-left px-3 py-1.5 text-[10px] text-muted-foreground hover:bg-red-50 hover:text-red-600 flex items-center space-x-1"
                                                     >
                                                         <Trash2 className="w-3 h-3" />
                                                         <span>Delete</span>
@@ -1103,19 +1122,19 @@ export default function ManufacturingDetailPage() {
                 {activeTab === 'Labor' && (
                     <div className="animate-in fade-in duration-300">
                         <table className="w-full border-collapse text-left">
-                            <thead className="bg-slate-50 border-y border-slate-100 sticky top-0 z-20">
+                            <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
                                 <tr>
                                     {['Date', 'Type', 'User', 'Duration', 'Hourly Rate', 'Cost', 'Actions'].map(col => (
-                                        <th key={col} className="px-3 py-1.5 text-[8px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                                        <th key={col} className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">
                                             {col}
                                         </th>
                                     ))}
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100">
+                            <tbody className="divide-y divide-border">
                                 {(!order.labor || order.labor.length === 0) ? (
                                     <tr>
-                                        <td colSpan={7} className="px-3 py-6 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">No labor entries found</td>
+                                        <td colSpan={7} className="px-3 py-6 text-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider">No labor entries found</td>
                                     </tr>
                                 ) : order.labor.map(entry => {
                                     // Parse duration (HH:MM:SS) to hours for cost calculation
@@ -1128,22 +1147,22 @@ export default function ManufacturingDetailPage() {
                                     const userName = formatUser(entry.user);
 
                                     return (
-                                        <tr key={entry._id} className="hover:bg-slate-50 transition-colors">
-                                            <td className="px-3 py-1 text-[10px] text-slate-500 font-mono">
+                                        <tr key={entry._id} className="hover:bg-secondary/30 transition-colors">
+                                            <td className="px-3 py-1 text-[10px] text-muted-foreground font-mono">
                                                 {new Date(entry.createdAt).toLocaleDateString()}
                                             </td>
-                                            <td className="px-3 py-1 text-[10px] text-slate-700">{entry.type || '-'}</td>
-                                            <td className="px-3 py-1 text-[10px] text-slate-500 truncate max-w-[120px]">{userName}</td>
-                                            <td className="px-3 py-1 text-[10px] text-slate-500 font-mono">
+                                            <td className="px-3 py-1 text-[10px] text-foreground/80">{entry.type || '-'}</td>
+                                            <td className="px-3 py-1 text-[10px] text-muted-foreground truncate max-w-[120px]">{userName}</td>
+                                            <td className="px-3 py-1 text-[10px] text-muted-foreground font-mono">
                                                 {activeTimers[entry._id] 
                                                     ? formatDuration(Math.floor((currentTime - activeTimers[entry._id]) / 1000))
                                                     : (entry.duration || '-')
                                                 }
                                             </td>
-                                            <td className="px-3 py-1 text-[10px] text-slate-500 font-mono">
+                                            <td className="px-3 py-1 text-[10px] text-muted-foreground font-mono">
                                                 {entry.hourlyRate !== undefined ? `$${entry.hourlyRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}` : '-'}
                                             </td>
-                                            <td className="px-3 py-1 text-[10px] text-slate-700 bg-slate-50/30">
+                                            <td className="px-3 py-1 text-[10px] text-foreground/80 bg-secondary/30">
                                                 ${cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
                                             </td>
                                             <td className="px-3 py-1 text-right">
@@ -1206,7 +1225,7 @@ export default function ManufacturingDetailPage() {
                                                                     }
                                                                 }
                                                             }}
-                                                            className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
+                                                            className="p-1 text-muted-foreground hover:text-blue-600 transition-colors"
                                                             title="Start Timer"
                                                         >
                                                             <Play className="w-3 h-3 fill-current" />
@@ -1220,7 +1239,7 @@ export default function ManufacturingDetailPage() {
                                                             setUserSearch(userName);
                                                             setIsLaborModalOpen(true);
                                                         }}
-                                                        className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
+                                                        className="p-1 text-muted-foreground hover:text-blue-600 transition-colors"
                                                         title="Edit Labor"
                                                     >
                                                         <Pencil className="w-3 h-3" />
@@ -1241,7 +1260,7 @@ export default function ManufacturingDetailPage() {
                                                                 }
                                                             }
                                                         }}
-                                                        className="p-1 text-slate-400 hover:text-red-600 transition-colors"
+                                                        className="p-1 text-muted-foreground hover:text-red-600 transition-colors"
                                                         title="Delete Labor"
                                                     >
                                                         <Trash2 className="w-3 h-3" />
@@ -1259,20 +1278,20 @@ export default function ManufacturingDetailPage() {
                 {activeTab === 'Recipe Steps' && (
                     <div className="p-6 space-y-4 animate-in fade-in duration-300 overflow-auto max-h-full">
                         {(!order.recipesId || typeof order.recipesId !== 'object' || !order.recipesId.steps || order.recipesId.steps.length === 0) ? (
-                            <div className="text-center py-12 text-slate-400 text-sm">
-                                <Layers className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                            <div className="text-center py-12 text-muted-foreground text-sm">
+                                <Layers className="w-8 h-8 mx-auto mb-2 text-muted-foreground/40" />
                                 No recipe steps found
                             </div>
                         ) : (
                             <div className="space-y-4">
                                 {(order.recipesId.steps as any[]).sort((a: any, b: any) => (parseInt(a.step) || 0) - (parseInt(b.step) || 0)).map((step: any, i: number) => (
-                                    <div key={i} className="flex gap-4 p-4 rounded bg-white border border-slate-100 shadow-sm relative group hover:border-slate-200 transition-colors">
-                                        <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-slate-900 text-white text-[10px] font-bold rounded-full shadow-sm">
+                                    <div key={i} className="flex gap-4 p-4 rounded bg-white border border-border shadow-sm relative group hover:border-border transition-colors">
+                                        <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-foreground text-white text-[10px] font-bold rounded-full shadow-sm">
                                             {step.step}
                                         </div>
                                         <div className="flex-1">
-                                            <div className="font-bold text-slate-900 text-[11px] mb-1">{step.description}</div>
-                                            <div className="text-[10px] text-slate-500 whitespace-pre-wrap leading-relaxed">{step.details || 'No details provided.'}</div>
+                                            <div className="font-bold text-foreground text-[11px] mb-1">{step.description}</div>
+                                            <div className="text-[10px] text-muted-foreground whitespace-pre-wrap leading-relaxed">{step.details || 'No details provided.'}</div>
                                         </div>
                                     </div>
                                 ))}
@@ -1284,17 +1303,17 @@ export default function ManufacturingDetailPage() {
                 {activeTab === 'Recipe Notes' && (
                     <div className="p-6 animate-in fade-in duration-300 overflow-auto max-h-full">
                         {(!order.recipesId || typeof order.recipesId !== 'object' || !order.recipesId.notes) ? (
-                            <div className="text-center py-12 text-slate-400 text-sm">
-                                <Clipboard className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                            <div className="text-center py-12 text-muted-foreground text-sm">
+                                <Clipboard className="w-8 h-8 mx-auto mb-2 text-muted-foreground/40" />
                                 No recipe notes found
                             </div>
                         ) : (
-                            <div className="bg-white p-6 rounded border border-slate-100 shadow-sm">
-                                <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-4 flex items-center">
+                            <div className="bg-white p-6 rounded border border-border shadow-sm">
+                                <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold mb-4 flex items-center">
                                     <Clipboard className="w-3 h-3 mr-2" />
                                     Recipe Notes
                                 </div>
-                                <div className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed">
+                                <div className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
                                     {order.recipesId.notes}
                                 </div>
                             </div>
@@ -1303,8 +1322,8 @@ export default function ManufacturingDetailPage() {
                 )}
 
                 {activeTab === 'SKU Notes' && (
-                    <div className="text-center py-12 text-slate-400 text-sm">
-                        <Tag className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                    <div className="text-center py-12 text-muted-foreground text-sm">
+                        <Tag className="w-8 h-8 mx-auto mb-2 text-muted-foreground/40" />
                         SKU notes coming soon
                     </div>
                 )}
@@ -1312,44 +1331,44 @@ export default function ManufacturingDetailPage() {
                 {activeTab === 'QC' && (
                     <div className="animate-in fade-in duration-300">
                         <table className="w-full border-collapse text-left">
-                            <thead className="bg-slate-50 border-y border-slate-100 sticky top-0 z-20">
+                            <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
                                 <tr>
                                     {['Checked By', 'Packaged By', 'Label', 'Lot', 'Seal', 'Pkg Qty', 'Repackaged', 'Weight', 'Target', 'Actual Wt', 'QC By', 'Date'].map(col => (
-                                        <th key={col} className="px-3 py-1.5 text-[8px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                                        <th key={col} className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">
                                             {col}
                                         </th>
                                     ))}
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100">
+                            <tbody className="divide-y divide-border">
                                 {(!order.qualityCheck || order.qualityCheck.length === 0) ? (
                                     <tr>
-                                        <td colSpan={12} className="px-3 py-6 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">No quality checks found</td>
+                                        <td colSpan={12} className="px-3 py-6 text-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider">No quality checks found</td>
                                     </tr>
                                 ) : order.qualityCheck.map((qc, idx) => (
-                                    <tr key={qc._id || idx} className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-3 py-1 text-[10px] text-slate-700">{formatUser(qc.checkedBy)}</td>
-                                        <td className="px-3 py-1 text-[10px] text-slate-700">{formatUser(qc.packagedBy)}</td>
+                                    <tr key={qc._id || idx} className="hover:bg-secondary/30 transition-colors">
+                                        <td className="px-3 py-1 text-[10px] text-foreground/80">{formatUser(qc.checkedBy)}</td>
+                                        <td className="px-3 py-1 text-[10px] text-foreground/80">{formatUser(qc.packagedBy)}</td>
                                         <td className="px-3 py-1 text-[10px] text-center">
-                                            {qc.label ? <span className="text-emerald-500 font-bold">✓</span> : <span className="text-slate-300">✗</span>}
+                                            {qc.label ? <span className="text-emerald-500 font-bold">✓</span> : <span className="text-muted-foreground/40">✗</span>}
                                         </td>
                                         <td className="px-3 py-1 text-[10px] text-center">
-                                            {qc.lot ? <span className="text-emerald-500 font-bold">✓</span> : <span className="text-slate-300">✗</span>}
+                                            {qc.lot ? <span className="text-emerald-500 font-bold">✓</span> : <span className="text-muted-foreground/40">✗</span>}
                                         </td>
                                         <td className="px-3 py-1 text-[10px] text-center">
-                                            {qc.seal ? <span className="text-emerald-500 font-bold">✓</span> : <span className="text-slate-300">✗</span>}
+                                            {qc.seal ? <span className="text-emerald-500 font-bold">✓</span> : <span className="text-muted-foreground/40">✗</span>}
                                         </td>
                                         <td className="px-3 py-1 text-[10px] text-center">
-                                            {qc.packageQuality ? <span className="text-emerald-500 font-bold">✓</span> : <span className="text-slate-300">✗</span>}
+                                            {qc.packageQuality ? <span className="text-emerald-500 font-bold">✓</span> : <span className="text-muted-foreground/40">✗</span>}
                                         </td>
                                         <td className="px-3 py-1 text-[10px] text-center">
-                                            {qc.repackaged ? <span className="text-amber-500 font-bold">✓</span> : <span className="text-slate-300">✗</span>}
+                                            {qc.repackaged ? <span className="text-amber-500 font-bold">✓</span> : <span className="text-muted-foreground/40">✗</span>}
                                         </td>
-                                        <td className="px-3 py-1 text-[10px] text-slate-700 font-mono">{qc.weight ?? 0}</td>
-                                        <td className="px-3 py-1 text-[10px] text-slate-700 font-mono">{qc.target ?? 0}</td>
-                                        <td className="px-3 py-1 text-[10px] text-slate-700 font-mono">{qc.actualWeight ?? 0}</td>
-                                        <td className="px-3 py-1 text-[10px] text-slate-700">{formatUser(qc.qualityCheckedBy)}</td>
-                                        <td className="px-3 py-1 text-[10px] text-slate-500 font-mono">
+                                        <td className="px-3 py-1 text-[10px] text-foreground/80 font-mono">{qc.weight ?? 0}</td>
+                                        <td className="px-3 py-1 text-[10px] text-foreground/80 font-mono">{qc.target ?? 0}</td>
+                                        <td className="px-3 py-1 text-[10px] text-foreground/80 font-mono">{qc.actualWeight ?? 0}</td>
+                                        <td className="px-3 py-1 text-[10px] text-foreground/80">{formatUser(qc.qualityCheckedBy)}</td>
+                                        <td className="px-3 py-1 text-[10px] text-muted-foreground font-mono">
                                             {qc.createdAt ? new Date(qc.createdAt).toLocaleDateString() : '—'}
                                         </td>
                                     </tr>
@@ -1362,29 +1381,29 @@ export default function ManufacturingDetailPage() {
                 {activeTab === 'WO Notes' && (
                     <div className="animate-in fade-in duration-300">
                         <table className="w-full border-collapse text-left">
-                            <thead className="bg-slate-50 border-y border-slate-100 sticky top-0 z-20">
+                            <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
                                 <tr>
                                     {['Note', 'Created By', 'Created At', 'Actions'].map(col => (
-                                        <th key={col} className="px-3 py-1.5 text-[8px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                                        <th key={col} className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">
                                             {col}
                                         </th>
                                     ))}
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100">
+                            <tbody className="divide-y divide-border">
                                 {(!order.notes || order.notes.length === 0) ? (
                                     <tr>
-                                        <td colSpan={4} className="px-3 py-6 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">No notes found</td>
+                                        <td colSpan={4} className="px-3 py-6 text-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider">No notes found</td>
                                     </tr>
                                 ) : order.notes.map((note, idx) => (
-                                    <tr key={note._id || idx} className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-3 py-1 text-[10px] text-slate-700 max-w-md">
+                                    <tr key={note._id || idx} className="hover:bg-secondary/30 transition-colors">
+                                        <td className="px-3 py-1 text-[10px] text-foreground/80 max-w-md">
                                             <p className="line-clamp-2">{note.note}</p>
                                         </td>
-                                        <td className="px-3 py-1 text-[10px] text-slate-500">
+                                        <td className="px-3 py-1 text-[10px] text-muted-foreground">
                                             {formatUser(note.createdBy)}
                                         </td>
-                                        <td className="px-3 py-1 text-[10px] text-slate-500 font-mono">
+                                        <td className="px-3 py-1 text-[10px] text-muted-foreground font-mono">
                                             {new Date(note.createdAt).toLocaleDateString()}
                                         </td>
                                         <td className="px-3 py-1 text-right">
@@ -1394,7 +1413,7 @@ export default function ManufacturingDetailPage() {
                                                         setEditingNote({ _id: note._id, note: note.note });
                                                         setIsNoteModalOpen(true);
                                                     }}
-                                                    className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
+                                                    className="p-1 text-muted-foreground hover:text-blue-600 transition-colors"
                                                     title="Edit Note"
                                                 >
                                                     <Pencil className="w-3 h-3" />
@@ -1415,7 +1434,7 @@ export default function ManufacturingDetailPage() {
                                                             });
                                                         }
                                                     }}
-                                                    className="p-1 text-slate-400 hover:text-red-600 transition-colors"
+                                                    className="p-1 text-muted-foreground hover:text-red-600 transition-colors"
                                                     title="Delete Note"
                                                 >
                                                     <Trash2 className="w-3 h-3" />
@@ -1462,20 +1481,20 @@ export default function ManufacturingDetailPage() {
             {isEditModalOpen && editingItem && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={handleCloseEditModal}>
                     <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-                            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+                            <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">
                                 {editingItem._id ? 'Edit Item' : 'Add Line Item'}
                             </h3>
-                            <button onClick={handleCloseEditModal} className="p-1 hover:bg-slate-100 rounded transition-colors">
-                                <X className="w-4 h-4 text-slate-500" />
+                            <button onClick={handleCloseEditModal} className="p-1 hover:bg-secondary rounded transition-colors">
+                                <X className="w-4 h-4 text-muted-foreground" />
                             </button>
                         </div>
                         <div className="p-6 space-y-4">
                             {/* SKU - editable if new, read-only if editing */}
                             <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">SKU</label>
+                                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">SKU</label>
                                 {editingItem._id ? (
-                                    <div className="text-sm font-medium text-slate-700 bg-slate-50 px-3 py-2 rounded border border-slate-200">
+                                    <div className="text-sm font-medium text-foreground/80 bg-secondary px-3 py-2 rounded border border-border">
                                         {typeof editingItem.sku === 'object' ? editingItem.sku.name : editingItem.sku || '-'}
                                     </div>
                                 ) : (
@@ -1488,11 +1507,11 @@ export default function ManufacturingDetailPage() {
                                                 setIsSkuDropdownOpen(true);
                                             }}
                                             onFocus={() => setIsSkuDropdownOpen(true)}
-                                            className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-black/10"
+                                            className="w-full px-3 py-2 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-black/10"
                                             placeholder="Search SKU..."
                                         />
                                         {isSkuDropdownOpen && skuSearch && (
-                                            <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded shadow-lg max-h-48 overflow-auto">
+                                            <div className="absolute z-20 w-full mt-1 bg-white border border-border rounded shadow-lg max-h-48 overflow-auto">
                                                 {skuList
                                                     .filter(s => s.name.toLowerCase().includes(skuSearch.toLowerCase()) || s._id.toLowerCase().includes(skuSearch.toLowerCase()))
                                                     .slice(0, 20)
@@ -1527,14 +1546,14 @@ export default function ManufacturingDetailPage() {
                                                                     // Silently fail - user can still select lot manually
                                                                 }
                                                             }}
-                                                            className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 transition-colors"
+                                                            className="w-full text-left px-3 py-2 text-sm hover:bg-secondary transition-colors"
                                                         >
                                                             <span className="font-medium">{s.name}</span>
-                                                            <span className="text-xs text-slate-400 ml-2">({s._id})</span>
+                                                            <span className="text-xs text-muted-foreground ml-2">({s._id})</span>
                                                         </button>
                                                     ))}
                                                 {skuList.filter(s => s.name.toLowerCase().includes(skuSearch.toLowerCase()) || s._id.toLowerCase().includes(skuSearch.toLowerCase())).length === 0 && (
-                                                    <div className="px-3 py-2 text-sm text-slate-400">No SKUs found</div>
+                                                    <div className="px-3 py-2 text-sm text-muted-foreground">No SKUs found</div>
                                                 )}
                                             </div>
                                         )}
@@ -1544,13 +1563,13 @@ export default function ManufacturingDetailPage() {
                             
                             {/* Lot Number */}
                             <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Lot Number</label>
+                                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Lot Number</label>
                                 <div className="flex space-x-2">
                                     <input
                                         type="text"
                                         value={editingItem.lotNumber || ''}
                                         onChange={e => setEditingItem({ ...editingItem, lotNumber: e.target.value })}
-                                        className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-black/10"
+                                        className="flex-1 px-3 py-2 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-black/10"
                                         placeholder="Enter or select lot..."
                                     />
                                     {(editingItem.sku && (typeof editingItem.sku === 'string' ? editingItem.sku : editingItem.sku._id)) && (
@@ -1560,7 +1579,7 @@ export default function ManufacturingDetailPage() {
                                                 setEditingSkuId(typeof editingItem.sku === 'object' ? editingItem.sku._id : editingItem.sku as string);
                                                 setIsAddLotModalOpen(true);
                                             }}
-                                            className="px-3 py-2 text-xs font-bold uppercase bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors rounded"
+                                            className="px-3 py-2 text-xs font-bold uppercase bg-secondary text-muted-foreground hover:bg-secondary/80 transition-colors rounded"
                                         >
                                             Select Lot
                                         </button>
@@ -1571,24 +1590,24 @@ export default function ManufacturingDetailPage() {
                             <div className="grid grid-cols-2 gap-4">
                                 {/* Recipe Qty */}
                                 <div>
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Recipe Qty</label>
+                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Recipe Qty</label>
                                     <input
                                         type="number"
                                         step="0.01"
                                         value={editingItem.recipeQty || ''}
                                         onChange={e => setEditingItem({ ...editingItem, recipeQty: parseFloat(e.target.value) || 0 })}
-                                        className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-black/10"
+                                        className="w-full px-3 py-2 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-black/10"
                                     />
                                 </div>
 
                                 {/* UOM */}
                                 <div>
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">UOM</label>
+                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">UOM</label>
                                     <input
                                         type="text"
                                         value={editingItem.uom || ''}
                                         onChange={e => setEditingItem({ ...editingItem, uom: e.target.value })}
-                                        className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-black/10"
+                                        className="w-full px-3 py-2 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-black/10"
                                     />
                                 </div>
                             </div>
@@ -1596,20 +1615,20 @@ export default function ManufacturingDetailPage() {
                             <div className="grid grid-cols-3 gap-4">
                                 {/* Assay (%) */}
                                 <div>
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Assay (%)</label>
+                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Assay (%)</label>
                                     <input
                                         type="number"
                                         step="0.01"
                                         value={editingItem.sa || ''}
                                         onChange={e => setEditingItem({ ...editingItem, sa: parseFloat(e.target.value) || 0 })}
-                                        className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-black/10"
+                                        className="w-full px-3 py-2 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-black/10"
                                         placeholder="e.g., 55.6"
                                     />
                                 </div>
 
                                 {/* Qty Extra (Calculated - Read Only) */}
                                 <div>
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Qty Extra <span className="text-slate-300 normal-case">(calc)</span></label>
+                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Qty Extra <span className="text-muted-foreground/40 normal-case">(calc)</span></label>
                                     {(() => {
                                         const bomQty = (editingItem.recipeQty || 0) * (order?.qty || 0);
                                         const saPercent = editingItem.sa || 0;
@@ -1620,7 +1639,7 @@ export default function ManufacturingDetailPage() {
                                                 type="text"
                                                 value={qtyExtra > 0 ? qtyExtra.toFixed(2) : '-'}
                                                 disabled
-                                                className="w-full px-3 py-2 text-sm border border-slate-200 rounded bg-slate-50 text-slate-500 cursor-not-allowed"
+                                                className="w-full px-3 py-2 text-sm border border-border rounded bg-secondary text-muted-foreground cursor-not-allowed"
                                             />
                                         );
                                     })()}
@@ -1628,27 +1647,27 @@ export default function ManufacturingDetailPage() {
 
                                 {/* Qty Scrapped */}
                                 <div>
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Qty Scrapped</label>
+                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Qty Scrapped</label>
                                     <input
                                         type="number"
                                         step="0.01"
                                         value={editingItem.qtyScrapped || ''}
                                         onChange={e => setEditingItem({ ...editingItem, qtyScrapped: parseFloat(e.target.value) || 0 })}
-                                        className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-black/10"
+                                        className="w-full px-3 py-2 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-black/10"
                                     />
                                 </div>
                             </div>
                         </div>
-                        <div className="flex items-center justify-end space-x-3 px-6 py-4 border-t border-slate-100 bg-slate-50/50">
+                        <div className="flex items-center justify-end space-x-3 px-6 py-4 border-t border-border bg-secondary/50">
                             <button
                                 onClick={handleCloseEditModal}
-                                className="px-4 py-2 text-xs font-bold uppercase text-slate-500 hover:text-slate-700 transition-colors"
+                                className="px-4 py-2 text-xs font-bold uppercase text-muted-foreground hover:text-foreground/80 transition-colors"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleSaveItem}
-                                className="px-4 py-2 text-xs font-bold uppercase bg-black text-white hover:bg-slate-800 transition-colors rounded"
+                                className="px-4 py-2 text-xs font-bold uppercase bg-foreground text-background hover:bg-foreground/80 transition-colors rounded"
                             >
                                 {editingItem._id ? 'Save Changes' : 'Add Item'}
                             </button>
@@ -1661,31 +1680,31 @@ export default function ManufacturingDetailPage() {
             {isNoteModalOpen && editingNote && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setIsNoteModalOpen(false)}>
                     <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-                            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+                            <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">
                                 {editingNote._id ? 'Edit Note' : 'Add Note'}
                             </h3>
-                            <button onClick={() => setIsNoteModalOpen(false)} className="p-1 hover:bg-slate-100 rounded transition-colors">
-                                <X className="w-4 h-4 text-slate-500" />
+                            <button onClick={() => setIsNoteModalOpen(false)} className="p-1 hover:bg-secondary rounded transition-colors">
+                                <X className="w-4 h-4 text-muted-foreground" />
                             </button>
                         </div>
                         <div className="p-6 space-y-4">
                             <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Note</label>
+                                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Note</label>
                                 <textarea
                                     rows={4}
                                     value={editingNote.note}
                                     onChange={e => setEditingNote({ ...editingNote, note: e.target.value })}
-                                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-black/10 resize-none"
+                                    className="w-full px-3 py-2 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-black/10 resize-none"
                                     placeholder="Enter your note..."
                                     autoFocus
                                 />
                             </div>
                         </div>
-                        <div className="flex items-center justify-end space-x-3 px-6 py-4 border-t border-slate-100 bg-slate-50/50">
+                        <div className="flex items-center justify-end space-x-3 px-6 py-4 border-t border-border bg-secondary/50">
                             <button
                                 onClick={() => setIsNoteModalOpen(false)}
-                                className="px-4 py-2 text-xs font-bold uppercase text-slate-500 hover:text-slate-700 transition-colors"
+                                className="px-4 py-2 text-xs font-bold uppercase text-muted-foreground hover:text-foreground/80 transition-colors"
                             >
                                 Cancel
                             </button>
@@ -1729,7 +1748,7 @@ export default function ManufacturingDetailPage() {
                                         toast.error('Error saving note');
                                     }
                                 }}
-                                className="px-4 py-2 text-xs font-bold uppercase bg-black text-white hover:bg-slate-800 transition-colors rounded"
+                                className="px-4 py-2 text-xs font-bold uppercase bg-foreground text-background hover:bg-foreground/80 transition-colors rounded"
                             >
                                 {editingNote._id ? 'Save Changes' : 'Add Note'}
                             </button>
@@ -1742,22 +1761,22 @@ export default function ManufacturingDetailPage() {
             {isLaborModalOpen && editingLabor && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setIsLaborModalOpen(false)}>
                     <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-                            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+                            <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">
                                 {editingLabor._id ? 'Edit Labor' : 'Add Labor'}
                             </h3>
-                            <button onClick={() => setIsLaborModalOpen(false)} className="p-1 hover:bg-slate-100 rounded transition-colors">
-                                <X className="w-4 h-4 text-slate-500" />
+                            <button onClick={() => setIsLaborModalOpen(false)} className="p-1 hover:bg-secondary rounded transition-colors">
+                                <X className="w-4 h-4 text-muted-foreground" />
                             </button>
                         </div>
                         <div className="p-6 space-y-4">
                             {/* Type Dropdown */}
                             <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Type</label>
+                                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Type</label>
                                 <select
                                     value={editingLabor.type}
                                     onChange={e => setEditingLabor({ ...editingLabor, type: e.target.value })}
-                                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-black/10 bg-white"
+                                    className="w-full px-3 py-2 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-black/10 bg-white"
                                 >
                                     <option value="WO Labor">WO Labor</option>
                                     <option value="Maintenance & Preparation">Maintenance & Preparation</option>
@@ -1766,7 +1785,7 @@ export default function ManufacturingDetailPage() {
 
                             {/* User Dropdown */}
                             <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">User</label>
+                                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">User</label>
                                 <div className="relative">
                                     <input
                                         type="text"
@@ -1776,11 +1795,11 @@ export default function ManufacturingDetailPage() {
                                             setIsUserDropdownOpen(true);
                                         }}
                                         onFocus={() => setIsUserDropdownOpen(true)}
-                                        className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-black/10"
+                                        className="w-full px-3 py-2 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-black/10"
                                         placeholder="Search user..."
                                     />
                                     {isUserDropdownOpen && (
-                                        <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded shadow-lg max-h-48 overflow-auto">
+                                        <div className="absolute z-20 w-full mt-1 bg-white border border-border rounded shadow-lg max-h-48 overflow-auto">
                                             {usersList
                                                 .filter(u => {
                                                     // Filter by search
@@ -1810,13 +1829,13 @@ export default function ManufacturingDetailPage() {
                                                             setUserSearch(`${u.firstName} ${u.lastName}`);
                                                             setIsUserDropdownOpen(false);
                                                         }}
-                                                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 transition-colors"
+                                                        className="w-full text-left px-3 py-2 text-sm hover:bg-secondary transition-colors"
                                                     >
                                                         <span className="font-medium">{u.firstName} {u.lastName}</span>
                                                     </button>
                                                 ))}
                                             {usersList.filter(u => `${u.firstName} ${u.lastName}`.toLowerCase().includes(userSearch.toLowerCase())).length === 0 && (
-                                                <div className="px-3 py-2 text-sm text-slate-400">No users found</div>
+                                                <div className="px-3 py-2 text-sm text-muted-foreground">No users found</div>
                                             )}
                                         </div>
                                     )}
@@ -1827,32 +1846,32 @@ export default function ManufacturingDetailPage() {
                             {editingLabor._id && (
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Duration (HH:MM:SS)</label>
+                                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Duration (HH:MM:SS)</label>
                                         <input
                                             type="text"
                                             value={editingLabor.duration}
                                             onChange={e => setEditingLabor({ ...editingLabor, duration: e.target.value })}
-                                            className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-black/10"
+                                            className="w-full px-3 py-2 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-black/10"
                                             placeholder="0:30:00"
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Hourly Rate ($)</label>
+                                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Hourly Rate ($)</label>
                                         <input
                                             type="number"
                                             step="0.01"
                                             value={editingLabor.hourlyRate || ''}
                                             onChange={e => setEditingLabor({ ...editingLabor, hourlyRate: parseFloat(e.target.value) || 0 })}
-                                            className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-black/10"
+                                            className="w-full px-3 py-2 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-black/10"
                                         />
                                     </div>
                                 </div>
                             )}
                         </div>
-                        <div className="flex items-center justify-end space-x-3 px-6 py-4 border-t border-slate-100 bg-slate-50/50">
+                        <div className="flex items-center justify-end space-x-3 px-6 py-4 border-t border-border bg-secondary/50">
                             <button
                                 onClick={() => setIsLaborModalOpen(false)}
-                                className="px-4 py-2 text-xs font-bold uppercase text-slate-500 hover:text-slate-700 transition-colors"
+                                className="px-4 py-2 text-xs font-bold uppercase text-muted-foreground hover:text-foreground/80 transition-colors"
                             >
                                 Cancel
                             </button>
@@ -1898,7 +1917,7 @@ export default function ManufacturingDetailPage() {
                                         toast.error('Error saving labor');
                                     }
                                 }}
-                                className="px-4 py-2 text-xs font-bold uppercase bg-black text-white hover:bg-slate-800 transition-colors rounded"
+                                className="px-4 py-2 text-xs font-bold uppercase bg-foreground text-background hover:bg-foreground/80 transition-colors rounded"
                             >
                                 {editingLabor._id ? 'Save Changes' : 'Add Labor'}
                             </button>
@@ -1906,19 +1925,7 @@ export default function ManufacturingDetailPage() {
                     </div>
                 </div>
             )}
-            {/* Shell Footer */}
-            <div className="h-[24px] border-t border-slate-200 bg-slate-100/50 shrink-0 flex items-center justify-between px-4 z-[50]">
-                <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-1.5">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">System Ready</span>
-                    </div>
-                </div>
-                <div className="flex items-center space-x-4">
-                    <span className="text-[9px] text-slate-400 font-mono uppercase tracking-tighter">Manufacturing Shell v2.1</span>
-                    <span className="text-[9px] text-slate-400 font-mono uppercase tracking-tighter">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span>
-                </div>
-            </div>
+
         </div>
     );
 }

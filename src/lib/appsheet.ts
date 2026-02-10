@@ -432,3 +432,293 @@ export async function syncPaymentToAppSheet(order: any, payment: any, action: 'A
         console.error('AppSheet Payment Sync Error:', error);
     }
 }
+
+export async function syncManufacturingToAppSheet(
+    order: any,
+    action: 'Add' | 'Edit' | 'Delete' = 'Add'
+) {
+    const appId = process.env.APPSHEET_APP_ID;
+    const accessKey = process.env.APPSHEET_ACCESS_KEY;
+
+    if (!appId || !accessKey) {
+        console.error('AppSheet API credentials missing');
+        return;
+    }
+
+    const orderObj = order.toObject ? order.toObject() : order;
+
+    // Resolve SKU ID: use legacyId if available (imported), otherwise _id
+    let finishedProductId = '';
+    if (typeof orderObj.sku === 'object' && orderObj.sku !== null) {
+        finishedProductId = orderObj.sku.legacyId || orderObj.sku._id?.toString() || '';
+    } else {
+        finishedProductId = orderObj.sku?.toString() || '';
+    }
+
+    // Resolve createdBy name
+    let createdByName = '';
+    if (typeof orderObj.createdBy === 'object' && orderObj.createdBy !== null) {
+        createdByName = `${orderObj.createdBy.firstName || ''} ${orderObj.createdBy.lastName || ''}`.trim();
+    } else if (typeof orderObj.createdBy === 'string') {
+        createdByName = orderObj.createdBy;
+    }
+
+    // Resolve finishedBy name
+    let finishedByName = '';
+    if (typeof orderObj.finishedBy === 'object' && orderObj.finishedBy !== null) {
+        finishedByName = `${orderObj.finishedBy.firstName || ''} ${orderObj.finishedBy.lastName || ''}`.trim();
+    } else if (typeof orderObj.finishedBy === 'string') {
+        finishedByName = orderObj.finishedBy;
+    }
+
+    // Resolve recipe ID
+    let recipesId = '';
+    if (typeof orderObj.recipesId === 'object' && orderObj.recipesId !== null) {
+        recipesId = orderObj.recipesId._id?.toString() || '';
+    } else {
+        recipesId = orderObj.recipesId?.toString() || '';
+    }
+
+    // For CREATE: use _id as Key (no legacyId)
+    // For EDIT/DELETE: match by TimeStamp (createdAt) which is the key in AppSheet
+    const row: Record<string, any> = {
+        'Key': orderObj._id?.toString() || '',
+        'WO #': orderObj.label || '',
+        'Finished Product ID': finishedProductId,
+        'RecipesID': recipesId,
+        'WO Qty': orderObj.qty || 0,
+        'UOM': orderObj.uom || '',
+        'Output Difference +/-': orderObj.qtyDifference || 0,
+        'Scheduled Start': orderObj.scheduledStart ? new Date(orderObj.scheduledStart).toISOString() : '',
+        'Scheduled Finish': orderObj.scheduledFinish ? new Date(orderObj.scheduledFinish).toISOString() : '',
+        'Priority': orderObj.priority || 'Normal',
+        'Status': orderObj.status || 'Pending',
+        'Create By': createdByName,
+        'Finish By': finishedByName,
+        'TimeStamp': orderObj.createdAt ? new Date(orderObj.createdAt).toISOString() : '',
+    };
+
+    const payload = {
+        Action: action,
+        Properties: {
+            Locale: 'en-US',
+            Timezone: 'Eastern Standard Time',
+        },
+        Rows: [row]
+    };
+
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 30000);
+        const response = await fetch(
+            `https://api.appsheet.com/api/v2/apps/${appId}/tables/Manufacturing/Action`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'ApplicationAccessKey': accessKey,
+                },
+                body: JSON.stringify(payload),
+                signal: controller.signal,
+            }
+        );
+        clearTimeout(timeout);
+
+        const result = await response.json();
+        console.log(`AppSheet Manufacturing ${action} Result:`, result);
+
+        // If Add fails because key already exists, retry with Edit
+        if (action === 'Add' && result?.Errors) {
+            console.log('Add failed, retrying with Edit...');
+            return syncManufacturingToAppSheet(order, 'Edit');
+        }
+
+        return result;
+    } catch (error) {
+        console.error('AppSheet Manufacturing Sync Error:', error);
+    }
+}
+
+export async function deleteManufacturingFromAppSheet(order: any) {
+    const appId = process.env.APPSHEET_APP_ID;
+    const accessKey = process.env.APPSHEET_ACCESS_KEY;
+
+    if (!appId || !accessKey) {
+        console.error('AppSheet API credentials missing');
+        return;
+    }
+
+    const orderObj = order.toObject ? order.toObject() : order;
+
+    // Match by TimeStamp (createdAt) which is the key in AppSheet
+    const row: Record<string, any> = {
+        'TimeStamp': orderObj.createdAt ? new Date(orderObj.createdAt).toISOString() : '',
+    };
+
+    const payload = {
+        Action: 'Delete',
+        Properties: {
+            Locale: 'en-US',
+            Timezone: 'Eastern Standard Time',
+        },
+        Rows: [row]
+    };
+
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 30000);
+        const response = await fetch(
+            `https://api.appsheet.com/api/v2/apps/${appId}/tables/Manufacturing/Action`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'ApplicationAccessKey': accessKey,
+                },
+                body: JSON.stringify(payload),
+                signal: controller.signal,
+            }
+        );
+        clearTimeout(timeout);
+
+        const result = await response.json();
+        console.log('AppSheet Manufacturing Delete Result:', result);
+        return result;
+    } catch (error) {
+        console.error('AppSheet Manufacturing Delete Error:', error);
+    }
+}
+
+export async function syncManufacturingLineItemsToAppSheet(
+    parentOrder: any,
+    lineItems: any[],
+    action: 'Add' | 'Edit' | 'Delete' = 'Add'
+) {
+    const appId = process.env.APPSHEET_APP_ID;
+    const accessKey = process.env.APPSHEET_ACCESS_KEY;
+
+    if (!appId || !accessKey) {
+        console.error('AppSheet API credentials missing');
+        return;
+    }
+
+    if (!lineItems || lineItems.length === 0) return;
+
+    const parentObj = parentOrder.toObject ? parentOrder.toObject() : parentOrder;
+    const parentCreatedAt = parentObj.createdAt ? new Date(parentObj.createdAt).toISOString() : '';
+    const parentId = parentObj._id?.toString() || '';
+
+    const rows = lineItems.map((item: any) => {
+        // Resolve SKU ID: use legacyId if available (imported), otherwise _id
+        let rawMaterialId = '';
+        if (typeof item.sku === 'object' && item.sku !== null) {
+            rawMaterialId = item.sku.legacyId || item.sku._id?.toString() || '';
+        } else {
+            rawMaterialId = item.sku?.toString() || '';
+        }
+
+        return {
+            'RecordID': item._id?.toString() || '',
+            'WO #': parentCreatedAt,
+            'Lot #': item.lotNumber || '',
+            'RecipesID': item.recipeId?.toString() || '',
+            'Raw Material': rawMaterialId,
+            'UOM': item.uom || '',
+            'Qty': item.recipeQty || 0,
+            'SA': item.sa || 0,
+            'Qty Extra Consumed': item.qtyExtra || 0,
+            'Qty Scrapped': item.qtyScrapped || 0,
+            'TimeStamp': item.createdAt ? new Date(item.createdAt).toISOString() : '',
+            'OldWO #': parentId,
+        };
+    });
+
+    const payload = {
+        Action: action,
+        Properties: {
+            Locale: 'en-US',
+            Timezone: 'Eastern Standard Time',
+        },
+        Rows: rows
+    };
+
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 30000);
+        const response = await fetch(
+            `https://api.appsheet.com/api/v2/apps/${appId}/tables/Manufacturing LineItems/Action`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'ApplicationAccessKey': accessKey,
+                },
+                body: JSON.stringify(payload),
+                signal: controller.signal,
+            }
+        );
+        clearTimeout(timeout);
+
+        const result = await response.json();
+        console.log(`AppSheet Manufacturing LineItems ${action} Result:`, result);
+
+        // If Add fails because key already exists, retry with Edit
+        if (action === 'Add' && result?.Errors) {
+            console.log('LineItems Add failed, retrying with Edit...');
+            return syncManufacturingLineItemsToAppSheet(parentOrder, lineItems, 'Edit');
+        }
+
+        return result;
+    } catch (error) {
+        console.error('AppSheet Manufacturing LineItems Sync Error:', error);
+    }
+}
+
+export async function deleteManufacturingLineItemsFromAppSheet(lineItemIds: string[]) {
+    const appId = process.env.APPSHEET_APP_ID;
+    const accessKey = process.env.APPSHEET_ACCESS_KEY;
+
+    if (!appId || !accessKey) {
+        console.error('AppSheet API credentials missing');
+        return;
+    }
+
+    if (!lineItemIds || lineItemIds.length === 0) return;
+
+    const rows = lineItemIds.map(id => ({
+        'RecordID': id,
+    }));
+
+    const payload = {
+        Action: 'Delete',
+        Properties: {
+            Locale: 'en-US',
+            Timezone: 'Eastern Standard Time',
+        },
+        Rows: rows
+    };
+
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 30000);
+        const response = await fetch(
+            `https://api.appsheet.com/api/v2/apps/${appId}/tables/Manufacturing LineItems/Action`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'ApplicationAccessKey': accessKey,
+                },
+                body: JSON.stringify(payload),
+                signal: controller.signal,
+            }
+        );
+        clearTimeout(timeout);
+
+        const result = await response.json();
+        console.log('AppSheet Manufacturing LineItems Delete Result:', result);
+        return result;
+    } catch (error) {
+        console.error('AppSheet Manufacturing LineItems Delete Error:', error);
+    }
+}
