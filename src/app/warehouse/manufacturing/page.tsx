@@ -1,16 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowUpDown,
-  MoreVertical,
-  Eye,
-  Pencil,
-  Trash2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import toast from 'react-hot-toast';
+
 import { Pagination } from '@/components/ui/Pagination';
 
 interface LineItem {
@@ -72,20 +68,6 @@ function ManufacturingContent() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
 
-
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  // Close menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOpenMenuId(null);
-      }
-    };
-    if (openMenuId) document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [openMenuId]);
 
   // Sync search from URL params
   useEffect(() => {
@@ -160,7 +142,6 @@ function ManufacturingContent() {
                 { key: 'laborCost', label: 'Labor Cost' },
                 { key: 'totalCost', label: 'Total Cost' },
                 { key: 'unitCost', label: 'Unit Cost' },
-                { key: 'actions', label: '' },
               ].map(col => (
                 <th
                   key={col.key}
@@ -177,19 +158,20 @@ function ManufacturingContent() {
           </thead>
           <tbody className="divide-y divide-border">
             {loading ? (
-              <tr><td colSpan={13} className="px-2 py-4 text-center text-[10px] text-muted-foreground italic">Loading Orders...</td></tr>
+              <tr><td colSpan={12} className="px-2 py-4 text-center text-[10px] text-muted-foreground italic">Loading Orders...</td></tr>
             ) : error ? (
-              <tr><td colSpan={13} className="px-2 py-4 text-center text-destructive text-[10px] font-bold">{error}</td></tr>
+              <tr><td colSpan={12} className="px-2 py-4 text-center text-destructive text-[10px] font-bold">{error}</td></tr>
             ) : orders.length === 0 ? (
-              <tr><td colSpan={13} className="px-2 py-4 text-center text-[10px] text-muted-foreground uppercase font-medium tracking-tighter opacity-50">No Orders found</td></tr>
+              <tr><td colSpan={12} className="px-2 py-4 text-center text-[10px] text-muted-foreground uppercase font-medium tracking-tighter opacity-50">No Orders found</td></tr>
             ) : orders.map(order => {
               const unitCost = order.qty && order.qty > 0 ? (order.totalCost || 0) / order.qty : 0;
               return (
               <tr
                 key={order._id}
-                className="hover:bg-primary/5 transition-all duration-200 group relative z-0 hover:z-10"
+                className="hover:bg-primary/5 transition-all duration-200 group relative z-0 hover:z-10 cursor-pointer"
+                onClick={() => router.push(`/warehouse/manufacturing/${order._id}`)}
               >
-                <td className="px-2 py-1.5 text-[10px] font-bold text-foreground tracking-tight font-mono">{order.label || '-'}</td>
+                <td className="px-2 py-1.5 text-[10px] font-bold text-foreground tracking-tight font-mono group-hover:border-l-2 group-hover:border-l-primary transition-all">{order.label || '-'}</td>
                 <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono">{new Date(order.createdAt).toLocaleDateString()}</td>
                 <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-medium whitespace-nowrap">
                    <div className="flex items-center space-x-1.5">
@@ -234,61 +216,6 @@ function ManufacturingContent() {
                 <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono">${(order.laborCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
                 <td className="px-2 py-1.5 text-[10px] text-foreground font-mono font-bold">${(order.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
                 <td className="px-2 py-1.5 text-[10px] text-emerald-500 font-mono font-bold">${unitCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
-                <td className="px-2 py-1.5 relative">
-                  <div className="relative" ref={openMenuId === order._id ? menuRef : null}>
-                    <button
-                      onClick={() => setOpenMenuId(openMenuId === order._id ? null : order._id)}
-                      className="p-1 hover:bg-secondary rounded transition-colors cursor-pointer"
-                    >
-                      <MoreVertical className="w-4 h-4 text-muted-foreground" />
-                    </button>
-                    {openMenuId === order._id && (
-                      <div className="absolute right-0 top-full mt-1 bg-card border border-border shadow-lg z-50 min-w-[120px] py-1">
-                        <button
-                          onClick={() => {
-                            setOpenMenuId(null);
-                            router.push(`/warehouse/manufacturing/${order._id}`);
-                          }}
-                          className="w-full px-3 py-1.5 text-left text-[10px] font-medium text-foreground hover:bg-secondary flex items-center gap-2 cursor-pointer transition-colors"
-                        >
-                          <Eye className="w-3 h-3" />
-                          View
-                        </button>
-                        <button
-                          onClick={() => {
-                            setOpenMenuId(null);
-                            router.push(`/warehouse/manufacturing/${order._id}`);
-                          }}
-                          className="w-full px-3 py-1.5 text-left text-[10px] font-medium text-foreground hover:bg-secondary flex items-center gap-2 cursor-pointer transition-colors"
-                        >
-                          <Pencil className="w-3 h-3" />
-                          Edit
-                        </button>
-                        <button
-                          onClick={async () => {
-                            if (!confirm('Are you sure you want to delete this order?')) return;
-                            setOpenMenuId(null);
-                            try {
-                              const res = await fetch(`/api/manufacturing/${order._id}`, { method: 'DELETE' });
-                              if (res.ok) {
-                                toast.success('Order deleted');
-                                fetchOrders();
-                              } else {
-                                toast.error('Failed to delete order');
-                              }
-                            } catch (e) {
-                              toast.error('Error deleting order');
-                            }
-                          }}
-                          className="w-full px-3 py-1.5 text-left text-[10px] font-medium text-destructive hover:bg-destructive/10 flex items-center gap-2 cursor-pointer transition-colors"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                          Delete
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </td>
               </tr>
             );
             })}

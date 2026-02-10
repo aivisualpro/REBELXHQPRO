@@ -359,26 +359,26 @@ function SkuDetailsPageContent() {
     }, [hasMore, isLoadingMore, displayTransactions.length]);
 
     if (loading) return (
-        <div className="flex items-center justify-center h-screen bg-white">
+        <div className="flex items-center justify-center h-screen bg-background">
             <LoadingSpinner size="lg" message="Loading SKU Ledger" />
         </div>
     );
 
     if (!sku) return (
-        <div className="flex flex-col items-center justify-center h-screen bg-slate-50">
-            <h2 className="text-xl font-bold text-slate-800">SKU Not Found</h2>
-            <button onClick={() => router.back()} className="mt-4 px-4 py-2 bg-black text-white rounded text-sm font-medium">Go Back</button>
+        <div className="flex flex-col items-center justify-center h-screen bg-background">
+            <h2 className="text-xl font-bold text-foreground">SKU Not Found</h2>
+            <button onClick={() => router.back()} className="mt-4 px-4 py-2 bg-foreground text-background rounded text-sm font-medium">Go Back</button>
         </div>
     );
 
     const currentStock = transactions.length > 0 ? transactions[0].balance : 0;
 
     return (
-        <div className="flex flex-col h-[calc(100vh-40px)] overflow-hidden bg-white">
+        <div className="flex flex-col h-[calc(100vh-40px)] overflow-hidden bg-background">
             {/* Shell Layer 1: Route Header (Sticky at top of content band) */}
-            <div className="sticky top-0 z-[10] bg-white border-b border-slate-200 px-4 flex items-center space-x-3 shrink-0 h-10 shadow-sm">
-                <button onClick={() => router.back()} className="hover:bg-slate-100 transition-colors p-1 rounded-full">
-                    <ArrowLeft className="w-4 h-4 text-slate-500" />
+            <div className="sticky top-0 z-[10] bg-background border-b border-border px-4 flex items-center space-x-3 shrink-0 h-10 shadow-sm">
+                <button onClick={() => router.back()} className="hover:bg-secondary transition-colors p-1 rounded-full">
+                    <ArrowLeft className="w-4 h-4 text-muted-foreground" />
                 </button>
                 <div className="flex items-baseline space-x-3">
                     {sku.tier && (
@@ -387,31 +387,31 @@ function SkuDetailsPageContent() {
                             sku.tier === 1 ? "bg-emerald-500" : sku.tier === 2 ? "bg-blue-500" : "bg-orange-500"
                         )}>{sku.tier}</span>
                     )}
-                    <h1 className="text-sm font-bold text-slate-900 uppercase tracking-tight">{sku.name}</h1>
-                    <p className="text-[10px] text-slate-400 font-mono">{sku._id}</p>
+                    <h1 className="text-sm font-bold text-foreground uppercase tracking-tight">{sku.name}</h1>
+                    <p className="text-[10px] text-muted-foreground font-mono">{sku._id}</p>
                 </div>
             </div>
 
             {/* Shell Layer 2: Main Middle Content Band (Split view) */}
-            <div className="flex-1 flex overflow-hidden min-h-0 bg-white">
+            <div className="flex-1 flex overflow-hidden min-h-0 bg-background">
                 {/* Left Column (30%) - Independent Scroll */}
-                <aside className="w-[30%] h-full overflow-y-auto border-r border-slate-100 bg-white shrink-0 scrollbar-custom">
+                <aside className="w-[30%] h-full overflow-y-auto border-r border-border bg-background shrink-0 scrollbar-custom">
                     <div className="p-4">
-                        <div className="flex items-center justify-center mb-6 bg-slate-50/50 p-4 h-48 border border-slate-100 border-dashed relative overflow-hidden rounded-lg">
+                        <div className="flex items-center justify-center mb-6 bg-secondary/50 p-4 h-48 border border-border border-dashed relative overflow-hidden rounded-lg">
                             <img src={sku.image || fallbackImage} alt={sku.name} className="h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).src = fallbackImage; }} />
                         </div>
 
-                        <div className="space-y-6 pt-2 pb-6 flex flex-col items-center border-b border-slate-50">
+                        <div className="space-y-6 pt-2 pb-6 flex flex-col items-center border-b border-border">
                             <div className="flex flex-col items-center">
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-4">Stock Level</label>
+                                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] mb-4">Stock Level</label>
                                 <div className="flex items-baseline space-x-2">
                                     <span className={cn(
                                         "text-4xl font-black tracking-tighter",
-                                        currentStock > (sku.reOrderPoint || 0) ? "text-slate-900" : "text-orange-600"
+                                        currentStock > (sku.reOrderPoint || 0) ? "text-foreground" : "text-orange-600"
                                     )}>
                                         {currentStock.toLocaleString(undefined, { maximumFractionDigits: 3 })}
                                     </span>
-                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">{sku.uom || 'Unit'}</span>
+                                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{sku.uom || 'Unit'}</span>
                                 </div>
                             </div>
                             {/* Pending Production Warning */}
@@ -461,12 +461,12 @@ function SkuDetailsPageContent() {
 
                     {/* Lots Summary Section */}
                     {lots.length > 0 && (
-                        <div className="p-4 bg-white border-b border-slate-100">
-                            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3 border-b border-slate-100 pb-2">Lot Inventory</h3>
+                        <div className="p-4 bg-background border-b border-border">
+                            <h3 className="text-xs font-bold text-foreground uppercase tracking-wider mb-3 border-b border-border pb-2">Lot Inventory</h3>
                             <div className="overflow-hidden">
                                 <table className="w-full text-left">
                                     <thead>
-                                        <tr className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">
+                                        <tr className="text-[8px] font-bold text-muted-foreground uppercase tracking-wider">
                                             <th className="pb-2">Lot #</th>
                                             <th className="pb-2">Type</th>
                                             <th className="pb-2">Date</th>
@@ -474,34 +474,34 @@ function SkuDetailsPageContent() {
                                             <th className="pb-2 text-right">Balance</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-slate-50">
+                                    <tbody className="divide-y divide-border">
                                         {lots.filter(l => l.balance !== 0).map((lot, idx) => (
                                             <tr 
                                                 key={lot.lotNumber} 
                                                 className={cn(
-                                                    "text-[10px] hover:bg-slate-50 cursor-pointer transition-colors",
-                                                    selectedLot === lot.lotNumber && "bg-blue-50 hover:bg-blue-100"
+                                                    "text-[10px] hover:bg-secondary/50 cursor-pointer transition-colors",
+                                                    selectedLot === lot.lotNumber && "bg-primary/10 hover:bg-primary/15"
                                                 )}
                                                 onClick={() => setSelectedLot(selectedLot === lot.lotNumber ? 'All' : lot.lotNumber)}
                                             >
-                                                <td className="py-1.5 font-mono font-medium text-slate-700 truncate max-w-[80px]" title={lot.lotNumber}>
+                                                <td className="py-1.5 font-mono font-medium text-foreground truncate max-w-[80px]" title={lot.lotNumber}>
                                                     {lot.lotNumber.length > 15 ? lot.lotNumber.substring(0, 15) + '...' : lot.lotNumber}
                                                 </td>
-                                                <td className="py-1.5 text-slate-500 truncate max-w-[60px]" title={lot.source}>
+                                                <td className="py-1.5 text-muted-foreground truncate max-w-[60px]" title={lot.source}>
                                                     {lot.source === 'Opening Balance' ? 'OB' : 
                                                      lot.source === 'Manufacturing' ? 'MFG' : 
                                                      lot.source === 'Audit Adjustment' ? 'ADJ' : 
                                                      lot.source.startsWith('PO') ? 'PO' : lot.source.substring(0, 8)}
                                                 </td>
-                                                <td className="py-1.5 text-slate-400 font-mono">
+                                                <td className="py-1.5 text-muted-foreground font-mono">
                                                     {lot.date ? new Date(lot.date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) : '-'}
                                                 </td>
-                                                <td className="py-1.5 text-right font-mono text-slate-600">
+                                                <td className="py-1.5 text-right font-mono text-muted-foreground">
                                                     {lot.cost > 0 ? `$${lot.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}` : '-'}
                                                 </td>
                                                 <td className={cn(
                                                     "py-1.5 text-right font-mono font-bold",
-                                                    lot.balance > 0 ? "text-emerald-600" : lot.balance < 0 ? "text-rose-600" : "text-slate-400"
+                                                    lot.balance > 0 ? "text-emerald-600" : lot.balance < 0 ? "text-rose-600" : "text-muted-foreground"
                                                 )}>
                                                     {lot.balance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                                                 </td>
@@ -515,29 +515,29 @@ function SkuDetailsPageContent() {
 
                     {/* Financial Summary */}
                     {financials && (
-                        <div className="p-4 bg-white space-y-8">
-                            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">Financials</h3>
+                        <div className="p-4 bg-background space-y-8">
+                            <h3 className="text-xs font-bold text-foreground uppercase tracking-wider mb-4 border-b border-border pb-2">Financials</h3>
                             
                             {/* Tier 1 & 2: Show Revenue, Cost of Sales, Gross Profit */}
                             {(sku?.tier === 1 || sku?.tier === 2) && (
                                 <div className="space-y-4">
                                     <div className="flex justify-between items-baseline">
-                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Revenue</span>
-                                        <span className="text-sm font-bold text-slate-900">${financials.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
+                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Total Revenue</span>
+                                        <span className="text-sm font-bold text-foreground">${financials.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
                                     </div>
                                     <div className="flex justify-between items-baseline">
-                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Cost of Sales</span>
-                                        <span className="text-sm font-medium text-slate-600">${financials.costOfSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
+                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Cost of Sales</span>
+                                        <span className="text-sm font-medium text-muted-foreground">${financials.costOfSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
                                     </div>
-                                    <div className="flex justify-between items-baseline pt-2 border-t border-slate-100">
-                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Gross Profit</span>
+                                    <div className="flex justify-between items-baseline pt-2 border-t border-border">
+                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Gross Profit</span>
                                         <span className={cn("text-sm font-bold", financials.grossProfit >= 0 ? "text-emerald-600" : "text-rose-600")}>
                                             ${financials.grossProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
                                         </span>
                                     </div>
 
                                     <div className="mt-8">
-                                        <h4 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-4">Last 12 Months Turnover</h4>
+                                        <h4 className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-4">Last 12 Months Turnover</h4>
                                         <div className="flex items-end space-x-1 pt-6 h-32">
                                             {financials.chartData.map((d, i) => {
                                                 const maxRev = Math.max(...financials.chartData.map(c => c.revenue), 100); 
@@ -547,13 +547,13 @@ function SkuDetailsPageContent() {
                                                     <div key={i} className="flex-1 h-full flex flex-col group relative">
                                                         <div className="relative h-full flex flex-col justify-end w-full pb-px px-0.5">
                                                             <div 
-                                                                className="bg-slate-800 rounded-t hover:bg-black transition-all w-full relative group" 
+                                                                className="bg-foreground/80 rounded-t hover:bg-foreground transition-all w-full relative group" 
                                                                 style={{ height: d.revenue > 0 ? `${Math.max(heightPct, 4)}%` : '2px' }}
                                                             >
                                                                 {d.revenue > 0 ? (
                                                                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 flex flex-col items-center pointer-events-none w-max z-10 opacity-100 group-hover:scale-110 transition-transform">
-                                                                        <span className="text-[9px] font-bold text-slate-800 tracking-tighter">${Math.round(d.revenue).toLocaleString()}</span>
-                                                                        <span className="text-[7px] text-slate-400 font-medium uppercase">{d.qty || 0}</span>
+                                                                        <span className="text-[9px] font-bold text-foreground tracking-tighter">${Math.round(d.revenue).toLocaleString()}</span>
+                                                                        <span className="text-[7px] text-muted-foreground font-medium uppercase">{d.qty || 0}</span>
                                                                     </div>
                                                                 ) : null}
                                                                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-8 hidden group-hover:block z-30 bg-black text-white text-[9px] px-2 py-1 rounded whitespace-nowrap shadow-xl">
@@ -563,7 +563,7 @@ function SkuDetailsPageContent() {
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                        <div className="text-[7px] text-slate-400 font-medium text-center mt-1 uppercase tracking-tight">{monthLabel}</div>
+                                                        <div className="text-[7px] text-muted-foreground font-medium text-center mt-1 uppercase tracking-tight">{monthLabel}</div>
                                                     </div>
                                                 );
                                             })}
@@ -574,18 +574,18 @@ function SkuDetailsPageContent() {
 
                             {/* Tier 2: Also show COGM, COGP and Manufacturing Chart */}
                             {sku?.tier === 2 && (
-                                <div className="pt-8 border-t border-slate-100 space-y-4">
+                                <div className="pt-8 border-t border-border space-y-4">
                                     <div className="flex justify-between items-baseline">
-                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">COGM</span>
-                                        <span className="text-sm font-bold text-slate-900">${(financials.cogm || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
+                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">COGM</span>
+                                        <span className="text-sm font-bold text-foreground">${(financials.cogm || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
                                     </div>
                                     <div className="flex justify-between items-baseline">
-                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">COGP</span>
-                                        <span className="text-sm font-medium text-slate-600">${(financials.cogp || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
+                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">COGP</span>
+                                        <span className="text-sm font-medium text-muted-foreground">${(financials.cogp || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
                                     </div>
 
                                     <div className="mt-8">
-                                        <h4 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-4">Last 12 Months Manufacturing</h4>
+                                        <h4 className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-4">Last 12 Months Manufacturing</h4>
                                         <div className="flex items-end space-x-1 pt-6 h-32">
                                             {financials.chartData.map((d, i) => {
                                                 const maxQty = Math.max(...financials.chartData.map(c => c.productionQty || 0), 10); 
@@ -610,7 +610,7 @@ function SkuDetailsPageContent() {
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                        <div className="text-[7px] text-slate-400 font-medium text-center mt-1 uppercase tracking-tight">{monthLabel}</div>
+                                                        <div className="text-[7px] text-muted-foreground font-medium text-center mt-1 uppercase tracking-tight">{monthLabel}</div>
                                                     </div>
                                                 );
                                             })}
@@ -623,10 +623,10 @@ function SkuDetailsPageContent() {
                             {sku?.tier === 3 && (
                                 <div className="space-y-4">
                                     <div className="flex justify-between items-baseline">
-                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">COGP</span>
-                                        <span className="text-sm font-bold text-slate-900">${(financials.cogp || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
+                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">COGP</span>
+                                        <span className="text-sm font-bold text-foreground">${(financials.cogp || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
                                     </div>
-                                    <p className="text-[9px] text-slate-400 italic">Raw material - consumed in manufacturing only</p>
+                                    <p className="text-[9px] text-muted-foreground italic">Raw material - consumed in manufacturing only</p>
                                 </div>
                             )}
                             <div className="h-20" />
@@ -635,35 +635,35 @@ function SkuDetailsPageContent() {
                 </aside>
 
                 {/* Right Column: Ledger Workspace - Independent Scroll */}
-                <main className="flex-1 h-full overflow-y-auto bg-white relative scrollbar-custom">
+                <main className="flex-1 h-full overflow-y-auto bg-background relative scrollbar-custom">
                     {/* Nested Sticky Layer 1: Toolbar */}
-                    <div className="sticky top-0 z-[30] bg-white border-b border-slate-100 px-4 h-10 flex items-center justify-between gap-4">
+                    <div className="sticky top-0 z-[30] bg-background border-b border-border px-4 h-10 flex items-center justify-between gap-4">
                         <div className="flex items-center space-x-3">
-                            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Transaction Ledger</h3>
+                            <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">Transaction Ledger</h3>
                             {isSaving && (
                                 <span className="text-[10px] font-bold text-blue-500 animate-pulse">Saving changes...</span>
                             )}
                             <div className="relative" ref={filterRef}>
-                                <button onClick={() => setIsFilterOpen(!isFilterOpen)} className={cn("flex items-center space-x-1 px-3 py-1 text-[10px] font-bold border rounded transition-all", isFilterOpen ? "bg-slate-900 border-slate-900 text-white" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm")}>
+                                <button onClick={() => setIsFilterOpen(!isFilterOpen)} className={cn("flex items-center space-x-1 px-3 py-1 text-[10px] font-bold border rounded transition-all", isFilterOpen ? "bg-foreground border-foreground text-background" : "bg-background border-border text-muted-foreground hover:bg-secondary shadow-sm")}>
                                     <Filter className="w-3 h-3" />
                                     <span>FILTERS</span>
                                 </button>
                                 {isFilterOpen && (
-                                    <div className="absolute left-0 top-full mt-2 w-64 bg-white border border-slate-200 rounded-lg shadow-2xl z-[100] p-4 animate-in fade-in zoom-in duration-200">
+                                    <div className="absolute left-0 top-full mt-2 w-64 bg-card border border-border rounded-lg shadow-2xl z-[100] p-4 animate-in fade-in zoom-in duration-200">
                                         <div className="space-y-4">
                                             <div>
-                                                <label className="text-[9px] font-bold text-slate-400 uppercase block mb-2">Date Range</label>
+                                                <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-2">Date Range</label>
                                                 <div className="grid grid-cols-2 gap-2">
-                                                    <input type="date" value={filters.fromDate} onChange={(e) => setFilters(prev => ({...prev, fromDate: e.target.value}))} className="w-full text-[10px] border border-slate-200 rounded px-2 py-1" />
-                                                    <input type="date" value={filters.toDate} onChange={(e) => setFilters(prev => ({...prev, toDate: e.target.value}))} className="w-full text-[10px] border border-slate-200 rounded px-2 py-1" />
+                                                    <input type="date" value={filters.fromDate} onChange={(e) => setFilters(prev => ({...prev, fromDate: e.target.value}))} className="w-full text-[10px] border border-border rounded px-2 py-1 bg-background text-foreground" />
+                                                    <input type="date" value={filters.toDate} onChange={(e) => setFilters(prev => ({...prev, toDate: e.target.value}))} className="w-full text-[10px] border border-border rounded px-2 py-1 bg-background text-foreground" />
                                                 </div>
                                             </div>
                                             <div>
-                                                <label className="text-[9px] font-bold text-slate-400 uppercase block mb-2">Lot Selection</label>
+                                                <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-2">Lot Selection</label>
                                                 <SearchableSelect options={[{ label: 'All Lots', value: 'All' }, ...uniqueLots.map(l => ({ label: l!, value: l! }))]} value={selectedLot} onChange={(val) => setSelectedLot(val)} placeholder="Select Lot..." triggerClassName="py-1 text-[10px] border-slate-200" />
                                             </div>
                                             <div>
-                                                <label className="text-[9px] font-bold text-slate-400 uppercase block mb-3">Transaction Types</label>
+                                                <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-3">Transaction Types</label>
                                                 <div className="space-y-2">
                                                     {[
                                                         { label: 'Opening Bal.', key: 'showOpeningBalance' as const, icon: <History className="w-3 h-3 text-purple-500" /> },
@@ -677,48 +677,48 @@ function SkuDetailsPageContent() {
                                                         <label key={t.key} className="flex items-center justify-between group cursor-pointer">
                                                             <div className="flex items-center space-x-2">
                                                                 {t.icon}
-                                                                <span className="text-[10px] font-medium text-slate-600 group-hover:text-slate-900 transition-colors uppercase tracking-tight">{t.label}</span>
+                                                                <span className="text-[10px] font-medium text-muted-foreground group-hover:text-foreground transition-colors uppercase tracking-tight">{t.label}</span>
                                                             </div>
                                                             <input 
                                                                 type="checkbox" 
                                                                 checked={filters[t.key]} 
                                                                 onChange={() => setFilters(prev => ({ ...prev, [t.key]: !prev[t.key] }))}
-                                                                className="w-3 h-3 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                                                                className="w-3 h-3 rounded border-border text-foreground focus:ring-primary"
                                                             />
                                                         </label>
                                                     ))}
                                                 </div>
                                             </div>
                                             <div>
-                                                <label className="text-[9px] font-bold text-slate-400 uppercase block mb-3">Special Filters</label>
+                                                <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-3">Special Filters</label>
                                                 <div className="space-y-2">
                                                     <label className="flex items-center justify-between group cursor-pointer">
                                                         <div className="flex items-center space-x-2">
                                                             <AlertCircle className="w-3 h-3 text-amber-500" />
-                                                            <span className="text-[10px] font-medium text-slate-600 group-hover:text-slate-900 transition-colors uppercase tracking-tight">No Lot #</span>
+                                                            <span className="text-[10px] font-medium text-muted-foreground group-hover:text-foreground transition-colors uppercase tracking-tight">No Lot #</span>
                                                         </div>
                                                         <input 
                                                             type="checkbox" 
                                                             checked={filters.showOnlyNoLot} 
                                                             onChange={() => setFilters(prev => ({ ...prev, showOnlyNoLot: !prev.showOnlyNoLot }))}
-                                                            className="w-3 h-3 rounded border-slate-300 text-amber-500 focus:ring-amber-500"
+                                                            className="w-3 h-3 rounded border-border text-amber-500 focus:ring-amber-500"
                                                         />
                                                     </label>
                                                     <label className="flex items-center justify-between group cursor-pointer">
                                                         <div className="flex items-center space-x-2">
                                                             <DollarSign className="w-3 h-3 text-rose-500" />
-                                                            <span className="text-[10px] font-medium text-slate-600 group-hover:text-slate-900 transition-colors uppercase tracking-tight">No Cost</span>
+                                                            <span className="text-[10px] font-medium text-muted-foreground group-hover:text-foreground transition-colors uppercase tracking-tight">No Cost</span>
                                                         </div>
                                                         <input 
                                                             type="checkbox" 
                                                             checked={filters.showOnlyNoCost} 
                                                             onChange={() => setFilters(prev => ({ ...prev, showOnlyNoCost: !prev.showOnlyNoCost }))}
-                                                            className="w-3 h-3 rounded border-slate-300 text-rose-500 focus:ring-rose-500"
+                                                            className="w-3 h-3 rounded border-border text-rose-500 focus:ring-rose-500"
                                                         />
                                                     </label>
                                                 </div>
                                             </div>
-                                            <div className="pt-2 border-t border-slate-50 flex justify-end">
+                                            <div className="pt-2 border-t border-border flex justify-end">
                                                 <button 
                                                     onClick={() => {
                                                         const defaultFilters = {
@@ -732,7 +732,7 @@ function SkuDetailsPageContent() {
                                                         localStorage.removeItem(`sku_filters_${id}`);
                                                         localStorage.removeItem(`sku_lot_${id}`);
                                                     }}
-                                                    className="text-[9px] font-bold text-slate-400 hover:text-slate-600 uppercase"
+                                                    className="text-[9px] font-bold text-muted-foreground hover:text-foreground uppercase"
                                                 >
                                                     Reset All
                                                 </button>
@@ -748,12 +748,12 @@ function SkuDetailsPageContent() {
                                 const totalQty = countable.reduce((acc, tx) => acc + tx.quantity, 0);
                                 return (
                                     <>
-                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
                                             {paginatedTransactions.length === displayTransactions.length 
                                                 ? `${countable.length} Records` 
                                                 : `${Math.min(paginatedTransactions.length, countable.length)} of ${countable.length} Records`}
                                         </span>
-                                        <span className="text-[10px] text-slate-300">|</span>
+                                        <span className="text-[10px] text-muted-foreground/50">|</span>
                                         <span className={cn(
                                             "text-[10px] font-bold font-mono",
                                             totalQty > 0 ? "text-emerald-600" : "text-rose-600"
@@ -769,30 +769,30 @@ function SkuDetailsPageContent() {
 
                     {/* Nested Sticky Layer 2: Table Header (Pinned exactly below toolbar) */}
                     <table className="w-full text-left border-collapse">
-                        <thead className="sticky top-10 z-[20] bg-slate-50/90 backdrop-blur-sm border-b border-slate-100">
+                        <thead className="sticky top-10 z-[20] bg-secondary/90 backdrop-blur-sm border-b border-border">
                             <tr>
-                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100/50">Date</th>
-                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100/50">Type</th>
-                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100/50">Reference</th>
-                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100/50">Lot #</th>
-                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right border-r border-slate-100/50">In/Out</th>
-                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100/50">Status</th>
-                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right border-r border-slate-100/50">Balance</th>
-                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right">Cost</th>
+                                <th className="px-3 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border">Date</th>
+                                <th className="px-3 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border">Type</th>
+                                <th className="px-3 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border">Reference</th>
+                                <th className="px-3 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border">Lot #</th>
+                                <th className="px-3 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-right border-r border-border">In/Out</th>
+                                <th className="px-3 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border">Status</th>
+                                <th className="px-3 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-right border-r border-border">Balance</th>
+                                <th className="px-3 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-right">Cost</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-50">
+                        <tbody className="divide-y divide-border">
                             {paginatedTransactions.map((tx) => (
-                                <tr key={tx._id} className={cn("hover:bg-slate-50/50 transition-colors group cursor-pointer", (isPendingProduction(tx) || isUnfulfilledConsumption(tx)) && "!bg-rose-50 hover:!bg-rose-100 border-l-2 border-l-rose-400")} onClick={() => router.push(tx.link)}>
-                                    <td className="px-3 py-2 text-[10px] text-slate-500 font-mono">{new Date(tx.date).toLocaleDateString('en-US', { year: '2-digit', month: '2-digit', day: '2-digit' })}</td>
+                                <tr key={tx._id} className={cn("hover:bg-secondary/50 transition-colors group cursor-pointer", (isPendingProduction(tx) || isUnfulfilledConsumption(tx)) && "!bg-rose-950/20 hover:!bg-rose-950/30 border-l-2 border-l-rose-400")} onClick={() => router.push(tx.link)}>
+                                    <td className="px-3 py-2 text-[10px] text-muted-foreground font-mono">{new Date(tx.date).toLocaleDateString('en-US', { year: '2-digit', month: '2-digit', day: '2-digit' })}</td>
                                     <td className="px-3 py-2">
                                         <div className="flex items-center space-x-2">
                                             {getTypeIcon(tx.type)}
-                                            <span className="text-[9px] uppercase font-bold text-slate-500">{tx.type}</span>
+                                            <span className="text-[9px] uppercase font-bold text-muted-foreground">{tx.type}</span>
                                         </div>
                                     </td>
-                                    <td className="px-3 py-2 text-[10px] text-slate-600 truncate max-w-[120px]">{tx.reference}</td>
-                                    <td className="px-3 py-2 text-[10px] text-slate-600 font-mono group/cell relative">
+                                    <td className="px-3 py-2 text-[10px] text-muted-foreground truncate max-w-[120px]">{tx.reference}</td>
+                                    <td className="px-3 py-2 text-[10px] text-muted-foreground font-mono group/cell relative">
                                         <div className="flex items-center justify-between">
                                             <span>{tx.lotNumber || '-'}</span>
                                             <button 
@@ -801,37 +801,37 @@ function SkuDetailsPageContent() {
                                                     setEditingTx(tx); 
                                                     setIsLotModalOpen(true);
                                                 }}
-                                                className="opacity-0 group-hover/cell:opacity-100 p-1 hover:bg-slate-200 rounded transition-opacity"
+                                                className="opacity-0 group-hover/cell:opacity-100 p-1 hover:bg-secondary rounded transition-opacity"
                                                 title="Edit Lot Number"
                                             >
-                                                <Pencil className="w-3 h-3 text-slate-500" />
+                                                <Pencil className="w-3 h-3 text-muted-foreground" />
                                             </button>
                                         </div>
                                     </td>
                                     <td className="px-3 py-2 text-right">
                                         <span className={cn(
                                             "text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-sm",
-                                            (isPendingProduction(tx) || isUnfulfilledConsumption(tx)) ? "text-amber-500/70 bg-amber-50 line-through" :
-                                            tx.quantity > 0 ? "text-emerald-700 bg-emerald-50" : "text-rose-700 bg-rose-50"
+                                            (isPendingProduction(tx) || isUnfulfilledConsumption(tx)) ? "text-amber-500/70 bg-amber-500/10 line-through" :
+                                            tx.quantity > 0 ? "text-emerald-500 bg-emerald-500/10" : "text-rose-500 bg-rose-500/10"
                                         )}>{tx.quantity > 0 ? '+' : ''}{tx.quantity}</span>
                                     </td>
                                     <td className="px-3 py-2">
                                         {tx.status ? (
                                             <span className={cn(
                                                 "text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-sm",
-                                                tx.status === 'Completed' || tx.status === 'Delivered' || tx.status === 'Shipped' || tx.status === 'Fulfilled' ? 'text-emerald-700 bg-emerald-50' :
-                                                tx.status === 'In Progress' || tx.status === 'Processing' || tx.status === 'Ready to QC' ? 'text-blue-700 bg-blue-50' :
-                                                tx.status === 'Cancelled' || tx.status === 'Rejected' ? 'text-rose-700 bg-rose-50' :
-                                                tx.status === 'Pending' || tx.status === 'Draft' ? 'text-amber-700 bg-amber-50' :
-                                                'text-slate-600 bg-slate-50'
+                                                tx.status === 'Completed' || tx.status === 'Delivered' || tx.status === 'Shipped' || tx.status === 'Fulfilled' ? 'text-emerald-500 bg-emerald-500/10' :
+                                                tx.status === 'In Progress' || tx.status === 'Processing' || tx.status === 'Ready to QC' ? 'text-blue-500 bg-blue-500/10' :
+                                                tx.status === 'Cancelled' || tx.status === 'Rejected' ? 'text-rose-500 bg-rose-500/10' :
+                                                tx.status === 'Pending' || tx.status === 'Draft' ? 'text-amber-500 bg-amber-500/10' :
+                                                'text-muted-foreground bg-secondary'
                                             )}>{tx.status}</span>
-                                        ) : <span className="text-[10px] text-slate-300">-</span>}
+                                        ) : <span className="text-[10px] text-muted-foreground/50">-</span>}
                                     </td>
-                                    <td className="px-3 py-2 text-right text-[10px] font-bold text-slate-900 font-mono">
-                                        {(isPendingProduction(tx) || isUnfulfilledConsumption(tx)) ? <span className="text-slate-300">-</span> : tx.balance.toLocaleString()}
+                                    <td className="px-3 py-2 text-right text-[10px] font-bold text-foreground font-mono">
+                                        {(isPendingProduction(tx) || isUnfulfilledConsumption(tx)) ? <span className="text-muted-foreground/50">-</span> : tx.balance.toLocaleString()}
                                     </td>
-                                    <td className="px-3 py-2 text-right text-[10px] text-slate-600 font-mono">
-                                        {(isPendingProduction(tx) || isUnfulfilledConsumption(tx)) ? <span className="text-slate-300">-</span> : (tx.cost ? `$${tx.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}` : '-')}
+                                    <td className="px-3 py-2 text-right text-[10px] text-muted-foreground font-mono">
+                                        {(isPendingProduction(tx) || isUnfulfilledConsumption(tx)) ? <span className="text-muted-foreground/50">-</span> : (tx.cost ? `$${tx.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}` : '-')}
                                     </td>
                                 </tr>
                             ))}
@@ -841,7 +841,7 @@ function SkuDetailsPageContent() {
                     {/* Load More Indicator */}
                     <div ref={loadMoreRef} className="h-16 flex items-center justify-center">
                         {hasMore && (
-                            <div className="flex items-center space-x-2 text-slate-400">
+                            <div className="flex items-center space-x-2 text-muted-foreground">
                                 {isLoadingMore ? (
                                     <>
                                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -858,18 +858,18 @@ function SkuDetailsPageContent() {
             </div>
 
             {/* Shell Layer 3: Shell Footer (Fixed at the bottom of the content band) */}
-            <div className="h-[24px] border-t border-slate-200 bg-slate-100/50 shrink-0 flex items-center justify-between px-4 z-[50]">
+            <div className="h-[24px] border-t border-border bg-secondary/50 shrink-0 flex items-center justify-between px-4 z-[50]">
                 <div className="flex items-center space-x-4">
                     <div className="flex items-center space-x-1.5">
                         <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", isSaving ? "bg-blue-500" : "bg-emerald-500")} />
-                        <span className={cn("text-[9px] font-bold uppercase tracking-widest", isSaving ? "text-blue-500" : "text-slate-500")}>
+                        <span className={cn("text-[9px] font-bold uppercase tracking-widest", isSaving ? "text-blue-500" : "text-muted-foreground")}>
                             {isSaving ? "Saving..." : "System Ready"}
                         </span>
                     </div>
                 </div>
                 <div className="flex items-center space-x-4">
-                    <span className="text-[9px] text-slate-400 font-mono uppercase tracking-tighter">SKU Detail Shell v2.0</span>
-                    <span className="text-[9px] text-slate-400 font-mono uppercase tracking-tighter">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span>
+                    <span className="text-[9px] text-muted-foreground font-mono uppercase tracking-tighter">SKU Detail Shell v2.0</span>
+                    <span className="text-[9px] text-muted-foreground font-mono uppercase tracking-tighter">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span>
                 </div>
             </div>
             {/* Standard Lot Selection Modal */}
@@ -896,8 +896,8 @@ function SkuDetailsPageContent() {
 export default function SkuDetailsPage() {
     return (
         <Suspense fallback={
-            <div className="flex items-center justify-center h-screen bg-white">
-                <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+            <div className="flex items-center justify-center h-screen bg-background">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
         }>
             <SkuDetailsPageContent />

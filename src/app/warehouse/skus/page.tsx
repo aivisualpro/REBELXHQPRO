@@ -249,11 +249,8 @@ function SkusPageContent() {
           <table className="w-full text-left border-separate border-spacing-0 relative z-0">
           <thead className="sticky top-0 bg-secondary/80 z-10 border-b border-border backdrop-blur-md transition-colors">
             <tr>
-              {/* Image */}
-              <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest w-10 border-r border-border">Img</th>
-              
               {/* Name */}
-              <th className="border-r border-border max-w-[160px]">
+              <th className="border-r border-border max-w-[220px]">
                 <TableColumnHeader
                   column="name"
                   title="Name"
@@ -351,40 +348,24 @@ function SkusPageContent() {
 
               {/* Gross Profit */}
               <th className="px-2 py-1 border-r border-border">
-                <TableColumnHeader column="grossProfit" title="Gross Profit" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
+                <TableColumnHeader column="grossProfit" title="Gross Profit" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground justify-end" />
               </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border bg-background/50">
             {loading ? (
-              <tr><td colSpan={14} className="px-2 py-12 text-center text-[10px] text-slate-400">Loading SKUs...</td></tr>
+              <tr><td colSpan={13} className="px-2 py-12 text-center text-[10px] text-slate-400">Loading SKUs...</td></tr>
             ) : error ? (
-              <tr><td colSpan={14} className="px-2 py-12 text-center text-red-500 text-[10px] font-bold">{error}</td></tr>
+              <tr><td colSpan={13} className="px-2 py-12 text-center text-red-500 text-[10px] font-bold">{error}</td></tr>
             ) : skus.length === 0 ? (
-              <tr><td colSpan={14} className="px-2 py-12 text-center text-[10px] text-slate-400 uppercase font-bold tracking-tighter opacity-50">No SKUs found</td></tr>
+              <tr><td colSpan={13} className="px-2 py-12 text-center text-[10px] text-slate-400 uppercase font-bold tracking-tighter opacity-50">No SKUs found</td></tr>
             ) : skus.map(sku => (
               <tr 
                 key={sku._id} 
                 className="group relative z-0 bg-background hover:bg-secondary/40 transition-colors duration-150 cursor-pointer"
                 onClick={() => router.push(`/warehouse/skus/${sku._id}`)}
               >
-                <td className="px-2 py-1 border-r border-border group-hover:border-l-2 group-hover:border-l-primary transition-all">
-                  <div className="w-6 h-6 rounded bg-secondary overflow-hidden relative border border-border">
-                    <img 
-                        src={sku.image || globalSettings?.missingSkuImage || '/sku-placeholder.png'} 
-                        alt="" 
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            const fallback = globalSettings?.missingSkuImage || '/sku-placeholder.png';
-                            if (target.src !== fallback && target.src.indexOf('sku-placeholder.png') === -1) {
-                                target.src = fallback;
-                            }
-                        }} 
-                    />
-                  </div>
-                </td>
-                <td className="px-2 py-1 text-[9px] text-foreground font-medium border-r border-border whitespace-nowrap max-w-[160px]">
+                <td className="px-2 py-1 text-[10px] text-foreground font-medium border-r border-border whitespace-nowrap max-w-[220px] group-hover:border-l-2 group-hover:border-l-primary transition-all">
                   <div className="flex items-center space-x-1.5">
                     {sku.tier ? (
                       <span className={cn(
@@ -399,12 +380,12 @@ function SkusPageContent() {
                     <span className="truncate max-w-[120px]" title={sku.name}>{sku.name}</span>
                   </div>
                 </td>
-                <td className="px-2 py-1 text-[8px] uppercase font-bold text-muted-foreground border-r border-border">{sku.category}</td>
-                <td className="px-2 py-1 text-[8px] uppercase font-bold text-muted-foreground border-r border-border">{sku.subCategory}</td>
-                <td className="px-2 py-1 text-[8px] uppercase font-bold text-muted-foreground border-r border-border">{sku.materialType}</td>
-                <td className="px-2 py-1 text-[9px] text-muted-foreground font-mono border-r border-border text-right">${(sku.salePrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td className="px-2 py-1 text-[9px] text-muted-foreground font-mono border-r border-border text-right">${(sku.avgCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td className="px-2 py-1 text-[9px] font-bold text-foreground border-r border-border text-center">
+                <td className="px-2 py-1 text-[9px] uppercase font-bold text-muted-foreground border-r border-border">{sku.category}</td>
+                <td className="px-2 py-1 text-[9px] uppercase font-bold text-muted-foreground border-r border-border">{sku.subCategory}</td>
+                <td className="px-2 py-1 text-[9px] uppercase font-bold text-muted-foreground border-r border-border">{sku.materialType}</td>
+                <td className="px-2 py-1 text-[10px] text-muted-foreground font-mono border-r border-border text-right">${(sku.salePrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td className="px-2 py-1 text-[10px] text-muted-foreground font-mono border-r border-border text-right">${(sku.avgCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td className="px-2 py-1 text-[10px] font-bold text-foreground border-r border-border text-center">
                   <span className={cn(
                     "px-1.5 py-0.5 rounded text-[10px] font-bold",
                     (sku.currentStock || 0) <= (sku.reOrderPoint || 0) ? "bg-destructive/10 text-destructive border border-destructive/20" : "text-foreground"
@@ -412,12 +393,12 @@ function SkusPageContent() {
                     {Math.round(sku.currentStock || 0)}
                   </span>
                 </td>
-                <td className="px-2 py-1 text-[9px] text-muted-foreground border-r border-border text-center">{sku.reOrderPoint}</td>
-                <td className="px-2 py-1 text-[9px] text-muted-foreground border-r border-border text-center">{sku.orderUpto}</td>
-                <td className="px-2 py-1 text-[9px] text-emerald-600 font-mono border-r border-border text-right">${(sku.revenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td className="px-2 py-1 text-[9px] text-muted-foreground font-mono border-r border-border text-right">${(sku.cogs || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td className="px-2 py-1 text-[9px] text-muted-foreground font-mono border-r border-border text-right">${(sku.cogm || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td className="px-2 py-1 text-[9px] font-black text-foreground font-mono text-right">${(sku.grossProfit || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td className="px-2 py-1 text-[10px] text-muted-foreground border-r border-border text-center">{sku.reOrderPoint}</td>
+                <td className="px-2 py-1 text-[10px] text-muted-foreground border-r border-border text-center">{sku.orderUpto}</td>
+                <td className="px-2 py-1 text-[10px] text-emerald-600 font-mono border-r border-border text-right">${(sku.revenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td className="px-2 py-1 text-[10px] text-muted-foreground font-mono border-r border-border text-right">${(sku.cogs || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td className="px-2 py-1 text-[10px] text-muted-foreground font-mono border-r border-border text-right">${(sku.cogm || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td className="px-2 py-1 text-[10px] font-black text-foreground font-mono text-right">${(sku.grossProfit || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
               </tr>
             ))}
           </tbody>
