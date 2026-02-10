@@ -73,7 +73,7 @@ export async function GET(
                 .select('_id sku qty qtyDifference uom lotNumber label scheduledStart scheduledFinish createdAt lineItems labor totalCost packagingCost status')
                 .lean(),
             SaleOrder.find({ "lineItems.sku": id, ...dateFilter })
-                .select('_id label createdAt shippedDate lineItems status')
+                .select('_id label createdAt shippedDate lineItems orderStatus')
                 .populate('clientId', 'name')
                 .lean(),
             AuditAdjustment.find({ sku: id, ...dateFilter })
@@ -313,7 +313,7 @@ export async function GET(
                         salePrice: round8(line.price || 0),
                         docId: so._id,
                         link: `/sales/wholesale-orders/${so._id}`,
-                        status: so.status || ''
+                        status: so.orderStatus || ''
                     });
                 }
             });

@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
-    ArrowLeft,
     Package,
     Factory,
     ShoppingCart,
@@ -472,29 +471,8 @@ function SkuDetailsPageContent() {
     };
 
     return (
-        <div className="flex flex-col h-[calc(100vh-40px)] overflow-hidden bg-background">
-            {/* Shell Layer 1: Route Header (Sticky at top of content band) */}
-            <div className="sticky top-0 z-[10] bg-background border-b border-border px-4 flex items-center justify-between shrink-0 h-10 shadow-sm">
-                <div className="flex items-center space-x-3">
-                    <button onClick={() => router.back()} className="hover:bg-secondary transition-colors p-1 rounded-full cursor-pointer">
-                        <ArrowLeft className="w-4 h-4 text-muted-foreground" />
-                    </button>
-                    <div className="flex items-baseline space-x-3">
-                        {sku.tier && (
-                            <span className={cn(
-                                "flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-black text-white shadow-sm",
-                                sku.tier === 1 ? "bg-emerald-500" : sku.tier === 2 ? "bg-blue-500" : "bg-orange-500"
-                            )}>{sku.tier}</span>
-                        )}
-                        <h1 className="text-sm font-bold text-foreground uppercase tracking-tight">{sku.name}</h1>
-                        <p className="text-[10px] text-muted-foreground font-mono">{sku._id}</p>
-                    </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                </div>
-            </div>
-
-            {/* Shell Layer 2: Main Middle Content Band (Split view) */}
+        <div className="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-background">
+            {/* Main Content Band (Split view) */}
             <div className="flex-1 flex overflow-hidden min-h-0 bg-background">
                 {/* Left Column (30%) - Independent Scroll */}
                 <aside className="w-[30%] h-full border-r border-border bg-background shrink-0 flex flex-col overflow-hidden">
