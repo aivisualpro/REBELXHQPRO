@@ -3,14 +3,16 @@ import dbConnect from '@/lib/mongoose';
 import Manufacturing from '@/models/Manufacturing';
 import mongoose from 'mongoose';
 import Sku from '@/models/Sku';
+import User from '@/models/User';
 import { applyDateFilter } from '@/lib/global-settings';
 import { getSkuTiers } from '@/lib/sku-tiers';
 
 export async function GET(request: Request) {
     try {
         await dbConnect();
-        // Ensure models are registered
+        // Ensure models are registered for populate()
         void Sku;
+        void User;
 
         const { searchParams } = new URL(request.url);
 
