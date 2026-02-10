@@ -691,7 +691,7 @@ export default function SettingsPage() {
                                                 </button>
                                             </div>
 
-                                            <div className="mt-6 p-4 bg-slate-50 rounded-lg">
+                                            <div className="mt-6 p-4 bg-secondary/30 rounded-lg">
                                                 <h4 className="text-xs font-bold text-muted-foreground mb-2">CSV Column Reference</h4>
                                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-[10px] text-muted-foreground">
                                                     <div>
@@ -1112,7 +1112,7 @@ export default function SettingsPage() {
                                                 </button>
                                             </div>
 
-                                            <div className="mt-6 p-4 bg-slate-50 rounded-lg">
+                                            <div className="mt-6 p-4 bg-secondary/30 rounded-lg">
                                                 <h4 className="text-xs font-bold text-muted-foreground mb-2">CSV Column Reference</h4>
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-[10px] text-muted-foreground">
                                                     <div>
@@ -1221,7 +1221,7 @@ export default function SettingsPage() {
                                                 </button>
                                             </div>
 
-                                            <div className="mt-4 p-4 bg-slate-50 rounded-lg">
+                                            <div className="mt-4 p-4 bg-secondary/30 rounded-lg">
                                                 <h4 className="text-xs font-bold text-muted-foreground mb-2">CSV Column Reference</h4>
                                                 <div className="text-[10px] text-muted-foreground">
                                                     <span className="font-bold text-muted-foreground">Opening Balances:</span>
@@ -1262,7 +1262,7 @@ export default function SettingsPage() {
                                                 </button>
                                             </div>
 
-                                            <div className="mt-4 p-4 bg-slate-50 rounded-lg">
+                                            <div className="mt-4 p-4 bg-secondary/30 rounded-lg">
                                                 <h4 className="text-xs font-bold text-muted-foreground mb-2">CSV Column Reference</h4>
                                                 <div className="text-[10px] text-muted-foreground">
                                                     <span className="font-bold text-muted-foreground">Audit Adjustments:</span>
@@ -1303,7 +1303,7 @@ export default function SettingsPage() {
                                                 </button>
                                             </div>
 
-                                            <div className="mt-4 p-4 bg-slate-50 rounded-lg">
+                                            <div className="mt-4 p-4 bg-secondary/30 rounded-lg">
                                                 <h4 className="text-xs font-bold text-muted-foreground mb-2">CSV Column Reference</h4>
                                                 <div className="text-[10px] text-muted-foreground">
                                                     <span className="font-bold text-muted-foreground">Lab Results:</span>
@@ -1370,7 +1370,7 @@ export default function SettingsPage() {
                                                 </button>
                                             </div>
 
-                                            <div className="mt-4 p-4 bg-slate-50 rounded-lg">
+                                            <div className="mt-4 p-4 bg-secondary/30 rounded-lg">
                                                 <h4 className="text-xs font-bold text-muted-foreground mb-2">CSV Column Reference</h4>
                                                 <div className="text-[10px] text-muted-foreground space-y-1">
                                                     <div>
@@ -1436,7 +1436,7 @@ export default function SettingsPage() {
                                                 </button>
                                             </div>
 
-                                            <div className="mt-4 p-4 bg-slate-50 rounded-lg">
+                                            <div className="mt-4 p-4 bg-secondary/30 rounded-lg">
                                                 <h4 className="text-xs font-bold text-muted-foreground mb-2">CSV Column Reference</h4>
                                                 <div className="text-[10px] text-muted-foreground space-y-1">
                                                     <div>
@@ -1540,7 +1540,7 @@ export default function SettingsPage() {
                                                 </button>
                                             </div>
 
-                                            <div className="mt-4 p-4 bg-slate-50 rounded-lg">
+                                            <div className="mt-4 p-4 bg-secondary/30 rounded-lg">
                                                 <h4 className="text-xs font-bold text-muted-foreground mb-2">CSV Column Reference</h4>
                                                 <div className="text-[10px] text-muted-foreground space-y-1">
                                                     <div>
@@ -1622,7 +1622,7 @@ export default function SettingsPage() {
                                                 </button>
                                             </div>
 
-                                            <div className="mt-4 p-4 bg-slate-50 rounded-lg">
+                                            <div className="mt-4 p-4 bg-secondary/30 rounded-lg">
                                                 <h4 className="text-xs font-bold text-muted-foreground mb-2">CSV Column Reference</h4>
                                                 <div className="text-[10px] text-muted-foreground">
                                                     <span className="font-bold text-muted-foreground">Tickets:</span>
