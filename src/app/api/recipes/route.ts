@@ -58,32 +58,34 @@ export async function GET(request: Request) {
 
         const total = await Recipe.countDocuments(query);
 
-        // Manual SKU hydration via native driver (handles String vs ObjectId mismatch)
-        const skuIds = [...new Set(recipesRaw.map((r: any) => r.sku?.toString()).filter(Boolean))];
+        // Manual SKU hydration via Sku model's native collection (handles String vs ObjectId mismatch)
+        const skuIds = [...new Set(recipesRaw.map((r: any) => r.sku ? String(r.sku) : null).filter(Boolean))] as string[];
         const skuMap = new Map<string, { _id: string; name: string }>();
 
         if (skuIds.length > 0) {
             const mongoose = (await import('mongoose')).default;
-            const db = mongoose.connection.db!;
-            const skusCol = db.collection('skus');
 
             // Build $or query to match both String and ObjectId _id types
             const orConditions: any[] = [
-                { _id: { $in: skuIds } } // String match
+                { _id: { $in: skuIds } }
             ];
-            const validOids = skuIds.filter(id => mongoose.Types.ObjectId.isValid(id));
+            const validOids = skuIds.filter(id => /^[0-9a-f]{24}$/i.test(id));
             if (validOids.length > 0) {
                 orConditions.push({ _id: { $in: validOids.map(id => new mongoose.Types.ObjectId(id)) } });
             }
 
-            const skuDocs = await skusCol.find(
-                { $or: orConditions },
-                { projection: { _id: 1, name: 1 } }
-            ).toArray();
+            try {
+                const skuDocs = await Sku.collection.find(
+                    { $or: orConditions },
+                    { projection: { _id: 1, name: 1 } }
+                ).toArray();
 
-            skuDocs.forEach((s: any) => {
-                skuMap.set(s._id.toString(), { _id: s._id.toString(), name: s.name });
-            });
+                skuDocs.forEach((s: any) => {
+                    skuMap.set(String(s._id), { _id: String(s._id), name: s.name });
+                });
+            } catch (err) {
+                console.error('SKU hydration error:', err);
+            }
         }
 
         const recipes = recipesRaw.map((r: any) => {

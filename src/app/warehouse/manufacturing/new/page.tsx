@@ -86,6 +86,15 @@ export default function NewManufacturingOrderPage() {
 
         setSubmitting(true);
         try {
+            // Build line items from recipe ingredients
+            const selectedRecipe = recipes.find((r: any) => r._id === recipeId);
+            const recipeLineItems = selectedRecipe?.lineItems?.map((item: any) => ({
+                sku: typeof item.sku === 'object' && item.sku ? item.sku._id : item.sku,
+                uom: item.uom || '',
+                recipeQty: item.qty || 0,
+                recipeId: recipeId || undefined,
+            })) || [];
+
             const payload = {
                 sku,
                 recipesId: recipeId || undefined,
@@ -97,7 +106,7 @@ export default function NewManufacturingOrderPage() {
                 status: 'Pending',
                 createdBy: (session?.user as any)?.id || session?.user?.email,
                 createdAt: new Date().toISOString(),
-                lineItems: [],
+                lineItems: recipeLineItems,
                 notes: [],
                 labor: []
             };

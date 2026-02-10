@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, Trash2, Edit2, Save, X, Package, Layers, FileText, Beaker } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, Save, X, Package, Layers, FileText, Beaker, Copy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
@@ -52,6 +52,11 @@ export default function RecipeDetailPage() {
     // Header editing
     const [isHeaderEditing, setIsHeaderEditing] = useState(false);
     const [headerForm, setHeaderForm] = useState({ name: '', sku: '', qty: 1, uom: 'EA' });
+
+    // Copy state
+    const [isCopying, setIsCopying] = useState(false);
+    const [copyForm, setCopyForm] = useState({ name: '', sku: '' });
+    const [copyLoading, setCopyLoading] = useState(false);
 
     useEffect(() => {
         const target = document.getElementById('header-portal-target');
@@ -209,6 +214,96 @@ export default function RecipeDetailPage() {
     const renderSku = (val: any) => (typeof val === 'object' && val?.name ? val.name : val || '-');
     const skuOptions = skus.map(s => ({ value: s._id, label: s.name }));
 
+    const openCopyModal = () => {
+        if (!recipe) return;
+        setCopyForm({
+            name: `Copy of ${recipe.name}`,
+            sku: typeof recipe.sku === 'object' ? recipe.sku._id : recipe.sku
+        });
+        setIsCopying(true);
+    };
+
+    const handleCopy = async () => {
+        if (!recipe || !copyForm.name || !copyForm.sku) return toast.error('Name and SKU are required');
+        setCopyLoading(true);
+        try {
+            // Build the new recipe payload with all data from the current recipe
+            const payload = {
+                name: copyForm.name,
+                sku: copyForm.sku,
+                qty: recipe.qty,
+                uom: recipe.uom,
+                notes: recipe.notes || '',
+                lineItems: recipe.lineItems?.map((item: any) => ({
+                    sku: typeof item.sku === 'object' && item.sku ? item.sku._id : item.sku,
+                    qty: item.qty,
+                    uom: item.uom
+                })) || [],
+                steps: recipe.steps?.map((step: any) => ({
+                    step: step.step,
+                    description: step.description,
+                    details: step.details
+                })) || []
+            };
+
+            const res = await fetch('/api/recipes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                const newRecipe = await res.json();
+                toast.success('Recipe copied successfully!');
+                setIsCopying(false);
+                router.push(`/warehouse/recipes/${newRecipe._id}`);
+            } else {
+                toast.error('Failed to copy recipe');
+            }
+        } catch (e) {
+            toast.error('Error copying recipe');
+        } finally {
+            setCopyLoading(false);
+        }
+    };
+
+    const handleDelete = () => {
+        if (!recipe) return;
+        toast((t) => (
+            <div className="flex flex-col gap-2">
+                <p className="text-sm font-bold text-white">Delete this recipe?</p>
+                <p className="text-xs text-gray-400">This action cannot be undone.</p>
+                <div className="flex gap-2 mt-1">
+                    <button
+                        onClick={() => toast.dismiss(t.id)}
+                        className="flex-1 px-3 py-1.5 text-xs font-bold rounded border border-gray-600 bg-gray-800 text-white hover:bg-gray-700 transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={async () => {
+                            toast.dismiss(t.id);
+                            try {
+                                const res = await fetch(`/api/recipes/${recipe._id}`, { method: 'DELETE' });
+                                if (res.ok) {
+                                    toast.success('Recipe deleted');
+                                    router.push('/warehouse/recipes');
+                                } else {
+                                    toast.error('Failed to delete');
+                                }
+                            } catch (e) {
+                                toast.error('Error deleting recipe');
+                            }
+                        }}
+                        className="flex-1 px-3 py-1.5 text-xs font-bold rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+                    >
+                        Delete
+                    </button>
+                </div>
+            </div>
+        ), { duration: 10000, position: 'top-center', style: { maxWidth: '360px', background: '#1a1a1a', color: '#fff', marginTop: '40vh' } });
+    };
+
     const getTabCount = (tab: TabType) => {
         if (!recipe) return 0;
         if (tab === 'Ingredients') return recipe.lineItems?.length || 0;
@@ -233,63 +328,13 @@ export default function RecipeDetailPage() {
             {/* Header Portal Content */}
             {headerPortal && createPortal(
                 <>
-                    <div className="flex items-center space-x-2">
-                        <button
-                            onClick={() => router.back()}
-                            className="flex items-center space-x-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded transition-all cursor-pointer border border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
-                        >
-                            <ArrowLeft className="w-3.5 h-3.5" />
-                            <span>Back</span>
-                        </button>
-                        <button
-                            onClick={openHeaderEdit}
-                            className="flex items-center space-x-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded transition-all cursor-pointer border border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
-                        >
-                            <Edit2 className="w-3.5 h-3.5" />
-                            <span>Edit</span>
-                        </button>
-                        <button
-                            onClick={() => {
-                                toast((t) => (
-                                    <div className="flex flex-col gap-2">
-                                        <p className="text-sm font-bold text-white">Delete this recipe?</p>
-                                        <p className="text-xs text-gray-400">This action cannot be undone.</p>
-                                        <div className="flex gap-2 mt-1">
-                                            <button
-                                                onClick={() => toast.dismiss(t.id)}
-                                                className="flex-1 px-3 py-1.5 text-xs font-bold rounded border border-gray-600 bg-gray-800 text-white hover:bg-gray-700 transition-colors"
-                                            >
-                                                Cancel
-                                            </button>
-                                            <button
-                                                onClick={async () => {
-                                                    toast.dismiss(t.id);
-                                                    try {
-                                                        const res = await fetch(`/api/recipes/${recipe._id}`, { method: 'DELETE' });
-                                                        if (res.ok) {
-                                                            toast.success('Recipe deleted');
-                                                            router.push('/warehouse/recipes');
-                                                        } else {
-                                                            toast.error('Failed to delete');
-                                                        }
-                                                    } catch (e) {
-                                                        toast.error('Error deleting recipe');
-                                                    }
-                                                }}
-                                                className="flex-1 px-3 py-1.5 text-xs font-bold rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
-                                            >
-                                                Delete
-                                            </button>
-                                        </div>
-                                    </div>
-                                ), { duration: 10000, position: 'top-center', style: { maxWidth: '360px', background: '#1a1a1a', color: '#fff', marginTop: '40vh' } });
-                            }}
-                            className="flex items-center space-x-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded transition-all cursor-pointer border border-red-500/30 text-red-500 hover:text-white hover:bg-red-600"
-                        >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>Delete</span>
-                        </button>
-                    </div>
+                    <button
+                        onClick={() => router.back()}
+                        className="flex items-center space-x-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded transition-all cursor-pointer border border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
+                    >
+                        <ArrowLeft className="w-3.5 h-3.5" />
+                        <span>Back</span>
+                    </button>
                 </>,
                 headerPortal
             )}
@@ -303,7 +348,7 @@ export default function RecipeDetailPage() {
                             <Beaker className="w-4 h-4 text-primary" />
                             <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Recipe</span>
                         </div>
-                        <div className="text-sm font-black text-foreground leading-snug">{recipe.name}</div>
+                        <div className="text-sm font-black text-muted-foreground leading-snug">{recipe.name}</div>
                     </div>
 
                     {/* Product SKU */}
@@ -312,18 +357,18 @@ export default function RecipeDetailPage() {
                             <Package className="w-4 h-4 text-primary" />
                             <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Product SKU</span>
                         </div>
-                        <div className="text-sm font-bold text-foreground">{renderSku(recipe.sku)}</div>
+                        <div className="text-sm font-bold text-muted-foreground">{renderSku(recipe.sku)}</div>
                     </div>
 
                     {/* Yield Info */}
                     <div className="grid grid-cols-2 gap-2">
                         <div className="border border-border rounded-md p-4 bg-background text-center">
                             <div className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Yield Qty</div>
-                            <div className="text-xl font-black text-foreground font-mono">{recipe.qty}</div>
+                            <div className="text-xl font-black text-muted-foreground font-mono">{recipe.qty}</div>
                         </div>
                         <div className="border border-border rounded-md p-4 bg-background text-center">
                             <div className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-2">UOM</div>
-                            <div className="text-xl font-black text-foreground uppercase">{recipe.uom}</div>
+                            <div className="text-xl font-black text-muted-foreground uppercase">{recipe.uom}</div>
                         </div>
                     </div>
 
@@ -333,17 +378,17 @@ export default function RecipeDetailPage() {
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
                                 <span className="text-xs text-muted-foreground">Ingredients</span>
-                                <span className="text-xs font-bold text-foreground">{recipe.lineItems?.length || 0}</span>
+                                <span className="text-xs font-bold text-muted-foreground">{recipe.lineItems?.length || 0}</span>
                             </div>
                             <div className="w-full h-px bg-border" />
                             <div className="flex items-center justify-between">
                                 <span className="text-xs text-muted-foreground">Process Steps</span>
-                                <span className="text-xs font-bold text-foreground">{recipe.steps?.length || 0}</span>
+                                <span className="text-xs font-bold text-muted-foreground">{recipe.steps?.length || 0}</span>
                             </div>
                             <div className="w-full h-px bg-border" />
                             <div className="flex items-center justify-between">
                                 <span className="text-xs text-muted-foreground">Has Notes</span>
-                                <span className="text-xs font-bold text-foreground">{recipe.notes ? 'Yes' : 'No'}</span>
+                                <span className="text-xs font-bold text-muted-foreground">{recipe.notes ? 'Yes' : 'No'}</span>
                             </div>
                         </div>
                     </div>
@@ -352,7 +397,7 @@ export default function RecipeDetailPage() {
                     {recipe.createdAt && (
                         <div className="border border-border rounded-md p-4 bg-background space-y-2">
                             <div className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Created</div>
-                            <div className="text-xs text-foreground">
+                            <div className="text-xs text-muted-foreground">
                                 {new Date(recipe.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                             </div>
                             {recipe.createdBy && typeof recipe.createdBy === 'object' && (
@@ -362,6 +407,31 @@ export default function RecipeDetailPage() {
                             )}
                         </div>
                     )}
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={openCopyModal}
+                            className="flex-1 flex items-center justify-center space-x-1.5 h-9 text-[10px] font-bold uppercase tracking-widest rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-all cursor-pointer"
+                        >
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Copy</span>
+                        </button>
+                        <button
+                            onClick={openHeaderEdit}
+                            className="flex-1 flex items-center justify-center space-x-1.5 h-9 text-[10px] font-bold uppercase tracking-widest rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-all cursor-pointer"
+                        >
+                            <Edit2 className="w-3.5 h-3.5" />
+                            <span>Edit</span>
+                        </button>
+                        <button
+                            onClick={handleDelete}
+                            className="flex-1 flex items-center justify-center space-x-1.5 h-9 text-[10px] font-bold uppercase tracking-widest rounded-md border border-red-500/30 text-red-500 hover:text-white hover:bg-red-600 transition-all cursor-pointer"
+                        >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Delete</span>
+                        </button>
+                    </div>
                 </div>
 
                 {/* Right Side: Tabs (70%) */}
@@ -438,8 +508,8 @@ export default function RecipeDetailPage() {
                                         )}
                                         {recipe.lineItems?.map((item: any, i: number) => (
                                             <tr key={i} className="hover:bg-secondary/30 group transition-colors">
-                                                <td className="px-3 py-2 text-xs font-medium text-foreground">{renderSku(item.sku)}</td>
-                                                <td className="px-3 py-2 text-xs text-foreground font-mono">{item.qty}</td>
+                                                <td className="px-3 py-2 text-xs font-medium text-muted-foreground">{renderSku(item.sku)}</td>
+                                                <td className="px-3 py-2 text-xs text-muted-foreground font-mono">{item.qty}</td>
                                                 <td className="px-3 py-2 text-[10px] font-bold uppercase text-muted-foreground tracking-wider">{item.uom}</td>
                                                 <td className="px-3 py-2 text-right">
                                                     <div className="flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -462,11 +532,11 @@ export default function RecipeDetailPage() {
                                 )}
                                 {recipe.steps?.sort((a: any, b: any) => (parseInt(a.step) || 0) - (parseInt(b.step) || 0)).map((step: any, i: number) => (
                                     <div key={i} className="flex gap-4 p-4 rounded-md bg-background border border-border relative group hover:border-primary/30 transition-colors">
-                                        <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-foreground text-background text-xs font-bold rounded-full shadow-sm">
+                                        <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-muted-foreground text-background text-xs font-bold rounded-full shadow-sm">
                                             {step.step}
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <div className="font-bold text-foreground text-sm mb-1">{step.description}</div>
+                                            <div className="font-bold text-muted-foreground text-sm mb-1">{step.description}</div>
                                             <div className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">{step.details || 'No details provided.'}</div>
                                         </div>
                                         <div className="absolute top-3 right-3 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -482,7 +552,7 @@ export default function RecipeDetailPage() {
                         {activeTab === 'Notes' && (
                             <div className="p-4 space-y-4 animate-in fade-in duration-300">
                                 <textarea
-                                    className="w-full px-4 py-3 bg-secondary/30 border border-border rounded-md text-xs text-foreground focus:outline-none focus:bg-background focus:border-primary/30 transition-all min-h-[200px] leading-relaxed placeholder:text-muted-foreground"
+                                    className="w-full px-4 py-3 bg-secondary/30 border border-border rounded-md text-xs text-muted-foreground focus:outline-none focus:bg-background focus:border-primary/30 transition-all min-h-[200px] leading-relaxed placeholder:text-muted-foreground/50"
                                     placeholder="Add general recipe notes here..."
                                     value={recipe.notes || ''}
                                     onChange={(e) => setRecipe({ ...recipe, notes: e.target.value })}
@@ -653,6 +723,52 @@ export default function RecipeDetailPage() {
                         <div className="px-4 h-10 bg-secondary/50 border-t border-border flex items-center justify-end">
                             <button onClick={saveHeaderEdit} className="px-5 py-1.5 bg-primary text-black text-[10px] font-bold uppercase tracking-widest rounded-md hover:bg-primary/90 transition-colors cursor-pointer">
                                 Save Changes
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Copy Recipe Modal */}
+            {isCopying && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsCopying(false)} />
+                    <div className="relative bg-background border border-border shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 rounded-md">
+                        <div className="px-4 h-10 border-b border-border flex justify-between items-center bg-secondary/50">
+                            <h3 className="font-bold text-xs text-muted-foreground uppercase tracking-widest">Copy Recipe</h3>
+                            <button onClick={() => setIsCopying(false)} className="text-muted-foreground hover:text-foreground cursor-pointer"><X className="w-4 h-4" /></button>
+                        </div>
+                        <div className="p-4 space-y-4">
+                            <div>
+                                <label className="block text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">New Recipe Name</label>
+                                <input
+                                    type="text"
+                                    className="w-full h-9 px-3 bg-background border border-border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary/30 text-muted-foreground font-medium"
+                                    value={copyForm.name}
+                                    onChange={e => setCopyForm({ ...copyForm, name: e.target.value })}
+                                    placeholder="Enter recipe name..."
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">Target SKU</label>
+                                <SearchableSelect
+                                    options={skuOptions}
+                                    value={copyForm.sku}
+                                    onChange={(val) => setCopyForm({ ...copyForm, sku: val })}
+                                    placeholder="Search SKU..."
+                                />
+                            </div>
+                            <div className="text-[10px] text-muted-foreground/60 leading-relaxed">
+                                This will create a new recipe with the same ingredients ({recipe?.lineItems?.length || 0} items), steps ({recipe?.steps?.length || 0}), and notes.
+                            </div>
+                        </div>
+                        <div className="px-4 h-10 bg-secondary/50 border-t border-border flex items-center justify-end">
+                            <button
+                                onClick={handleCopy}
+                                disabled={copyLoading}
+                                className="px-5 py-1.5 bg-primary text-black text-[10px] font-bold uppercase tracking-widest rounded-md hover:bg-primary/90 transition-colors cursor-pointer disabled:opacity-50"
+                            >
+                                {copyLoading ? 'Copying...' : 'Copy Recipe'}
                             </button>
                         </div>
                     </div>
