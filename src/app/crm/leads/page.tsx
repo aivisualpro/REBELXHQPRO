@@ -15,6 +15,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { TableColumnHeader } from '@/components/ui/TableColumnHeader';
 import { Pagination } from '@/components/ui/Pagination';
 import toast from 'react-hot-toast';
+import { confirmDeleteToast } from '@/lib/confirmToast';
 import ClientModal from '@/components/crm/ClientModal';
 
 interface Lead {
@@ -539,23 +540,23 @@ function LeadsPageContent() {
     }
   };
 
-  const handleDeleteLead = async (leadId: string, leadName: string) => {
-    if (!confirm(`Are you sure you want to delete "${leadName}"? This action cannot be undone.`)) return;
-    
-    try {
-        const res = await fetch(`/api/clients/${leadId}`, { method: 'DELETE' });
-        if (res.ok) {
-            toast.success('Lead deleted successfully');
-            if (viewMode === 'table') fetchLeads();
-            else PIPELINE_STAGES.forEach(s => fetchPipelineStage(s.id, 1, false));
-        } else {
-            const err = await res.json();
-            toast.error(err.error || 'Failed to delete lead');
+  const handleDeleteLead = (leadId: string, leadName: string) => {
+    confirmDeleteToast(`Delete "${leadName}"?`, async () => {
+        try {
+            const res = await fetch(`/api/clients/${leadId}`, { method: 'DELETE' });
+            if (res.ok) {
+                toast.success('Lead deleted successfully');
+                if (viewMode === 'table') fetchLeads();
+                else PIPELINE_STAGES.forEach(s => fetchPipelineStage(s.id, 1, false));
+            } else {
+                const err = await res.json();
+                toast.error(err.error || 'Failed to delete lead');
+            }
+        } catch (error) {
+            console.error('Delete error:', error);
+            toast.error('Failed to delete lead');
         }
-    } catch (error) {
-        console.error('Delete error:', error);
-        toast.error('Failed to delete lead');
-    }
+    });
   };
 
   return (

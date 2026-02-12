@@ -9,6 +9,7 @@ import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { confirmDeleteToast } from '@/lib/confirmToast';
 import { useTimers } from '@/components/TimerContext';
 
 interface LineItem {
@@ -1477,19 +1478,19 @@ export default function ManufacturingDetailPage() {
                                                 </button>
                                                 <button 
                                                     onClick={() => {
-                                                        if (window.confirm('Are you sure you want to delete this note?')) {
+                                                        confirmDeleteToast('Delete this note?', async () => {
                                                             const updatedNotes = order.notes?.filter(n => n._id !== note._id) || [];
-                                                            fetch(`/api/manufacturing/${order._id}`, {
+                                                            const res = await fetch(`/api/manufacturing/${order._id}`, {
                                                                 method: 'PATCH',
                                                                 headers: { 'Content-Type': 'application/json' },
                                                                 body: JSON.stringify({ notes: updatedNotes })
-                                                            }).then(res => {
-                                                                if (res.ok) {
-                                                                    res.json().then(data => setOrder(data));
-                                                                    toast.success('Note deleted');
-                                                                }
                                                             });
-                                                        }
+                                                            if (res.ok) {
+                                                                const data = await res.json();
+                                                                setOrder(data);
+                                                                toast.success('Note deleted');
+                                                            }
+                                                        });
                                                     }}
                                                     className="p-1 text-muted-foreground hover:text-red-600 transition-colors"
                                                     title="Delete Note"

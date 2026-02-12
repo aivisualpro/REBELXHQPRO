@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Plus, Trash2, Edit2, Save, X, Package, Layers, FileText, Beaker, Copy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { confirmDeleteToast } from '@/lib/confirmToast';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 
 interface Recipe {
@@ -153,10 +154,11 @@ export default function RecipeDetailPage() {
     };
 
     const deleteItem = (index: number) => {
-        if (!confirm("Remove this ingredient?")) return;
-        const newItems = [...(recipe?.lineItems || [])];
-        newItems.splice(index, 1);
-        updateRecipe({ lineItems: newItems });
+        confirmDeleteToast('Remove this ingredient?', () => {
+            const newItems = [...(recipe?.lineItems || [])];
+            newItems.splice(index, 1);
+            updateRecipe({ lineItems: newItems });
+        });
     };
 
     // --- Steps Handlers ---
@@ -188,10 +190,11 @@ export default function RecipeDetailPage() {
     };
 
     const deleteStep = (index: number) => {
-        if (!confirm("Remove this step?")) return;
-        const newSteps = [...(recipe?.steps || [])];
-        newSteps.splice(index, 1);
-        updateRecipe({ steps: newSteps });
+        confirmDeleteToast('Remove this step?', () => {
+            const newSteps = [...(recipe?.steps || [])];
+            newSteps.splice(index, 1);
+            updateRecipe({ steps: newSteps });
+        });
     };
 
     const openHeaderEdit = () => {

@@ -21,6 +21,7 @@ import {
 import Papa from 'papaparse';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { confirmDeleteToast } from '@/lib/confirmToast';
 import { Pagination } from '@/components/ui/Pagination';
 import { TableColumnHeader } from '@/components/ui/TableColumnHeader';
 
@@ -150,14 +151,15 @@ export default function UsersPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this user?')) return;
-    try {
-      const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
-      if (res.ok) fetchUsers();
-    } catch (error) {
-      console.error('Error deleting user:', error);
-    }
+  const handleDelete = (id: string) => {
+    confirmDeleteToast('Delete this user?', async () => {
+      try {
+        const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
+        if (res.ok) fetchUsers();
+      } catch (error) {
+        console.error('Error deleting user:', error);
+      }
+    });
   };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
