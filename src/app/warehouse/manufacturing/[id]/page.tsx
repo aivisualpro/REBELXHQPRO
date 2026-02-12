@@ -116,7 +116,7 @@ export default function ManufacturingDetailPage() {
 
     // Line Item Actions Menu State
     const [openActionMenu, setOpenActionMenu] = useState<{ id: string; x: number; y: number } | null>(null);
-    const [pendingDeleteItemId, setPendingDeleteItemId] = useState<string | null>(null);
+
 
     // Shell Viewport Lock: Prevents window-level scrolling
     useEffect(() => {
@@ -563,34 +563,46 @@ export default function ManufacturingDetailPage() {
     };
 
     const handleDeleteItem = async (itemId: string) => {
-        // Show confirmation modal instead of window.confirm
-        setPendingDeleteItemId(itemId);
-    };
-
-    const confirmDeleteItem = async () => {
-        if (!order || !pendingDeleteItemId) return;
-        
-        try {
-            const updatedLineItems = order.lineItems?.filter(item => item._id !== pendingDeleteItemId) || [];
-            
-            const res = await fetch(`/api/manufacturing/${order._id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ lineItems: updatedLineItems })
-            });
-            
-            if (res.ok) {
-                const updatedOrder = await res.json();
-                setOrder(updatedOrder);
-                toast.success('Item deleted successfully');
-            } else {
-                toast.error('Failed to delete item');
-            }
-        } catch (e) {
-            toast.error('Error deleting item');
-        } finally {
-            setPendingDeleteItemId(null);
-        }
+        toast((t) => (
+            <div className="flex flex-col gap-2">
+                <p className="text-sm font-bold text-white">Delete this line item?</p>
+                <p className="text-xs text-gray-400">This action cannot be undone.</p>
+                <div className="flex gap-2 mt-1">
+                    <button
+                        onClick={() => toast.dismiss(t.id)}
+                        className="flex-1 px-3 py-1.5 text-xs font-bold rounded border border-gray-600 bg-gray-800 text-white hover:bg-gray-700 transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={async () => {
+                            toast.dismiss(t.id);
+                            if (!order) return;
+                            try {
+                                const updatedLineItems = order.lineItems?.filter(item => item._id !== itemId) || [];
+                                const res = await fetch(`/api/manufacturing/${order._id}`, {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ lineItems: updatedLineItems })
+                                });
+                                if (res.ok) {
+                                    const updatedOrder = await res.json();
+                                    setOrder(updatedOrder);
+                                    toast.success('Item deleted successfully');
+                                } else {
+                                    toast.error('Failed to delete item');
+                                }
+                            } catch (e) {
+                                toast.error('Error deleting item');
+                            }
+                        }}
+                        className="flex-1 px-3 py-1.5 text-xs font-bold rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+                    >
+                        Delete
+                    </button>
+                </div>
+            </div>
+        ), { duration: 10000, position: 'top-center', style: { maxWidth: '360px', background: '#1a1a1a', color: '#fff', marginTop: '40vh' } });
     };
 
     return (
@@ -1532,29 +1544,7 @@ export default function ManufacturingDetailPage() {
                 );
             })()}
 
-            {/* Delete Confirmation Modal */}
-            {pendingDeleteItemId && (
-                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999]" onClick={() => setPendingDeleteItemId(null)}>
-                    <div className="bg-background rounded-lg shadow-2xl w-full max-w-sm mx-4 p-6" onClick={e => e.stopPropagation()}>
-                        <h3 className="text-base font-bold text-foreground mb-2">Delete this item?</h3>
-                        <p className="text-sm text-muted-foreground mb-6">This action cannot be undone.</p>
-                        <div className="flex items-center gap-3">
-                            <button
-                                onClick={() => setPendingDeleteItemId(null)}
-                                className="flex-1 px-4 py-2.5 text-sm font-bold text-foreground bg-secondary border border-border hover:bg-secondary/80 transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={confirmDeleteItem}
-                                className="flex-1 px-4 py-2.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 transition-colors"
-                            >
-                                Delete
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+
 
             {/* Lot Selection Modal */}
             <LotSelectionModal
