@@ -338,7 +338,7 @@ export default function RecipesPage() {
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-background w-full max-w-md animate-in fade-in zoom-in duration-200 border border-border shadow-2xl rounded overflow-hidden">
-            <div className="px-6 py-4 border-b border-border flex justify-between items-center bg-secondary/50">
+            <div className="px-6 h-9 border-b border-border flex justify-between items-center bg-secondary/50">
               <h3 className="text-sm font-black uppercase tracking-widest text-foreground">
                 {modalMode === 'create' ? 'New Recipe' : modalMode === 'edit' ? 'Edit Recipe' : 'Copy Recipe'}
               </h3>
@@ -394,7 +394,7 @@ export default function RecipesPage() {
                 </div>
               </div>
             </div>
-            <div className="px-6 py-4 bg-secondary/50 border-t border-border flex justify-end">
+            <div className="px-6 h-9 bg-secondary/50 border-t border-border flex items-center justify-end">
               <button
                 onClick={handleSaveRecipe}
                 disabled={saving}
