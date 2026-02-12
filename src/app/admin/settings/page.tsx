@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { 
     Save, 
     Globe, 
@@ -32,7 +33,9 @@ import {
     UtensilsCrossed,
     TicketCheck,
     PackageCheck,
-    MessageSquare
+    MessageSquare,
+    Download,
+    Search
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -41,11 +44,31 @@ import Papa from 'papaparse';
 type Tab = 'general' | 'localization' | 'crm' | 'notifications' | 'security' | 'dataFilter' | 'modules';
 type ModuleSubTab = 'sales' | 'warehouse' | 'reports' | 'help';
 
-export default function SettingsPage() {
-    const [activeTab, setActiveTab] = useState<Tab>('general');
-    const [moduleSubTab, setModuleSubTab] = useState<ModuleSubTab>('sales');
+function SettingsPageContent() {
+    const searchParams = useSearchParams();
+    const router = useRouter();
+
+    // URL-synced tab state
+    const activeTab = (searchParams.get('tab') as Tab) || 'general';
+    const moduleSubTab = (searchParams.get('moduleTab') as ModuleSubTab) || 'sales';
+
+    const setActiveTab = useCallback((tab: Tab) => {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set('tab', tab);
+        params.delete('moduleTab');
+        router.replace(`/admin/settings?${params.toString()}`, { scroll: false });
+    }, [searchParams, router]);
+
+    const setModuleSubTab = useCallback((subTab: ModuleSubTab) => {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set('tab', 'modules');
+        params.set('moduleTab', subTab);
+        router.replace(`/admin/settings?${params.toString()}`, { scroll: false });
+    }, [searchParams, router]);
+
     const [saving, setSaving] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [headerSearch, setHeaderSearch] = useState('');
 
     // Sales Import State
     const [importStatus, setImportStatus] = useState('');
@@ -245,7 +268,17 @@ export default function SettingsPage() {
     return (
         <div className="flex flex-col h-[calc(100vh-48px)] bg-background">
             {/* Header */}
-            <div className="flex items-center justify-end px-4 py-2 border-b border-border bg-background shrink-0">
+            <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-background shrink-0">
+                <div className="relative w-64">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                    <input
+                        type="text"
+                        placeholder="Search settings..."
+                        value={headerSearch}
+                        onChange={e => setHeaderSearch(e.target.value)}
+                        className="w-full pl-9 pr-3 py-1.5 bg-secondary/50 border border-border rounded text-xs focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring placeholder:text-muted-foreground"
+                    />
+                </div>
                 <button
                     onClick={handleSave}
                     disabled={saving}
@@ -1081,6 +1114,60 @@ export default function SettingsPage() {
                                                     </p>
                                                 </button>
 
+                                                {/* Export Vendors */}
+                                                <button
+                                                    onClick={async () => {
+                                                        const toastId = toast.loading('Exporting vendors...');
+                                                        try {
+                                                            const res = await fetch('/api/vendors?limit=99999');
+                                                            if (!res.ok) throw new Error('Failed to fetch vendors');
+                                                            const data = await res.json();
+                                                            const vendors = data.vendors || [];
+                                                            if (vendors.length === 0) {
+                                                                toast.error('No vendors to export', { id: toastId });
+                                                                return;
+                                                            }
+                                                            const csvData = vendors.map((v: any) => ({
+                                                                legacyId: v.legacyId || '',
+                                                                name: v.name || '',
+                                                                contactName: v.contactName || '',
+                                                                email: v.email || '',
+                                                                phone: v.phone || '',
+                                                                address: v.address || '',
+                                                                city: v.city || '',
+                                                                state: v.state || '',
+                                                                zipCode: v.zipCode || '',
+                                                                country: v.country || '',
+                                                                website: v.website || '',
+                                                                paymentTerms: v.paymentTerms || '',
+                                                                carrierPreference: v.carrierPreference || '',
+                                                                status: v.status || '',
+                                                            }));
+                                                            const csv = Papa.unparse(csvData);
+                                                            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                                                            const url = URL.createObjectURL(blob);
+                                                            const link = document.createElement('a');
+                                                            link.href = url;
+                                                            link.download = `vendors_export_${new Date().toISOString().split('T')[0]}.csv`;
+                                                            link.click();
+                                                            URL.revokeObjectURL(url);
+                                                            toast.success(`Exported ${vendors.length} vendors`, { id: toastId });
+                                                        } catch (err) {
+                                                            console.error(err);
+                                                            toast.error('Failed to export vendors', { id: toastId });
+                                                        }
+                                                    }}
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-lg hover:border-emerald-400 hover:bg-emerald-500/10 transition-colors group"
+                                                >
+                                                    <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center mb-3 group-hover:bg-emerald-500/30 transition-colors">
+                                                        <Download className="w-6 h-6 text-emerald-600" />
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-muted-foreground">Export Vendors</h4>
+                                                    <p className="text-[10px] text-muted-foreground mt-1 text-center">
+                                                        Download all vendors as CSV
+                                                    </p>
+                                                </button>
+
                                                 {/* Import POs */}
                                                 <button
                                                     onClick={() => importPurchaseOrdersRef.current?.click()}
@@ -1642,3 +1729,14 @@ export default function SettingsPage() {
     );
 }
 
+export default function SettingsPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex items-center justify-center h-screen bg-background">
+                <div className="text-sm text-muted-foreground">Loading settings...</div>
+            </div>
+        }>
+            <SettingsPageContent />
+        </Suspense>
+    );
+}

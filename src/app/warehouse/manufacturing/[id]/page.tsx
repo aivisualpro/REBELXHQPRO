@@ -1334,47 +1334,64 @@ export default function ManufacturingDetailPage() {
                 )}
 
                 {activeTab === 'Recipe Steps' && (
-                    <div className="p-6 space-y-4 animate-in fade-in duration-300 overflow-auto max-h-full">
+                    <div className="animate-in fade-in duration-300 overflow-auto max-h-full">
                         {(!order.recipesId || typeof order.recipesId !== 'object' || !order.recipesId.steps || order.recipesId.steps.length === 0) ? (
                             <div className="text-center py-12 text-muted-foreground text-sm">
                                 <Layers className="w-8 h-8 mx-auto mb-2 text-muted-foreground/40" />
                                 No recipe steps found
                             </div>
                         ) : (
-                            <div className="space-y-4">
-                                {(order.recipesId.steps as any[]).sort((a: any, b: any) => (parseInt(a.step) || 0) - (parseInt(b.step) || 0)).map((step: any, i: number) => (
-                                    <div key={i} className="flex gap-4 p-4 rounded bg-background border border-border shadow-sm relative group hover:border-border transition-colors">
-                                        <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-foreground text-white text-[10px] font-bold rounded-full shadow-sm">
-                                            {step.step}
-                                        </div>
-                                        <div className="flex-1">
-                                            <div className="font-bold text-foreground text-[11px] mb-1">{step.description}</div>
-                                            <div className="text-[10px] text-muted-foreground whitespace-pre-wrap leading-relaxed">{step.details || 'No details provided.'}</div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+                            <table className="w-full border-collapse text-left">
+                                <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
+                                    <tr>
+                                        <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap w-16">Step</th>
+                                        <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {(order.recipesId.steps as any[]).sort((a: any, b: any) => (parseInt(a.step) || 0) - (parseInt(b.step) || 0)).map((step: any, i: number) => (
+                                        <tr key={i} className="border-b border-border hover:bg-secondary/30 transition-colors">
+                                            <td className="px-3 py-2 text-xs font-bold text-foreground whitespace-nowrap align-top text-center">
+                                                {step.step}
+                                            </td>
+                                            <td className="px-3 py-2 align-top">
+                                                <div className="font-bold text-foreground text-[11px]">{step.description}</div>
+                                                {step.details && <div className="text-[10px] text-muted-foreground whitespace-pre-wrap leading-relaxed mt-0.5">{step.details}</div>}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         )}
                     </div>
                 )}
 
                 {activeTab === 'Recipe Notes' && (
-                    <div className="p-6 animate-in fade-in duration-300 overflow-auto max-h-full">
+                    <div className="animate-in fade-in duration-300 overflow-auto max-h-full">
                         {(!order.recipesId || typeof order.recipesId !== 'object' || !order.recipesId.notes) ? (
                             <div className="text-center py-12 text-muted-foreground text-sm">
                                 <Clipboard className="w-8 h-8 mx-auto mb-2 text-muted-foreground/40" />
                                 No recipe notes found
                             </div>
                         ) : (
-                            <div className="bg-background p-6 rounded border border-border shadow-sm">
-                                <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold mb-4 flex items-center">
-                                    <Clipboard className="w-3 h-3 mr-2" />
-                                    Recipe Notes
-                                </div>
-                                <div className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                                    {order.recipesId.notes}
-                                </div>
-                            </div>
+                            <table className="w-full border-collapse text-left">
+                                <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
+                                    <tr>
+                                        <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">Recipe</th>
+                                        <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">Notes</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr className="border-b border-border hover:bg-secondary/30 transition-colors">
+                                        <td className="px-3 py-2 text-xs font-medium text-foreground whitespace-nowrap align-top">
+                                            {typeof order.recipesId === 'object' ? order.recipesId.name : '-'}
+                                        </td>
+                                        <td className="px-3 py-2 text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                                            {order.recipesId.notes}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         )}
                     </div>
                 )}
