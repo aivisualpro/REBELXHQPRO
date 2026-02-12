@@ -65,6 +65,7 @@ export default function PurchaseOrderDetailPage() {
     const [formData, setFormData] = useState({
         sku: '',
         qtyOrdered: 1,
+        qtyReceived: 0,
         cost: 0,
         uom: '',
         lotNumber: ''
@@ -142,7 +143,7 @@ export default function PurchaseOrderDetailPage() {
 
     const handleOpenAddModal = () => {
         setEditingId(null);
-        setFormData({ sku: '', qtyOrdered: 1, cost: 0, uom: '', lotNumber: '' });
+        setFormData({ sku: '', qtyOrdered: 1, qtyReceived: 0, cost: 0, uom: '', lotNumber: '' });
         setIsItemModalOpen(true);
     };
 
@@ -151,6 +152,7 @@ export default function PurchaseOrderDetailPage() {
         setFormData({
             sku: (typeof item.sku === 'object' && item.sku !== null) ? item.sku._id : (item.sku || ''),
             qtyOrdered: item.qtyOrdered,
+            qtyReceived: item.qtyReceived || 0,
             cost: item.cost,
             uom: item.uom || '',
             lotNumber: item.lotNumber || ''
@@ -183,6 +185,7 @@ export default function PurchaseOrderDetailPage() {
                         ...item,
                         sku: formData.sku,
                         qtyOrdered: formData.qtyOrdered,
+                        qtyReceived: formData.qtyReceived,
                         cost: formData.cost,
                         uom: formData.uom,
                         lotNumber: formData.lotNumber
@@ -698,10 +701,11 @@ export default function PurchaseOrderDetailPage() {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-3 gap-4">
+                            <div className="grid grid-cols-4 gap-4">
                                 <div className="space-y-1.5">
                                     <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">UOM</label>
                                     <SearchableSelect
+                                        triggerClassName="h-[38px]"
                                         options={UOM_OPTIONS}
                                         value={formData.uom}
                                         onChange={(val) => setFormData({ ...formData, uom: val })}
@@ -716,6 +720,16 @@ export default function PurchaseOrderDetailPage() {
                                         min="1"
                                         value={formData.qtyOrdered}
                                         onChange={(e) => setFormData({ ...formData, qtyOrdered: parseInt(e.target.value) || 0 })}
+                                        className="w-full px-3 py-2 border border-border rounded text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/20"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Received</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        value={formData.qtyReceived}
+                                        onChange={(e) => setFormData({ ...formData, qtyReceived: parseInt(e.target.value) || 0 })}
                                         className="w-full px-3 py-2 border border-border rounded text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/20"
                                     />
                                 </div>
