@@ -114,6 +114,9 @@ export default function ManufacturingDetailPage() {
     const [skuSearch, setSkuSearch] = useState('');
     const [isSkuDropdownOpen, setIsSkuDropdownOpen] = useState(false);
 
+    // Line Item Actions Menu State
+    const [openActionMenu, setOpenActionMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+
     // Shell Viewport Lock: Prevents window-level scrolling
     useEffect(() => {
         const originalBodyStyle = document.body.style.overflow;
@@ -125,6 +128,18 @@ export default function ManufacturingDetailPage() {
             document.documentElement.style.overflow = originalHtmlStyle;
         };
     }, []);
+
+    // Close action menu on outside click or scroll
+    useEffect(() => {
+        if (!openActionMenu) return;
+        const close = () => setOpenActionMenu(null);
+        document.addEventListener('click', close);
+        document.addEventListener('scroll', close, true);
+        return () => {
+            document.removeEventListener('click', close);
+            document.removeEventListener('scroll', close, true);
+        };
+    }, [openActionMenu]);
 
     // Qty Difference update state
     const [isSubmittingDiff, setIsSubmittingDiff] = useState(false);
@@ -1086,32 +1101,21 @@ export default function ManufacturingDetailPage() {
                                             <td className="px-3 py-1 text-[10px] font-mono text-foreground/80 bg-secondary/10 whitespace-nowrap text-right">
                                                 {item.cost !== undefined ? `$${(totalQty * item.cost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}` : '-'}
                                             </td>
-                                            <td className="px-3 py-1 text-center relative group/actions">
-                                                <button className="p-1 hover:bg-secondary rounded text-muted-foreground">
+                                            <td className="px-3 py-1 text-center">
+                                                <button 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (openActionMenu?.id === item._id) {
+                                                            setOpenActionMenu(null);
+                                                        } else {
+                                                            const rect = e.currentTarget.getBoundingClientRect();
+                                                            setOpenActionMenu({ id: item._id, x: rect.right, y: rect.bottom + 4 });
+                                                        }
+                                                    }}
+                                                    className="p-1 hover:bg-secondary rounded text-muted-foreground"
+                                                >
                                                     <MoreVertical className="w-3.5 h-3.5" />
                                                 </button>
-                                                <div className="hidden group-hover/actions:block absolute right-0 top-full mt-1 w-24 bg-white shadow-md border border-border rounded z-20 py-1">
-                                                    <button 
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleOpenEditModal(item);
-                                                        }}
-                                                        className="w-full text-left px-3 py-1.5 text-[10px] text-muted-foreground hover:bg-secondary hover:text-blue-600 flex items-center space-x-1"
-                                                    >
-                                                        <Pencil className="w-3 h-3" />
-                                                        <span>Edit</span>
-                                                    </button>
-                                                    <button 
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleDeleteItem(item._id);
-                                                        }}
-                                                        className="w-full text-left px-3 py-1.5 text-[10px] text-muted-foreground hover:bg-red-50 hover:text-red-600 flex items-center space-x-1"
-                                                    >
-                                                        <Trash2 className="w-3 h-3" />
-                                                        <span>Delete</span>
-                                                    </button>
-                                                </div>
                                             </td>
                                         </tr>
                                     );
@@ -1287,7 +1291,7 @@ export default function ManufacturingDetailPage() {
                         ) : (
                             <div className="space-y-4">
                                 {(order.recipesId.steps as any[]).sort((a: any, b: any) => (parseInt(a.step) || 0) - (parseInt(b.step) || 0)).map((step: any, i: number) => (
-                                    <div key={i} className="flex gap-4 p-4 rounded bg-white border border-border shadow-sm relative group hover:border-border transition-colors">
+                                    <div key={i} className="flex gap-4 p-4 rounded bg-background border border-border shadow-sm relative group hover:border-border transition-colors">
                                         <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-foreground text-white text-[10px] font-bold rounded-full shadow-sm">
                                             {step.step}
                                         </div>
@@ -1310,7 +1314,7 @@ export default function ManufacturingDetailPage() {
                                 No recipe notes found
                             </div>
                         ) : (
-                            <div className="bg-white p-6 rounded border border-border shadow-sm">
+                            <div className="bg-background p-6 rounded border border-border shadow-sm">
                                 <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold mb-4 flex items-center">
                                     <Clipboard className="w-3 h-3 mr-2" />
                                     Recipe Notes
@@ -1453,6 +1457,41 @@ export default function ManufacturingDetailPage() {
             </div>
         </div>
 
+            {/* Fixed-position Line Item Actions Dropdown */}
+            {openActionMenu && order && (() => {
+                const targetItem = order.lineItems?.find(i => i._id === openActionMenu.id);
+                if (!targetItem) return null;
+                return (
+                    <div 
+                        className="fixed w-28 bg-background shadow-[0_4px_20px_rgba(0,0,0,0.3)] border border-border rounded z-[9999] py-1"
+                        style={{ top: openActionMenu.y, left: openActionMenu.x - 112 }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <button 
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenActionMenu(null);
+                                handleOpenEditModal(targetItem);
+                            }}
+                            className="w-full text-left px-3 py-2 text-[10px] text-foreground/70 hover:bg-secondary hover:text-blue-500 flex items-center space-x-1.5 transition-colors"
+                        >
+                            <Pencil className="w-3 h-3" />
+                            <span>Edit</span>
+                        </button>
+                        <button 
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenActionMenu(null);
+                                handleDeleteItem(targetItem._id);
+                            }}
+                            className="w-full text-left px-3 py-2 text-[10px] text-foreground/70 hover:bg-red-500/10 hover:text-red-500 flex items-center space-x-1.5 transition-colors"
+                        >
+                            <Trash2 className="w-3 h-3" />
+                            <span>Delete</span>
+                        </button>
+                    </div>
+                );
+            })()}
 
             {/* Lot Selection Modal */}
             <LotSelectionModal
@@ -1482,7 +1521,7 @@ export default function ManufacturingDetailPage() {
             {/* Edit Item Modal */}
             {isEditModalOpen && editingItem && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={handleCloseEditModal}>
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
+                    <div className="bg-background rounded-lg shadow-xl w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
                             <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">
                                 {editingItem._id ? 'Edit Item' : 'Add Line Item'}
@@ -1512,10 +1551,10 @@ export default function ManufacturingDetailPage() {
                                             className="w-full px-3 py-2 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-black/10"
                                             placeholder="Search SKU..."
                                         />
-                                        {isSkuDropdownOpen && skuSearch && (
-                                            <div className="absolute z-20 w-full mt-1 bg-white border border-border rounded shadow-lg max-h-48 overflow-auto">
+                                        {isSkuDropdownOpen && (
+                                            <div className="absolute z-20 w-full mt-1 bg-background border border-border rounded shadow-lg max-h-48 overflow-auto">
                                                 {skuList
-                                                    .filter(s => s.name.toLowerCase().includes(skuSearch.toLowerCase()) || s._id.toLowerCase().includes(skuSearch.toLowerCase()))
+                                                    .filter(s => !skuSearch || s.name.toLowerCase().includes(skuSearch.toLowerCase()) || s._id.toLowerCase().includes(skuSearch.toLowerCase()))
                                                     .slice(0, 20)
                                                     .map(s => (
                                                         <button
@@ -1554,7 +1593,7 @@ export default function ManufacturingDetailPage() {
                                                             <span className="text-xs text-muted-foreground ml-2">({s._id})</span>
                                                         </button>
                                                     ))}
-                                                {skuList.filter(s => s.name.toLowerCase().includes(skuSearch.toLowerCase()) || s._id.toLowerCase().includes(skuSearch.toLowerCase())).length === 0 && (
+                                                {skuList.filter(s => !skuSearch || s.name.toLowerCase().includes(skuSearch.toLowerCase()) || s._id.toLowerCase().includes(skuSearch.toLowerCase())).length === 0 && (
                                                     <div className="px-3 py-2 text-sm text-muted-foreground">No SKUs found</div>
                                                 )}
                                             </div>
@@ -1681,7 +1720,7 @@ export default function ManufacturingDetailPage() {
             {/* Note Modal */}
             {isNoteModalOpen && editingNote && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setIsNoteModalOpen(false)}>
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
+                    <div className="bg-background rounded-lg shadow-xl w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
                             <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">
                                 {editingNote._id ? 'Edit Note' : 'Add Note'}
@@ -1762,7 +1801,7 @@ export default function ManufacturingDetailPage() {
             {/* Labor Modal */}
             {isLaborModalOpen && editingLabor && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setIsLaborModalOpen(false)}>
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
+                    <div className="bg-background rounded-lg shadow-xl w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
                             <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">
                                 {editingLabor._id ? 'Edit Labor' : 'Add Labor'}
@@ -1778,7 +1817,7 @@ export default function ManufacturingDetailPage() {
                                 <select
                                     value={editingLabor.type}
                                     onChange={e => setEditingLabor({ ...editingLabor, type: e.target.value })}
-                                    className="w-full px-3 py-2 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-black/10 bg-white"
+                                    className="w-full px-3 py-2 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-black/10 bg-background"
                                 >
                                     <option value="WO Labor">WO Labor</option>
                                     <option value="Maintenance & Preparation">Maintenance & Preparation</option>
@@ -1801,7 +1840,7 @@ export default function ManufacturingDetailPage() {
                                         placeholder="Search user..."
                                     />
                                     {isUserDropdownOpen && (
-                                        <div className="absolute z-20 w-full mt-1 bg-white border border-border rounded shadow-lg max-h-48 overflow-auto">
+                                        <div className="absolute z-20 w-full mt-1 bg-background border border-border rounded shadow-lg max-h-48 overflow-auto">
                                             {usersList
                                                 .filter(u => {
                                                     // Filter by search

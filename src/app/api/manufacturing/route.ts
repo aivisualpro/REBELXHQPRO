@@ -63,13 +63,33 @@ export async function GET(request: Request) {
         query = await applyDateFilter(query, 'createdAt');
 
         const total = await Manufacturing.countDocuments(query);
-        const orders = await Manufacturing.find(query)
+        
+        let orders: any[];
+        
+        if (sortBy === 'label') {
+            // Label is stored as string but represents a number — use aggregation for numeric sort
+            orders = await Manufacturing.aggregate([
+                { $match: query },
+                { $addFields: { _numericLabel: { $toInt: { $ifNull: ['$label', '0'] } } } },
+                { $sort: { _numericLabel: sortOrder as 1 | -1 } },
+                { $skip: (page - 1) * limit },
+                { $limit: limit },
+                { $project: { _numericLabel: 0 } }
+            ]);
+            // Manually populate since aggregate doesn't support populate
+            await Manufacturing.populate(orders, [
+                { path: 'createdBy', select: 'firstName lastName' },
+                { path: 'finishedBy', select: 'firstName lastName' },
+            ]);
+        } else {
+            orders = await Manufacturing.find(query)
                 .populate('createdBy', 'firstName lastName')
                 .populate('finishedBy', 'firstName lastName')
                 .sort({ [sortBy]: sortOrder as any })
                 .skip((page - 1) * limit)
                 .limit(limit)
                 .lean();
+        }
 
         // Manual SKU hydration using native driver (handles String _id, ObjectId _id, and legacyId)
         const rawSkuIds = new Set<string>();
