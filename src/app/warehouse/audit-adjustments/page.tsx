@@ -3,11 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import {
     ArrowUpDown,
-    Edit,
-    Trash2,
     X,
-    Save,
-    Eye
+    Save
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -19,7 +16,7 @@ import { Suspense } from 'react';
 
 interface AuditAdjustment {
     _id: string;
-    sku: { _id: string; name: string; uom: string; image?: string } | string;
+    sku: { _id: string; name: string; uom: string; image?: string; tier?: number } | string;
     lotNumber: string;
     qty: number;
     reason: string;
@@ -138,24 +135,6 @@ function AuditAdjustmentsPage() {
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (confirm('Are you sure you want to delete this adjustment? This cannot be undone.')) {
-            try {
-                const res = await fetch(`/api/warehouse/audit-adjustments/${id}`, {
-                    method: 'DELETE'
-                });
-                if (res.ok) {
-                    toast.success('Adjustment deleted');
-                    fetchAdjustments();
-                } else {
-                    toast.error('Failed to delete');
-                }
-            } catch (error) {
-                toast.error('Error deleting adjustment');
-            }
-        }
-    };
-
     const getSkuData = (val: any) => {
         if (typeof val === 'object' && val?.name) return val;
         return { _id: '', name: typeof val === 'string' ? val : '-', uom: '', image: '' };
@@ -176,7 +155,7 @@ function AuditAdjustmentsPage() {
                 <table className="w-full border-collapse text-left">
                     <thead className="sticky top-0 bg-secondary/50 z-10 border-b border-border">
                         <tr>
-                            <th className="px-2 py-1 text-[8px] font-bold text-muted-foreground uppercase tracking-widest w-8 border-r border-border">Img</th>
+                            <th className="px-2 py-1 text-[8px] font-medium text-muted-foreground uppercase tracking-widest w-8 border-r border-border">Img</th>
                             {[
                                 { key: 'sku', label: 'SKU' },
                                 { key: 'lotNumber', label: 'Lot #' },
@@ -188,7 +167,7 @@ function AuditAdjustmentsPage() {
                                 <th
                                     key={col.key}
                                     onClick={() => handleSort(col.key)}
-                                    className="px-2 py-1 text-[8px] font-bold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary transition-colors border-r border-border"
+                                    className="px-2 py-1 text-[8px] font-medium text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary transition-colors border-r border-border"
                                 >
                                     <div className="flex items-center space-x-1">
                                         <span>{col.label}</span>
@@ -196,19 +175,23 @@ function AuditAdjustmentsPage() {
                                     </div>
                                 </th>
                             ))}
-                            <th className="px-2 py-1 text-[8px] font-bold text-muted-foreground uppercase tracking-widest text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
                         {loading ? (
-                            <tr><td colSpan={9} className="px-4 py-12 text-center text-xs text-muted-foreground">Loading...</td></tr>
+                            <tr><td colSpan={8} className="px-4 py-12 text-center text-xs text-muted-foreground">Loading...</td></tr>
                         ) : adjustments.length === 0 ? (
-                            <tr><td colSpan={9} className="px-4 py-12 text-center text-xs text-muted-foreground uppercase font-bold tracking-tighter opacity-50">No records found</td></tr>
+                            <tr><td colSpan={8} className="px-4 py-12 text-center text-xs text-muted-foreground uppercase tracking-tighter opacity-50">No records found</td></tr>
                         ) : adjustments.map(item => {
                             const skuData = getSkuData(item.sku);
                             const imgSrc = skuData.image || missingImg || '';
+                            const skuTier = typeof item.sku === 'object' && item.sku !== null ? (item.sku as any).tier : undefined;
                             return (
-                                <tr key={item._id} className="hover:bg-secondary/30 transition-colors group">
+                                <tr
+                                    key={item._id}
+                                    className="hover:bg-secondary/30 transition-colors group cursor-pointer"
+                                    onClick={() => router.push(`/warehouse/audit-adjustments/${item._id}`)}
+                                >
                                     {/* Image */}
                                     <td className="px-1 py-0.5 w-8 border-r border-border">
                                         <div className="w-6 h-6 rounded overflow-hidden bg-secondary flex items-center justify-center border border-border">
@@ -226,13 +209,25 @@ function AuditAdjustmentsPage() {
                                             />
                                         </div>
                                     </td>
-                                    {/* SKU Name */}
-                                    <td className="px-2 py-1.5 text-[10px] font-bold text-foreground border-r border-border">
-                                        <span className="truncate max-w-[200px] block" title={skuData.name}>{skuData.name}</span>
+                                    {/* SKU Name with Tier */}
+                                    <td className="px-2 py-1.5 text-[10px] text-foreground border-r border-border">
+                                        <div className="flex items-center space-x-1.5">
+                                            {skuTier ? (
+                                                <span className={cn(
+                                                    "flex-shrink-0 w-4 h-4 rounded flex items-center justify-center text-[9px] font-black text-white shadow-sm",
+                                                    skuTier === 1 ? "bg-emerald-500" :
+                                                    skuTier === 2 ? "bg-blue-500" :
+                                                    "bg-orange-500"
+                                                )} title={`Tier ${skuTier}`}>
+                                                    {skuTier}
+                                                </span>
+                                            ) : null}
+                                            <span className="truncate max-w-[200px]" title={skuData.name}>{skuData.name}</span>
+                                        </div>
                                     </td>
                                     <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono tracking-tighter border-r border-border">{item.lotNumber}</td>
                                     <td className={cn(
-                                        "px-2 py-1.5 text-[10px] font-bold font-mono border-r border-border",
+                                        "px-2 py-1.5 text-[10px] font-mono border-r border-border",
                                         item.qty > 0 ? "text-emerald-600" : "text-rose-600"
                                     )}>
                                         {item.qty > 0 ? '+' : ''}{item.qty.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 8 })}
@@ -241,34 +236,6 @@ function AuditAdjustmentsPage() {
                                     <td className="px-2 py-1.5 text-[10px] text-muted-foreground border-r border-border">{renderUser(item.createdBy)}</td>
                                     <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono border-r border-border">
                                         {new Date(item.createdAt).toLocaleDateString()}
-                                    </td>
-                                    <td className="px-2 py-1.5 text-right">
-                                        <div className="flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button
-                                                onClick={() => router.push(`/warehouse/audit-adjustments/${item._id}`)}
-                                                className="p-1 text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10 rounded transition-colors cursor-pointer"
-                                                title="View"
-                                            >
-                                                <Eye className="w-3 h-3" />
-                                            </button>
-                                            <button 
-                                                onClick={() => {
-                                                    setEditingItem(item);
-                                                    setIsModalOpen(true);
-                                                }}
-                                                className="p-1 text-muted-foreground hover:text-foreground hover:bg-secondary rounded transition-colors cursor-pointer"
-                                                title="Edit"
-                                            >
-                                                <Edit className="w-3 h-3" />
-                                            </button>
-                                            <button 
-                                                 onClick={() => handleDelete(item._id)}
-                                                 className="p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors cursor-pointer"
-                                                 title="Delete"
-                                            >
-                                                <Trash2 className="w-3 h-3" />
-                                            </button>
-                                        </div>
                                     </td>
                                 </tr>
                             );

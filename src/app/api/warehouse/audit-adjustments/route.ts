@@ -50,7 +50,7 @@ export async function GET(request: Request) {
         // Mongoose populate/find can't resolve string _id refs due to BSON type mismatch
         const skuRefIds = [...new Set(adjustments.map((a: any) => a.sku?.toString()).filter(Boolean))];
         
-        const skuMap = new Map<string, { _id: string; name: string; uom: string; image: string }>();
+        const skuMap = new Map<string, { _id: string; name: string; uom: string; image: string; tier?: number }>();
 
         if (skuRefIds.length > 0) {
             const db = mongoose.connection.db;
@@ -66,11 +66,11 @@ export async function GET(request: Request) {
 
                 const skuDocs = await db.collection('skus').find(
                     { _id: { $in: lookupIds } },
-                    { projection: { _id: 1, name: 1, uom: 1, image: 1 } }
+                    { projection: { _id: 1, name: 1, uom: 1, image: 1, tier: 1 } }
                 ).toArray();
 
                 skuDocs.forEach((s: any) => {
-                    skuMap.set(s._id.toString(), { _id: s._id.toString(), name: s.name || '', uom: s.uom || '', image: s.image || '' });
+                    skuMap.set(s._id.toString(), { _id: s._id.toString(), name: s.name || '', uom: s.uom || '', image: s.image || '', tier: s.tier });
                 });
             }
         }
@@ -94,7 +94,7 @@ export async function GET(request: Request) {
         }
 
         const hydratedAdjustments = adjustments.map((a: any) => {
-            const skuData = skuMap.get(a.sku?.toString()) || { _id: a.sku, name: a.sku, uom: '', image: '' };
+            const skuData = skuMap.get(a.sku?.toString()) || { _id: a.sku, name: a.sku, uom: '', image: '', tier: undefined };
             const userData = userMap.get(a.createdBy?.toString());
             return {
                 ...a,

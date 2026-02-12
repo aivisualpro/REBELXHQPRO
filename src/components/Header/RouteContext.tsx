@@ -113,6 +113,15 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
         };
     }
 
+    // Audit Adjustment Detail
+    if (pathname.match(/^\/warehouse\/audit-adjustments\/[^/]+$/)) {
+        return {
+            title: '',
+            actions: [],
+            isPortal: true
+        };
+    }
+
     // Lab Results
     if (pathname === '/warehouse/lab-results') {
         return {
