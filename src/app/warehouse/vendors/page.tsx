@@ -270,7 +270,14 @@ export default function VendorsPage() {
               <tr><td colSpan={9} className="px-2 py-4 text-center text-[10px] text-muted-foreground uppercase font-medium tracking-tighter opacity-50">No Vendors found</td></tr>
             ) : vendors.map(vendor => (
               <tr key={vendor._id} className="hover:bg-secondary/40 hover:scale-[1.002] hover:shadow-md transition-all duration-200 group relative z-0 hover:z-10 bg-background">
-                <td className="px-2 py-1.5 text-[10px] font-bold text-foreground tracking-tight">{vendor.name}</td>
+                <td className="px-2 py-1.5 text-[10px] font-bold text-foreground tracking-tight">
+                  <span
+                    onClick={() => router.push(`/warehouse/vendors/${vendor._id}`)}
+                    className="hover:text-blue-500 hover:underline cursor-pointer transition-colors"
+                  >
+                    {vendor.name}
+                  </span>
+                </td>
                 <td className="px-2 py-1.5 text-[10px] text-muted-foreground truncate max-w-[200px]" title={vendor.address}>{vendor.address || '-'}</td>
                 <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono tracking-tighter">{vendor.phone || '-'}</td>
                 <td className="px-2 py-1.5 text-[10px] text-muted-foreground truncate max-w-[150px]"><a href={`mailto:${vendor.email}`} className="hover:underline">{vendor.email || '-'}</a></td>

@@ -230,6 +230,15 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
         };
     }
 
+    // Vendor Detail
+    if (pathname.match(/^\/warehouse\/vendors\/[^/]+$/)) {
+        return {
+            title: '',
+            actions: [],
+            isPortal: true
+        };
+    }
+
     // Default: No context
     return null;
 };

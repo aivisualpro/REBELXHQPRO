@@ -251,20 +251,49 @@ function SettingsPageContent() {
     };
 
     const tabs = [
-        { id: 'general', label: 'General', icon: Building },
-        { id: 'localization', label: 'Localization', icon: Globe },
-        { id: 'dataFilter', label: 'Data Filter', icon: Calendar },
-        { id: 'notifications', label: 'Notifications', icon: Bell },
-        { id: 'security', label: 'Security', icon: Shield },
-        { id: 'modules', label: 'Modules', icon: Layers },
+        { id: 'general', label: 'General', icon: Building, keywords: 'company name email phone address support general' },
+        { id: 'localization', label: 'Localization', icon: Globe, keywords: 'currency timezone date format locale localization language' },
+        { id: 'dataFilter', label: 'Data Filter', icon: Calendar, keywords: 'data filter date range crm revenue' },
+        { id: 'notifications', label: 'Notifications', icon: Bell, keywords: 'notifications email alerts sms push' },
+        { id: 'security', label: 'Security', icon: Shield, keywords: 'security password authentication two-factor session' },
+        { id: 'modules', label: 'Modules', icon: Layers, keywords: 'modules sales warehouse reports help import export sync vendors skus recipes kits manufacturing purchase orders lab results audit adjustments opening balances tickets' },
     ];
 
     const moduleSubTabs = [
-        { id: 'sales', label: 'Sales', icon: ShoppingCart },
-        { id: 'warehouse', label: 'Warehouse', icon: Warehouse },
-        { id: 'reports', label: 'Reports', icon: BarChart3 },
-        { id: 'help', label: 'Help', icon: HelpCircle },
+        { id: 'sales', label: 'Sales', icon: ShoppingCart, keywords: 'sales orders import sync wholesale payments notes' },
+        { id: 'warehouse', label: 'Warehouse', icon: Warehouse, keywords: 'warehouse skus vendors import export purchase orders kits recipes manufacturing lab results audit adjustments opening balances variances' },
+        { id: 'reports', label: 'Reports', icon: BarChart3, keywords: 'reports analytics' },
+        { id: 'help', label: 'Help', icon: HelpCircle, keywords: 'help tickets support' },
     ];
+
+    // Filter tabs based on search
+    const searchLower = headerSearch.toLowerCase().trim();
+    const filteredTabs = searchLower
+        ? tabs.filter(tab => tab.label.toLowerCase().includes(searchLower) || tab.keywords.includes(searchLower))
+        : tabs;
+    const filteredModuleSubTabs = searchLower
+        ? moduleSubTabs.filter(tab => tab.label.toLowerCase().includes(searchLower) || tab.keywords.includes(searchLower))
+        : moduleSubTabs;
+
+    // Auto-navigate to first matching tab when search changes
+    useEffect(() => {
+        if (!searchLower) return;
+        // If current tab is still in filtered results, stay on it
+        if (filteredTabs.find(t => t.id === activeTab)) return;
+        // Otherwise navigate to first match
+        if (filteredTabs.length > 0) {
+            setActiveTab(filteredTabs[0].id as Tab);
+        }
+    }, [searchLower]);
+
+    // Auto-navigate module sub-tab when on modules tab and search changes
+    useEffect(() => {
+        if (!searchLower || activeTab !== 'modules') return;
+        if (filteredModuleSubTabs.find(t => t.id === moduleSubTab)) return;
+        if (filteredModuleSubTabs.length > 0) {
+            setModuleSubTab(filteredModuleSubTabs[0].id as ModuleSubTab);
+        }
+    }, [searchLower, activeTab]);
 
 
 
@@ -304,7 +333,7 @@ function SettingsPageContent() {
             <div className="flex flex-1 overflow-hidden">
                 {/* Sidebar */}
                 <div className="w-64 bg-background border-r border-border flex flex-col pt-6 shrink-0">
-                    {tabs.map(tab => {
+                    {filteredTabs.map(tab => {
                         const Icon = tab.icon;
                         return (
                             <button
@@ -589,7 +618,7 @@ function SettingsPageContent() {
                             <div className="space-y-6">
                                 {/* Sub-tabs for modules */}
                                 <div className="flex items-center space-x-1 border-b border-border pb-0">
-                                    {moduleSubTabs.map(tab => {
+                                    {filteredModuleSubTabs.map(tab => {
                                         const Icon = tab.icon;
                                         return (
                                             <button

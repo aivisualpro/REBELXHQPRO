@@ -377,7 +377,16 @@ export default function PurchaseOrderDetailPage() {
     };
 
     const renderVendor = (val: { _id: string; name: string } | string) => {
-        if (typeof val === 'object' && val !== null) return val.name;
+        if (typeof val === 'object' && val !== null) {
+            return (
+                <span
+                    onClick={() => router.push(`/warehouse/vendors/${val._id}`)}
+                    className="hover:text-blue-500 hover:underline cursor-pointer transition-colors"
+                >
+                    {val.name}
+                </span>
+            );
+        }
         return val || '-';
     };
 
