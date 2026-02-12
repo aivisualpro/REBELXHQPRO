@@ -142,6 +142,24 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
         };
     }
 
+    // Recipes
+    if (pathname === '/warehouse/recipes') {
+        return {
+            title: '',
+            actions: [],
+            isPortal: true
+        };
+    }
+
+    // Recipe Detail
+    if (pathname.match(/^\/warehouse\/recipes\/[^/]+$/)) {
+        return {
+            title: '',
+            actions: [],
+            isPortal: true
+        };
+    }
+
     // Manufacturing
     if (pathname === '/warehouse/manufacturing') {
         return {
