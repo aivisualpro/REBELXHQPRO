@@ -1,24 +1,15 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import {
   Search,
-  Upload,
   ArrowUpDown,
-  Building2,
-  Mail,
-  Phone,
-  MapPin,
-  CreditCard,
   Plus
 } from 'lucide-react';
-import Papa from 'papaparse';
 import { cn } from '@/lib/utils';
-import toast from 'react-hot-toast';
 import { Pagination } from '@/components/ui/Pagination';
-import { MultiSelectFilter } from '@/components/ui/filters/MultiSelectFilter';
 
 interface Vendor {
   _id: string;
@@ -48,17 +39,6 @@ export default function VendorsPage() {
   const [sortBy, setSortBy] = useState('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
-  // Filters
-  const [selectedCities, setSelectedCities] = useState<string[]>([]);
-  const [selectedStates, setSelectedStates] = useState<string[]>([]);
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
-
-  // Filter Options
-  const [cityOptions, setCityOptions] = useState<{ label: string; value: string }[]>([]);
-  const [stateOptions, setStateOptions] = useState<{ label: string; value: string }[]>([]);
-  const [statusOptions, setStatusOptions] = useState<{ label: string; value: string }[]>([]);
-
-  const importInputRef = useRef<HTMLInputElement>(null);
 
   const [headerPortalTarget, setHeaderPortalTarget] = useState<HTMLElement | null>(null);
   useEffect(() => {
@@ -86,10 +66,6 @@ export default function VendorsPage() {
         sortOrder,
       });
 
-      if (selectedCities.length) params.append('city', selectedCities.join(','));
-      if (selectedStates.length) params.append('state', selectedStates.join(','));
-      if (selectedStatuses.length) params.append('status', selectedStatuses.join(','));
-
       const res = await fetch(`/api/vendors?${params.toString()}`);
       const data = await res.json();
 
@@ -98,15 +74,6 @@ export default function VendorsPage() {
         setTotalPages(data.totalPages || 1);
         setTotalVendors(data.total || 0);
 
-        // Populate options (simplified extraction)
-        const allCities = Array.from(new Set((data.vendors || []).map((v: any) => v.city).filter(Boolean))).map((c: any) => ({ label: c, value: c }));
-        setCityOptions(allCities);
-
-        const allStates = Array.from(new Set((data.vendors || []).map((v: any) => v.state).filter(Boolean))).map((s: any) => ({ label: s, value: s }));
-        setStateOptions(allStates);
-
-        const allStatuses = Array.from(new Set((data.vendors || []).map((v: any) => v.status).filter(Boolean))).map((s: any) => ({ label: s, value: s }));
-        setStatusOptions(allStatuses);
       } else {
         setError(data.error || 'Failed to fetch vendors');
       }
@@ -115,7 +82,7 @@ export default function VendorsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, debouncedSearch, sortBy, sortOrder, selectedCities, selectedStates, selectedStatuses]);
+  }, [page, debouncedSearch, sortBy, sortOrder]);
 
   useEffect(() => {
     fetchVendors();
@@ -130,47 +97,13 @@ export default function VendorsPage() {
     }
   };
 
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (results) => {
-        try {
-          const loadingToast = toast.loading('Importing vendors...');
-          const res = await fetch('/api/vendors/import', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ data: results.data })
-          });
-          toast.dismiss(loadingToast);
-
-          if (res.ok) {
-            const data = await res.json();
-            toast.success(`Imported/Updated ${data.count} vendors`);
-            fetchVendors();
-          } else {
-            const err = await res.json();
-            toast.error('Import failed: ' + err.error);
-          }
-        } catch (e) {
-          toast.error('Import error');
-          console.error(e);
-        }
-      }
-    });
-    e.target.value = '';
-  };
 
   return (
     <div className="flex flex-col h-[calc(100vh-48px)] bg-background transition-colors duration-300">
       {/* Header Portal */}
       {headerPortalTarget && createPortal(
         <>
-          <h1 className="text-sm font-bold text-foreground uppercase tracking-tight whitespace-nowrap">Vendors</h1>
-          <div className="relative ml-4">
+          <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
             <input
               type="text"
@@ -181,7 +114,6 @@ export default function VendorsPage() {
             />
           </div>
           <div className="flex-1" />
-          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mr-2">{totalVendors} vendors</span>
           <button
             onClick={() => {/* TODO: Add Modal */ }}
             className="h-8 px-3 bg-primary text-black hover:opacity-90 transition-all rounded shadow-md flex items-center space-x-1.5 cursor-pointer"
@@ -193,49 +125,7 @@ export default function VendorsPage() {
         headerPortalTarget
       )}
 
-      {/* Filters Bar */}
-      <div className="flex items-center px-4 h-9 border-b border-border bg-secondary/30 transition-colors space-x-2">
-        <MultiSelectFilter
-          label="City"
-          icon={MapPin}
-          options={cityOptions}
-          selectedValues={selectedCities}
-          onChange={setSelectedCities}
-          className="h-7"
-        />
-        <MultiSelectFilter
-          label="State"
-          icon={MapPin}
-          options={stateOptions}
-          selectedValues={selectedStates}
-          onChange={setSelectedStates}
-          className="h-7"
-        />
-        <MultiSelectFilter
-          label="Status"
-          icon={Building2}
-          options={statusOptions}
-          selectedValues={selectedStatuses}
-          onChange={setSelectedStatuses}
-          className="h-7"
-        />
-        <div className="flex-1" />
-        <input
-          type="file"
-          accept=".csv"
-          className="hidden"
-          ref={importInputRef}
-          onChange={handleImport}
-        />
-        <button
-          onClick={() => importInputRef.current?.click()}
-          className="h-7 px-2.5 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors rounded flex items-center space-x-1 border border-border bg-card shadow-sm cursor-pointer"
-          title="Import Vendors"
-        >
-          <Upload className="w-3.5 h-3.5" />
-          <span className="text-[10px] font-bold uppercase">Import</span>
-        </button>
-      </div>
+
 
       <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
         <div className="min-w-full px-2 py-2">
