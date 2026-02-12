@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { confirmDeleteToast } from '@/lib/confirmToast';
 import { Pagination } from '@/components/ui/Pagination';
 
 interface Kit {
@@ -158,19 +159,20 @@ function KitsPageContent() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this kit?")) return;
-    try {
-      const res = await fetch(`/api/kits/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        toast.success("Kit deleted");
-        fetchKits();
-      } else {
-        toast.error("Failed to delete");
+  const handleDelete = (id: string) => {
+    confirmDeleteToast('Delete this kit?', async () => {
+      try {
+        const res = await fetch(`/api/kits/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          toast.success("Kit deleted");
+          fetchKits();
+        } else {
+          toast.error("Failed to delete");
+        }
+      } catch (e) {
+        toast.error("Error deleting kit");
       }
-    } catch (e) {
-      toast.error("Error deleting kit");
-    }
+    });
   };
 
   return (

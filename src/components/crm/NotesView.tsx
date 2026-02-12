@@ -5,6 +5,7 @@ import { Search, Plus, Pencil, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { Pagination } from '@/components/ui/Pagination';
 import toast from 'react-hot-toast';
+import { confirmDeleteToast } from '@/lib/confirmToast';
 import NoteModal from '@/components/crm/NoteModal';
 
 interface Note {
@@ -80,23 +81,24 @@ export default function NotesView({ clientId, onNotesUpdate }: NotesViewProps) {
         fetchNotes();
     }, [fetchNotes]);
 
-    const handleDelete = async (clientId: string, noteId: string) => {
-        if (!confirm('Are you sure you want to delete this note?')) return;
+    const handleDelete = (clientId: string, noteId: string) => {
+        confirmDeleteToast('Delete this note?', async () => {
         
-        try {
-            const res = await fetch(`/api/notes/action?clientId=${clientId}&noteId=${noteId}`, {
-                method: 'DELETE'
-            });
-            if (res.ok) {
-                toast.success('Note deleted');
-                fetchNotes();
-                if (onNotesUpdate) onNotesUpdate();
-            } else {
-                toast.error('Failed to delete note');
+            try {
+                const res = await fetch(`/api/notes/action?clientId=${clientId}&noteId=${noteId}`, {
+                    method: 'DELETE'
+                });
+                if (res.ok) {
+                    toast.success('Note deleted');
+                    fetchNotes();
+                    if (onNotesUpdate) onNotesUpdate();
+                } else {
+                    toast.error('Failed to delete note');
+                }
+            } catch (error) {
+                toast.error('Error deleting note');
             }
-        } catch (error) {
-            toast.error('Error deleting note');
-        }
+        });
     };
 
     const openNewNoteModal = () => {

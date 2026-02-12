@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
 import toast from 'react-hot-toast';
+import { confirmDeleteToast } from '@/lib/confirmToast';
 import { Pagination } from '@/components/ui/Pagination';
 import { TableColumnHeader } from '@/components/ui/TableColumnHeader';
 
@@ -208,20 +209,21 @@ function OpeningBalancesContent() {
         setIsModalOpen(true);
     };
 
-    const handleDelete = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this opening balance?')) return;
+    const handleDelete = (id: string) => {
+        confirmDeleteToast('Delete this opening balance?', async () => {
         
-        try {
-            const res = await fetch(`/api/opening-balances/${id}`, { method: 'DELETE' });
-            if (res.ok) {
-                 toast.success('Deleted successfully');
-                 fetchBalances();
-            } else {
-                 toast.error('Failed to delete');
+            try {
+                const res = await fetch(`/api/opening-balances/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                     toast.success('Deleted successfully');
+                     fetchBalances();
+                } else {
+                     toast.error('Failed to delete');
+                }
+            } catch (e) {
+                toast.error('Error deleting item');
             }
-        } catch (e) {
-            toast.error('Error deleting item');
-        }
+        });
     };
 
     const handleSubmit = async (e: React.FormEvent) => {

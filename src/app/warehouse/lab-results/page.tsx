@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { confirmDeleteToast } from '@/lib/confirmToast';
 import { Pagination } from '@/components/ui/Pagination';
 import { useRouter, useSearchParams } from 'next/navigation';
 
@@ -164,20 +165,20 @@ function LabResultsPageContent() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this result?')) return;
-
-    try {
-      const res = await fetch(`/api/lab-results/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        toast.success('Deleted successfully');
-        fetchResults();
-      } else {
-        toast.error('Failed to delete');
+  const handleDelete = (id: string) => {
+    confirmDeleteToast('Delete this result?', async () => {
+      try {
+        const res = await fetch(`/api/lab-results/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          toast.success('Deleted successfully');
+          fetchResults();
+        } else {
+          toast.error('Failed to delete');
+        }
+      } catch (error) {
+        toast.error('Error deleting item');
       }
-    } catch (error) {
-      toast.error('Error deleting item');
-    }
+    });
   };
 
   // Helper to handle comma-separated variations input

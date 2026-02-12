@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { confirmDeleteToast } from '@/lib/confirmToast';
 import { Pagination } from '@/components/ui/Pagination';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 
@@ -221,19 +222,20 @@ export default function RecipesPage() {
   };
 
   // --- Delete Recipe ---
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this recipe?")) return;
-    try {
-      const res = await fetch(`/api/recipes/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        toast.success("Recipe deleted");
-        fetchRecipes();
-      } else {
-        toast.error("Failed to delete");
+  const handleDelete = (id: string) => {
+    confirmDeleteToast('Delete this recipe?', async () => {
+      try {
+        const res = await fetch(`/api/recipes/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          toast.success("Recipe deleted");
+          fetchRecipes();
+        } else {
+          toast.error("Failed to delete");
+        }
+      } catch (e) {
+        toast.error("Error deleting recipe");
       }
-    } catch (e) {
-      toast.error("Error deleting recipe");
-    }
+    });
   };
 
 

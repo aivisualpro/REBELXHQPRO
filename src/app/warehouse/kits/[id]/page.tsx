@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Plus, Trash2, Edit2, Save, X } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { confirmDeleteToast } from '@/lib/confirmToast';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 
 interface Kit {
@@ -118,10 +119,11 @@ export default function KitDetailPage() {
     };
 
     const deleteItem = (index: number) => {
-        if (!confirm("Remove this item?")) return;
-        const newItems = [...(kit?.lineItems || [])];
-        newItems.splice(index, 1);
-        updateKit({ lineItems: newItems });
+        confirmDeleteToast('Remove this item?', () => {
+            const newItems = [...(kit?.lineItems || [])];
+            newItems.splice(index, 1);
+            updateKit({ lineItems: newItems });
+        });
     };
 
     const renderSku = (val: any) => (typeof val === 'object' && val?.name ? val.name : val || '-');

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { confirmDeleteToast } from '@/lib/confirmToast';
 import { Pagination } from '@/components/ui/Pagination';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 
@@ -186,20 +187,21 @@ export default function TicketsPage() {
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this ticket?')) return;
+    const handleDelete = (id: string) => {
+        confirmDeleteToast('Delete this ticket?', async () => {
 
-        try {
-            const res = await fetch(`/api/tickets/${id}`, { method: 'DELETE' });
-            if (res.ok) {
-                toast.success('Deleted successfully');
-                fetchTickets();
-            } else {
-                toast.error('Failed to delete');
+            try {
+                const res = await fetch(`/api/tickets/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    toast.success('Deleted successfully');
+                    fetchTickets();
+                } else {
+                    toast.error('Failed to delete');
+                }
+            } catch (error) {
+                toast.error('Error deleting ticket');
             }
-        } catch (error) {
-            toast.error('Error deleting ticket');
-        }
+        });
     };
 
     const getPriorityColor = (p: string) => {

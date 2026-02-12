@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { confirmDeleteToast } from '@/lib/confirmToast';
 import { Pagination } from '@/components/ui/Pagination';
 import { MultiSelectFilter } from '@/components/ui/filters/MultiSelectFilter';
 import { TableColumnHeader } from '@/components/ui/TableColumnHeader';
@@ -223,19 +224,20 @@ function SkusPageContent() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this SKU?')) return;
-    try {
-      const res = await fetch(`/api/skus/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        toast.success('SKU deleted');
-        fetchSkus();
-      } else {
-        toast.error('Failed to delete');
+  const handleDelete = (id: string) => {
+    confirmDeleteToast('Delete this SKU?', async () => {
+      try {
+        const res = await fetch(`/api/skus/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          toast.success('SKU deleted');
+          fetchSkus();
+        } else {
+          toast.error('Failed to delete');
+        }
+      } catch (e) {
+        toast.error('Delete failed');
       }
-    } catch (e) {
-      toast.error('Delete failed');
-    }
+    });
   };
 
   // Derived options for filters based on current data

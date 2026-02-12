@@ -20,6 +20,7 @@ import {
 import Papa from 'papaparse';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { confirmDeleteToast } from '@/lib/confirmToast';
 import { Pagination } from '@/components/ui/Pagination';
 import { MultiSelectFilter } from '@/components/ui/filters/MultiSelectFilter';
 import { useSession } from 'next-auth/react';
@@ -255,19 +256,20 @@ export default function CallsView({ clientId, clientPhone, onInitiateCall }: Cal
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this call?')) return;
-    try {
-      const res = await fetch(`/api/activities/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        toast.success('Call deleted');
-        fetchActivities();
-      } else {
-        toast.error('Failed to delete');
+  const handleDelete = (id: string) => {
+    confirmDeleteToast('Delete this call?', async () => {
+      try {
+        const res = await fetch(`/api/activities/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          toast.success('Call deleted');
+          fetchActivities();
+        } else {
+          toast.error('Failed to delete');
+        }
+      } catch (e) {
+        toast.error('Delete failed');
       }
-    } catch (e) {
-      toast.error('Delete failed');
-    }
+    });
   };
 
 
