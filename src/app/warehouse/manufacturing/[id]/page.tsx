@@ -116,6 +116,7 @@ export default function ManufacturingDetailPage() {
 
     // Line Item Actions Menu State
     const [openActionMenu, setOpenActionMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+    const [pendingDeleteItemId, setPendingDeleteItemId] = useState<string | null>(null);
 
     // Shell Viewport Lock: Prevents window-level scrolling
     useEffect(() => {
@@ -573,10 +574,15 @@ export default function ManufacturingDetailPage() {
     };
 
     const handleDeleteItem = async (itemId: string) => {
-        if (!order || !window.confirm('Are you sure you want to delete this item?')) return;
+        // Show confirmation modal instead of window.confirm
+        setPendingDeleteItemId(itemId);
+    };
+
+    const confirmDeleteItem = async () => {
+        if (!order || !pendingDeleteItemId) return;
         
         try {
-            const updatedLineItems = order.lineItems?.filter(item => item._id !== itemId) || [];
+            const updatedLineItems = order.lineItems?.filter(item => item._id !== pendingDeleteItemId) || [];
             
             const res = await fetch(`/api/manufacturing/${order._id}`, {
                 method: 'PATCH',
@@ -593,6 +599,8 @@ export default function ManufacturingDetailPage() {
             }
         } catch (e) {
             toast.error('Error deleting item');
+        } finally {
+            setPendingDeleteItemId(null);
         }
     };
 
@@ -785,7 +793,7 @@ export default function ManufacturingDetailPage() {
                                 </div>
                             </div>
                         </div>
-                        <div className="bg-emerald-950/50 border border-emerald-800/30 px-4 py-2.5 flex justify-between items-center">
+                        <div className="bg-emerald-500/10 border border-emerald-500/20 px-4 py-2.5 flex justify-between items-center">
                             <div className="text-[9px] uppercase tracking-widest font-bold text-emerald-400">Qty Manufactured</div>
                             <div className="text-lg font-black text-emerald-400">{costs.qtyManufactured} <span className="text-[9px] text-emerald-400/60 font-bold uppercase">{order.uom}</span></div>
                         </div>
@@ -1492,6 +1500,30 @@ export default function ManufacturingDetailPage() {
                     </div>
                 );
             })()}
+
+            {/* Delete Confirmation Modal */}
+            {pendingDeleteItemId && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999]" onClick={() => setPendingDeleteItemId(null)}>
+                    <div className="bg-background rounded-lg shadow-2xl w-full max-w-sm mx-4 p-6" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-base font-bold text-foreground mb-2">Delete this item?</h3>
+                        <p className="text-sm text-muted-foreground mb-6">This action cannot be undone.</p>
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => setPendingDeleteItemId(null)}
+                                className="flex-1 px-4 py-2.5 text-sm font-bold text-foreground bg-secondary border border-border hover:bg-secondary/80 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmDeleteItem}
+                                className="flex-1 px-4 py-2.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 transition-colors"
+                            >
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Lot Selection Modal */}
             <LotSelectionModal
