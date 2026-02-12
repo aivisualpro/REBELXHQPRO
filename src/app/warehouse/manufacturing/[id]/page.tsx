@@ -1139,7 +1139,7 @@ export default function ManufacturingDetailPage() {
                             <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
                                 <tr>
                                     {['Date', 'Type', 'User', 'Duration', 'Actions'].map(col => (
-                                        <th key={col} className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">
+                                        <th key={col} className={`px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap ${col === 'Actions' ? 'text-right' : ''}`}>
                                             {col}
                                         </th>
                                     ))}
