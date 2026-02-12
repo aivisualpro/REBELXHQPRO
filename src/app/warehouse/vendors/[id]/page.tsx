@@ -322,8 +322,8 @@ export default function VendorDetailPage() {
                     <div className="flex-1 overflow-y-auto p-4 space-y-4">
                         {/* Identity Section */}
                         <div className="grid grid-cols-2 gap-2">
-                            <div className="border border-border rounded-md p-3 bg-background text-center flex items-center justify-center">
-                                <div className="text-[11px] font-bold text-foreground break-words">{vendor.name}</div>
+                            <div className="border border-sky-500/30 rounded-md p-3 bg-sky-500/10 text-center flex items-center justify-center">
+                                <div className="text-sm font-bold text-sky-400 break-words">{vendor.name}</div>
                             </div>
                             <div className={cn(
                                 "border rounded-md p-3 text-center flex flex-col items-center justify-center transition-colors",
