@@ -676,7 +676,7 @@ export default function ManufacturingDetailPage() {
                                     const skuId = typeof order.sku === 'object' && order.sku !== null ? (order.sku as any)._id : order.sku;
                                     if (skuId) router.push(`/warehouse/skus/${skuId}`);
                                 }}
-                                className="flex-1 bg-emerald-950/50 hover:bg-emerald-950/70 transition-colors flex items-center justify-center px-3 min-w-0 cursor-pointer"
+                                className="flex-1 bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors flex items-center justify-center px-3 min-w-0 cursor-pointer"
                             >
                                 <h1 className="text-sm font-black text-foreground leading-tight text-center line-clamp-2">{skuName}</h1>
                             </button>
@@ -1138,7 +1138,7 @@ export default function ManufacturingDetailPage() {
                         <table className="w-full border-collapse text-left">
                             <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
                                 <tr>
-                                    {['Date', 'Type', 'User', 'Duration', 'Hourly Rate', 'Cost', 'Actions'].map(col => (
+                                    {['Date', 'Type', 'User', 'Duration', 'Actions'].map(col => (
                                         <th key={col} className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">
                                             {col}
                                         </th>
@@ -1148,7 +1148,7 @@ export default function ManufacturingDetailPage() {
                             <tbody className="divide-y divide-border">
                                 {(!order.labor || order.labor.length === 0) ? (
                                     <tr>
-                                        <td colSpan={7} className="px-3 py-6 text-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider">No labor entries found</td>
+                                        <td colSpan={5} className="px-3 py-6 text-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider">No labor entries found</td>
                                     </tr>
                                 ) : order.labor.map(entry => {
                                     // Parse duration (HH:MM:SS) to hours for cost calculation
@@ -1173,12 +1173,7 @@ export default function ManufacturingDetailPage() {
                                                     : (entry.duration || '-')
                                                 }
                                             </td>
-                                            <td className="px-3 py-1 text-[10px] text-muted-foreground font-mono">
-                                                {entry.hourlyRate !== undefined ? `$${entry.hourlyRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}` : '-'}
-                                            </td>
-                                            <td className="px-3 py-1 text-[10px] text-foreground/80 bg-secondary/30">
-                                                ${cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
-                                            </td>
+
                                             <td className="px-3 py-1 text-right">
                                                 <div className="flex items-center justify-end space-x-1">
                                                     {activeTimers[entry._id] ? (
@@ -1915,29 +1910,17 @@ export default function ManufacturingDetailPage() {
                                 </div>
                             </div>
 
-                            {/* Duration and Hourly Rate - only show when editing */}
+                            {/* Duration - only show when editing */}
                             {editingLabor._id && (
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Duration (HH:MM:SS)</label>
-                                        <input
-                                            type="text"
-                                            value={editingLabor.duration}
-                                            onChange={e => setEditingLabor({ ...editingLabor, duration: e.target.value })}
-                                            className="w-full px-3 py-2 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-black/10"
-                                            placeholder="0:30:00"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Hourly Rate ($)</label>
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            value={editingLabor.hourlyRate || ''}
-                                            onChange={e => setEditingLabor({ ...editingLabor, hourlyRate: parseFloat(e.target.value) || 0 })}
-                                            className="w-full px-3 py-2 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-black/10"
-                                        />
-                                    </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Duration (HH:MM:SS)</label>
+                                    <input
+                                        type="text"
+                                        value={editingLabor.duration}
+                                        onChange={e => setEditingLabor({ ...editingLabor, duration: e.target.value })}
+                                        className="w-full px-3 py-2 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-black/10"
+                                        placeholder="0:30:00"
+                                    />
                                 </div>
                             )}
                         </div>
