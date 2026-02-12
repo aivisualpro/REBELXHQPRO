@@ -337,59 +337,53 @@ export default function VendorDetailPage() {
                         {/* Contact Info */}
                         <div>
                             <h3 className="text-xs font-bold uppercase text-foreground tracking-widest mb-3 border-b border-border pb-2">Contact Information</h3>
-                            <div className="space-y-3">
-                                <div className="flex items-start space-x-3">
-                                    <User className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                                    <div>
-                                        <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Contact Name</div>
-                                        <div className="text-xs font-medium text-foreground">{vendor.contactName || '-'}</div>
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-2">
+                                        <User className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                                        <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Contact Name</span>
                                     </div>
+                                    <span className="text-xs font-medium text-foreground">{vendor.contactName || '-'}</span>
                                 </div>
-                                <div className="flex items-start space-x-3">
-                                    <Mail className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                                    <div>
-                                        <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Email</div>
-                                        {vendor.email ? (
-                                            <a href={`mailto:${vendor.email}`} className="text-xs font-medium text-blue-500 hover:underline">{vendor.email}</a>
-                                        ) : (
-                                            <div className="text-xs font-medium text-foreground">-</div>
-                                        )}
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-2">
+                                        <Mail className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                                        <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Email</span>
                                     </div>
+                                    {vendor.email ? (
+                                        <a href={`mailto:${vendor.email}`} className="text-xs font-medium text-blue-500 hover:underline">{vendor.email}</a>
+                                    ) : (
+                                        <span className="text-xs font-medium text-foreground">-</span>
+                                    )}
                                 </div>
-                                <div className="flex items-start space-x-3">
-                                    <Phone className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                                    <div>
-                                        <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Phone</div>
-                                        <div className="text-xs font-medium text-foreground">{vendor.phone || '-'}</div>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-2">
+                                        <Phone className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                                        <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Phone</span>
                                     </div>
+                                    <span className="text-xs font-medium text-foreground">{vendor.phone || '-'}</span>
                                 </div>
                                 {vendor.website && (
-                                    <div className="flex items-start space-x-3">
-                                        <Globe className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                                        <div>
-                                            <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Website</div>
-                                            <a href={vendor.website.startsWith('http') ? vendor.website : `https://${vendor.website}`} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-blue-500 hover:underline flex items-center space-x-1">
-                                                <span>{vendor.website}</span>
-                                                <ExternalLink className="w-2.5 h-2.5" />
-                                            </a>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center space-x-2">
+                                            <Globe className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                                            <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Website</span>
                                         </div>
+                                        <a href={vendor.website.startsWith('http') ? vendor.website : `https://${vendor.website}`} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-blue-500 hover:underline flex items-center space-x-1">
+                                            <span>{vendor.website}</span>
+                                            <ExternalLink className="w-2.5 h-2.5" />
+                                        </a>
                                     </div>
                                 )}
-                            </div>
-                        </div>
-
-                        {/* Address */}
-                        <div>
-                            <h3 className="text-xs font-bold uppercase text-foreground tracking-widest mb-3 border-b border-border pb-2">Address</h3>
-                            <div className="flex items-start space-x-3">
-                                <MapPin className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                                <div className="text-xs text-foreground leading-relaxed">
-                                    {vendor.address && <div>{vendor.address}</div>}
-                                    <div>
-                                        {[vendor.city, vendor.state, vendor.zipCode].filter(Boolean).join(', ')}
+                                {/* Address */}
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-2">
+                                        <MapPin className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                                        <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Address</span>
                                     </div>
-                                    {vendor.country && <div>{vendor.country}</div>}
-                                    {!vendor.address && !vendor.city && !vendor.state && '-'}
+                                    <span className="text-xs font-medium text-foreground text-right">
+                                        {[vendor.address, vendor.city, vendor.state, vendor.zipCode, vendor.country].filter(Boolean).join(', ') || '-'}
+                                    </span>
                                 </div>
                             </div>
                         </div>

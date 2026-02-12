@@ -77,34 +77,6 @@ const DynamicActionsContent = () => {
     return (
         <div className="flex items-center justify-end space-x-1 w-full h-full">
             {/* Global Actions */}
-            {isSearchable ? (
-                    <div className="relative flex items-center">
-                        <Search className="absolute left-2.5 w-3.5 h-3.5 text-muted-foreground" />
-                        <input
-                            ref={searchInputRef}
-                            type="text"
-                            value={searchValue}
-                            onChange={(e) => handleSearchChange(e.target.value)}
-                            placeholder="Search..."
-                            className="pl-8 pr-8 h-7 w-60 bg-secondary border border-border rounded text-xs focus:outline-none focus:border-primary text-foreground placeholder:text-muted-foreground"
-                        />
-                        {searchValue && (
-                            <button 
-                                onClick={handleSearchClose}
-                                className="absolute right-2 p-0.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                            >
-                                <X className="w-3 h-3" />
-                            </button>
-                        )}
-                    </div>
-            ) : (
-                    <button 
-                        className="p-1.5 rounded-full text-muted-foreground/30 cursor-not-allowed"
-                        title="Search not available on this page"
-                    >
-                        <Search className="w-4 h-4" />
-                    </button>
-            )}
             <button 
                 onClick={() => setIsPanelOpen(true)}
                 className={`relative p-1.5 rounded-full transition-all cursor-pointer ${

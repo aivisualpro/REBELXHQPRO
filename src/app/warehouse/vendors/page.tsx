@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import {
-  Search,
   ArrowUpDown,
   Plus
 } from 'lucide-react';
@@ -103,16 +102,13 @@ export default function VendorsPage() {
       {/* Header Portal */}
       {headerPortalTarget && createPortal(
         <>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search vendors..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 pr-3 h-8 w-64 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
-            />
-          </div>
+          <input
+            type="text"
+            placeholder="Search vendors..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-3 pr-3 h-8 w-64 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
+          />
           <div className="flex-1" />
           <button
             onClick={() => {/* TODO: Add Modal */ }}
@@ -166,9 +162,9 @@ export default function VendorsPage() {
               <tr
                 key={vendor._id}
                 onClick={() => router.push(`/warehouse/vendors/${vendor._id}`)}
-                className="hover:bg-secondary/40 hover:scale-[1.002] hover:shadow-md transition-all duration-200 group relative z-0 hover:z-10 bg-background cursor-pointer"
+                className="hover:bg-secondary/40 transition-colors duration-200 group bg-background cursor-pointer"
               >
-                <td className="px-2 py-1.5 text-[10px] font-bold text-foreground tracking-tight">{vendor.name}</td>
+                <td className="px-2 py-1.5 text-[10px] font-bold text-foreground tracking-tight border-l-3 border-l-transparent group-hover:border-l-primary">{vendor.name}</td>
                 <td className="px-2 py-1.5 text-[10px] text-muted-foreground truncate max-w-[200px]" title={vendor.address}>{vendor.address || '-'}</td>
                 <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono tracking-tighter">{vendor.phone || '-'}</td>
                 <td className="px-2 py-1.5 text-[10px] text-muted-foreground truncate max-w-[150px]">{vendor.email || '-'}</td>
