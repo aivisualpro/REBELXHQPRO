@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useRef, useCallback, Suspense } from 'react';
+import React, { useState, useRef, useCallback, Suspense, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { 
     Save, 
@@ -121,6 +122,12 @@ function SettingsPageContent() {
 
     React.useEffect(() => {
         fetchSettings();
+    }, []);
+
+    const [headerPortalTarget, setHeaderPortalTarget] = useState<HTMLElement | null>(null);
+    useEffect(() => {
+        const target = document.getElementById('header-portal-target');
+        if (target) setHeaderPortalTarget(target);
     }, []);
 
     const fetchSettings = async () => {
@@ -267,27 +274,32 @@ function SettingsPageContent() {
 
     return (
         <div className="flex flex-col h-[calc(100vh-48px)] bg-background">
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-background shrink-0">
-                <div className="relative w-64">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                    <input
-                        type="text"
-                        placeholder="Search settings..."
-                        value={headerSearch}
-                        onChange={e => setHeaderSearch(e.target.value)}
-                        className="w-full pl-9 pr-3 py-1.5 bg-secondary/50 border border-border rounded text-xs focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring placeholder:text-muted-foreground"
-                    />
-                </div>
-                <button
-                    onClick={handleSave}
-                    disabled={saving}
-                    className="flex items-center space-x-2 px-4 py-1.5 bg-foreground text-background rounded text-xs font-bold hover:bg-foreground/90 transition-colors disabled:opacity-50"
-                >
-                    <Save className="w-3.5 h-3.5" />
-                    <span>{saving ? 'Saving...' : 'Save Changes'}</span>
-                </button>
-            </div>
+            {/* Portal search + save into main header */}
+            {headerPortalTarget && createPortal(
+                <>
+                    <h1 className="text-sm font-bold text-foreground uppercase tracking-tight whitespace-nowrap">Settings</h1>
+                    <div className="relative ml-4">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                        <input
+                            type="text"
+                            placeholder="Search settings..."
+                            value={headerSearch}
+                            onChange={e => setHeaderSearch(e.target.value)}
+                            className="pl-8 pr-3 h-8 w-64 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
+                        />
+                    </div>
+                    <div className="flex-1" />
+                    <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="h-8 px-4 bg-foreground text-background hover:bg-foreground/90 transition-all rounded shadow-md flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                        <Save className="w-3 h-3" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">{saving ? 'Saving...' : 'Save Changes'}</span>
+                    </button>
+                </>,
+                headerPortalTarget
+            )}
 
             <div className="flex flex-1 overflow-hidden">
                 {/* Sidebar */}
@@ -313,8 +325,8 @@ function SettingsPageContent() {
                 </div>
 
                 {/* Content Area */}
-                <div className="flex-1 overflow-y-auto p-8">
-                    <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="flex-1 overflow-y-auto p-4">
+                    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
                         {/* GENERAL TAB */}
                         {activeTab === 'general' && (
                             <div className="space-y-6">

@@ -221,6 +221,15 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
         };
     }
 
+    // Settings
+    if (pathname === '/admin/settings') {
+        return {
+            title: '',
+            actions: [],
+            isPortal: true
+        };
+    }
+
     // Default: No context
     return null;
 };
