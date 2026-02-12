@@ -1268,20 +1268,42 @@ export default function ManufacturingDetailPage() {
                                                         <Pencil className="w-3 h-3" />
                                                     </button>
                                                     <button 
-                                                        onClick={async () => {
-                                                            if (window.confirm('Are you sure you want to delete this labor entry?')) {
-                                                                const updatedLabor = order.labor?.filter(l => l._id !== entry._id) || [];
-                                                                const res = await fetch(`/api/manufacturing/${order._id}`, {
-                                                                    method: 'PATCH',
-                                                                    headers: { 'Content-Type': 'application/json' },
-                                                                    body: JSON.stringify({ labor: updatedLabor })
-                                                                });
-                                                                if (res.ok) {
-                                                                    const data = await res.json();
-                                                                    setOrder(data);
-                                                                    toast.success('Labor entry deleted');
-                                                                }
-                                                            }
+                                                        onClick={() => {
+                                                            toast((t) => (
+                                                                <div className="flex flex-col gap-2">
+                                                                    <p className="text-sm font-bold text-white">Delete this labor entry?</p>
+                                                                    <p className="text-xs text-gray-400">This action cannot be undone.</p>
+                                                                    <div className="flex gap-2 mt-1">
+                                                                        <button
+                                                                            onClick={() => toast.dismiss(t.id)}
+                                                                            className="flex-1 px-3 py-1.5 text-xs font-bold rounded border border-gray-600 bg-gray-800 text-white hover:bg-gray-700 transition-colors"
+                                                                        >
+                                                                            Cancel
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={async () => {
+                                                                                toast.dismiss(t.id);
+                                                                                const updatedLabor = order.labor?.filter(l => l._id !== entry._id) || [];
+                                                                                const res = await fetch(`/api/manufacturing/${order._id}`, {
+                                                                                    method: 'PATCH',
+                                                                                    headers: { 'Content-Type': 'application/json' },
+                                                                                    body: JSON.stringify({ labor: updatedLabor })
+                                                                                });
+                                                                                if (res.ok) {
+                                                                                    const data = await res.json();
+                                                                                    setOrder(data);
+                                                                                    toast.success('Labor entry deleted');
+                                                                                } else {
+                                                                                    toast.error('Failed to delete labor');
+                                                                                }
+                                                                            }}
+                                                                            className="flex-1 px-3 py-1.5 text-xs font-bold rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+                                                                        >
+                                                                            Delete
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            ), { duration: 10000, position: 'top-center', style: { maxWidth: '360px', background: '#1a1a1a', color: '#fff', marginTop: '40vh' } });
                                                         }}
                                                         className="p-1 text-muted-foreground hover:text-red-600 transition-colors"
                                                         title="Delete Labor"
