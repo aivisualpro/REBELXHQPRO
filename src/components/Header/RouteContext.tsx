@@ -65,6 +65,15 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
         };
     }
 
+    // Vendors
+    if (pathname === '/warehouse/vendors') {
+        return {
+            title: '',
+            actions: [],
+            isPortal: true
+        };
+    }
+
     // Products/SKUs
     if (pathname === '/warehouse/skus') {
         return {
@@ -223,15 +232,6 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
 
     // Settings
     if (pathname === '/admin/settings') {
-        return {
-            title: '',
-            actions: [],
-            isPortal: true
-        };
-    }
-
-    // Vendor Detail
-    if (pathname.match(/^\/warehouse\/vendors\/[^/]+$/)) {
         return {
             title: '',
             actions: [],

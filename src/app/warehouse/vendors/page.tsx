@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import {
   Search,
@@ -11,9 +12,7 @@ import {
   Phone,
   MapPin,
   CreditCard,
-  Plus,
-  Pencil,
-  Trash2
+  Plus
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { cn } from '@/lib/utils';
@@ -60,6 +59,12 @@ export default function VendorsPage() {
   const [statusOptions, setStatusOptions] = useState<{ label: string; value: string }[]>([]);
 
   const importInputRef = useRef<HTMLInputElement>(null);
+
+  const [headerPortalTarget, setHeaderPortalTarget] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const target = document.getElementById('header-portal-target');
+    if (target) setHeaderPortalTarget(target);
+  }, []);
 
   // Debounce search
   useEffect(() => {
@@ -161,75 +166,75 @@ export default function VendorsPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-48px)] bg-background transition-colors duration-300">
-      {/* Action Bar */}
-      <div className="flex items-center justify-between px-4 h-11 border-b border-border bg-secondary/50 transition-colors">
-        <div className="flex items-center space-x-4">
-          <h1 className="text-sm font-bold text-foreground uppercase tracking-tighter">Vendors</h1>
-          <div className="relative">
+      {/* Header Portal */}
+      {headerPortalTarget && createPortal(
+        <>
+          <h1 className="text-sm font-bold text-foreground uppercase tracking-tight whitespace-nowrap">Vendors</h1>
+          <div className="relative ml-4">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
             <input
               type="text"
-              placeholder="Search Name, Email, Phone..."
+              placeholder="Search vendors..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-8 pr-3 h-8 w-64 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
             />
           </div>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <MultiSelectFilter
-            label="City"
-            icon={MapPin}
-            options={cityOptions}
-            selectedValues={selectedCities}
-            onChange={setSelectedCities}
-            className="h-8"
-          />
-          <MultiSelectFilter
-            label="State"
-            icon={MapPin}
-            options={stateOptions}
-            selectedValues={selectedStates}
-            onChange={setSelectedStates}
-            className="h-8"
-          />
-          <MultiSelectFilter
-            label="Status"
-            icon={Building2}
-            options={statusOptions}
-            selectedValues={selectedStatuses}
-            onChange={setSelectedStatuses}
-            className="h-8"
-          />
-
-          <div className="w-px h-6 bg-slate-200 mx-2" />
-
-          <input
-            type="file"
-            accept=".csv"
-            className="hidden"
-            ref={importInputRef}
-            onChange={handleImport}
-          />
-
-          <button
-            onClick={() => importInputRef.current?.click()}
-            className="h-8 px-3 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors rounded flex items-center space-x-1 border border-border bg-card shadow-sm cursor-pointer"
-            title="Import Vendors"
-          >
-            <Upload className="w-4 h-4" />
-            <span className="text-[10px] font-bold uppercase">Import</span>
-          </button>
-
+          <div className="flex-1" />
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mr-2">{totalVendors} vendors</span>
           <button
             onClick={() => {/* TODO: Add Modal */ }}
-            className="h-8 w-8 bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-md flex items-center justify-center rounded cursor-pointer"
-            title="Add Vendor"
+            className="h-8 px-3 bg-primary text-black hover:opacity-90 transition-all rounded shadow-md flex items-center space-x-1.5 cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-3 h-3" />
+            <span className="hidden sm:inline text-[10px] font-black uppercase tracking-widest">New</span>
           </button>
-        </div>
+        </>,
+        headerPortalTarget
+      )}
+
+      {/* Filters Bar */}
+      <div className="flex items-center px-4 h-9 border-b border-border bg-secondary/30 transition-colors space-x-2">
+        <MultiSelectFilter
+          label="City"
+          icon={MapPin}
+          options={cityOptions}
+          selectedValues={selectedCities}
+          onChange={setSelectedCities}
+          className="h-7"
+        />
+        <MultiSelectFilter
+          label="State"
+          icon={MapPin}
+          options={stateOptions}
+          selectedValues={selectedStates}
+          onChange={setSelectedStates}
+          className="h-7"
+        />
+        <MultiSelectFilter
+          label="Status"
+          icon={Building2}
+          options={statusOptions}
+          selectedValues={selectedStatuses}
+          onChange={setSelectedStatuses}
+          className="h-7"
+        />
+        <div className="flex-1" />
+        <input
+          type="file"
+          accept=".csv"
+          className="hidden"
+          ref={importInputRef}
+          onChange={handleImport}
+        />
+        <button
+          onClick={() => importInputRef.current?.click()}
+          className="h-7 px-2.5 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors rounded flex items-center space-x-1 border border-border bg-card shadow-sm cursor-pointer"
+          title="Import Vendors"
+        >
+          <Upload className="w-3.5 h-3.5" />
+          <span className="text-[10px] font-bold uppercase">Import</span>
+        </button>
       </div>
 
       <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
@@ -258,29 +263,25 @@ export default function VendorsPage() {
                   </div>
                 </th>
               ))}
-               <th className="px-2 py-2 text-[8px] font-bold text-muted-foreground uppercase tracking-widest text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border bg-background/50">
             {loading ? (
-              <tr><td colSpan={9} className="px-2 py-4 text-center text-[10px] text-muted-foreground italic tracking-tight">Loading Vendors...</td></tr>
+              <tr><td colSpan={8} className="px-2 py-4 text-center text-[10px] text-muted-foreground italic tracking-tight">Loading Vendors...</td></tr>
             ) : error ? (
-              <tr><td colSpan={9} className="px-2 py-4 text-center text-destructive text-[10px] font-bold">{error}</td></tr>
+              <tr><td colSpan={8} className="px-2 py-4 text-center text-destructive text-[10px] font-bold">{error}</td></tr>
             ) : vendors.length === 0 ? (
-              <tr><td colSpan={9} className="px-2 py-4 text-center text-[10px] text-muted-foreground uppercase font-medium tracking-tighter opacity-50">No Vendors found</td></tr>
+              <tr><td colSpan={8} className="px-2 py-4 text-center text-[10px] text-muted-foreground uppercase font-medium tracking-tighter opacity-50">No Vendors found</td></tr>
             ) : vendors.map(vendor => (
-              <tr key={vendor._id} className="hover:bg-secondary/40 hover:scale-[1.002] hover:shadow-md transition-all duration-200 group relative z-0 hover:z-10 bg-background">
-                <td className="px-2 py-1.5 text-[10px] font-bold text-foreground tracking-tight">
-                  <span
-                    onClick={() => router.push(`/warehouse/vendors/${vendor._id}`)}
-                    className="hover:text-blue-500 hover:underline cursor-pointer transition-colors"
-                  >
-                    {vendor.name}
-                  </span>
-                </td>
+              <tr
+                key={vendor._id}
+                onClick={() => router.push(`/warehouse/vendors/${vendor._id}`)}
+                className="hover:bg-secondary/40 hover:scale-[1.002] hover:shadow-md transition-all duration-200 group relative z-0 hover:z-10 bg-background cursor-pointer"
+              >
+                <td className="px-2 py-1.5 text-[10px] font-bold text-foreground tracking-tight">{vendor.name}</td>
                 <td className="px-2 py-1.5 text-[10px] text-muted-foreground truncate max-w-[200px]" title={vendor.address}>{vendor.address || '-'}</td>
                 <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono tracking-tighter">{vendor.phone || '-'}</td>
-                <td className="px-2 py-1.5 text-[10px] text-muted-foreground truncate max-w-[150px]"><a href={`mailto:${vendor.email}`} className="hover:underline">{vendor.email || '-'}</a></td>
+                <td className="px-2 py-1.5 text-[10px] text-muted-foreground truncate max-w-[150px]">{vendor.email || '-'}</td>
                 <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[100px]">{vendor.contactName || '-'}</td>
                 <td className="px-2 py-1.5 text-[8px] text-muted-foreground uppercase font-bold">{vendor.paymentTerms || '-'}</td>
                 <td className="px-2 py-1.5 text-[10px] text-muted-foreground truncate max-w-[100px]">{vendor.carrierPreference || '-'}</td>
@@ -293,16 +294,6 @@ export default function VendorsPage() {
                   )}>
                     {vendor.status || 'Active'}
                   </span>
-                </td>
-                <td className="px-2 py-1.5 text-right">
-                  <div className="flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button className="p-1 hover:bg-secondary rounded text-muted-foreground hover:text-primary transition-colors cursor-pointer">
-                      <Pencil className="w-3 h-3" />
-                    </button>
-                    <button className="p-1 hover:bg-destructive/10 rounded text-muted-foreground hover:text-destructive transition-colors cursor-pointer">
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
                 </td>
               </tr>
             ))}
