@@ -8,10 +8,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useSession, signOut } from 'next-auth/react';
 import { useTheme } from '@/components/ThemeProvider';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useTimers } from '@/components/TimerContext';
 
 const DynamicActionsContent = () => {
     const { data: session } = useSession();
     const { theme, toggleTheme } = useTheme();
+    const { timers, setIsPanelOpen } = useTimers();
+    const activeTimerCount = timers.length;
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [searchValue, setSearchValue] = useState('');
@@ -102,9 +105,21 @@ const DynamicActionsContent = () => {
                         <Search className="w-4 h-4" />
                     </button>
             )}
-            <button className="relative p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-all cursor-pointer">
-                <Bell className="w-4 h-4" />
-                <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-red-500 rounded-full border border-card" />
+            <button 
+                onClick={() => setIsPanelOpen(true)}
+                className={`relative p-1.5 rounded-full transition-all cursor-pointer ${
+                    activeTimerCount > 0 
+                        ? 'text-red-500 hover:text-red-400 hover:bg-red-500/10' 
+                        : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+                }`}
+                title={activeTimerCount > 0 ? `${activeTimerCount} active timer${activeTimerCount > 1 ? 's' : ''}` : 'No active timers'}
+            >
+                <Bell className={`w-4 h-4 ${activeTimerCount > 0 ? 'animate-[wiggle_1s_ease-in-out_infinite]' : ''}`} />
+                {activeTimerCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center bg-red-500 text-white text-[9px] font-black rounded-full px-1 border-2 border-background shadow-lg">
+                        {activeTimerCount}
+                    </span>
+                )}
             </button>
             <button 
                 onClick={toggleTheme}

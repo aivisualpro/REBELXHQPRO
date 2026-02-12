@@ -9,6 +9,7 @@ import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { useTimers } from '@/components/TimerContext';
 
 interface LineItem {
     _id: string;
@@ -105,9 +106,8 @@ export default function ManufacturingDetailPage() {
     const [userSearch, setUserSearch] = useState('');
     const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
 
-    // Active Labor Timer State
-    const [activeTimers, setActiveTimers] = useState<Record<string, number>>({});
-    const [currentTime, setCurrentTime] = useState(Date.now());
+    // Active Labor Timer (Global Context)
+    const { timers: globalTimers, currentTime, startTimer: globalStartTimer, stopTimer: globalStopTimer, isTimerRunning, getTimer, formatDuration: globalFormatDuration } = useTimers();
 
     // SKU List for adding line items
     const [skuList, setSkuList] = useState<{ _id: string; name: string; category?: string; image?: string }[]>([]);
@@ -235,18 +235,7 @@ export default function ManufacturingDetailPage() {
             .catch(() => {});
     }, [loading]);
 
-    // Timer Logic
-    // Timer Logic
-    useEffect(() => {
-        let interval: NodeJS.Timeout;
-        // Check if we have any active timers
-        if (Object.keys(activeTimers).length > 0) {
-            interval = setInterval(() => {
-                setCurrentTime(Date.now());
-            }, 1000);
-        }
-        return () => clearInterval(interval);
-    }, [activeTimers]);
+    // Timer logic handled by global TimerContext (persists across route changes)
 
     const formatDuration = (seconds: number) => {
         const hrs = Math.floor(seconds / 3600);
@@ -1167,28 +1156,33 @@ export default function ManufacturingDetailPage() {
                                             </td>
                                             <td className="px-3 py-1 text-[10px] text-foreground/80">{entry.type || '-'}</td>
                                             <td className="px-3 py-1 text-[10px] text-muted-foreground truncate max-w-[120px]">{userName}</td>
-                                            <td className="px-3 py-1 text-[10px] text-muted-foreground font-mono">
-                                                {activeTimers[entry._id] 
-                                                    ? formatDuration(Math.floor((currentTime - activeTimers[entry._id]) / 1000))
-                                                    : (entry.duration || '-')
+                                            <td className="px-3 py-1">
+                                                {isTimerRunning(entry._id) 
+                                                    ? (
+                                                        <span className="inline-flex items-center gap-1.5">
+                                                            <span className="relative flex h-2 w-2">
+                                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+                                                            </span>
+                                                            <span className="text-sm font-black font-mono text-red-500 tabular-nums">
+                                                                {formatDuration(Math.floor((currentTime - (getTimer(entry._id)?.startedAt || Date.now())) / 1000))}
+                                                            </span>
+                                                        </span>
+                                                    )
+                                                    : <span className="text-[10px] text-muted-foreground font-mono">{entry.duration || '-'}</span>
                                                 }
                                             </td>
 
                                             <td className="px-3 py-1 text-right">
                                                 <div className="flex items-center justify-end space-x-1">
-                                                    {activeTimers[entry._id] ? (
+                                                    {isTimerRunning(entry._id) ? (
                                                         <button 
                                                             onClick={async () => {
-                                                                const startTime = activeTimers[entry._id];
-                                                                if (!startTime) return;
-                                                                const durationSeconds = Math.floor((Date.now() - startTime) / 1000);
-                                                                const duration = formatDuration(durationSeconds);
+                                                                const result = globalStopTimer(entry._id);
+                                                                if (!result) return;
                                                                 const updatedLabor = order.labor?.map(l => 
-                                                                    l._id === entry._id ? { ...l, duration: duration } : l
+                                                                    l._id === entry._id ? { ...l, duration: result.duration } : l
                                                                 ) || [];
-                                                                const newTimers = { ...activeTimers };
-                                                                delete newTimers[entry._id];
-                                                                setActiveTimers(newTimers);
                                                                 setOrder({ ...order, labor: updatedLabor });
                                                                 try {
                                                                     await fetch(`/api/manufacturing/${order._id}`, {
@@ -1201,7 +1195,7 @@ export default function ManufacturingDetailPage() {
                                                                     toast.error('Failed to save labor');
                                                                 }
                                                             }}
-                                                            className="p-1 text-red-500 hover:text-red-700 transition-colors"
+                                                            className="p-1.5 bg-red-500 hover:bg-red-600 text-white transition-colors"
                                                             title="Stop Timer"
                                                         >
                                                             <Square className="w-3 h-3 fill-current" />
@@ -1211,8 +1205,19 @@ export default function ManufacturingDetailPage() {
                                                             onClick={async () => {
                                                                 const userId = typeof entry.user === 'object' ? entry.user._id : entry.user || '';
                                                                 const isDurationZero = !entry.duration || entry.duration === '0:00:00' || entry.duration === '0:0:0';
+                                                                const orderLabel = order.label || '';
+                                                                const orderSkuName = typeof order.sku === 'object' && order.sku !== null ? (order.sku as any).name : '';
                                                                 if (isDurationZero) {
-                                                                    setActiveTimers(prev => ({ ...prev, [entry._id]: Date.now() }));
+                                                                    globalStartTimer({
+                                                                        laborId: entry._id,
+                                                                        orderId: order._id,
+                                                                        orderLabel,
+                                                                        skuName: orderSkuName,
+                                                                        userName: formatUser(entry.user),
+                                                                        laborType: entry.type || 'WO Labor',
+                                                                        startedAt: Date.now(),
+                                                                        hourlyRate: entry.hourlyRate || 0,
+                                                                    });
                                                                 } else {
                                                                     const newId = generateId();
                                                                     const newLabor = {
@@ -1222,7 +1227,16 @@ export default function ManufacturingDetailPage() {
                                                                     };
                                                                     const updatedLabor = [...(order.labor || []), newLabor];
                                                                     setOrder({ ...order, labor: updatedLabor });
-                                                                    setActiveTimers(prev => ({ ...prev, [newId]: Date.now() }));
+                                                                    globalStartTimer({
+                                                                        laborId: newId,
+                                                                        orderId: order._id,
+                                                                        orderLabel,
+                                                                        skuName: orderSkuName,
+                                                                        userName: formatUser(entry.user),
+                                                                        laborType: entry.type || 'WO Labor',
+                                                                        startedAt: Date.now(),
+                                                                        hourlyRate: entry.hourlyRate || 0,
+                                                                    });
                                                                     try {
                                                                         await fetch(`/api/manufacturing/${order._id}`, {
                                                                             method: 'PATCH',
@@ -1234,7 +1248,7 @@ export default function ManufacturingDetailPage() {
                                                                     }
                                                                 }
                                                             }}
-                                                            className="p-1 text-muted-foreground hover:text-blue-600 transition-colors"
+                                                            className="p-1 text-muted-foreground hover:text-emerald-500 transition-colors"
                                                             title="Start Timer"
                                                         >
                                                             <Play className="w-3 h-3 fill-current" />
