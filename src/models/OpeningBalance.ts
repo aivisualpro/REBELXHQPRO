@@ -7,6 +7,7 @@ export interface IOpeningBalance extends Document {
     uom: string;
     cost: number;
     expirationDate?: Date;
+    notes?: { _id: string; text: string; createdBy: string; createdAt: Date }[];
     createdAt: Date;
     createdBy?: mongoose.Types.ObjectId;
 }
@@ -18,6 +19,12 @@ const OpeningBalanceSchema: Schema = new Schema({
     uom: { type: String, required: true },
     cost: { type: Number, default: 0 },
     expirationDate: { type: Date },
+    notes: [{ 
+        _id: { type: String },
+        text: { type: String },
+        createdBy: { type: String },
+        createdAt: { type: Date, default: Date.now }
+    }],
     createdAt: { type: Date, default: Date.now },
     createdBy: { type: Schema.Types.ObjectId, ref: 'RXHQUsers' }
 });

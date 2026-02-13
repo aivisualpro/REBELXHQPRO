@@ -1,15 +1,13 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
+import { createPortal } from 'react-dom';
 import { useSession } from 'next-auth/react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
     Search,
     ArrowUpDown,
     Loader2,
-    Pencil,
-    Trash2,
-    Eye,
     List,
     Plus,
     X
@@ -46,6 +44,25 @@ function OpeningBalancesContent() {
     const router = useRouter();
     const { data: session } = useSession();
     const searchParams = useSearchParams();
+    const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+
+    useEffect(() => {
+        const checkTarget = () => {
+             const el = document.getElementById('header-portal-target');
+             if (el) {
+                 setPortalTarget(el);
+             }
+        };
+        
+        checkTarget();
+        const interval = setInterval(checkTarget, 50);
+        const timeout = setTimeout(() => clearInterval(interval), 1000);
+
+        return () => {
+            clearInterval(interval);
+            clearTimeout(timeout);
+        };
+    }, []);
     const [balances, setBalances] = useState<OpeningBalance[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -263,32 +280,49 @@ function OpeningBalancesContent() {
 
     return (
         <div className="flex flex-col h-[calc(100vh-36px)] bg-background relative transition-colors duration-300">
-            <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
-                <div className="min-w-full px-2 py-2">
-                    {/* Search Bar */}
-                    <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm pb-2">
-                        <div className="relative max-w-md">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            {/* Portal search + title + Add button into the header */}
+            {portalTarget && createPortal(
+                <div className="flex items-center justify-between w-full h-full">
+                    <div className="flex items-center gap-3">
+                        <h1 className="text-sm font-bold text-foreground uppercase tracking-tight whitespace-nowrap">Opening Balances</h1>
+                        <div className="relative">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
                             <input
                                 type="text"
-                                placeholder="Search by SKU name or lot number..."
+                                placeholder="Search SKU or lot..."
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
-                                className="w-full pl-9 pr-8 py-1.5 text-xs bg-secondary/50 border border-border rounded-md focus:outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/60 transition-colors"
+                                className="w-40 lg:w-56 pl-7 pr-7 py-1 text-[10px] bg-secondary/50 border border-border rounded-md focus:outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/60 transition-colors"
                             />
                             {search && (
                                 <button 
                                     onClick={() => setSearch('')}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors z-20 cursor-pointer"
                                 >
-                                    <X className="h-3.5 w-3.5" />
+                                    <X className="h-3 w-3" />
                                 </button>
                             )}
                         </div>
                     </div>
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenAdd();
+                        }}
+                        className="flex items-center space-x-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm transition-all cursor-pointer relative z-50 pointer-events-auto"
+                    >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add</span>
+                    </button>
+                </div>,
+                portalTarget
+            )}
+
+            <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
+                <div className="min-w-full px-2 py-2">
 
                     <table className="w-full text-left border-separate border-spacing-0 relative z-0">
-                        <thead className="sticky top-12 bg-secondary/80 z-10 border-b border-border backdrop-blur-md transition-colors">
+                        <thead className="sticky top-0 bg-secondary/80 z-10 border-b border-border backdrop-blur-md transition-colors">
                             <tr>
                                 {/* Image */}
                                 <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest w-10 border-r border-border">Img</th>
@@ -344,7 +378,8 @@ function OpeningBalancesContent() {
                             ) : balances.map(item => (
                                 <tr 
                                     key={item._id} 
-                                    className="group relative z-0 bg-background hover:bg-secondary/40 transition-colors duration-150"
+                                    className="group relative z-0 bg-background hover:bg-secondary/40 transition-colors duration-150 cursor-pointer"
+                                    onClick={() => router.push(`/warehouse/opening-balances/${item._id}`)}
                                 >
                                     {/* Image */}
                                     <td className="px-2 py-1 border-r border-border group-hover:border-l-2 group-hover:border-l-primary transition-all">
@@ -364,47 +399,18 @@ function OpeningBalancesContent() {
                                         </div>
                                     </td>
 
-                                    {/* SKU Name + Hover Actions */}
-                                    <td className="px-2 py-1 text-[9px] text-foreground font-medium border-r border-border whitespace-nowrap">
-                                        <div className="flex items-center justify-between w-full gap-2">
-                                            <span className="truncate max-w-[200px]" title={getSkuName(item.sku)}>{getSkuName(item.sku)}</span>
-                                            
-                                            {/* Hover Actions - Right Aligned */}
-                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                                                <button
-                                                    onClick={() => {
-                                                        const skuId = typeof item.sku === 'object' ? item.sku._id : item.sku;
-                                                        router.push(`/warehouse/skus/${skuId}`);
-                                                    }}
-                                                    className="p-1 text-muted-foreground hover:text-primary hover:bg-secondary rounded transition-colors cursor-pointer"
-                                                    title="View SKU"
-                                                >
-                                                    <Eye className="w-3 h-3" />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleOpenEdit(item)}
-                                                    className="p-1 text-muted-foreground hover:text-primary hover:bg-secondary rounded transition-colors cursor-pointer"
-                                                    title="Edit"
-                                                >
-                                                    <Pencil className="w-3 h-3" />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(item._id)}
-                                                    className="p-1 text-muted-foreground hover:text-destructive hover:bg-secondary rounded transition-colors cursor-pointer"
-                                                    title="Delete"
-                                                >
-                                                    <Trash2 className="w-3 h-3" />
-                                                </button>
-                                            </div>
-                                        </div>
+                                    {/* SKU Name */}
+                                    <td className="px-2 py-1 text-[10px] text-foreground font-medium border-r border-border whitespace-nowrap">
+                                        <span className="truncate max-w-[200px]" title={getSkuName(item.sku)}>{getSkuName(item.sku)}</span>
                                     </td>
 
                                     {/* Lot Number */}
-                                    <td className="px-2 py-1 text-[9px] text-muted-foreground font-mono border-r border-border">
+                                    <td className="px-2 py-1 text-[10px] text-foreground font-mono border-r border-border">
                                         <div className="flex items-center gap-2">
                                             <span className="tracking-tighter">{item.lotNumber}</span>
                                             <button 
-                                                onClick={() => {
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
                                                     const skuId = typeof item.sku === 'object' ? item.sku._id : item.sku;
                                                     setLotSelector({
                                                         isOpen: true,
@@ -423,23 +429,23 @@ function OpeningBalancesContent() {
                                     </td>
 
                                     {/* Qty */}
-                                    <td className="px-2 py-1 text-[9px] font-bold text-foreground border-r border-border text-center">{item.qty}</td>
+                                    <td className="px-2 py-1 text-[10px] text-foreground border-r border-border text-center">{item.qty}</td>
 
                                     {/* UOM */}
-                                    <td className="px-2 py-1 text-[8px] uppercase font-bold text-muted-foreground border-r border-border">{item.uom}</td>
+                                    <td className="px-2 py-1 text-[10px] uppercase text-foreground border-r border-border">{item.uom}</td>
 
                                     {/* Cost */}
-                                    <td className="px-2 py-1 text-[9px] text-muted-foreground font-mono border-r border-border text-right">
+                                    <td className="px-2 py-1 text-[10px] text-foreground font-mono border-r border-border text-right">
                                         ${(item.cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
                                     </td>
 
                                     {/* Expires */}
-                                    <td className="px-2 py-1 text-[9px] text-muted-foreground font-mono border-r border-border">
+                                    <td className="px-2 py-1 text-[10px] text-foreground font-mono border-r border-border">
                                         {item.expirationDate ? new Date(item.expirationDate).toLocaleDateString() : '-'}
                                     </td>
 
                                     {/* Created At */}
-                                    <td className="px-2 py-1 text-[9px] text-muted-foreground font-mono border-r border-border last:border-0">
+                                    <td className="px-2 py-1 text-[10px] text-foreground font-mono border-r border-border last:border-0">
                                         {new Date(item.createdAt).toLocaleDateString()}
                                     </td>
                                 </tr>
@@ -462,37 +468,37 @@ function OpeningBalancesContent() {
 
             {/* Add/Edit Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-white w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
-                            <h2 className="text-sm font-black uppercase tracking-widest text-slate-900">
+                <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-background border border-border w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh] rounded-md">
+                        <div className="flex items-center justify-between px-4 h-9 border-b border-border shrink-0 bg-background">
+                            <h2 className="text-[10px] font-black uppercase tracking-widest text-foreground">
                                 {editingId ? 'Edit Opening Balance' : 'Add Opening Balance'}
                             </h2>
-                            <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-black transition-colors">
-                                <X className="w-5 h-5" />
+                            <button onClick={() => setIsModalOpen(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                                <X className="w-4 h-4" />
                             </button>
                         </div>
                         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-bold uppercase text-slate-500">SKU</label>
+                                <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">SKU</label>
                                 <SearchableSelect
                                     placeholder="Select SKU"
                                     options={allSkus.map(s => ({ value: s._id, label: s.name }))}
                                     value={formData.sku}
                                     onChange={(val) => setFormData({ ...formData, sku: val })}
-                                    className="w-full"
+                                    className="w-full text-[11px]"
                                 />
                             </div>
                             
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-bold uppercase text-slate-500">Lot Number</label>
-                                    <div className="flex gap-2">
+                                    <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">Lot Number</label>
+                                    <div className="flex gap-2 h-9">
                                         <input 
                                             type="text" 
                                             value={formData.lotNumber} 
                                             onChange={e => setFormData({...formData, lotNumber: e.target.value})} 
-                                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm outline-none focus:border-black transition-colors"
+                                            className="flex-1 px-3 h-full bg-secondary/50 border border-border rounded text-[11px] outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/50 transition-colors"
                                             placeholder="Enter Lot #"
                                         />
                                         <button
@@ -509,7 +515,7 @@ function OpeningBalancesContent() {
                                                     currentLot: formData.lotNumber
                                                 });
                                             }}
-                                            className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+                                            className="px-3 h-full bg-secondary border border-border rounded text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
                                             title="Select Existing Lot"
                                         >
                                             <List className="w-4 h-4" />
@@ -517,30 +523,52 @@ function OpeningBalancesContent() {
                                     </div>
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-bold uppercase text-slate-500">Quantity</label>
-                                    <input type="number" step="0.01" value={formData.qty} onChange={e => setFormData({...formData, qty: parseFloat(e.target.value)})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm outline-none focus:border-black transition-colors" />
+                                    <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">Quantity</label>
+                                    <input 
+                                        type="number" 
+                                        step="0.01" 
+                                        value={formData.qty} 
+                                        onChange={e => setFormData({...formData, qty: parseFloat(e.target.value)})} 
+                                        className="w-full px-3 h-9 bg-secondary/50 border border-border rounded text-[11px] outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/50 transition-colors" 
+                                    />
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-bold uppercase text-slate-500">UOM</label>
-                                    <input type="text" value={formData.uom} onChange={e => setFormData({...formData, uom: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm outline-none focus:border-black transition-colors" />
+                                    <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">UOM</label>
+                                    <input 
+                                        type="text" 
+                                        value={formData.uom} 
+                                        onChange={e => setFormData({...formData, uom: e.target.value})} 
+                                        className="w-full px-3 h-9 bg-secondary/50 border border-border rounded text-[11px] outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/50 transition-colors" 
+                                    />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-bold uppercase text-slate-500">Cost ($)</label>
-                                    <input type="number" step="0.01" value={formData.cost} onChange={e => setFormData({...formData, cost: parseFloat(e.target.value)})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm outline-none focus:border-black transition-colors" />
+                                    <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">Cost ($)</label>
+                                    <input 
+                                        type="number" 
+                                        step="0.01" 
+                                        value={formData.cost} 
+                                        onChange={e => setFormData({...formData, cost: parseFloat(e.target.value)})} 
+                                        className="w-full px-3 h-9 bg-secondary/50 border border-border rounded text-[11px] outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/50 transition-colors" 
+                                    />
                                 </div>
                             </div>
 
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-bold uppercase text-slate-500">Expiration Date (Optional)</label>
-                                <input type="date" value={formData.expirationDate} onChange={e => setFormData({...formData, expirationDate: e.target.value})} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-sm outline-none focus:border-black transition-colors" />
+                                <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">Expiration Date (Optional)</label>
+                                <input 
+                                    type="date" 
+                                    value={formData.expirationDate} 
+                                    onChange={e => setFormData({...formData, expirationDate: e.target.value})} 
+                                    className="w-full px-3 h-9 bg-secondary/50 border border-border rounded text-[11px] outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/50 transition-colors" 
+                                />
                             </div>
 
-                            <div className="pt-4 flex gap-3">
-                                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-3 text-slate-500 text-xs font-bold uppercase tracking-wider hover:text-black hover:bg-slate-100 transition-colors">Cancel</button>
-                                <button type="submit" className="flex-1 py-3 bg-primary text-primary-foreground text-xs font-bold uppercase tracking-wider hover:bg-primary/90 transition-colors">Save</button>
+                            <div className="h-10 pt-1 flex gap-2 border-t border-border mt-2">
+                                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 flex items-center justify-center bg-secondary text-muted-foreground hover:text-foreground text-[10px] font-bold uppercase tracking-widest hover:bg-secondary/80 transition-colors rounded-sm">Cancel</button>
+                                <button type="submit" className="flex-1 flex items-center justify-center bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-widest hover:bg-primary/90 transition-colors rounded-sm">Save</button>
                             </div>
                         </form>
                     </div>

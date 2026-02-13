@@ -92,13 +92,13 @@ export const Header = () => {
                     </Link>
                 </div>
 
-                {/* Navigation: 50% Menus */}
-                <div className="w-[50%] h-full">
+                {/* Navigation: 40% Menus */}
+                <div className="w-[40%] h-full">
                     <MegaMenu />
                 </div>
 
-                {/* Route Context: 25% - Dynamic title + route-specific actions */}
-                <div className="w-[25%] h-full flex items-center">
+                {/* Route Context: 35% - Dynamic title + route-specific actions */}
+                <div className="w-[35%] h-full flex items-center">
                     <RouteContext />
                 </div>
 

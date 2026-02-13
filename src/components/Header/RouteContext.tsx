@@ -86,10 +86,18 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
     // Opening Balances
     if (pathname === '/warehouse/opening-balances') {
         return {
-            title: 'Opening Balances',
-            actions: [
-                { label: 'Add', icon: Plus, href: '/warehouse/opening-balances?createNew=true', variant: 'primary' },
-            ]
+            title: '',
+            actions: [],
+            isPortal: true
+        };
+    }
+
+    // Opening Balance Detail
+    if (pathname.match(/^\/warehouse\/opening-balances\/[^/]+$/)) {
+        return {
+            title: '',
+            actions: [],
+            isPortal: true
         };
     }
 
@@ -251,7 +259,7 @@ export const RouteContext = () => {
     }
 
     if (config.isPortal) {
-        return <div id="header-portal-target" className="flex items-center justify-between w-full h-full px-4" />;
+        return <div id="header-portal-target" className="flex items-center justify-between w-full h-full px-4 relative z-10" />;
     }
 
     return (

@@ -13,10 +13,33 @@ export async function GET(
         await dbConnect();
         const { id } = await context.params;
 
-        const item = await OpeningBalance.findById(id).populate('sku').lean();
+        const item = await OpeningBalance.findById(id).lean();
 
         if (!item) {
             return NextResponse.json({ error: 'Item not found' }, { status: 404 });
+        }
+
+        // Manual SKU population using raw driver for cross-type matching
+        if (item.sku) {
+            try {
+                const skuIdStr = item.sku.toString();
+                const lookupIds: any[] = [skuIdStr];
+                const mongoose = await import('mongoose');
+                if (mongoose.default.Types.ObjectId.isValid(skuIdStr)) {
+                    lookupIds.push(new mongoose.default.Types.ObjectId(skuIdStr));
+                }
+                const db = mongoose.default.connection.db;
+                if (db) {
+                    const skuDoc = await db.collection('skus').findOne(
+                        { _id: { $in: lookupIds } }
+                    );
+                    if (skuDoc) {
+                        (item as any).sku = { _id: skuDoc._id.toString(), name: skuDoc.name || '', image: skuDoc.image || '', category: skuDoc.category || '' };
+                    }
+                }
+            } catch (e) {
+                // Leave sku as-is if lookup fails
+            }
         }
 
         return NextResponse.json(item);
@@ -38,7 +61,7 @@ export async function PATCH(
             id,
             body,
             { new: true, runValidators: true }
-        );
+        ).populate('sku');
 
         if (!updatedItem) {
             return NextResponse.json({ error: 'Item not found' }, { status: 404 });
@@ -47,7 +70,8 @@ export async function PATCH(
         // Propagate cost change if applicable
         if (updatedItem.lotNumber && updatedItem.cost !== undefined) {
             const { propagateCostChange } = await import('@/lib/cost-propagation');
-            await propagateCostChange(updatedItem.sku, updatedItem.lotNumber, updatedItem.cost);
+            const skuId = (typeof updatedItem.sku === 'object' && updatedItem.sku?._id) ? updatedItem.sku._id : updatedItem.sku;
+            await propagateCostChange(skuId, updatedItem.lotNumber, updatedItem.cost);
         }
 
         return NextResponse.json(updatedItem);
