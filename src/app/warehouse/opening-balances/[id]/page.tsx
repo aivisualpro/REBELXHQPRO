@@ -72,7 +72,7 @@ export default function OpeningBalanceDetailPage() {
 
     useEffect(() => {
         // Deferred fetch of all SKUs for name resolution fallback
-        fetch('/api/skus?limit=1000')
+        fetch('/api/skus?limit=0&ignoreDate=true&simple=true')
             .then(res => res.json())
             .then(data => {
                 if (data.skus) setAllSkus(data.skus);

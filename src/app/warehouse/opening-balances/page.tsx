@@ -150,7 +150,7 @@ function OpeningBalancesContent() {
 
     const fetchSkus = async () => {
         try {
-            const res = await fetch('/api/skus?limit=1000');
+            const res = await fetch('/api/skus?limit=0&ignoreDate=true&simple=true');
             if (res.ok) {
                 const data = await res.json();
                 setAllSkus(data.skus || []);

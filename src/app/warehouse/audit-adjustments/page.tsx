@@ -77,7 +77,7 @@ function AuditAdjustmentsPage() {
     }, [searchParams]);
 
     useEffect(() => {
-        fetch('/api/skus?limit=1000')
+        fetch('/api/skus?limit=0&ignoreDate=true&simple=true')
             .then(res => res.json())
             .then(data => {
                 if(data.skus) {

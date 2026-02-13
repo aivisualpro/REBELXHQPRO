@@ -156,7 +156,7 @@ function PurchaseOrdersContent() {
         }
 
         // Skus
-        const sRes = await fetch('/api/skus?limit=1000');
+        const sRes = await fetch('/api/skus?limit=0&ignoreDate=true&simple=true');
         if (sRes.ok) {
           const data = await sRes.json();
           setAllSkus(data.skus || []);
