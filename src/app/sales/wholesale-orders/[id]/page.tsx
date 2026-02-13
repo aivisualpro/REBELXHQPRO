@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, CreditCard, Truck, Plus, X, Trash2, Pencil, User, MapPin, DollarSign, List, RefreshCw, MessageSquare, Phone, Mail, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Calendar, CreditCard, Truck, Plus, X, Trash2, Pencil, User, MapPin, DollarSign, List, RefreshCw, MessageSquare, Phone, Mail, Eye, EyeOff, Download, FileText, Loader2 } from 'lucide-react';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -164,12 +164,42 @@ export default function SaleOrderDetailPage() {
   // Delete Order State
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // PDF Download State
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
   // Billing visibility state
   const [showBillingDetails, setShowBillingDetails] = useState(false);
   const [billingPasswordModal, setBillingPasswordModal] = useState(false);
   const [billingPassword, setBillingPassword] = useState('');
   const [billingPasswordError, setBillingPasswordError] = useState('');
   const billingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleDownloadPdf = async () => {
+      if (downloadingPdf || !order) return;
+      setDownloadingPdf(true);
+      try {
+          const res = await fetch(`/api/wholesale/orders/${order._id}/pdf`);
+          if (!res.ok) {
+              const err = await res.json().catch(() => null);
+              throw new Error(err?.error || `Failed (${res.status})`);
+          }
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${order.label || 'SaleOrder'}.pdf`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          toast.success('PDF downloaded');
+      } catch (e: any) {
+          console.error('PDF download error:', e);
+          toast.error(e.message || 'Failed to download PDF');
+      } finally {
+          setDownloadingPdf(false);
+      }
+  };
 
   const fetchOrder = async () => {
       try {
@@ -655,8 +685,19 @@ export default function SaleOrderDetailPage() {
                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {/* Identity Boxes */}
                 <div className="grid grid-cols-3 gap-2">
-                    <div className="border border-border rounded-md p-3 bg-background text-center flex items-center justify-center">
-                        <div className="text-base font-black text-amber-500 tracking-tight font-mono">{order.label}</div>
+                    <div 
+                        className="border border-border rounded-md p-3 bg-background text-center flex items-center justify-center cursor-pointer hover:border-amber-500/50 hover:bg-amber-500/5 transition-all group/label relative"
+                        onClick={handleDownloadPdf}
+                        title="Download PDF Invoice"
+                    >
+                        {downloadingPdf ? (
+                            <Loader2 className="w-4 h-4 text-amber-500 animate-spin" />
+                        ) : (
+                            <>
+                                <div className="text-base font-black text-amber-500 tracking-tight font-mono">{order.label}</div>
+                                <Download className="w-3 h-3 text-amber-500/0 group-hover/label:text-amber-500 transition-all ml-1.5" />
+                            </>
+                        )}
                     </div>
                     <div
                         className="border border-border rounded-md p-3 bg-background text-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all"
