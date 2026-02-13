@@ -840,7 +840,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                                 const form = document.getElementById('client-modal-form') as HTMLFormElement;
                                 if (form) form.requestSubmit();
                             }}
-                            className="px-10 py-2.5 bg-[#FFEF5F] text-black text-[10px] font-bold uppercase tracking-[0.2em] hover:opacity-90 transition-all disabled:opacity-50 flex items-center space-x-2 shadow-lg cursor-pointer"
+                            className="px-10 py-2.5 bg-[#fe9900] text-black text-[10px] font-bold uppercase tracking-[0.2em] hover:opacity-90 transition-all disabled:opacity-50 flex items-center space-x-2 shadow-lg cursor-pointer"
                         >
                             {isSubmitting ? (
                                 <>

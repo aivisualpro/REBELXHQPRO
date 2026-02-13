@@ -84,7 +84,7 @@ export const MultiSelectFilter = forwardRef<MultiSelectFilterRef, FilterProps>((
                 className={cn(
                     "flex items-center space-x-1.5 px-3 py-1.5 border rounded-sm text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer",
                     selectedValues.length > 0
-                        ? "bg-[#FFEF5F] text-black border-transparent hover:opacity-90"
+                        ? "bg-[#fe9900] text-black border-transparent hover:opacity-90"
                         : "bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:text-slate-700",
                     className
                 )}
@@ -127,7 +127,7 @@ export const MultiSelectFilter = forwardRef<MultiSelectFilterRef, FilterProps>((
                                 >
                                     <div className={cn(
                                         "w-3.5 h-3.5 border rounded-sm flex items-center justify-center transition-colors shrink-0 cursor-pointer",
-                                        selectedValues.includes(option.value) ? "bg-[#FFEF5F] border-transparent" : "border-slate-300 group-hover:border-slate-400 bg-white"
+                                        selectedValues.includes(option.value) ? "bg-[#fe9900] border-transparent" : "border-slate-300 group-hover:border-slate-400 bg-white"
                                     )}>
                                         {selectedValues.includes(option.value) && <Check className="w-2.5 h-2.5 text-black" />}
                                     </div>

@@ -214,13 +214,13 @@ export default function OrdersView({ clientId }: OrdersViewProps) {
                 Orders
             </h1>
             <div className="relative group">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-[#FFEF5F] transition-colors" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-[#fe9900] transition-colors" />
                 <input 
                     type="text" 
                     placeholder="Search orders..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="pl-9 pr-4 h-7 w-64 bg-secondary/50 hover:bg-secondary focus:bg-background border border-transparent focus:border-[#FFEF5F] rounded text-sm transition-all focus:outline-none focus:ring-1 focus:ring-[#FFEF5F] placeholder:text-muted-foreground text-foreground"
+                    className="pl-9 pr-4 h-7 w-64 bg-secondary/50 hover:bg-secondary focus:bg-background border border-transparent focus:border-[#fe9900] rounded text-sm transition-all focus:outline-none focus:ring-1 focus:ring-[#fe9900] placeholder:text-muted-foreground text-foreground"
                 />
             </div>
         </div>
@@ -246,7 +246,7 @@ export default function OrdersView({ clientId }: OrdersViewProps) {
             {/* Actions Group */}
             <button 
                 onClick={() => setIsModalOpen(true)}
-                className="flex items-center justify-center w-7 h-7 bg-[#FFEF5F] text-black hover:opacity-90 rounded shadow-sm transition-all cursor-pointer"
+                className="flex items-center justify-center w-7 h-7 bg-[#fe9900] text-black hover:opacity-90 rounded shadow-sm transition-all cursor-pointer"
                 title="Create Order"
             >
                 <Plus className="w-4 h-4" />

@@ -554,7 +554,7 @@ export default function PurchaseOrderDetailPage() {
                         <div className="flex items-center space-x-2">
                             <button
                                 onClick={handleOpenAddModal}
-                                className="px-3 h-9 text-[10px] font-black uppercase tracking-widest bg-[#f2b61c] text-black hover:bg-[#d9a318] transition-colors flex items-center space-x-1 shadow-sm cursor-pointer"
+                                className="px-3 h-9 text-[10px] font-black uppercase tracking-widest bg-[#fe9900] text-black hover:bg-[#d9a318] transition-colors flex items-center space-x-1 shadow-sm cursor-pointer"
                             >
                                 <Plus className="w-3 h-3" />
                                 <span>Add Item</span>
@@ -645,7 +645,7 @@ export default function PurchaseOrderDetailPage() {
             {isItemModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-background border border-border rounded shadow-2xl w-full max-w-2xl animate-in fade-in zoom-in duration-200">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-secondary/50">
+                        <div className="flex items-center justify-between px-6 h-12 border-b border-border bg-secondary/50">
                             <h2 className="text-sm font-bold uppercase text-foreground tracking-wider">{editingId ? 'Edit Line Item' : 'Add Line Item'}</h2>
                             <button onClick={() => setIsItemModalOpen(false)} className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
                                 <X className="w-4 h-4" />
@@ -655,6 +655,7 @@ export default function PurchaseOrderDetailPage() {
                             <div className="space-y-1.5">
                                 <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">SKU</label>
                                 <SearchableSelect
+                                    triggerClassName="h-[38px]"
                                     options={allSkus
                                         .filter(s => {
                                             const isUsed = order?.lineItems?.some(item => {

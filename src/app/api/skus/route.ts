@@ -90,6 +90,13 @@ export async function GET(request: Request) {
         const strSkuIds = skusRaw.map(s => s._id.toString());
         const allVariances = skusRaw.flatMap(s => (s as any).variances?.map((v: any) => v._id) || []);
 
+        // Dual-type array for collections that store sku as ObjectId or Mixed
+        const { ObjectId } = require('mongodb');
+        const dualSkuIds = [
+            ...strSkuIds,
+            ...strSkuIds.filter(id => ObjectId.isValid(id)).map((id: string) => new ObjectId(id))
+        ];
+
         const tiers = await getSkuTiers(strSkuIds);
 
         // --- Optimized Aggregations ---
@@ -104,16 +111,17 @@ export async function GET(request: Request) {
             wosSkuAgg,
             wosVarAgg
         ] = await Promise.all([
-            // 1. Opening Balances
+            // 1. Opening Balances (Mixed type — use dual IDs)
             OpeningBalance.aggregate([
-                { $match: { sku: { $in: skuIds } } },
+                { $match: { sku: { $in: dualSkuIds } } },
+                { $addFields: { skuStr: { $toString: "$sku" } } },
                 { $group: { 
-                    _id: "$sku", 
+                    _id: "$skuStr", 
                     qty: { $sum: "$qty" }, 
                     costVal: { $sum: { $multiply: ["$qty", "$cost"] } } 
                 }}
             ]),
-            // 2. Purchase Orders (Stock In)
+            // 2. Purchase Orders (String type — use string IDs)
             PurchaseOrder.aggregate([
                 { $match: { "lineItems.sku": { $in: skuIds }, status: "Received" } },
                 { $unwind: "$lineItems" },
@@ -124,42 +132,42 @@ export async function GET(request: Request) {
                     costVal: { $sum: { $multiply: ["$lineItems.qtyReceived", "$lineItems.cost"] } }
                 }}
             ]),
-            // 3. Sale Orders (Stock Out + Revenue)
+            // 3. Sale Orders (ObjectId type — use dual IDs)
             SaleOrder.aggregate([
-                { $match: { "lineItems.sku": { $in: skuIds } } },
+                { $match: { "lineItems.sku": { $in: dualSkuIds } } },
                 { $unwind: "$lineItems" },
-                { $match: { "lineItems.sku": { $in: skuIds } } },
-                { $match: { orderStatus: { $in: ['Shipped', 'Completed'] } } }, // Assuming status is on root, but aggregate loses root if we strictly unwind? No, aggregate keeps other fields unless project excludes them. But wait, $match after unwind filters the *result* of unwind. The root 'orderStatus' is still available? Yes, if we haven't grouped yet.
-                // Wait, if we unwind lineItems, the root fields are duplicated for each line item. So we can filter by orderStatus.
+                { $match: { "lineItems.sku": { $in: dualSkuIds } } },
+                { $match: { orderStatus: { $in: ['Shipped', 'Completed'] } } },
+                { $addFields: { "lineItems.skuStr": { $toString: "$lineItems.sku" } } },
                 { $group: {
-                    _id: "$lineItems.sku",
+                    _id: "$lineItems.skuStr",
                     qty: { $sum: "$lineItems.qtyShipped" }, 
                     revenue: { $sum: { $multiply: ["$lineItems.qtyShipped", "$lineItems.price"] } },
                     cogs: { $sum: { $multiply: ["$lineItems.qtyShipped", "$lineItems.cost"] } }
                 }}
             ]),
-            // 4. Manufacturing - Produced (Stock In)
-            // We fetch full documents for Prod to handle complex cost logic if needed, but we can optimize projection.
-            Manufacturing.find({ sku: { $in: skuIds }, status: 'Completed' })
-                .select('sku qty qtyDifference lineItems labor')
+            // 4. Manufacturing - Produced (all except Pending — matches ledger logic)
+            Manufacturing.find({ sku: { $in: skuIds }, status: { $ne: 'Pending' } })
+                .select('sku qty qtyDifference lineItems labor status')
                 .lean(),
 
-            // 5. Manufacturing - Consumed (Stock Out)
-            Manufacturing.find({ "lineItems.sku": { $in: skuIds }, status: { $in: ['In Progress', 'Completed'] } })
+            // 5. Manufacturing - Consumed (ONLY Fulfilled — matches ledger logic)
+            Manufacturing.find({ "lineItems.sku": { $in: skuIds }, status: 'Fulfilled' })
                 .select('lineItems qty status')
                 .lean(),
 
-            // 6. Audit Adjustments
+            // 6. Audit Adjustments (Mixed type — use dual IDs)
             AuditAdjustment.aggregate([
-                { $match: { sku: { $in: skuIds } } },
+                { $match: { sku: { $in: dualSkuIds } } },
+                { $addFields: { skuStr: { $toString: "$sku" } } },
                 { $group: {
-                    _id: "$sku",
+                    _id: "$skuStr",
                     netQty: { $sum: "$qty" },
                     costVal: { $sum: { $multiply: ["$qty", "$cost"] } }
                 }}
             ]), 
             
-            // 7. Web Orders (By SKU)
+            // 7. Web Orders (By SKU — String type)
             WebOrder.aggregate([
                 { $match: { 
                     "lineItems.sku": { $in: skuIds }, 
@@ -289,7 +297,14 @@ export async function GET(request: Request) {
                 let moCost = 0;
                 mo.lineItems?.forEach((li: any) => {
                     const liSkuId = (li.sku?._id || li.sku);
-                    const liQty = (li.recipeQty || 0) * (mo.qty || 0) + (li.qtyExtra || 0) + (li.qtyScrapped || 0);
+                    const orderQty = mo.qty || 0;
+                    const recipeQty = li.recipeQty || 0;
+                    const bomQty = orderQty * recipeQty;
+                    const saPercent = li.sa || 0;
+                    const sa = saPercent / 100;
+                    const qtyExtra = sa > 0 ? (bomQty / sa) - bomQty : 0;
+                    const qtyScrapped = li.qtyScrapped || 0;
+                    const liQty = bomQty + qtyScrapped + qtyExtra;
                     const unitCost = li.cost || getLotCostBulk(liSkuId?.toString(), li.lotNumber);
                     moCost += liQty * unitCost;
                 });
@@ -310,12 +325,19 @@ export async function GET(request: Request) {
             });
             
             myConsMos.forEach((mo: any) => {
-                const li = mo.lineItems.find((l: any) => (l.sku?._id || l.sku)?.toString() === id);
-                 if (li) {
-                     const bomQty = (li.recipeQty || 0) * (mo.qty || 0);
-                     const totalConsumed = bomQty + (li.qtyExtra || 0) + (li.qtyScrapped || 0);
-                     qtyOut += totalConsumed;
-                 }
+                // Use filter (not find) — a job may have multiple line items for the same SKU (different lots)
+                const matchingLines = mo.lineItems.filter((l: any) => (l.sku?._id || l.sku)?.toString() === id);
+                matchingLines.forEach((li: any) => {
+                    const orderQty = mo.qty || 0;
+                    const recipeQty = li.recipeQty || 0;
+                    const bomQty = orderQty * recipeQty;
+                    const saPercent = li.sa || 0;
+                    const sa = saPercent / 100;
+                    const qtyExtra = sa > 0 ? (bomQty / sa) - bomQty : 0;
+                    const qtyScrapped = li.qtyScrapped || 0;
+                    const totalConsumed = bomQty + qtyScrapped + qtyExtra;
+                    qtyOut += totalConsumed;
+                });
             });
 
             // 5. Adjustments

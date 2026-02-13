@@ -370,7 +370,7 @@ function ClientsPageContent() {
               placeholder="Search clients..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-7 w-[220px] pl-8 pr-3 text-[11px] bg-background border border-border rounded focus:outline-none focus:ring-1 focus:ring-[#FFEF5F] focus:border-[#FFEF5F] placeholder:text-muted-foreground/60 text-foreground"
+              className="h-7 w-[220px] pl-8 pr-3 text-[11px] bg-background border border-border rounded focus:outline-none focus:ring-1 focus:ring-[#fe9900] focus:border-[#fe9900] placeholder:text-muted-foreground/60 text-foreground"
             />
           </div>
 

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { createPortal } from 'react-dom';
 import {
   Search,
   ArrowUpDown,
@@ -62,9 +63,16 @@ function SkusPageContent() {
   const [sortBy, setSortBy] = useState('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
-  // Search from URL params (main header)
-  const search = searchParams.get('search') || '';
-  const [debouncedSearch, setDebouncedSearch] = useState(search);
+  // Search — local state for instant input, synced to URL after debounce
+  const [search, setSearch] = useState(searchParams.get('search') || '');
+  const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('search') || '');
+
+  // Header portal
+  const [headerPortalTarget, setHeaderPortalTarget] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const target = document.getElementById('header-portal-target');
+    if (target) setHeaderPortalTarget(target);
+  }, []);
 
   // Filters
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -93,12 +101,20 @@ function SkusPageContent() {
   };
   const [formData, setFormData] = useState(initialFormState);
 
-  // Debounce search from URL
+  // Debounce search + sync to URL
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
       setPage(1);
-    }, 500);
+      // Sync to URL
+      const params = new URLSearchParams(searchParams.toString());
+      if (search) {
+        params.set('search', search);
+      } else {
+        params.delete('search');
+      }
+      router.replace(`/warehouse/skus?${params.toString()}`, { scroll: false });
+    }, 300);
     return () => clearTimeout(timer);
   }, [search]);
 
@@ -247,6 +263,27 @@ function SkusPageContent() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-36px)] bg-background relative transition-colors duration-300">
+      {/* Header Portal */}
+      {headerPortalTarget && createPortal(
+        <>
+          <input
+            type="text"
+            placeholder="Search products..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-3 pr-3 h-8 w-64 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
+          />
+          <div className="flex-1" />
+          <button
+            onClick={() => openModal()}
+            className="h-8 px-3 bg-primary text-black hover:opacity-90 transition-all rounded shadow-md flex items-center space-x-1.5 cursor-pointer"
+          >
+            <Plus className="w-3 h-3" />
+            <span className="hidden sm:inline text-[10px] font-black uppercase tracking-widest">Add</span>
+          </button>
+        </>,
+        headerPortalTarget
+      )}
       <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
         <div className="min-w-full px-2 py-2">
           <table className="w-full text-left border-separate border-spacing-0 relative z-0">
@@ -311,42 +348,42 @@ function SkusPageContent() {
 
               {/* Sale Price */}
               <th className="border-r border-border">
-                <TableColumnHeader column="salePrice" title="Sale Price" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
+                <TableColumnHeader column="salePrice" title="Sale Price" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground justify-end" />
               </th>
 
               {/* Cost */}
               <th className="border-r border-border">
-                <TableColumnHeader column="avgCost" title="Cost (Avg)" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
+                <TableColumnHeader column="avgCost" title="Cost (Avg)" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground justify-end" />
               </th>
 
-              {/* Avb Qty */}
+              {/* Stock Level */}
               <th className="border-r border-border">
-                <TableColumnHeader column="currentStock" title="Avb Qty" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
+                <TableColumnHeader column="currentStock" title="Stock Level" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground justify-end" />
               </th>
 
               {/* Re-Ord */}
               <th className="border-r border-border">
-                <TableColumnHeader column="reOrderPoint" title="Re-Ord" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
+                <TableColumnHeader column="reOrderPoint" title="Re-Ord" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground justify-end" />
               </th>
 
               {/* Order Up to */}
               <th className="border-r border-border">
-                <TableColumnHeader column="orderUpto" title="Order Up to" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
+                <TableColumnHeader column="orderUpto" title="Order Up to" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground justify-end" />
               </th>
 
               {/* Revenue */}
               <th className="border-r border-border">
-                <TableColumnHeader column="revenue" title="Revenue" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
+                <TableColumnHeader column="revenue" title="Revenue" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground justify-end" />
               </th>
 
               {/* COGS */}
               <th className="border-r border-border">
-                <TableColumnHeader column="cogs" title="COGS" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
+                <TableColumnHeader column="cogs" title="COGS" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground justify-end" />
               </th>
 
               {/* COGM */}
               <th className="border-r border-border">
-                <TableColumnHeader column="cogm" title="COGM" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
+                <TableColumnHeader column="cogm" title="COGM" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground justify-end" />
               </th>
 
               {/* Gross Profit */}
@@ -388,16 +425,16 @@ function SkusPageContent() {
                 <td className="px-2 py-1 text-[10px] uppercase font-bold text-muted-foreground border-r border-border">{sku.materialType}</td>
                 <td className="px-2 py-1 text-[11px] text-muted-foreground font-mono border-r border-border text-right">${(sku.salePrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 <td className="px-2 py-1 text-[11px] text-muted-foreground font-mono border-r border-border text-right">${(sku.avgCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td className="px-2 py-1 text-[11px] font-bold text-foreground border-r border-border text-center">
+                <td className="px-2 py-1 text-[11px] font-bold text-foreground border-r border-border text-right">
                   <span className={cn(
                     "px-1.5 py-0.5 rounded text-[11px] font-bold",
                     (sku.currentStock || 0) <= (sku.reOrderPoint || 0) ? "bg-destructive/10 text-destructive border border-destructive/20" : "text-foreground"
                   )}>
-                    {Math.round(sku.currentStock || 0)}
+                    {Math.round(sku.currentStock || 0).toLocaleString()}
                   </span>
                 </td>
-                <td className="px-2 py-1 text-[11px] text-muted-foreground border-r border-border text-center">{sku.reOrderPoint}</td>
-                <td className="px-2 py-1 text-[11px] text-muted-foreground border-r border-border text-center">{sku.orderUpto}</td>
+                <td className="px-2 py-1 text-[11px] text-muted-foreground border-r border-border text-right">{(sku.reOrderPoint || 0).toLocaleString()}</td>
+                <td className="px-2 py-1 text-[11px] text-muted-foreground border-r border-border text-right">{(sku.orderUpto || 0).toLocaleString()}</td>
                 <td className="px-2 py-1 text-[11px] text-emerald-600 font-mono border-r border-border text-right">${(sku.revenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 <td className="px-2 py-1 text-[11px] text-muted-foreground font-mono border-r border-border text-right">${(sku.cogs || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 <td className="px-2 py-1 text-[11px] text-muted-foreground font-mono border-r border-border text-right">${(sku.cogm || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>

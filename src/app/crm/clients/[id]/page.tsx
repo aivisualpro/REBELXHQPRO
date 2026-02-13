@@ -769,11 +769,11 @@ export default function ClientDashboardPage() {
                 </button>
 
                 <div className="flex-1 max-w-sm relative group h-7">
-                    <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 group-focus-within:text-[#FFEF5F] transition-colors" />
+                    <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 group-focus-within:text-[#fe9900] transition-colors" />
                     <input 
                         type="text" 
                         placeholder={`Search ${activeTab.toLowerCase()}...`}
-                        className="w-full h-full pl-9 pr-4 bg-secondary/50 border border-transparent text-[11px] focus:outline-none focus:ring-1 focus:ring-[#FFEF5F] focus:bg-background focus:border-[#FFEF5F] transition-all rounded placeholder:text-muted-foreground font-medium text-foreground"
+                        className="w-full h-full pl-9 pr-4 bg-secondary/50 border border-transparent text-[11px] focus:outline-none focus:ring-1 focus:ring-[#fe9900] focus:bg-background focus:border-[#fe9900] transition-all rounded placeholder:text-muted-foreground font-medium text-foreground"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
@@ -796,7 +796,7 @@ export default function ClientDashboardPage() {
                             className={cn(
                                 "flex items-center space-x-2 px-4 h-full text-[10px] font-bold uppercase tracking-widest transition-all rounded-md",
                                 activeTab === tab.id
-                                    ? "bg-[#FFEF5F] text-black shadow-sm"
+                                    ? "bg-[#fe9900] text-black shadow-sm"
                                     : "text-muted-foreground hover:text-foreground hover:bg-secondary"
                             )}
                         >

@@ -143,7 +143,7 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
                 <div className={cn(
                     "flex items-center rounded-md cursor-pointer transition-colors group",
                     isSidebarCollapsed ? "justify-center py-2.5 px-0" : "justify-between px-3 py-2",
-                    isActive('/crm/inbox') ? "bg-[#FFEF5F] text-black" : "hover:bg-secondary"
+                    isActive('/crm/inbox') ? "bg-[#fe9900] text-black" : "hover:bg-secondary"
                 )}>
                   <div className={cn("flex items-center", isSidebarCollapsed ? "justify-center" : "space-x-3")}>
                     <Inbox className={cn("w-5 h-5 transition-colors", !isSidebarCollapsed && "mr-3", isActive('/crm/inbox') ? "text-black" : "group-hover:text-foreground")} />
@@ -167,7 +167,7 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
                 <div className={cn(
                   "flex items-center rounded-md cursor-pointer transition-colors group",
                   isSidebarCollapsed ? "justify-center py-2.5 px-0" : "px-3 py-2",
-                  isActive(item.href) ? "bg-[#FFEF5F] text-black" : "hover:bg-secondary"
+                  isActive(item.href) ? "bg-[#fe9900] text-black" : "hover:bg-secondary"
                 )}>
                   <item.icon className={cn("w-5 h-5 transition-colors", !isSidebarCollapsed && "mr-3", isActive(item.href) ? "text-black" : "group-hover:text-foreground")} />
                   {!isSidebarCollapsed && <span className={cn("text-[14px] font-medium transition-colors", isActive(item.href) ? "text-black" : "group-hover:text-foreground")}>{item.name}</span>}

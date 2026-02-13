@@ -129,7 +129,7 @@ export default function NotesPage() {
                 <div className="flex items-center space-x-2">
                     <button 
                         onClick={openNewNoteModal} 
-                        className="flex items-center space-x-1.5 px-3 py-1.5 bg-[#FFEF5F] text-black text-[11px] font-bold uppercase tracking-wider rounded hover:bg-[#F9E137] transition-all cursor-pointer"
+                        className="flex items-center space-x-1.5 px-3 py-1.5 bg-[#fe9900] text-black text-[11px] font-bold uppercase tracking-wider rounded hover:bg-[#F9E137] transition-all cursor-pointer"
                     >
                         <Plus className="w-3.5 h-3.5" />
                         <span>New Note</span>

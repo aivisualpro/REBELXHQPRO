@@ -139,7 +139,7 @@ export default function NotesView({ clientId, onNotesUpdate }: NotesViewProps) {
                 <div className="flex items-center space-x-2">
                     <button 
                         onClick={openNewNoteModal} 
-                        className="p-1.5 bg-[#FFEF5F] text-black rounded hover:bg-[#F9E137] transition-all cursor-pointer"
+                        className="p-1.5 bg-[#fe9900] text-black rounded hover:bg-[#F9E137] transition-all cursor-pointer"
                         title="New Note"
                     >
                         <Plus className="w-4 h-4" />

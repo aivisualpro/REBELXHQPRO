@@ -3,10 +3,10 @@
 :root {
   --background: #f8fafc;
   --foreground: #000000;
-  --primary: #FFEF5F;
+  --primary: #fe9900;
   --primary-foreground: #000000;
   --secondary: #ffffff;
-  --accent: #FFEF5F;
+  --accent: #fe9900;
   --border: #e2e8f0;
   --muted: #64748b;
   --muted-foreground: #64748b;
@@ -16,10 +16,10 @@
 .dark {
   --background: #0a0a0a;
   --foreground: #f5f5f5;
-  --primary: #FFEF5F;
+  --primary: #fe9900;
   --primary-foreground: #000000;
   --secondary: #171717;
-  --accent: #FFEF5F;
+  --accent: #fe9900;
   --border: #262626;
   --muted: #a1a1aa;
   --muted-foreground: #a1a1aa;
@@ -84,13 +84,13 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #f2b61c;
+  background: #fe9900;
   border-radius: 10px;
   border: 2px solid var(--background);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #f2b61c; /* slightly darker yellow */
+  background: #fe9900; /* slightly darker yellow */
 }
 
 .glass-header {
@@ -218,7 +218,7 @@ body {
   top: 50%;
   left: 50%;
   border-radius: 50%;
-  background: radial-gradient(circle, #FFD700 0%, #f2b61c 60%, transparent 100%);
+  background: radial-gradient(circle, #FFD700 0%, #fe9900 60%, transparent 100%);
   box-shadow: 0 0 4px 1px rgba(255, 215, 0, 0.6);
   pointer-events: none;
   z-index: 12;
@@ -248,7 +248,7 @@ body {
 
 @keyframes loading-text-glow {
   0%, 100% { opacity: 0.4; color: var(--muted-foreground); }
-  50%      { opacity: 1;   color: #f2b61c; }
+  50%      { opacity: 1;   color: #fe9900; }
 }
 
 /* ── Ledger Row Flash (Warning click highlight) ─────────── */

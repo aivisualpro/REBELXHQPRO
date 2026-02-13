@@ -100,7 +100,7 @@ export const MobileMenu = () => {
                             <div className="p-6 border-t border-border">
                                 <button 
                                     onClick={() => signOut({ callbackUrl: '/login' })}
-                                    className="w-full bg-[#FFEF5F] text-black p-4 rounded-xl font-black uppercase tracking-widest shadow-lg shadow-slate-200 hover:opacity-90 transition-all"
+                                    className="w-full bg-[#fe9900] text-black p-4 rounded-xl font-black uppercase tracking-widest shadow-lg shadow-slate-200 hover:opacity-90 transition-all"
                                 >
                                     Logout
                                 </button>

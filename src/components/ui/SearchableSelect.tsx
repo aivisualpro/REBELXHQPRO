@@ -180,8 +180,8 @@ export function SearchableSelect({
                             <div
                                 key={option.value}
                                 className={cn(
-                                    "px-3 py-2.5 text-sm cursor-pointer rounded-md hover:bg-[#FFEF5F] hover:text-black transition-colors text-foreground",
-                                    option.value === value && "bg-[#FFEF5F] text-black font-medium"
+                                    "px-3 py-2.5 text-sm cursor-pointer rounded-md hover:bg-[#fe9900] hover:text-black transition-colors text-foreground",
+                                    option.value === value && "bg-[#fe9900] text-black font-medium"
                                 )}
                                 onClick={() => handleSelect(option.value)}
                             >

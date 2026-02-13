@@ -528,7 +528,7 @@ export function GmailEmailView({ initialLabel, forcedClientEmails }: GmailEmailV
                                 link.click();
                                 link.remove();
                             }}
-                            className="flex items-center space-x-2 text-[10px] font-black uppercase tracking-widest hover:text-[#FFEF5F] transition-colors"
+                            className="flex items-center space-x-2 text-[10px] font-black uppercase tracking-widest hover:text-[#fe9900] transition-colors"
                         >
                             <span>Download</span>
                         </button>

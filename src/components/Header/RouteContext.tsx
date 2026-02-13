@@ -77,10 +77,9 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
     // Products/SKUs
     if (pathname === '/warehouse/skus') {
         return {
-            title: 'Products',
-            actions: [
-                { label: 'Add', icon: Plus, href: '/warehouse/skus?createNew=true', variant: 'primary' },
-            ]
+            title: '',
+            actions: [],
+            isPortal: true
         };
     }
 

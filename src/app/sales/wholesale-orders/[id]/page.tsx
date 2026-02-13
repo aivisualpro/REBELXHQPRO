@@ -1125,7 +1125,7 @@ export default function SaleOrderDetailPage() {
                                         setEditingItem({ sku: '', lotNumber: '', qtyShipped: 1, price: 0, uom: 'Each' });
                                         setIsItemModalOpen(true);
                                     }}
-                                    className="px-3 h-9 text-[10px] font-black uppercase tracking-widest bg-[#f2b61c] text-black hover:bg-[#d9a318] transition-colors flex items-center space-x-1 shadow-sm"
+                                    className="px-3 h-9 text-[10px] font-black uppercase tracking-widest bg-[#fe9900] text-black hover:bg-[#d9a318] transition-colors flex items-center space-x-1 shadow-sm"
                                 >
                                     <Plus className="w-3 h-3" />
                                     <span>Add Item</span>
@@ -1785,7 +1785,7 @@ export default function SaleOrderDetailPage() {
                         </div>
                     </div>
                     <div className="px-4 border-t border-border bg-muted/20 flex items-center justify-end shrink-0 h-9">
-                        <button onClick={handleSaveHeader} className="px-6 py-1.5 bg-[#FFEF5F] text-black text-xs font-bold uppercase rounded hover:opacity-90 transition-colors shadow-lg">
+                        <button onClick={handleSaveHeader} className="px-6 py-1.5 bg-[#fe9900] text-black text-xs font-bold uppercase rounded hover:opacity-90 transition-colors shadow-lg">
                             Save Changes
                         </button>
                     </div>
