@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { X, Check, AlertCircle, Search, Ban } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, Check, AlertCircle, Search, Ban, Clock, Package, TrendingUp, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
@@ -20,7 +20,7 @@ interface LotSelectionModalProps {
     skuId: string;
     currentLotNumber?: string;
     title?: string;
-    requiredQty?: number; // Required quantity for suggestion logic
+    requiredQty?: number;
 }
 
 export function LotSelectionModal({
@@ -64,260 +64,337 @@ export function LotSelectionModal({
         }
     };
 
-    if (!isOpen) return null;
+    // ── Derived data ──
+    const { selectedLot, suggestedLotNumber, displayLots, totalAvailable } = useMemo(() => {
+        // Sort lots oldest → newest (FIFO)
+        const sorted = [...lots].sort((a, b) => {
+            const dateA = a.date ? new Date(a.date).getTime() : 0;
+            const dateB = b.date ? new Date(b.date).getTime() : 0;
+            return dateA - dateB;
+        });
 
-    // Sort lots from oldest to newest by date
-    const sortedLots = [...lots].sort((a, b) => {
-        const dateA = a.date ? new Date(a.date).getTime() : 0;
-        const dateB = b.date ? new Date(b.date).getTime() : 0;
-        return dateA - dateB; // oldest first
-    });
+        // Filter: hide zero-balance lots unless it's the currently selected lot
+        const filtered = sorted.filter(lot => {
+            const matchesSearch = lot.lotNumber.toLowerCase().includes(searchQuery.toLowerCase());
+            const isCurrent = lot.lotNumber === currentLotNumber;
+            const hasBalance = lot.balance > 0;
 
-    // Filter: Include if searching OR balance > 0 OR matches currentLotNumber
-    // User requested: "show the lot # which is already applied no matter if that lot # value is 0"
-    const filteredLots = sortedLots.filter(lot => {
-         const matchesSearch = lot.lotNumber.toLowerCase().includes(searchQuery.toLowerCase());
-         const isCurrent = lot.lotNumber === currentLotNumber;
-         const hasBalance = lot.balance > 0;
+            if (searchQuery) return matchesSearch && (hasBalance || isCurrent);
+            return hasBalance || isCurrent;
+        });
 
-         // If searching, show all matches. If not searching, show positive balance OR current.
-         if (searchQuery) return matchesSearch;
-         return hasBalance || isCurrent;
-    });
+        const selected = filtered.find(lot => lot.lotNumber === currentLotNumber) || null;
+        const others = filtered.filter(lot => lot.lotNumber !== currentLotNumber);
 
-    // Separate selected lot from others (to show first after None)
-    const selectedLot = filteredLots.find(lot => lot.lotNumber === currentLotNumber);
-    const otherLots = filteredLots.filter(lot => lot.lotNumber !== currentLotNumber);
-
-    // Format date as mm/dd/yyyy
-    const formatDate = (dateStr: string) => {
-        const date = new Date(dateStr);
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        const year = date.getFullYear();
-        return `${month}/${day}/${year}`;
-    };
-
-    // Suggested lot logic:
-    // 1. First, find lots with balance >= requiredQty (if requiredQty specified)
-    // 2. Among those, pick the oldest (FIFO)
-    // 3. If no lots have sufficient qty, fall back to oldest lot with any balance
-    const getSuggestedLot = () => {
-        if (otherLots.length === 0) return null;
-        
-        if (requiredQty > 0) {
-            // Find lots with sufficient quantity
-            const sufficientLots = otherLots.filter(lot => lot.balance >= requiredQty);
-            if (sufficientLots.length > 0) {
-                // Return the oldest lot with sufficient qty (already sorted by date)
-                return sufficientLots[0].lotNumber;
+        // Suggested lot: FIFO — oldest lot with positive balance
+        // If requiredQty specified, prefer lots with enough stock
+        let suggested: string | null = null;
+        if (others.length > 0) {
+            if (requiredQty > 0) {
+                const sufficient = others.filter(lot => lot.balance >= requiredQty);
+                suggested = sufficient.length > 0 ? sufficient[0].lotNumber : null;
+            }
+            // If no sufficient lot found, pick oldest with any positive balance
+            if (!suggested) {
+                const positive = others.filter(lot => lot.balance > 0);
+                suggested = positive.length > 0 ? positive[0].lotNumber : null;
             }
         }
-        
-        // Fall back to oldest lot with any positive balance
-        const positiveLots = otherLots.filter(lot => lot.balance > 0);
-        return positiveLots.length > 0 ? positiveLots[0].lotNumber : otherLots[0].lotNumber;
-    };
-    
-    const suggestedLotNumber = getSuggestedLot();
 
-    // Render a lot item
-    const renderLotItem = (lot: Lot, idx: number, isSelected: boolean, isSuggested: boolean = false) => (
-        <button
-            key={lot.lotNumber}
-            onClick={() => onSelect(lot.lotNumber, lot.cost)}
-            className={cn(
-                "w-full flex items-center justify-between px-6 py-3 transition-colors text-left group hover:bg-secondary/50",
-                isSelected ? "bg-blue-500/10" : "",
-                isSuggested && !isSelected ? "bg-amber-500/10" : ""
-            )}
-        >
-            <div className="flex items-center gap-3">
+        const totalAvail = filtered.reduce((acc, lot) => acc + Math.max(0, lot.balance), 0);
+
+        return {
+            selectedLot: selected,
+            suggestedLotNumber: suggested,
+            displayLots: others,
+            totalAvailable: totalAvail
+        };
+    }, [lots, searchQuery, currentLotNumber, requiredQty]);
+
+    if (!isOpen) return null;
+
+    const formatDate = (dateStr: string) => {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    };
+
+    const getRelativeAge = (dateStr: string) => {
+        const date = new Date(dateStr);
+        const now = new Date();
+        const diffMs = now.getTime() - date.getTime();
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        if (diffDays === 0) return 'today';
+        if (diffDays === 1) return '1 day ago';
+        if (diffDays < 30) return `${diffDays}d ago`;
+        if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`;
+        return `${Math.floor(diffDays / 365)}yr ago`;
+    };
+
+    const getSourceAbbreviation = (source?: string) => {
+        if (!source) return 'UNK';
+        if (source === 'Opening Balance') return 'OB';
+        if (source === 'Manufacturing') return 'MFG';
+        if (source === 'Audit Adjustment') return 'ADJ';
+        if (source.startsWith('PO')) return 'PO';
+        return source.substring(0, 4).toUpperCase();
+    };
+
+    const getSourceColor = (source?: string) => {
+        if (!source) return 'text-muted-foreground';
+        if (source === 'Opening Balance') return 'text-purple-400';
+        if (source === 'Manufacturing') return 'text-orange-400';
+        if (source === 'Audit Adjustment') return 'text-rose-400';
+        if (source.startsWith('PO')) return 'text-blue-400';
+        return 'text-muted-foreground';
+    };
+
+    // Unified lot renderer
+    const renderLotItem = (lot: Lot, idx: number, isSelected: boolean, isSuggested: boolean = false) => {
+        const isNegative = lot.balance < 0;
+        const isZero = lot.balance === 0;
+
+        return (
+            <button
+                key={lot.lotNumber}
+                onClick={() => onSelect(lot.lotNumber, lot.cost)}
+                className={cn(
+                    "w-full flex items-center gap-3 px-4 py-3 transition-all text-left group relative overflow-hidden",
+                    isSelected
+                        ? "bg-blue-500/8 hover:bg-blue-500/12"
+                        : isSuggested
+                            ? "bg-emerald-500/5 hover:bg-emerald-500/10"
+                            : "hover:bg-secondary/60",
+                )}
+            >
+                {/* Left accent bar */}
                 <div className={cn(
-                    "w-8 h-8 flex items-center justify-center text-xs font-bold transition-colors border rounded",
-                    isSelected 
-                        ? "bg-blue-500 text-white border-blue-500"
-                        : isSuggested 
-                            ? "bg-amber-500 text-white border-amber-500" 
-                            : "bg-secondary text-muted-foreground border-border group-hover:border-muted-foreground"
+                    "absolute left-0 top-0 bottom-0 w-0.5 transition-all",
+                    isSelected ? "bg-blue-500" : isSuggested ? "bg-emerald-500" : "bg-transparent group-hover:bg-border"
+                )} />
+
+                {/* Badge / Index */}
+                <div className={cn(
+                    "w-7 h-7 flex items-center justify-center text-[9px] font-black rounded-md shrink-0 transition-all",
+                    isSelected
+                        ? "bg-blue-500 text-white shadow-sm shadow-blue-500/30"
+                        : isSuggested
+                            ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/30"
+                            : "bg-secondary text-muted-foreground border border-border group-hover:border-muted-foreground/50"
                 )}>
-                    {isSelected ? <Check className="w-4 h-4" /> : isSuggested ? '★' : `#${idx + 1}`}
+                    {isSelected ? <Check className="w-3.5 h-3.5" /> : isSuggested ? <Sparkles className="w-3 h-3" /> : `#${idx + 1}`}
                 </div>
-                <div>
-                    <div className="flex items-center gap-2">
+
+                {/* Lot info (center) */}
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
                         <p className={cn(
-                            "text-sm font-bold transition-colors",
-                            isSelected ? "text-blue-500" : isSuggested ? "text-amber-500" : "text-foreground"
+                            "text-xs font-bold truncate transition-colors",
+                            isSelected ? "text-blue-400" : isSuggested ? "text-emerald-400" : "text-foreground"
                         )}>
                             {lot.lotNumber}
                         </p>
                         {isSelected && (
-                            <span className="px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider bg-blue-500/20 text-blue-500 border border-blue-500/30 rounded">
-                                Selected
+                            <span className="px-1 py-px text-[7px] font-black uppercase tracking-widest bg-blue-500/15 text-blue-400 rounded shrink-0">
+                                Current
                             </span>
                         )}
                         {isSuggested && !isSelected && (
-                            <span className="px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-500 border border-amber-500/30 rounded">
-                                Suggested
+                            <span className="px-1 py-px text-[7px] font-black uppercase tracking-widest bg-emerald-500/15 text-emerald-400 rounded shrink-0">
+                                FIFO Pick
                             </span>
                         )}
                     </div>
-                    <div className="flex items-center gap-2 mt-0.5">
+                    <div className="flex items-center gap-1.5 mt-0.5">
                         <span className={cn(
-                            "text-[10px] uppercase font-bold tracking-wider",
-                            isSelected ? "text-blue-500/70" : isSuggested ? "text-amber-500/70" : "text-muted-foreground"
+                            "text-[9px] font-bold uppercase tracking-wider",
+                            getSourceColor(lot.source)
                         )}>
-                            {lot.source || 'Unknown'}
+                            {getSourceAbbreviation(lot.source)}
                         </span>
                         {lot.date && (
                             <>
-                                <span className="text-[10px] text-muted-foreground/50">•</span>
-                                <span className={cn(
-                                    "text-[10px] font-medium",
-                                    isSelected ? "text-blue-500/60" : isSuggested ? "text-amber-500/60" : "text-muted-foreground"
-                                )}>
+                                <span className="text-[8px] text-muted-foreground/30">•</span>
+                                <span className="text-[9px] text-muted-foreground/70 font-medium">
                                     {formatDate(lot.date)}
+                                </span>
+                                <span className="text-[8px] text-muted-foreground/30">•</span>
+                                <span className={cn(
+                                    "text-[9px] font-medium",
+                                    isSelected ? "text-blue-400/60" : isSuggested ? "text-emerald-400/60" : "text-muted-foreground/50"
+                                )}>
+                                    {getRelativeAge(lot.date)}
                                 </span>
                             </>
                         )}
-                        {lot.cost !== undefined && (
+                        {lot.cost != null && lot.cost > 0 && (
                             <>
-                                <span className="text-[10px] text-muted-foreground/50">•</span>
-                                <span className={cn(
-                                    "text-[10px] font-mono font-medium",
-                                    isSelected ? "text-blue-500" : isSuggested ? "text-amber-500" : "text-emerald-500"
-                                )}>
-                                    ${lot.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
+                                <span className="text-[8px] text-muted-foreground/30">•</span>
+                                <span className="text-[9px] font-mono font-medium text-foreground/50">
+                                    ${lot.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
                                 </span>
                             </>
                         )}
                     </div>
                 </div>
-            </div>
-            <div className="text-right">
-                <span className={cn(
-                    "block px-2.5 py-1 text-xs font-bold border transition-colors mb-1 rounded",
-                    isSelected 
-                        ? "bg-blue-500/20 text-blue-500 border-blue-500/30"
-                        : isSuggested
-                            ? "bg-amber-500/20 text-amber-500 border-amber-500/30" 
-                            : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-                )}>
-                    {lot.balance.toLocaleString()}
-                </span>
-                <span className={cn(
-                    "text-[9px] uppercase font-bold tracking-widest",
-                    isSelected ? "text-blue-500/40" : isSuggested ? "text-amber-500/40" : "text-muted-foreground/50"
-                )}>
-                    Available
-                </span>
-            </div>
-        </button>
-    );
+
+                {/* Balance chip (right) */}
+                <div className="shrink-0 text-right">
+                    <div className={cn(
+                        "inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold font-mono rounded transition-colors",
+                        isNegative
+                            ? "bg-rose-500/10 text-rose-400 border border-rose-500/15"
+                            : isZero
+                                ? "bg-muted text-muted-foreground border border-border"
+                                : isSelected
+                                    ? "bg-blue-500/10 text-blue-400 border border-blue-500/15"
+                                    : isSuggested
+                                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/15"
+                                        : "bg-emerald-500/8 text-emerald-500 border border-emerald-500/12"
+                    )}>
+                        {lot.balance.toLocaleString()}
+                    </div>
+                    <p className="text-[7px] uppercase tracking-widest text-muted-foreground/40 mt-0.5 font-bold">
+                        avail
+                    </p>
+                </div>
+            </button>
+        );
+    };
 
     return (
-        <div className="fixed inset-0 z-[2001] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-card shadow-2xl max-w-md w-full overflow-hidden scale-100 transition-transform border border-border rounded-lg">
+        <div className="fixed inset-0 z-[2001] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
+            <div className="bg-card shadow-2xl max-w-md w-full overflow-hidden border border-border rounded-lg animate-in zoom-in-95 duration-200">
                 {/* Header */}
-                <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-secondary/50">
-                    <h3 className="font-bold text-foreground">{title}</h3>
+                <div className="px-4 py-3 border-b border-border flex items-center justify-between bg-secondary/30">
+                    <div className="flex items-center gap-2">
+                        <Package className="w-4 h-4 text-primary" />
+                        <h3 className="text-sm font-bold text-foreground">{title}</h3>
+                    </div>
                     <button 
                         onClick={onClose} 
                         className="text-muted-foreground hover:text-foreground transition-colors p-1 hover:bg-secondary rounded"
                     >
-                        <X className="w-5 h-5" />
+                        <X className="w-4 h-4" />
                     </button>
                 </div>
                 
-                {/* Search Bar */}
-                <div className="p-4 border-b border-border bg-card">
+                {/* Search */}
+                <div className="px-4 py-3 border-b border-border bg-card">
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                         <input 
                             type="text"
                             placeholder="Search lot numbers..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-9 pr-4 py-2 border border-border rounded-md text-sm bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring transition-colors"
+                            className="w-full pl-8 pr-4 h-8 border border-border rounded text-[11px] bg-background text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/50 transition-colors"
+                            autoFocus
                         />
                     </div>
                 </div>
 
                 {/* Content */}
-                <div className="max-h-[400px] overflow-y-auto">
+                <div className="max-h-[400px] overflow-y-auto scrollbar-custom">
                     {loading ? (
                         <div className="text-center py-12">
-                            <div className="animate-spin w-6 h-6 border-2 border-border border-t-primary rounded-full mx-auto mb-2"></div>
-                            <p className="text-xs text-muted-foreground">Loading inventory...</p>
+                            <div className="animate-spin w-5 h-5 border-2 border-border border-t-primary rounded-full mx-auto mb-2"></div>
+                            <p className="text-[10px] text-muted-foreground">Loading inventory...</p>
                         </div>
                     ) : error ? (
                         <div className="text-center py-8 text-destructive">
-                            <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                            <p className="text-sm font-medium">{error}</p>
+                            <AlertCircle className="w-6 h-6 mx-auto mb-2 opacity-50" />
+                            <p className="text-xs font-medium">{error}</p>
                         </div>
                     ) : (
                         <div>
-                            {/* Option to clear/select no lot */}
+                            {/* Clear option */}
                             <button
                                 onClick={() => onSelect('', 0)}
                                 className={cn(
-                                    "w-full flex items-center justify-between px-6 py-3 transition-colors text-left group border-b border-border",
+                                    "w-full flex items-center gap-3 px-4 py-2.5 transition-all text-left group border-b border-border",
                                     !currentLotNumber 
-                                        ? "bg-blue-500/10 border-blue-500/20" 
+                                        ? "bg-blue-500/8" 
                                         : "hover:bg-secondary/50"
                                 )}
                             >
-                                <div className="flex items-center gap-3">
-                                    <div className={cn(
-                                        "w-8 h-8 flex items-center justify-center text-xs font-bold transition-colors border rounded",
-                                        !currentLotNumber 
-                                            ? "bg-blue-500 text-white border-blue-500" 
-                                            : "bg-secondary text-muted-foreground border-border group-hover:border-muted-foreground"
+                                <div className={cn(
+                                    "w-7 h-7 flex items-center justify-center text-xs transition-colors border rounded-md",
+                                    !currentLotNumber 
+                                        ? "bg-blue-500 text-white border-blue-500 shadow-sm shadow-blue-500/30" 
+                                        : "bg-secondary text-muted-foreground border-border group-hover:border-muted-foreground/50"
+                                )}>
+                                    {!currentLotNumber ? <Check className="w-3.5 h-3.5" /> : <Ban className="w-3 h-3" />}
+                                </div>
+                                <div>
+                                    <p className={cn(
+                                        "text-xs font-bold transition-colors",
+                                        !currentLotNumber ? "text-blue-400" : "text-muted-foreground"
                                     )}>
-                                        {!currentLotNumber ? <Check className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
-                                    </div>
-                                    <div>
-                                        <p className={cn(
-                                            "text-sm font-bold transition-colors",
-                                            !currentLotNumber ? "text-blue-500" : "text-muted-foreground"
-                                        )}>
-                                            (N/A)
-                                        </p>
-                                        <p className="text-[10px] text-muted-foreground">Clear selection</p>
-                                    </div>
+                                        (No Lot)
+                                    </p>
+                                    <p className="text-[9px] text-muted-foreground/50">Clear lot assignment</p>
                                 </div>
                             </button>
 
-                            {/* Show currently selected lot first (if any) */}
+                            {/* Currently selected lot */}
                             {selectedLot && (
                                 <div className="border-b border-border">
                                     {renderLotItem(selectedLot, 0, true)}
                                 </div>
                             )}
 
-                            {filteredLots.length === 0 ? (
-                                <div className="text-center py-12">
-                                    <p className="text-muted-foreground text-sm mb-2 font-medium">No results found</p>
-                                    {searchQuery ? (
-                                        <p className="text-[10px] text-muted-foreground">Try a different search term</p>
-                                    ) : (
-                                        <p className="text-[10px] text-muted-foreground">Inventory might be 0 for this SKU</p>
+                            {/* Suggested lot (if different from selected) */}
+                            {suggestedLotNumber && suggestedLotNumber !== currentLotNumber && (
+                                <div className="border-b border-border">
+                                    {renderLotItem(
+                                        displayLots.find(l => l.lotNumber === suggestedLotNumber)!,
+                                        0,
+                                        false,
+                                        true
                                     )}
                                 </div>
+                            )}
+
+                            {/* Remaining lots */}
+                            {displayLots.length === 0 && !selectedLot ? (
+                                <div className="text-center py-10">
+                                    <Package className="w-6 h-6 mx-auto mb-2 text-muted-foreground/30" />
+                                    <p className="text-muted-foreground text-xs font-medium mb-1">No lots with stock</p>
+                                    <p className="text-[10px] text-muted-foreground/50">
+                                        {searchQuery ? 'Try a different search' : 'All lot balances are zero'}
+                                    </p>
+                                </div>
                             ) : (
-                                <div className="divide-y divide-border">
-                                    {otherLots.map((lot, idx) => renderLotItem(lot, idx + (selectedLot ? 1 : 0), false, lot.lotNumber === suggestedLotNumber))}
+                                <div className="divide-y divide-border/50">
+                                    {displayLots
+                                        .filter(lot => lot.lotNumber !== suggestedLotNumber) // Already shown above
+                                        .map((lot, idx) => renderLotItem(
+                                            lot,
+                                            idx + (selectedLot ? 1 : 0) + (suggestedLotNumber && suggestedLotNumber !== currentLotNumber ? 1 : 0),
+                                            false,
+                                            false
+                                        ))
+                                    }
                                 </div>
                             )}
                         </div>
                     )}
                 </div>
                 
-                <div className="px-6 py-3 bg-secondary/50 border-t border-border text-center flex items-center justify-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                    <p className="text-[10px] text-muted-foreground font-medium">
-                        Showing lots with positive inventory balance
-                    </p>
+                {/* Footer stats */}
+                <div className="px-4 py-2 bg-secondary/30 border-t border-border flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                        <Clock className="w-3 h-3 text-muted-foreground/50" />
+                        <p className="text-[9px] text-muted-foreground font-medium">
+                            FIFO: Oldest lots shown first
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        <TrendingUp className="w-3 h-3 text-emerald-500/50" />
+                        <p className="text-[9px] text-muted-foreground font-medium">
+                            <span className="font-bold text-emerald-500">{totalAvailable.toLocaleString()}</span> total available
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>

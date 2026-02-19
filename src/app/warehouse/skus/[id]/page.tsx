@@ -723,110 +723,111 @@ function SkuDetailsPageContent() {
                     {/* Linked Web Products Section */}
                     {(linkedWebProducts.length > 0 || loadingLinkedProducts) && (
                         <div className="p-4 bg-background border-b border-border">
-                            <h3 className="text-xs font-bold text-foreground uppercase tracking-wider mb-3 border-b border-border pb-2 flex items-center gap-2">
-                                <Link className="w-3.5 h-3.5 text-indigo-400" />
-                                Linked Web Products
-                            </h3>
+                            <div className="flex items-center justify-between mb-3 border-b border-border pb-2">
+                                <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
+                                    <Link className="w-3.5 h-3.5 text-indigo-400" />
+                                    Web Products
+                                    <span className="text-[9px] font-medium text-muted-foreground/60 normal-case tracking-normal">
+                                        ({linkedWebProducts.length})
+                                    </span>
+                                </h3>
+                            </div>
                             {loadingLinkedProducts ? (
                                 <div className="flex items-center justify-center py-4">
                                     <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
                                     <span className="text-[10px] text-muted-foreground ml-2">Loading…</span>
                                 </div>
                             ) : (
-                                <div className="space-y-2">
+                                <div className="space-y-1">
                                     {linkedWebProducts.map((wp) => (
                                         <div
                                             key={wp._id}
-                                            className="group border border-border rounded-lg overflow-hidden hover:border-indigo-500/40 transition-all bg-secondary/20 hover:bg-secondary/40 cursor-pointer"
+                                            className="group flex items-center gap-2 px-2 py-1.5 rounded hover:bg-secondary/50 transition-all cursor-pointer relative"
                                             onClick={() => router.push(`/warehouse/web-products?search=${encodeURIComponent(wp.name)}`)}
                                         >
-                                            {/* Header row: Website badge + product name */}
-                                            <div className="flex items-center gap-2 px-3 py-2">
-                                                {/* Product image */}
-                                                {wp.image ? (
-                                                    <img
-                                                        src={wp.image}
-                                                        alt={wp.name}
-                                                        className="w-8 h-8 rounded object-cover border border-border shrink-0"
-                                                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                                                    />
-                                                ) : (
-                                                    <div className="w-8 h-8 rounded bg-secondary flex items-center justify-center shrink-0 border border-border">
-                                                        <Globe className="w-3.5 h-3.5 text-muted-foreground" />
-                                                    </div>
-                                                )}
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-[10px] font-bold text-foreground truncate leading-tight" title={wp.name}>{wp.name}</p>
-                                                    <div className="flex items-center gap-1.5 mt-0.5">
-                                                        {wp.website && (
-                                                            <span className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                                                                {wp.website}
-                                                            </span>
-                                                        )}
-                                                        <span className={cn(
-                                                            "text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded",
-                                                            wp.status === 'publish' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' :
-                                                            wp.status === 'draft' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' :
-                                                            'bg-secondary text-muted-foreground border border-border'
-                                                        )}>
-                                                            {wp.status || 'Unknown'}
-                                                        </span>
-                                                    </div>
+                                            {/* Image */}
+                                            {wp.image ? (
+                                                <img
+                                                    src={wp.image}
+                                                    alt=""
+                                                    className="w-7 h-7 rounded object-cover border border-border shrink-0"
+                                                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                                />
+                                            ) : (
+                                                <div className="w-7 h-7 rounded bg-secondary flex items-center justify-center shrink-0 border border-border">
+                                                    <Globe className="w-3 h-3 text-muted-foreground/50" />
                                                 </div>
-                                                {wp.permalink && (
-                                                    <a
-                                                        href={wp.permalink}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        className="p-1 hover:bg-secondary rounded transition-colors opacity-0 group-hover:opacity-100"
-                                                        title="Open in store"
-                                                    >
-                                                        <ExternalLink className="w-3 h-3 text-muted-foreground hover:text-indigo-400" />
-                                                    </a>
-                                                )}
-                                            </div>
+                                            )}
 
-                                            {/* Details row */}
-                                            <div className="flex items-center justify-between px-3 py-1.5 border-t border-border/50 bg-secondary/30">
-                                                <div className="flex items-center gap-3">
-                                                    <span className="text-[9px] text-muted-foreground">
-                                                        <span className="font-bold text-foreground">
-                                                            {wp.price != null ? `$${wp.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '-'}
+                                            {/* Content */}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-1.5">
+                                                    {/* Website badge */}
+                                                    {wp.website && (
+                                                        <span className="text-[7px] font-black uppercase tracking-wider px-1 py-px rounded bg-indigo-500/10 text-indigo-400/80 border border-indigo-500/15 shrink-0">
+                                                            {wp.website.length > 12 ? wp.website.substring(0, 12) : wp.website}
                                                         </span>
-                                                    </span>
+                                                    )}
+                                                    <p className="text-[9px] font-bold text-foreground truncate leading-none" title={wp.name}>
+                                                        {wp.name}
+                                                    </p>
+                                                </div>
+                                                <div className="flex items-center gap-1 mt-0.5">
+                                                    {/* Status */}
                                                     <span className={cn(
-                                                        "text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded",
-                                                        wp.type === 'variable' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
-                                                        'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                                                        "text-[7px] font-bold uppercase tracking-wider px-1 py-px rounded shrink-0",
+                                                        wp.status === 'publish' ? 'bg-emerald-500/10 text-emerald-500/80' :
+                                                        wp.status === 'draft' ? 'bg-amber-500/10 text-amber-500/80' :
+                                                        'bg-secondary text-muted-foreground/60'
+                                                    )}>
+                                                        {wp.status || '?'}
+                                                    </span>
+                                                    {/* Type */}
+                                                    <span className={cn(
+                                                        "text-[7px] font-bold uppercase tracking-wider px-1 py-px rounded shrink-0",
+                                                        wp.type === 'variable' ? 'bg-purple-500/10 text-purple-400/80' : 'bg-blue-500/10 text-blue-400/80'
                                                     )}>
                                                         {wp.type || 'simple'}
                                                     </span>
+                                                    {/* Linked variations inline */}
+                                                    {wp.linkedVariations.length > 0 && (
+                                                        <>
+                                                            <span className="text-[7px] text-muted-foreground/30">→</span>
+                                                            {wp.linkedVariations.slice(0, 2).map((v) => (
+                                                                <span key={v._id} className="text-[8px] text-muted-foreground/60 truncate max-w-[60px]" title={v.name || v.sku}>
+                                                                    {v.name || v.sku || `#${v.id}`}
+                                                                </span>
+                                                            ))}
+                                                            {wp.linkedVariations.length > 2 && (
+                                                                <span className="text-[8px] text-muted-foreground/40">+{wp.linkedVariations.length - 2}</span>
+                                                            )}
+                                                        </>
+                                                    )}
                                                 </div>
-                                                <span className="text-[9px] font-mono font-bold text-muted-foreground">
-                                                    {wp.totalWebOrders} orders
-                                                </span>
                                             </div>
 
-                                            {/* Linked Variations (for variable products) */}
-                                            {wp.linkedVariations.length > 0 && (
-                                                <div className="border-t border-border/50 px-3 py-1.5 bg-indigo-500/5">
-                                                    <p className="text-[8px] font-bold text-indigo-400 uppercase tracking-wider mb-1">Linked Variations</p>
-                                                    <div className="space-y-0.5">
-                                                        {wp.linkedVariations.map((v) => (
-                                                            <div key={v._id} className="flex items-center justify-between">
-                                                                <span className="text-[9px] text-muted-foreground truncate" title={v.name || v.sku}>
-                                                                    {v.name || v.sku || `Variation #${v.id}`}
-                                                                </span>
-                                                                {v.price != null && (
-                                                                    <span className="text-[9px] font-mono text-foreground/70">
-                                                                        ${v.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
+                                            {/* Right: Price + Orders */}
+                                            <div className="shrink-0 text-right">
+                                                <p className="text-[10px] font-bold text-foreground font-mono leading-none">
+                                                    {wp.price != null ? `$${wp.price.toFixed(2)}` : '-'}
+                                                </p>
+                                                <p className="text-[8px] text-muted-foreground/50 font-mono mt-0.5">
+                                                    {wp.totalWebOrders || 0} ord
+                                                </p>
+                                            </div>
+
+                                            {/* External link */}
+                                            {wp.permalink && (
+                                                <a
+                                                    href={wp.permalink}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="p-0.5 hover:bg-secondary rounded transition-all opacity-0 group-hover:opacity-100 shrink-0"
+                                                    title="Open in store"
+                                                >
+                                                    <ExternalLink className="w-2.5 h-2.5 text-muted-foreground hover:text-indigo-400" />
+                                                </a>
                                             )}
                                         </div>
                                     ))}
