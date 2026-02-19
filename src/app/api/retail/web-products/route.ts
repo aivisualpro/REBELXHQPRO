@@ -107,13 +107,61 @@ export async function GET(request: NextRequest) {
                 countMap.set(key, c.count);
             });
 
+            // === Per-Variation Order Counts ===
+            const variationCounts = await WebOrder.aggregate([
+                { 
+                    $match: { 
+                        dateCreated: { $gte: filterDate },
+                        'lineItems.productId': { $in: productIdentifiers.map((p: any) => p.webId) }
+                    } 
+                },
+                { $unwind: '$lineItems' },
+                { 
+                    $match: { 
+                        'lineItems.productId': { $in: productIdentifiers.map((p: any) => p.webId) },
+                        'lineItems.variationId': { $exists: true, $nin: [null, 0] }
+                    } 
+                },
+                {
+                    $group: {
+                        _id: { 
+                            webId: '$lineItems.productId',
+                            website: '$website',
+                            variationId: '$lineItems.variationId'
+                        },
+                        orderIds: { $addToSet: "$_id" }
+                    }
+                },
+                {
+                    $project: {
+                        count: { $size: "$orderIds" }
+                    }
+                }
+            ]);
+
+            // Create a variation-level lookup map: "website-webId-variationId" => count
+            const varCountMap = new Map();
+            variationCounts.forEach((c: any) => {
+                const key = `${c._id.website}-${c._id.webId}-${c._id.variationId}`;
+                varCountMap.set(key, c.count);
+            });
+
             // Update the webProducts array with dynamic counts
             webProducts.forEach((p: any) => {
                 const key = `${p.website}-${p.webId}`;
                 if (countMap.has(key)) {
                     p.totalWebOrders = countMap.get(key);
                 } else {
-                    p.totalWebOrders = 0; // If no orders found in date range, count is 0
+                    p.totalWebOrders = 0;
+                }
+
+                // Map variation-level counts
+                if (p.variations && p.variations.length > 0) {
+                    p.variations.forEach((v: any) => {
+                        const vid = v.id || v._id;
+                        const vKey = `${p.website}-${p.webId}-${vid}`;
+                        v.totalWebOrders = varCountMap.get(vKey) || 0;
+                    });
                 }
             });
         }

@@ -13,6 +13,7 @@ import {
   Layers,
   ChevronsDownUp,
   ChevronsUpDown,
+  ExternalLink,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Pagination } from '@/components/ui/Pagination';
@@ -31,6 +32,7 @@ interface Variation {
   stockQuantity?: number;
   stockStatus?: string;
   linkedSkuId?: string | null;
+  totalWebOrders?: number;
 }
 
 interface WebProduct {
@@ -486,7 +488,7 @@ function WebProductsPageContent() {
               </th>
 
               {/* Website */}
-              <th className="border-r border-border">
+              <th className="border-r border-border w-[100px]">
                 <TableColumnHeader
                   column="website"
                   title="Website"
@@ -514,7 +516,7 @@ function WebProductsPageContent() {
 
               {/* Sale Price */}
               <th className="border-r border-border">
-                <TableColumnHeader column="salePrice" title="Price" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground justify-end" />
+                <TableColumnHeader column="salePrice" title="Price" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
               </th>
 
               {/* Linked SKU */}
@@ -531,12 +533,12 @@ function WebProductsPageContent() {
 
               {/* Total Web Orders */}
               <th className="border-r border-border">
-                <TableColumnHeader column="totalWebOrders" title="Orders" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground justify-end" />
+                <TableColumnHeader column="totalWebOrders" title="Orders" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
               </th>
 
               {/* Web ID */}
               <th>
-                <TableColumnHeader column="webId" title="Web ID" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground justify-end" />
+                <TableColumnHeader column="webId" title="Web ID" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
               </th>
             </tr>
           </thead>
@@ -610,6 +612,19 @@ function WebProductsPageContent() {
                             </span>
                           )}
                         </div>
+                        {/* Detail page link for variable products */}
+                        {isVariable && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/warehouse/web-products/${product._id}`);
+                            }}
+                            className="p-1 rounded hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors shrink-0 opacity-0 group-hover:opacity-100"
+                            title="Open product detail"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                          </button>
+                        )}
                       </div>
                     </td>
 
@@ -646,7 +661,7 @@ function WebProductsPageContent() {
                     </td>
 
                     {/* Sale Price */}
-                    <td className="px-2 py-1.5 text-[11px] text-muted-foreground font-mono border-r border-border text-right">
+                    <td className="px-2 py-1.5 text-[11px] text-muted-foreground font-mono border-r border-border">
                       ${(product.salePrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
 
@@ -672,12 +687,12 @@ function WebProductsPageContent() {
                     </td>
 
                     {/* Total Web Orders */}
-                    <td className="px-2 py-1.5 text-[11px] font-black text-emerald-600 font-mono border-r border-border text-right">
+                    <td className="px-2 py-1.5 text-[11px] font-black text-emerald-600 font-mono border-r border-border">
                       {product.totalWebOrders || 0}
                     </td>
 
                     {/* Web ID */}
-                    <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono text-right">
+                    <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono">
                       {product.webId || '—'}
                     </td>
                   </tr>
@@ -730,7 +745,7 @@ function WebProductsPageContent() {
                         </td>
 
                         {/* Variation Price */}
-                        <td className="px-2 py-1 text-[10px] text-muted-foreground/80 font-mono border-r border-border text-right">
+                        <td className="px-2 py-1 text-[10px] text-muted-foreground/80 font-mono border-r border-border">
                           ${((variation.salePrice || variation.price || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
 
@@ -739,11 +754,13 @@ function WebProductsPageContent() {
                           {renderSkuCell(product, variation)}
                         </td>
 
-                        {/* Orders - empty for variations */}
-                        <td className="px-2 py-1 border-r border-border text-right" />
+                        {/* Orders - per variation */}
+                        <td className="px-2 py-1 text-[11px] font-black text-emerald-600 font-mono border-r border-border">
+                          {(variation as any).totalWebOrders || 0}
+                        </td>
 
                         {/* Variation ID */}
-                        <td className="px-2 py-1 text-[9px] text-muted-foreground/60 font-mono text-right">
+                        <td className="px-2 py-1 text-[9px] text-muted-foreground/60 font-mono">
                           {vid || '—'}
                         </td>
                       </tr>
