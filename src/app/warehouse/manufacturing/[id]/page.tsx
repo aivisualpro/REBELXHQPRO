@@ -991,6 +991,7 @@ export default function ManufacturingDetailPage() {
                                             key={col.key || col.label} 
                                             className={cn(
                                                 "px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap",
+                                                col.width,
                                                 col.align || "text-left" 
                                             )}
                                         >
@@ -1036,7 +1037,7 @@ export default function ManufacturingDetailPage() {
                                             <td className="px-3 py-1 text-[10px] text-muted-foreground font-mono">
                                                 {new Date(item.createdAt).toLocaleDateString()}
                                             </td>
-                                            <td className="px-3 py-1 text-[10px] text-foreground/80 leading-tight">
+                                            <td className="px-3 py-1 text-[10px] text-foreground/80 leading-tight min-w-[200px]">
                                                 <div className="flex items-center space-x-1.5">
                                                     {!!displayTier && (
                                                         <span className={cn(
@@ -1600,45 +1601,39 @@ export default function ManufacturingDetailPage() {
                             </button>
                         </div>
                         <div className="p-6 space-y-4">
-                            {/* SKU - editable if new, read-only if editing */}
+                            {/* SKU - always editable */}
                             <div>
                                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">SKU</label>
-                                {editingItem._id ? (
-                                    <div className="text-sm font-medium text-foreground/80 bg-secondary px-3 py-2 rounded border border-border">
-                                        {typeof editingItem.sku === 'object' ? editingItem.sku.name : (skuList.find(s => s._id === editingItem.sku)?.name || editingItem.sku || '-')}
-                                    </div>
-                                ) : (
-                                    <SearchableSelect
-                                        options={skuList.map(s => ({ value: s._id, label: s.name }))}
-                                        value={typeof editingItem.sku === 'string' ? editingItem.sku : (editingItem.sku as any)?._id || ''}
-                                        onChange={async (skuId: string) => {
-                                            setEditingItem({ ...editingItem, sku: skuId });
-                                            
-                                            // Auto-fetch oldest lot for this SKU
-                                            try {
-                                                const res = await fetch(`/api/warehouse/skus/${skuId}/lots`);
-                                                if (res.ok) {
-                                                    const data = await res.json();
-                                                    const lotsWithBalance = (data.lots || [])
-                                                        .filter((l: any) => l.balance > 0)
-                                                        .sort((a: any, b: any) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime());
-                                                    if (lotsWithBalance.length > 0) {
-                                                        setEditingItem(prev => prev ? { 
-                                                            ...prev, 
-                                                            sku: skuId, 
-                                                            lotNumber: lotsWithBalance[0].lotNumber,
-                                                            cost: lotsWithBalance[0].cost || 0
-                                                        } : prev);
-                                                    }
+                                <SearchableSelect
+                                    options={skuList.map(s => ({ value: s._id, label: s.name }))}
+                                    value={typeof editingItem.sku === 'string' ? editingItem.sku : (editingItem.sku as any)?._id || ''}
+                                    onChange={async (skuId: string) => {
+                                        setEditingItem({ ...editingItem, sku: skuId });
+                                        
+                                        // Auto-fetch oldest lot for this SKU
+                                        try {
+                                            const res = await fetch(`/api/warehouse/skus/${skuId}/lots`);
+                                            if (res.ok) {
+                                                const data = await res.json();
+                                                const lotsWithBalance = (data.lots || [])
+                                                    .filter((l: any) => l.balance > 0)
+                                                    .sort((a: any, b: any) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime());
+                                                if (lotsWithBalance.length > 0) {
+                                                    setEditingItem(prev => prev ? { 
+                                                        ...prev, 
+                                                        sku: skuId, 
+                                                        lotNumber: lotsWithBalance[0].lotNumber,
+                                                        cost: lotsWithBalance[0].cost || 0
+                                                    } : prev);
                                                 }
-                                            } catch (e) {
-                                                // Silently fail - user can still select lot manually
                                             }
-                                        }}
-                                        placeholder="Search SKU..."
-                                        triggerClassName="rounded border-border h-9 bg-background"
-                                    />
-                                )}
+                                        } catch (e) {
+                                            // Silently fail - user can still select lot manually
+                                        }
+                                    }}
+                                    placeholder="Search SKU..."
+                                    triggerClassName="rounded border-border h-9 bg-background"
+                                />
                             </div>
                             
                             {/* Lot Number */}
