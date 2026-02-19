@@ -11,6 +11,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Layers,
+  ChevronsDownUp,
+  ChevronsUpDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Pagination } from '@/components/ui/Pagination';
@@ -176,12 +178,18 @@ function WebProductsPageContent() {
     fetchSkuList();
   }, []);
 
-  // SKU options for SearchableSelect
+  // SKU options for SearchableSelect — show only name, value is the ID
   const skuOptions: SkuOption[] = useMemo(() => {
     return skuList.map((sku: any) => ({
       value: sku._id,
-      label: `${sku._id}${sku.name ? ` — ${sku.name}` : ''}`,
+      label: sku.name || sku._id,
     }));
+  }, [skuList]);
+
+  // Helper to resolve a linkedSkuId to SKU name
+  const getSkuName = useCallback((skuId: string) => {
+    const sku = skuList.find((s: any) => s._id === skuId);
+    return sku?.name || skuId;
   }, [skuList]);
 
   // Sync status (read-only)
@@ -342,22 +350,17 @@ function WebProductsPageContent() {
       );
     }
 
-    return (
-      <div className="flex items-center gap-1.5 min-w-[180px]" onClick={(e) => e.stopPropagation()}>
-        <SearchableSelect
-          options={skuOptions}
-          value={currentLinkedSkuId || ''}
-          onChange={(value) => handleLinkSku(product._id, value, variationId)}
-          placeholder="Link SKU..."
-          className="w-full"
-          triggerClassName={cn(
-            "h-6 text-[10px] rounded border transition-all",
-            currentLinkedSkuId
-              ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 font-bold hover:bg-emerald-500/20"
-              : "bg-rose-500/5 border-rose-500/20 text-rose-400 hover:bg-rose-500/10 border-dashed"
-          )}
-        />
-        {currentLinkedSkuId && (
+    // If linked — show clickable SKU name + unlink button
+    if (currentLinkedSkuId) {
+      return (
+        <div className="flex items-center gap-1.5 min-w-[180px]" onClick={(e) => e.stopPropagation()}>
+          <span
+            className="flex-1 truncate text-[10px] font-bold text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded cursor-pointer hover:bg-emerald-500/20 transition-colors"
+            onClick={() => router.push(`/warehouse/skus/${currentLinkedSkuId}`)}
+            title={`Go to SKU: ${currentLinkedSkuId}`}
+          >
+            {getSkuName(currentLinkedSkuId)}
+          </span>
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -368,7 +371,21 @@ function WebProductsPageContent() {
           >
             <Unlink className="w-3 h-3" />
           </button>
-        )}
+        </div>
+      );
+    }
+
+    // If not linked — show SearchableSelect dropdown
+    return (
+      <div className="flex items-center gap-1.5 min-w-[180px]" onClick={(e) => e.stopPropagation()}>
+        <SearchableSelect
+          options={skuOptions}
+          value=""
+          onChange={(value) => handleLinkSku(product._id, value, variationId)}
+          placeholder="Link SKU..."
+          className="w-full"
+          triggerClassName="h-6 text-[10px] rounded border border-dashed transition-all bg-rose-500/5 border-rose-500/20 text-rose-400 hover:bg-rose-500/10"
+        />
       </div>
     );
   };
@@ -431,18 +448,20 @@ function WebProductsPageContent() {
           <div className="flex-1" />
 
           {/* Expand / Collapse All */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5">
             <button
               onClick={expandAll}
-              className="px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground hover:bg-secondary rounded transition-colors"
+              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded transition-colors"
+              title="Expand All"
             >
-              Expand All
+              <ChevronsUpDown className="w-4 h-4" />
             </button>
             <button
               onClick={collapseAll}
-              className="px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground hover:bg-secondary rounded transition-colors"
+              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded transition-colors"
+              title="Collapse All"
             >
-              Collapse All
+              <ChevronsDownUp className="w-4 h-4" />
             </button>
           </div>
         </>,

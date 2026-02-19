@@ -153,10 +153,10 @@ export function SearchableSelect({
                 width: dropdownPos.width,
                 zIndex: 99999
             }}
-            className="rounded-md shadow-2xl border border-border animate-in fade-in zoom-in-95 duration-100 bg-card dark:bg-zinc-900 flex flex-col"
+            className="rounded-md shadow-2xl border border-border animate-in fade-in zoom-in-95 duration-100 bg-card flex flex-col"
             onWheel={(e) => e.stopPropagation()}
         >
-            <div className="border-b border-border bg-muted sticky top-0 shrink-0 z-10">
+            <div className="border-b border-border bg-secondary/50 sticky top-0 shrink-0 z-10">
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <input
@@ -171,7 +171,7 @@ export function SearchableSelect({
                 </div>
             </div>
             
-            <div className="max-h-60 overflow-y-auto scrollbar-custom bg-card dark:bg-zinc-900">
+            <div className="max-h-60 overflow-y-auto scrollbar-custom bg-card">
                 {filteredOptions.length === 0 && !showCreate ? (
                     <div className="px-4 py-6 text-sm text-muted-foreground text-center">No results found</div>
                 ) : (
