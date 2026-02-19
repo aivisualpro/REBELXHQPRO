@@ -32,18 +32,19 @@ export async function GET(request: NextRequest) {
             query.website = { $in: website.split(',') };
         }
 
-        if (hideZeroOrders) {
-            query.totalWebOrders = { $gt: 0 };
-        }
+        // When hideZeroOrders is true, we need to filter AFTER dynamic count recalculation
+        // (because the date filter can change counts). So we fetch all and paginate manually.
+        // When hideZeroOrders is false, use normal DB-level pagination.
+        const useManualPagination = hideZeroOrders;
 
         const queryObj = WebProduct.find(query).sort({ [sortBy]: sortOrder });
 
-        if (limit > 0) {
+        if (!useManualPagination && limit > 0) {
             queryObj.skip((page - 1) * limit).limit(limit);
         }
 
-        const [total, webProducts] = await Promise.all([
-            WebProduct.countDocuments(query),
+        const [dbTotal, webProducts] = await Promise.all([
+            useManualPagination ? Promise.resolve(0) : WebProduct.countDocuments(query),
             queryObj.lean()
         ]);
 
@@ -54,28 +55,21 @@ export async function GET(request: NextRequest) {
             const filterDate = new Date(dateFilterSetting.value);
             
             // Calculate dynamic counts for the fetched products
-            // Optimization: Only aggregate for the products on this page
             const productIdentifiers = webProducts.map((p: any) => ({ 
                 webId: p.webId, 
                 website: p.website 
             }));
 
-            // We need to count orders for each product, respecting the date filter
-            // This aggregation is slightly complex because one order can contain multiple products
             const counts = await WebOrder.aggregate([
                 { 
                     $match: { 
                         dateCreated: { $gte: filterDate },
-                        // Optimization: Only look at orders that might contain our products
-                        // We can't easily filter by specific (webId+website) pairs in match without $expr or huge $or
-                        // But we can limit by productId list at least?
                         'lineItems.productId': { $in: productIdentifiers.map((p: any) => p.webId) }
                     } 
                 },
                 { $unwind: '$lineItems' },
                 { 
                     $match: { 
-                        // Ensure we are counting distinct Order+Product pairs correctly
                          'lineItems.productId': { $in: productIdentifiers.map((p: any) => p.webId) }
                     } 
                 },
@@ -83,16 +77,9 @@ export async function GET(request: NextRequest) {
                     $group: {
                         _id: { 
                             webId: '$lineItems.productId',
-                            // Try to group by website too if line item has it, or rely on Order website
                             website: '$website' 
                         },
-                        // We want unique order count. Since we unwound AND grouped, each doc is a line item.
-                        // But an order might have 2 line items of same product (rare but possible).
-                        // count: { $sum: 1 } counts occurrences. 
-                        // We want distinct orders. But we unwound from a unique order.
-                        // So counting using $addToSet: "$_id" (Order ID) is safest if we didn't unwind?
-                        // Actually, if we unwind, we are splitting order. 
-                        orderIds: { $addToSet: "$_id" } // Collect unique order IDs
+                        orderIds: { $addToSet: "$_id" }
                     }
                 },
                 {
@@ -141,7 +128,7 @@ export async function GET(request: NextRequest) {
                 }
             ]);
 
-            // Create a variation-level lookup map: "website-webId-variationId" => count
+            // Create a variation-level lookup map
             const varCountMap = new Map();
             variationCounts.forEach((c: any) => {
                 const key = `${c._id.website}-${c._id.webId}-${c._id.variationId}`;
@@ -166,6 +153,20 @@ export async function GET(request: NextRequest) {
                     });
                 }
             });
+        }
+
+        // Apply hideZeroOrders filter AFTER dynamic recalculation
+        let finalProducts = webProducts;
+        let total = dbTotal;
+
+        if (hideZeroOrders) {
+            finalProducts = webProducts.filter((p: any) => p.totalWebOrders && p.totalWebOrders > 0);
+            total = finalProducts.length;
+            // Manual pagination
+            if (limit > 0) {
+                const start = (page - 1) * limit;
+                finalProducts = finalProducts.slice(start, start + limit);
+            }
         }
 
         // === Global Link Stats (across all matching products, not just current page) ===
@@ -210,7 +211,7 @@ export async function GET(request: NextRequest) {
         };
 
         return NextResponse.json({
-            webProducts,
+            webProducts: finalProducts,
             total,
             page,
             totalPages: limit > 0 ? Math.ceil(total / limit) : 1,
