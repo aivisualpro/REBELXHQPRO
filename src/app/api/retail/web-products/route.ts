@@ -169,46 +169,68 @@ export async function GET(request: NextRequest) {
             }
         }
 
-        // === Global Link Stats (across all matching products, not just current page) ===
-        const linkStatsResult = await WebProduct.aggregate([
-            { $match: query },
-            {
-                $facet: {
-                    simple: [
-                        { $match: { type: { $ne: 'variable' } } },
-                        {
-                            $group: {
-                                _id: null,
-                                totalLinkable: { $sum: 1 },
-                                totalLinked: {
-                                    $sum: { $cond: [{ $and: [{ $ne: ['$linkedSkuId', null] }, { $ne: ['$linkedSkuId', ''] }] }, 1, 0] }
-                                }
-                            }
-                        }
-                    ],
-                    variable: [
-                        { $match: { type: 'variable', 'variations.0': { $exists: true } } },
-                        { $unwind: '$variations' },
-                        {
-                            $group: {
-                                _id: null,
-                                totalLinkable: { $sum: 1 },
-                                totalLinked: {
-                                    $sum: { $cond: [{ $and: [{ $ne: ['$variations.linkedSkuId', null] }, { $ne: ['$variations.linkedSkuId', ''] }] }, 1, 0] }
-                                }
-                            }
-                        }
-                    ]
-                }
-            }
-        ]);
+        // === Global Link Stats ===
+        let globalLinkStats = { totalLinkable: 0, totalLinked: 0 };
 
-        const simpleStats = linkStatsResult[0]?.simple[0] || { totalLinkable: 0, totalLinked: 0 };
-        const variableStats = linkStatsResult[0]?.variable[0] || { totalLinkable: 0, totalLinked: 0 };
-        const globalLinkStats = {
-            totalLinkable: simpleStats.totalLinkable + variableStats.totalLinkable,
-            totalLinked: simpleStats.totalLinked + variableStats.totalLinked,
-        };
+        if (hideZeroOrders) {
+            // Compute from the already-filtered products (before pagination slice)
+            const filteredAll = webProducts.filter((p: any) => p.totalWebOrders && p.totalWebOrders > 0);
+            let totalLinkable = 0;
+            let totalLinked = 0;
+            filteredAll.forEach((p: any) => {
+                if (p.type === 'variable' && p.variations && p.variations.length > 0) {
+                    p.variations.forEach((v: any) => {
+                        totalLinkable++;
+                        if (v.linkedSkuId) totalLinked++;
+                    });
+                } else {
+                    totalLinkable++;
+                    if (p.linkedSkuId) totalLinked++;
+                }
+            });
+            globalLinkStats = { totalLinkable, totalLinked };
+        } else {
+            // Use DB aggregation for unfiltered view
+            const linkStatsResult = await WebProduct.aggregate([
+                { $match: query },
+                {
+                    $facet: {
+                        simple: [
+                            { $match: { type: { $ne: 'variable' } } },
+                            {
+                                $group: {
+                                    _id: null,
+                                    totalLinkable: { $sum: 1 },
+                                    totalLinked: {
+                                        $sum: { $cond: [{ $and: [{ $ne: ['$linkedSkuId', null] }, { $ne: ['$linkedSkuId', ''] }] }, 1, 0] }
+                                    }
+                                }
+                            }
+                        ],
+                        variable: [
+                            { $match: { type: 'variable', 'variations.0': { $exists: true } } },
+                            { $unwind: '$variations' },
+                            {
+                                $group: {
+                                    _id: null,
+                                    totalLinkable: { $sum: 1 },
+                                    totalLinked: {
+                                        $sum: { $cond: [{ $and: [{ $ne: ['$variations.linkedSkuId', null] }, { $ne: ['$variations.linkedSkuId', ''] }] }, 1, 0] }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                }
+            ]);
+
+            const simpleStats = linkStatsResult[0]?.simple[0] || { totalLinkable: 0, totalLinked: 0 };
+            const variableStats = linkStatsResult[0]?.variable[0] || { totalLinkable: 0, totalLinked: 0 };
+            globalLinkStats = {
+                totalLinkable: simpleStats.totalLinkable + variableStats.totalLinkable,
+                totalLinked: simpleStats.totalLinked + variableStats.totalLinked,
+            };
+        }
 
         return NextResponse.json({
             webProducts: finalProducts,
