@@ -161,16 +161,28 @@ export async function GET(request: Request) {
                 }}
             ]), 
             
-            // 7. Web Orders (By SKU — String type)
+            // 7. Web Orders (By SKU — String type, including linkedSkuId)
             WebOrder.aggregate([
                 { $match: { 
-                    "lineItems.sku": { $in: skuIds }, 
+                    $or: [
+                        { "lineItems.sku": { $in: skuIds } },
+                        { "lineItems.linkedSkuId": { $in: strSkuIds } }
+                    ],
                     status: { $in: ['completed', 'shipped', 'Completed', 'Shipped', 'processing', 'Processing', 'pending', 'Pending', 'on-hold', 'On Hold'] } 
                 }},
                 { $unwind: "$lineItems" },
-                { $match: { "lineItems.sku": { $in: skuIds } } },
+                { $match: { 
+                    $or: [
+                        { "lineItems.sku": { $in: skuIds } },
+                        { "lineItems.linkedSkuId": { $in: strSkuIds } }
+                    ]
+                }},
+                // Normalize to a single key for grouping
+                { $addFields: {
+                    resolvedSkuId: { $ifNull: ["$lineItems.linkedSkuId", { $ifNull: ["$lineItems.sku", null] }] }
+                }},
                 { $group: {
-                    _id: "$lineItems.sku",
+                    _id: "$resolvedSkuId",
                     qty: { $sum: "$lineItems.quantity" },
                     revenue: { $sum: "$lineItems.total" } 
                 }}
