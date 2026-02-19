@@ -25,15 +25,29 @@ export async function GET(request: NextRequest) {
             // Tokenize: split search into individual words for flexible matching
             const tokens = search.trim().split(/\s+/).filter(Boolean);
             if (tokens.length > 0) {
-                // Each token must match at least one of name, _id, or sku_code
+                // Each token must match at least one of name, _id, sku_code, or variation name
+                // Fuzzy prefix matching: also try shorter prefixes for typo tolerance
                 query.$and = tokens.map(token => {
-                    const escapedToken = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const patterns: string[] = [escaped];
+
+                    // Drop trailing chars for typo tolerance (e.g. "maenge" → also try "maeng", "maen")
+                    if (token.length >= 4) {
+                        patterns.push(escaped.slice(0, -1));
+                    }
+                    if (token.length >= 6) {
+                        patterns.push(escaped.slice(0, -2));
+                    }
+
+                    // Combine all unique patterns into one regex with alternation
+                    const fuzzyPattern = [...new Set(patterns)].join('|');
+
                     return {
                         $or: [
-                            { name: { $regex: escapedToken, $options: 'i' } },
-                            { 'variations.name': { $regex: escapedToken, $options: 'i' } },
-                            { _id: { $regex: escapedToken, $options: 'i' } },
-                            { sku_code: { $regex: escapedToken, $options: 'i' } },
+                            { name: { $regex: fuzzyPattern, $options: 'i' } },
+                            { 'variations.name': { $regex: fuzzyPattern, $options: 'i' } },
+                            { _id: { $regex: fuzzyPattern, $options: 'i' } },
+                            { sku_code: { $regex: fuzzyPattern, $options: 'i' } },
                         ]
                     };
                 });

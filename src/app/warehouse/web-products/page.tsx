@@ -338,6 +338,47 @@ function WebProductsPageContent() {
     return variation.name.replace(new RegExp(`^${escaped}\\s*-\\s*`, 'i'), '');
   };
 
+  // Highlight search matches in text for visual feedback
+  const highlightText = useCallback((text: string): React.ReactNode => {
+    const tokens = debouncedSearch.trim().split(/\s+/).filter(Boolean);
+    if (!tokens.length || !text) return text;
+
+    // Build patterns: each token + shorter prefixes (mirrors API fuzzy logic)
+    const allPatterns: string[] = [];
+    tokens.forEach(token => {
+      const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      allPatterns.push(escaped);
+      if (token.length >= 4) allPatterns.push(escaped.slice(0, -1));
+      if (token.length >= 6) allPatterns.push(escaped.slice(0, -2));
+    });
+
+    // Longest first for greedy matching, deduplicate
+    allPatterns.sort((a, b) => b.length - a.length);
+    const uniquePatterns = [...new Set(allPatterns)].filter(p => p.length > 0);
+    if (!uniquePatterns.length) return text;
+
+    try {
+      const regex = new RegExp(`(${uniquePatterns.join('|')})`, 'gi');
+      const parts = text.split(regex);
+      if (parts.length <= 1) return text;
+
+      const testRegex = new RegExp(`^(?:${uniquePatterns.join('|')})$`, 'i');
+      return (
+        <>
+          {parts.map((part, i) => {
+            if (!part) return null;
+            if (testRegex.test(part)) {
+              return <span key={i} className="bg-primary/20 text-primary font-bold rounded-sm px-0.5">{part}</span>;
+            }
+            return <span key={i}>{part}</span>;
+          })}
+        </>
+      );
+    } catch {
+      return text;
+    }
+  }, [debouncedSearch]);
+
   // Render the linked SKU cell content
   const renderSkuCell = (product: WebProduct, variation?: Variation) => {
     const currentLinkedSkuId = variation ? variation.linkedSkuId : product.linkedSkuId;
@@ -623,7 +664,7 @@ function WebProductsPageContent() {
                           />
                         </div>
                         <div className="flex flex-col min-w-0">
-                          <span className="text-[11px] font-semibold text-foreground truncate" title={product.name}>{product.name}</span>
+                          <span className="text-[11px] font-semibold text-foreground truncate" title={product.name}>{highlightText(product.name)}</span>
                           {isVariable && (
                             <span className="text-[8px] text-muted-foreground font-bold uppercase tracking-wider">
                               {linkedCount}/{totalCount} linked
@@ -748,7 +789,7 @@ function WebProductsPageContent() {
                               />
                             </div>
                             <span className="font-medium text-foreground/80 truncate" title={variation.name}>
-                              {getVariationLabel(product, variation)}
+                              {highlightText(getVariationLabel(product, variation))}
                             </span>
                           </div>
                         </td>
