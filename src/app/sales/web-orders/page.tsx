@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { createPortal } from 'react-dom';
 import {
   Search,
   ArrowUpDown,
@@ -12,7 +13,9 @@ import {
   Package,
   CreditCard,
   Truck,
-  User
+  User,
+  X,
+  Plus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -60,6 +63,13 @@ export default function WebOrdersPage() {
   const [selectedWebsites, setSelectedWebsites] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState({ from: '', to: '' });
+
+  // Header portal
+  const [headerPortalTarget, setHeaderPortalTarget] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const el = document.getElementById('header-portal-target');
+    if (el) setHeaderPortalTarget(el);
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -136,26 +146,34 @@ export default function WebOrdersPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-48px)] bg-background transition-colors duration-300">
-
-      {/* Action Bar */}
-      <div className="flex items-center justify-between px-4 h-11 border-b border-border bg-secondary/50 transition-colors">
-        <div className="flex items-center space-x-4">
-          <h1 className="text-sm font-bold text-foreground uppercase tracking-tighter flex items-center space-x-2">
-            <ShoppingBag className="w-4 h-4 text-primary" />
-            <span>Web Orders</span>
-          </h1>
+      {/* Header Portal: search */}
+      {headerPortalTarget && createPortal(
+        <>
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <input
               type="text"
-              placeholder="Search Order#, Customer, Email..."
+              placeholder="Search orders..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 pr-3 h-8 w-64 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
+              className="pl-8 pr-8 h-8 w-64 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
             />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors z-20 cursor-pointer"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
           </div>
-        </div>
+          <div className="flex-1" />
+        </>,
+        headerPortalTarget
+      )}
 
+      {/* Filter Bar */}
+      <div className="flex items-center justify-end px-4 h-11 border-b border-border bg-secondary/50 transition-colors">
         <div className="flex items-center space-x-2">
           <MultiSelectFilter
             label="Website"

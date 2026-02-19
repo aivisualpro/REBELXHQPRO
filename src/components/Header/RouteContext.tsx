@@ -23,10 +23,18 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
     // Wholesale Orders
     if (pathname === '/sales/wholesale-orders') {
         return {
-            title: 'Wholesale Orders',
-            actions: [
-                { label: 'Add', icon: Plus, href: '/sales/wholesale-orders?createNew=true', variant: 'primary' },
-            ]
+            title: '',
+            actions: [],
+            isPortal: true
+        };
+    }
+
+    // Web Orders
+    if (pathname === '/sales/web-orders') {
+        return {
+            title: '',
+            actions: [],
+            isPortal: true
         };
     }
 
@@ -113,10 +121,9 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
     // Purchase Orders
     if (pathname === '/warehouse/purchase-orders') {
         return {
-            title: 'Purchase Orders',
-            actions: [
-                { label: 'Add', icon: Plus, href: '/warehouse/purchase-orders?createNew=true', variant: 'primary' },
-            ]
+            title: '',
+            actions: [],
+            isPortal: true
         };
     }
 
@@ -149,20 +156,18 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
     // Lab Results
     if (pathname === '/warehouse/lab-results') {
         return {
-            title: 'Lab Results',
-            actions: [
-                { label: 'Add', icon: Plus, href: '/warehouse/lab-results?createNew=true', variant: 'primary' },
-            ]
+            title: '',
+            actions: [],
+            isPortal: true
         };
     }
 
     // Kits
     if (pathname === '/warehouse/kits') {
         return {
-            title: 'Product Kits',
-            actions: [
-                { label: 'Add', icon: Plus, href: '/warehouse/kits?createNew=true', variant: 'primary' },
-            ]
+            title: '',
+            actions: [],
+            isPortal: true
         };
     }
 
@@ -187,10 +192,9 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
     // Manufacturing
     if (pathname === '/warehouse/manufacturing') {
         return {
-            title: 'Manufacturing',
-            actions: [
-                { label: 'Add', icon: Plus, href: '/warehouse/manufacturing/new', variant: 'primary' },
-            ]
+            title: '',
+            actions: [],
+            isPortal: true
         };
     }
 
