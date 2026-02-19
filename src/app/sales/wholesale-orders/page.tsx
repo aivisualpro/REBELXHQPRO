@@ -971,11 +971,11 @@ function SaleOrdersContent() {
           </thead>
           <tbody className="divide-y divide-border bg-background/50">
             {loading ? (
-              <tr><td colSpan={14} className="px-4 py-12 text-center text-xs text-slate-400">Loading Orders...</td></tr>
+              <tr><td colSpan={14} className="px-4 py-12 text-center text-[11px] text-muted-foreground">Loading Orders...</td></tr>
             ) : error ? (
-              <tr><td colSpan={14} className="px-4 py-12 text-center text-red-500 text-xs font-bold">{error}</td></tr>
+              <tr><td colSpan={14} className="px-4 py-12 text-center text-[11px] text-red-500">{error}</td></tr>
             ) : orders.length === 0 ? (
-              <tr><td colSpan={14} className="px-4 py-12 text-center text-xs text-slate-400 uppercase font-bold tracking-tighter opacity-50">No Orders found</td></tr>
+              <tr><td colSpan={14} className="px-4 py-12 text-center text-[11px] text-muted-foreground uppercase tracking-tighter opacity-50">No Orders found</td></tr>
             ) : orders.map(order => {
                 const subtotal = calculateTotal(order);
                 const shipping = order.shippingCost || 0;
@@ -995,16 +995,16 @@ function SaleOrdersContent() {
                     className="group relative z-0 bg-background transition-colors duration-150 cursor-pointer hover:bg-secondary/30"
                   >
                     <td className="px-2 py-1.5 border-r border-border group-hover:border-l-2 group-hover:border-l-primary transition-all">
-                      <span className="text-[10px] font-bold text-foreground tracking-tight font-mono whitespace-nowrap overflow-hidden text-ellipsis max-w-[60px]">{order.label || '-'}</span>
+                      <span className="text-[11px] text-muted-foreground tracking-tight font-mono whitespace-nowrap overflow-hidden text-ellipsis max-w-[60px]">{order.label || '-'}</span>
                     </td>
-                    <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono border-r border-border">{formatDate(order.createdAt)}</td>
-                    <td className="px-2 py-1.5 text-[10px] text-foreground font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px] border-r border-border">{renderClient(order)}</td>
-                    <td className="px-2 py-1.5 text-[10px] text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px] border-r border-border">
+                    <td className="px-2 py-1.5 text-[11px] text-muted-foreground font-mono border-r border-border">{formatDate(order.createdAt)}</td>
+                    <td className="px-2 py-1.5 text-[11px] text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px] border-r border-border">{renderClient(order)}</td>
+                    <td className="px-2 py-1.5 text-[11px] text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px] border-r border-border">
                         {typeof order.salesRep === 'object' && order.salesRep !== null 
                             ? `${order.salesRep.firstName} ${order.salesRep.lastName}` 
                             : (order.salesRep || '-')}
                     </td>
-                    <td className="px-2 py-1.5 text-[10px] text-muted-foreground border-r border-border">{order.paymentMethod || '-'}</td>
+                    <td className="px-2 py-1.5 text-[11px] text-muted-foreground border-r border-border">{order.paymentMethod || '-'}</td>
                     <td className="px-2 py-1.5 border-r border-border text-center">
                       <span className={cn(
                         "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider",
@@ -1019,28 +1019,28 @@ function SaleOrdersContent() {
                         {order.orderStatus}
                       </span>
                     </td>
-                    <td className="px-2 py-1.5 text-[10px] font-bold text-foreground font-mono text-right border-r border-border">
+                    <td className="px-2 py-1.5 text-[11px] text-muted-foreground font-mono text-right border-r border-border">
                       {formatCurrency(subtotal)}
                     </td>
-                    <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono text-right border-r border-border">
+                    <td className="px-2 py-1.5 text-[11px] text-muted-foreground font-mono text-right border-r border-border">
                         {formatCurrency(shipping)}
                     </td>
-                    <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono text-right border-r border-border">
+                    <td className="px-2 py-1.5 text-[11px] text-muted-foreground font-mono text-right border-r border-border">
                         {formatCurrency(discount)}
                     </td>
-                    <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono text-right border-r border-border">
+                    <td className="px-2 py-1.5 text-[11px] text-muted-foreground font-mono text-right border-r border-border">
                         {formatCurrency(tax)}
                     </td>
-                    <td className="px-2 py-1.5 text-[10px] font-black text-foreground bg-secondary/10 font-mono text-right border-r border-border">
+                    <td className="px-2 py-1.5 text-[11px] text-muted-foreground font-mono text-right border-r border-border">
                         {formatCurrency(grandTotal)}
                     </td>
-                    <td className={cn("px-2 py-1.5 text-[10px] font-bold font-mono text-right border-r border-border", balance > 0.01 ? "text-destructive" : "text-emerald-500")}>
+                    <td className={cn("px-2 py-1.5 text-[11px] font-mono text-right border-r border-border", balance > 0.01 ? "text-destructive" : "text-emerald-500")}>
                         {formatCurrency(balance)}
                     </td>
-                    <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono text-right border-r border-border">
+                    <td className="px-2 py-1.5 text-[11px] text-muted-foreground font-mono text-right border-r border-border">
                         {formatCurrency(cost)}
                     </td>
-                    <td className={cn("px-2 py-1.5 text-[10px] font-bold font-mono text-right", margin < 0 ? "text-destructive" : "text-emerald-500")}>
+                    <td className={cn("px-2 py-1.5 text-[11px] font-mono text-right", margin < 0 ? "text-destructive" : "text-emerald-500")}>
                         {formatCurrency(margin)}
                     </td>
                   </tr>
