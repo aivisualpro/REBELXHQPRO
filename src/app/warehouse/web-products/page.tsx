@@ -182,7 +182,7 @@ function WebProductsPageContent() {
   useEffect(() => {
     const fetchSkuList = async () => {
       try {
-        const res = await fetch('/api/skus?limit=1000&ignoreDate=true&simple=true');
+        const res = await fetch('/api/skus?limit=0&ignoreDate=true&simple=true');
         const data = await res.json();
         if (res.ok) {
           setSkuList(data.skus || []);
