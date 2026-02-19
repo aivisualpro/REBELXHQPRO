@@ -195,8 +195,6 @@ export default function AuditAdjustmentDetailPage() {
         );
     }
 
-    const skuTier = getSkuTier();
-
     return (
         <div className="flex flex-col h-[calc(100vh-48px)] bg-background relative">
             {/* Header Portal Content */}
@@ -219,98 +217,55 @@ export default function AuditAdjustmentDetailPage() {
                 {/* Left Sidebar: Details (30%) */}
                 <div className="w-[30%] border-r border-border bg-secondary/30 flex flex-col overflow-hidden">
                     <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                        {/* Identity Boxes */}
-                        <div className="grid grid-cols-2 gap-2">
-                            <div className="border border-border rounded-md p-3 bg-background text-center flex items-center justify-center">
-                                <div className="text-[10px] font-mono text-muted-foreground break-all">{item._id?.slice(-8)}</div>
+                        {/* Identity Boxes - 3 columns: Number, SKU, Lot # */}
+                        <div className="grid grid-cols-3 gap-2">
+                            <div className="border border-border rounded-md p-3 bg-background text-center flex flex-col items-center justify-center">
+                                <div className="text-[8px] text-muted-foreground uppercase tracking-widest font-bold mb-1">Number</div>
+                                <div className="text-[10px] font-mono text-foreground font-bold break-all">{item._id?.slice(-8)}</div>
                             </div>
-                            <div className={cn(
-                                "border rounded-md p-3 text-center flex items-center justify-center",
-                                item.qty > 0 
-                                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600" 
-                                    : "border-rose-500/30 bg-rose-500/10 text-rose-600"
-                            )}>
-                                <div className="text-base font-black font-mono tracking-tight">
-                                    {item.qty > 0 ? '+' : ''}{item.qty}
+                            <div 
+                                className="border border-border rounded-md p-3 bg-background text-center flex flex-col items-center justify-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all"
+                                onClick={() => router.push(`/warehouse/skus/${getSkuId()}`)}
+                            >
+                                <div className="text-[8px] text-muted-foreground uppercase tracking-widest font-bold mb-1">SKU</div>
+                                <div className="text-[10px] font-bold text-primary truncate w-full" title={getSkuName()}>
+                                    {getSkuName()}
                                 </div>
                             </div>
-                        </div>
-
-                        {/* SKU Hero */}
-                        <div className="border border-border rounded-md p-3 bg-background">
-                            <div className="flex items-center space-x-3">
-                                {/* Image */}
-                                {getSkuImage() && (
-                                    <div className="w-10 h-10 rounded overflow-hidden bg-secondary flex items-center justify-center border border-border shrink-0">
-                                        <img src={getSkuImage()} alt="" className="w-full h-full object-cover" />
-                                    </div>
-                                )}
-                                {/* Tier */}
-                                {!!skuTier && (
-                                    <div className={cn(
-                                        "w-6 h-6 rounded flex items-center justify-center shrink-0 shadow-sm",
-                                        skuTier === 1 ? "bg-emerald-500" :
-                                        skuTier === 2 ? "bg-blue-500" :
-                                        "bg-orange-500"
-                                    )}>
-                                        <span className="text-sm font-black text-white">{skuTier}</span>
-                                    </div>
-                                )}
-                                {/* Name */}
-                                <div className="min-w-0 flex-1">
-                                    <div 
-                                        className="text-[11px] font-bold text-foreground truncate hover:text-primary transition-colors cursor-pointer"
-                                        onClick={() => router.push(`/warehouse/skus/${getSkuId()}`)}
-                                    >
-                                        {getSkuName()}
-                                    </div>
-                                    <div className="text-[9px] text-muted-foreground font-mono truncate">{getSkuId()}</div>
-                                </div>
+                            <div className="border border-border rounded-md p-3 bg-background text-center flex flex-col items-center justify-center">
+                                <div className="text-[8px] text-muted-foreground uppercase tracking-widest font-bold mb-1">Lot #</div>
+                                <div className="text-[10px] font-mono font-bold text-foreground">{item.lotNumber || '-'}</div>
                             </div>
                         </div>
 
                         {/* Details */}
-                        <div>
-                            <div className="space-y-3">
-                                <div className="flex justify-between items-center">
-                                    <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold italic">Date</div>
-                                    <div className="text-xs font-medium text-foreground">{formatDate(item.createdAt)}</div>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold italic">Lot Number</div>
-                                    <div className="text-xs font-medium text-foreground font-mono">{item.lotNumber || '-'}</div>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold italic">Quantity</div>
-                                    <div className={cn(
-                                        "text-xs font-bold font-mono",
-                                        item.qty > 0 ? "text-emerald-600" : "text-rose-600"
-                                    )}>
-                                        {item.qty > 0 ? '+' : ''}{item.qty.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 8 })}
-                                        {getSkuUom() && <span className="text-muted-foreground ml-1 font-normal">{getSkuUom()}</span>}
-                                    </div>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold italic">Created By</div>
-                                    <div className="text-xs font-medium text-foreground">{getCreatedBy()}</div>
-                                </div>
-                                {item.cost !== undefined && item.cost !== 0 && (
-                                    <div className="flex justify-between items-center">
-                                        <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold italic">Cost</div>
-                                        <div className="text-xs font-medium text-foreground font-mono">
-                                            ${(item.cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </div>
-                                    </div>
-                                )}
+                        <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                                <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold italic">Date</div>
+                                <div className="text-xs font-medium text-foreground">{formatDate(item.createdAt)}</div>
                             </div>
-                        </div>
-
-                        {/* Reason */}
-                        <div>
-                            <h3 className="text-xs font-bold uppercase text-foreground tracking-widest mb-2 border-b border-border pb-2">Reason</h3>
-                            <p className="text-[11px] text-foreground leading-relaxed italic">
-                                {item.reason || 'No specific rationale provided.'}
-                            </p>
+                            <div className="flex justify-between items-center">
+                                <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold italic">Quantity</div>
+                                <div className={cn(
+                                    "text-xs font-bold font-mono",
+                                    item.qty > 0 ? "text-emerald-600" : "text-rose-600"
+                                )}>
+                                    {item.qty > 0 ? '+' : ''}{item.qty.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 8 })}
+                                    {getSkuUom() && <span className="text-muted-foreground ml-1 font-normal">{getSkuUom()}</span>}
+                                </div>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold italic">Created By</div>
+                                <div className="text-xs font-medium text-foreground">{getCreatedBy()}</div>
+                            </div>
+                            {item.cost !== undefined && item.cost !== 0 && (
+                                <div className="flex justify-between items-center">
+                                    <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold italic">Cost</div>
+                                    <div className="text-xs font-medium text-foreground font-mono">
+                                        ${(item.cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -357,7 +312,6 @@ export default function AuditAdjustmentDetailPage() {
 
                 {/* Right Content (70%) */}
                 <div className="w-[70%] bg-background flex flex-col overflow-hidden">
-                    {/* Edit Form or Detail View */}
                     <div className="flex-1 overflow-y-auto p-6">
                         {isEditing ? (
                             <div className="max-w-xl mx-auto space-y-6 animate-in fade-in duration-300">
@@ -413,95 +367,10 @@ export default function AuditAdjustmentDetailPage() {
                                 </div>
                             </div>
                         ) : (
-                            <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in duration-300">
-                                {/* Hero Section */}
-                                <div className="border border-border rounded-lg p-6 bg-secondary/20">
-                                    <div className="flex items-center space-x-4">
-                                        {/* SKU Image */}
-                                        {getSkuImage() && (
-                                            <div className="w-16 h-16 rounded-lg overflow-hidden bg-secondary flex items-center justify-center border border-border shrink-0">
-                                                <img src={getSkuImage()} alt="" className="w-full h-full object-cover" />
-                                            </div>
-                                        )}
-                                        {/* Tier Badge */}
-                                        {!!skuTier && (
-                                            <div className={cn(
-                                                "w-10 h-10 rounded-lg flex items-center justify-center shrink-0 shadow-sm",
-                                                skuTier === 1 ? "bg-emerald-500" :
-                                                skuTier === 2 ? "bg-blue-500" :
-                                                "bg-orange-500"
-                                            )}>
-                                                <span className="text-lg font-black text-white">{skuTier}</span>
-                                            </div>
-                                        )}
-                                        {/* SKU Info */}
-                                        <div className="min-w-0 flex-1">
-                                            <h2 
-                                                className="text-lg font-bold text-foreground hover:text-primary transition-colors cursor-pointer"
-                                                onClick={() => router.push(`/warehouse/skus/${getSkuId()}`)}
-                                            >
-                                                {getSkuName()}
-                                            </h2>
-                                            <p className="text-[10px] text-muted-foreground font-mono mt-0.5">{getSkuId()}</p>
-                                        </div>
-                                        {/* Qty Badge */}
-                                        <div className={cn(
-                                            "px-4 py-2 rounded-lg",
-                                            item.qty > 0 ? "bg-emerald-500/10 border border-emerald-500/30" : "bg-rose-500/10 border border-rose-500/30"
-                                        )}>
-                                            <span className={cn(
-                                                "text-2xl font-black font-mono",
-                                                item.qty > 0 ? "text-emerald-600" : "text-rose-600"
-                                            )}>
-                                                {item.qty > 0 ? '+' : ''}{item.qty}
-                                            </span>
-                                            <span className="text-xs font-medium text-muted-foreground ml-1 uppercase tracking-widest">{getSkuUom()}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Detail Grid */}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="border border-border rounded-lg p-4 bg-background">
-                                        <div className="flex items-center space-x-2 mb-2">
-                                            <Archive className="w-3.5 h-3.5 text-muted-foreground" />
-                                            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Lot Number</span>
-                                        </div>
-                                        <p className="text-sm font-mono font-medium text-foreground">{item.lotNumber || 'N/A'}</p>
-                                    </div>
-                                    <div className="border border-border rounded-lg p-4 bg-background">
-                                        <div className="flex items-center space-x-2 mb-2">
-                                            <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                                            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Date Created</span>
-                                        </div>
-                                        <p className="text-sm font-medium text-foreground">{formatDate(item.createdAt)}</p>
-                                    </div>
-                                    <div className="border border-border rounded-lg p-4 bg-background">
-                                        <div className="flex items-center space-x-2 mb-2">
-                                            <User className="w-3.5 h-3.5 text-muted-foreground" />
-                                            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Created By</span>
-                                        </div>
-                                        <p className="text-sm font-medium text-foreground">{getCreatedBy()}</p>
-                                    </div>
-                                    {item.cost !== undefined && item.cost !== 0 && (
-                                        <div className="border border-border rounded-lg p-4 bg-background">
-                                            <div className="flex items-center space-x-2 mb-2">
-                                                <Scale className="w-3.5 h-3.5 text-muted-foreground" />
-                                                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Cost</span>
-                                            </div>
-                                            <p className="text-sm font-mono font-medium text-foreground">
-                                                ${(item.cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                            </p>
-                                        </div>
-                                    )}
-                                </div>
-
+                            <div className="animate-in fade-in duration-300 space-y-6">
                                 {/* Reason Section */}
-                                <div className="border border-border rounded-lg p-4 bg-background">
-                                    <div className="flex items-center space-x-2 mb-3">
-                                        <FileText className="w-3.5 h-3.5 text-muted-foreground" />
-                                        <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Reason for Adjustment</span>
-                                    </div>
+                                <div>
+                                    <h3 className="text-xs font-bold uppercase text-foreground tracking-widest mb-4 border-b border-border pb-2">Reason for Adjustment</h3>
                                     <p className="text-sm text-foreground leading-relaxed">
                                         {item.reason || 'No specific rationale provided.'}
                                     </p>
