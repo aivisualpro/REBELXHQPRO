@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -21,6 +21,107 @@ interface SearchableSelectProps {
     triggerClassName?: string;
     onOpenChange?: (open: boolean) => void;
 }
+
+// ── Fuzzy Tokenized Search Engine ──────────────────────────────────────────
+// Splits the query into words, matches each independently (any order),
+// with prefix-trimming for typo tolerance. Scores results by relevance.
+
+function buildFuzzyPatterns(token: string): string[] {
+    const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const patterns = [escaped];
+    if (token.length >= 4) patterns.push(escaped.slice(0, -1));
+    if (token.length >= 6) patterns.push(escaped.slice(0, -2));
+    return [...new Set(patterns)];
+}
+
+function fuzzyMatch(label: string, searchQuery: string): { matches: boolean; score: number } {
+    if (!searchQuery.trim()) return { matches: true, score: 0 };
+
+    const lowerLabel = label.toLowerCase();
+    const tokens = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
+
+    // Every token must match somewhere in the label
+    let totalScore = 0;
+    for (const token of tokens) {
+        const patterns = buildFuzzyPatterns(token);
+        let tokenMatched = false;
+
+        for (let pi = 0; pi < patterns.length; pi++) {
+            try {
+                const regex = new RegExp(patterns[pi], 'i');
+                if (regex.test(lowerLabel)) {
+                    tokenMatched = true;
+                    // Score: exact token gets highest, trimmed prefixes get less
+                    // Also bonus for: starts-with, exact match, shorter labels
+                    const matchIndex = lowerLabel.search(regex);
+                    let tokenScore = 10 - pi * 3; // 10 for exact, 7 for -1 char, 4 for -2 chars
+
+                    // Bonus: token appears at start of a word boundary
+                    if (matchIndex === 0 || lowerLabel[matchIndex - 1] === ' ' || lowerLabel[matchIndex - 1] === '-') {
+                        tokenScore += 5;
+                    }
+
+                    // Bonus: exact full match of a word
+                    const afterMatch = matchIndex + patterns[pi].length;
+                    if ((matchIndex === 0 || /[\s\-]/.test(lowerLabel[matchIndex - 1])) &&
+                        (afterMatch >= lowerLabel.length || /[\s\-]/.test(lowerLabel[afterMatch]))) {
+                        tokenScore += 8;
+                    }
+
+                    totalScore += tokenScore;
+                    break;
+                }
+            } catch {
+                // Invalid regex, skip
+            }
+        }
+
+        if (!tokenMatched) return { matches: false, score: 0 };
+    }
+
+    // Bonus: shorter labels rank higher (more specific matches)
+    totalScore += Math.max(0, 20 - label.length * 0.1);
+
+    return { matches: true, score: totalScore };
+}
+
+function highlightLabel(label: string, searchQuery: string): React.ReactNode {
+    if (!searchQuery.trim()) return label;
+
+    const tokens = searchQuery.trim().split(/\s+/).filter(Boolean);
+    const allPatterns: string[] = [];
+    tokens.forEach(token => {
+        buildFuzzyPatterns(token).forEach(p => allPatterns.push(p));
+    });
+
+    // Longest first for greedy matching, deduplicate
+    allPatterns.sort((a, b) => b.length - a.length);
+    const uniquePatterns = [...new Set(allPatterns)].filter(p => p.length > 0);
+    if (!uniquePatterns.length) return label;
+
+    try {
+        const regex = new RegExp(`(${uniquePatterns.join('|')})`, 'gi');
+        const parts = label.split(regex);
+        if (parts.length <= 1) return label;
+
+        const testRegex = new RegExp(`^(?:${uniquePatterns.join('|')})$`, 'i');
+        return (
+            <>
+                {parts.map((part, i) => {
+                    if (!part) return null;
+                    if (testRegex.test(part)) {
+                        return <span key={i} className="bg-primary/25 text-primary font-bold rounded-sm">{part}</span>;
+                    }
+                    return <span key={i}>{part}</span>;
+                })}
+            </>
+        );
+    } catch {
+        return label;
+    }
+}
+
+// ── Component ──────────────────────────────────────────────────────────────
 
 export function SearchableSelect({
     options,
@@ -57,41 +158,8 @@ export function SearchableSelect({
         if (isOpen && containerRef.current) {
             const rect = containerRef.current.getBoundingClientRect();
             const windowHeight = window.innerHeight;
-            const dropdownHeight = 300; // Approximate max height (header + max-h-60)
-            const spaceBelow = windowHeight - rect.bottom;
-            const spaceAbove = rect.top;
-
-            let top = rect.bottom + 4;
-            const left = rect.left;
-            const width = rect.width;
-
-            // Flip to top if not enough space below and more space above
-            if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
-                // We don't know the exact height until render, but we can set bottom-aligned or estimate
-                // Since we use fixed positioning with `top`, we need to calculate `top`.
-                // However, without exact height, `top` is hard.
-                // Better approach: render it invisible first? No, too slow.
-                // We'll use the estimated max height OR we can use `bottom` prop in style if we change logic.
-                // But let's try to just check if we should go UP.
-                // If we go UP, `top` should be `rect.top - height`.
-                // Since height is dynamic, we can set `bottom: windowHeight - rect.top + 4` and `top: auto`
-                // Let's pass `placement: 'top' | 'bottom'` to state or just coordinates.
-                // Actually, let's change the style object to support bottom.
-                
-                // For now, let's assume we can change the `dropdownPos` state structure or just use `top`.
-                // If we use `bottom`, we need to update the interface of `dropdownPos` indirectly by using `style` prop more flexibly.
-                // Let's assume we can set `top` to `auto` and `bottom`.
-            }
             
-            // Re-evaluating: To support `bottom` positioning, I should update the state to store `style` object or `top/bottom`.
-            // Current state: { top: number, left: number, width: number }
-            
-            // Simplified "Open from Top" logic requested by user:
-            // "should open from the top so that we can see the list properly"
-            // If I just set the Z-index really high, it might be visible over others, but if off screen, it's bad.
-            // Let's implement the Flip.
-            
-            const shouldFlip = spaceBelow < 320 && spaceAbove > 320; // 320px buffer
+            const shouldFlip = (windowHeight - rect.bottom) < 320 && rect.top > 320;
             
             if (shouldFlip) {
                 // If flipping, we want the bottom of the dropdown to be at rect.top - 4
@@ -134,9 +202,20 @@ export function SearchableSelect({
         }
     }, [isOpen]);
 
-    const filteredOptions = options.filter(option =>
-        option.label.toLowerCase().includes(search.toLowerCase())
-    );
+    // ── Fuzzy tokenized filtering + scoring ──
+    const filteredOptions = useMemo(() => {
+        if (!search.trim()) return options;
+
+        const scored: { option: Option; score: number }[] = [];
+        for (const option of options) {
+            const { matches, score } = fuzzyMatch(option.label, search);
+            if (matches) scored.push({ option, score });
+        }
+
+        // Sort by score descending (best matches first)
+        scored.sort((a, b) => b.score - a.score);
+        return scored.map(s => s.option);
+    }, [options, search]);
 
     const showCreate = creatable && search && !filteredOptions.some(o => o.label.toLowerCase() === search.toLowerCase());
 
@@ -192,7 +271,7 @@ export function SearchableSelect({
                                 )}
                                 onClick={() => handleSelect(option.value)}
                             >
-                                {option.label}
+                                {highlightLabel(option.label, search)}
                             </div>
                         ))}
                         {showCreate && (
