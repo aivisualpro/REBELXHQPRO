@@ -282,106 +282,157 @@ export default function WebProductDetailsPage() {
             <div className="flex-1 flex overflow-hidden min-h-0 bg-background">
                 
                 {/* Left Column (30%) - Web Identity Sidebar */}
-                <aside className="w-[30%] h-full overflow-y-auto border-r border-border bg-secondary/30 shrink-0 scrollbar-custom">
-                    <div className="p-6">
-                        {/* Carousel Section */}
-                        <div className="relative aspect-square bg-background border border-border border-dashed rounded-xl overflow-hidden group mb-8">
-                            <div className="w-full h-full p-4">
+                <aside className="w-[30%] h-full border-r border-border bg-background shrink-0 flex flex-col overflow-hidden">
+                    <div className="flex-1 overflow-y-auto scrollbar-custom">
+                    {/* Hero Section - matches SKU detail: Image | Name */}
+                    <div className="px-4 pt-4 pb-4">
+                        <div className="flex items-stretch border border-border overflow-hidden">
+                            {/* Column 1: Image */}
+                            <div className="w-16 h-16 bg-secondary flex items-center justify-center shrink-0 border-r border-border overflow-hidden">
                                 <img 
                                     src={images[currentImageIndex].src} 
-                                    alt={images[currentImageIndex].alt || product.name}
-                                    className="w-full h-full object-contain mix-blend-multiply"
+                                    alt={product.name}
+                                    className="w-full h-full object-cover" 
+                                    onError={(e) => { (e.target as HTMLImageElement).src = '/sku-placeholder.png'; }}
                                 />
                             </div>
-                            
-                            {images.length > 1 && (
-                                <>
-                                    <button 
-                                        onClick={() => setCurrentImageIndex(prev => (prev > 0 ? prev - 1 : images.length - 1))}
-                                        className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-card text-foreground rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all border border-border"
-                                    >
-                                        <ChevronLeft className="w-4 h-4" />
-                                    </button>
-                                    <button 
-                                        onClick={() => setCurrentImageIndex(prev => (prev < images.length - 1 ? prev + 1 : 0))}
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-card text-foreground rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all border border-border"
-                                    >
-                                        <ChevronRight className="w-4 h-4" />
-                                    </button>
-                                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-1.5">
-                                        {images.map((_, idx) => (
-                                            <div 
-                                                key={idx}
-                                                className={cn(
-                                                    "w-1.5 h-1.5 rounded-full transition-all duration-300",
-                                                    idx === currentImageIndex ? "bg-foreground w-4" : "bg-muted-foreground/30"
-                                                )}
-                                            />
-                                        ))}
-                                    </div>
-                                </>
+                            {/* Column 2: Name */}
+                            <div className="flex-1 bg-emerald-950/50 flex items-center justify-center px-3 min-w-0">
+                                <h1 className="text-sm font-black text-foreground leading-tight text-center line-clamp-2">{product.name}</h1>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Web Intel Section - Previously in list view */}
+                    <div className="px-4 pb-4 border-b border-border">
+                        <div className={cn(
+                            "relative rounded-lg px-4 py-5 flex flex-col items-center overflow-hidden",
+                            "bg-gradient-to-b from-indigo-950/40 to-indigo-950/10 border border-indigo-500/20"
+                        )}>
+                            <div className="absolute inset-0 opacity-20 blur-2xl bg-indigo-500/30" />
+                            <div className="relative flex items-center gap-2 mb-2">
+                                <div className="w-2 h-2 rounded-full animate-pulse bg-indigo-400" />
+                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-[0.25em]">Sale Price</label>
+                            </div>
+                            <div className="relative flex items-baseline space-x-2">
+                                <span className="text-4xl font-black tracking-tighter text-indigo-400">
+                                    ${product.salePrice?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                </span>
+                            </div>
+                            {product.regularPrice > product.salePrice && (
+                                <span className="relative text-[11px] font-mono font-bold text-rose-500 line-through mt-1">
+                                    ${product.regularPrice?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                </span>
                             )}
                         </div>
+                    </div>
 
-                        {/* Financial Header */}
-                        <div className="space-y-6 mb-10 pb-10 border-b border-border">
-                            <div className="flex flex-col items-center">
-                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-4">Market Placement</label>
-                                <div className="flex flex-col items-center">
-                                    <span className="text-4xl font-black tracking-tighter text-foreground">
-                                        ${product.salePrice?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                    </span>
-                                    {product.regularPrice > product.salePrice && (
-                                        <span className="text-[11px] font-mono font-bold text-rose-500 line-through mt-1">
-                                            ${product.regularPrice?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    {/* Web Product Details - moved from list view */}
+                    <div className="p-4 bg-background border-b border-border">
+                        <h3 className="text-xs font-bold text-foreground uppercase tracking-wider mb-3 border-b border-border pb-2 flex items-center gap-2">
+                            <Globe className="w-3.5 h-3.5 text-indigo-400" />
+                            Web Intelligence
+                        </h3>
+                        <div className="space-y-2">
+                            {[
+                                { label: 'Web ID', value: product.webId?.toString() || 'N/A' },
+                                { label: 'Type', value: product.type?.toUpperCase() || 'N/A' },
+                                { label: 'Status', value: product.status?.toUpperCase() || 'N/A', badge: true, badgeClass: product.status === 'publish' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20' },
+                                { label: 'Stock Status', value: product.stockStatus?.toUpperCase()?.replace('_', ' ') || 'N/A', badge: true, badgeClass: product.stockStatus === 'instock' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-rose-500/10 text-rose-500 border-rose-500/20' },
+                                { label: 'Web Stock', value: product.stockQuantity?.toString() || '0', mono: true },
+                            ].map((item, idx) => (
+                                <div key={idx} className="flex justify-between items-center py-1.5 border-b border-border/50 last:border-0">
+                                    <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">{item.label}</span>
+                                    {item.badge ? (
+                                        <span className={cn("text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded border", item.badgeClass)}>
+                                            {item.value}
                                         </span>
+                                    ) : (
+                                        <span className={cn("text-[10px] font-bold text-foreground", item.mono && "font-mono")}>{item.value}</span>
                                     )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Image Carousel */}
+                    {images.length > 1 && (
+                        <div className="p-4 border-b border-border">
+                            <div className="relative aspect-square bg-secondary/30 border border-border border-dashed rounded-xl overflow-hidden group">
+                                <div className="w-full h-full p-4">
+                                    <img 
+                                        src={images[currentImageIndex].src} 
+                                        alt={images[currentImageIndex].alt || product.name}
+                                        className="w-full h-full object-contain"
+                                    />
+                                </div>
+                                <button 
+                                    onClick={() => setCurrentImageIndex(prev => (prev > 0 ? prev - 1 : images.length - 1))}
+                                    className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-card text-foreground rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all border border-border"
+                                >
+                                    <ChevronLeft className="w-4 h-4" />
+                                </button>
+                                <button 
+                                    onClick={() => setCurrentImageIndex(prev => (prev < images.length - 1 ? prev + 1 : 0))}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-card text-foreground rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all border border-border"
+                                >
+                                    <ChevronRight className="w-4 h-4" />
+                                </button>
+                                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-1.5">
+                                    {images.map((_, idx) => (
+                                        <div 
+                                            key={idx}
+                                            className={cn(
+                                                "w-1.5 h-1.5 rounded-full transition-all duration-300",
+                                                idx === currentImageIndex ? "bg-foreground w-4" : "bg-muted-foreground/30"
+                                            )}
+                                        />
+                                    ))}
                                 </div>
                             </div>
                         </div>
+                    )}
 
-                        {/* SKU Mapping Section - For Simple Products */}
-                        {product.type !== 'variable' && (
-                            <div className="mb-10 pb-10 border-b border-border">
-                                <section>
-                                    <h3 className="text-[9px] font-black text-foreground uppercase tracking-[0.15em] mb-4 flex items-center space-x-2">
-                                        <Link2 className="w-3.5 h-3.5 text-purple-500" />
-                                        <span>SKU Mapping</span>
-                                    </h3>
-                                    <div className="space-y-3 bg-background p-4 rounded-xl border border-border border-dashed">
-                                        <div className="flex flex-col space-y-2">
-                                            <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Link to Physical SKU</label>
-                                            <SearchableSelect
-                                                options={skuOptions}
-                                                value={linkedSkuId || ''}
-                                                onChange={(value) => {
-                                                    if (value) handleLinkSku(value);
-                                                }}
-                                                placeholder="Search SKU..."
-                                                className="w-full"
-                                            />
-                                        </div>
-                                        {linkedSkuId && (
-                                            <div className="flex items-center justify-between pt-2 border-t border-border">
-                                                <span className="text-[9px] font-bold text-muted-foreground uppercase">Linked SKU</span>
-                                                <span className="text-[10px] font-mono font-bold text-emerald-600 bg-emerald-500/10 px-2 py-1 rounded">
-                                                    {getSkuName(linkedSkuId)}
-                                                </span>
-                                            </div>
-                                        )}
-                                        {linkingSku && (
-                                            <div className="flex items-center justify-center py-2">
-                                                <Loader2 className="w-4 h-4 animate-spin text-blue-500 mr-2" />
-                                                <span className="text-[9px] text-blue-500 font-bold uppercase">Linking...</span>
-                                            </div>
-                                        )}
+                    {/* SKU Mapping Section - For Simple Products */}
+                    {product.type !== 'variable' && (
+                        <div className="p-4 border-b border-border">
+                            <h3 className="text-xs font-bold text-foreground uppercase tracking-wider mb-3 border-b border-border pb-2 flex items-center gap-2">
+                                <Link2 className="w-3.5 h-3.5 text-purple-500" />
+                                SKU Mapping
+                            </h3>
+                            <div className="space-y-3 bg-secondary/20 p-4 rounded-xl border border-border border-dashed">
+                                <div className="flex flex-col space-y-2">
+                                    <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Link to Physical SKU</label>
+                                    <SearchableSelect
+                                        options={skuOptions}
+                                        value={linkedSkuId || ''}
+                                        onChange={(value) => {
+                                            if (value) handleLinkSku(value);
+                                        }}
+                                        placeholder="Search SKU..."
+                                        className="w-full"
+                                    />
+                                </div>
+                                {linkedSkuId && (
+                                    <div className="flex items-center justify-between pt-2 border-t border-border">
+                                        <span className="text-[9px] font-bold text-muted-foreground uppercase">Linked SKU</span>
+                                        <span className="text-[10px] font-mono font-bold text-emerald-600 bg-emerald-500/10 px-2 py-1 rounded">
+                                            {getSkuName(linkedSkuId)}
+                                        </span>
                                     </div>
-                                </section>
+                                )}
+                                {linkingSku && (
+                                    <div className="flex items-center justify-center py-2">
+                                        <Loader2 className="w-4 h-4 animate-spin text-blue-500 mr-2" />
+                                        <span className="text-[9px] text-blue-500 font-bold uppercase">Linking...</span>
+                                    </div>
+                                )}
                             </div>
-                        )}
+                        </div>
+                    )}
 
-                        {/* Detailed Intel Sections */}
-                        <div className="space-y-10">
+                    {/* Detailed Intel Sections */}
+                    <div className="p-4 space-y-8">
                             {/* Product Variations - Relocated for Priority */}
                             {product.variations && product.variations.length > 0 && (
                                 <section>

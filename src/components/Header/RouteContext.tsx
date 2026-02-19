@@ -83,6 +83,15 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
         };
     }
 
+    // Web Products
+    if (pathname === '/warehouse/web-products') {
+        return {
+            title: '',
+            actions: [],
+            isPortal: true
+        };
+    }
+
     // Opening Balances
     if (pathname === '/warehouse/opening-balances') {
         return {
