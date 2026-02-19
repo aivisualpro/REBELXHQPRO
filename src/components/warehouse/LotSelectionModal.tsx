@@ -77,7 +77,7 @@ export function LotSelectionModal({
         const filtered = sorted.filter(lot => {
             const matchesSearch = lot.lotNumber.toLowerCase().includes(searchQuery.toLowerCase());
             const isCurrent = lot.lotNumber === currentLotNumber;
-            const hasBalance = lot.balance > 0;
+            const hasBalance = Math.abs(lot.balance) >= 1;
 
             if (searchQuery) return matchesSearch && (hasBalance || isCurrent);
             return hasBalance || isCurrent;
@@ -96,7 +96,7 @@ export function LotSelectionModal({
             }
             // If no sufficient lot found, pick oldest with any positive balance
             if (!suggested) {
-                const positive = others.filter(lot => lot.balance > 0);
+                const positive = others.filter(lot => lot.balance >= 1);
                 suggested = positive.length > 0 ? positive[0].lotNumber : null;
             }
         }
@@ -269,6 +269,11 @@ export function LotSelectionModal({
                     <div className="flex items-center gap-2">
                         <Package className="w-4 h-4 text-primary" />
                         <h3 className="text-sm font-bold text-foreground">{title}</h3>
+                        {requiredQty > 0 && (
+                            <span className="px-1.5 py-0.5 text-[10px] font-bold font-mono bg-primary/10 text-primary border border-primary/20 rounded">
+                                × {Math.abs(requiredQty).toLocaleString()} units
+                            </span>
+                        )}
                     </div>
                     <button 
                         onClick={onClose} 

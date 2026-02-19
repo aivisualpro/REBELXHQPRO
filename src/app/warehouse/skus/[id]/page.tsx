@@ -682,7 +682,7 @@ function SkuDetailsPageContent() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-border">
-                                        {lots.filter(l => l.balance !== 0).map((lot, idx) => (
+                                        {lots.filter(l => Math.abs(l.balance) >= 1).map((lot, idx) => (
                                             <tr 
                                                 key={lot.lotNumber} 
                                                 className={cn(
@@ -1213,6 +1213,7 @@ function SkuDetailsPageContent() {
                     skuId={sku._id}
                     currentLotNumber={editingTx.lotNumber}
                     title={`Update Lot for ${editingTx.type} #${editingTx.reference}`}
+                    requiredQty={Math.abs(editingTx.quantity)}
                 />
             )}
 
