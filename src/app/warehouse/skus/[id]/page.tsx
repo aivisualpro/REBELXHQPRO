@@ -164,7 +164,8 @@ function SkuDetailsPageContent() {
     const [linkedWebProducts, setLinkedWebProducts] = useState<LinkedWebProduct[]>([]);
     const [loadingLinkedProducts, setLoadingLinkedProducts] = useState(false);
 
-    // Warning click -> highlight ledger rows
+    // Warning click -> filter ledger
+    const [warningFilter, setWarningFilter] = useState<'pending' | 'unfulfilled' | null>(null);
     const [highlightedTxIds, setHighlightedTxIds] = useState<Set<string>>(new Set());
     const mainScrollRef = useRef<HTMLElement>(null);
 
@@ -389,6 +390,9 @@ function SkuDetailsPageContent() {
             if (tx.type === 'Web Order') return tx.varianceId === selectedVarianceId || tx._id === selectedVarianceId;
             return false;
         }
+        // Warning filter
+        if (warningFilter === 'pending') return isPendingProduction(tx);
+        if (warningFilter === 'unfulfilled') return isUnfulfilledConsumption(tx);
         return true;
     });
 
@@ -626,8 +630,8 @@ function SkuDetailsPageContent() {
 
                     {/* Warnings Section - stacked flush */}
                     {(() => {
-                        const pendingTxs = transactions.filter(tx => tx.type === 'Produced' && (tx.status === 'Pending' || tx.status === 'Processing'));
-                        const unfulfilledTxs = transactions.filter(tx => tx.type === 'Consumption' && tx.status !== 'Fulfilled');
+                        const pendingTxs = transactions.filter(tx => isPendingProduction(tx));
+                        const unfulfilledTxs = transactions.filter(tx => isUnfulfilledConsumption(tx));
                         if (pendingTxs.length === 0 && unfulfilledTxs.length === 0) return null;
                         const pendingQty = pendingTxs.reduce((acc, tx) => acc + tx.quantity, 0);
                         const unfulfilledQty = unfulfilledTxs.reduce((acc, tx) => acc + Math.abs(tx.quantity), 0);
@@ -635,27 +639,15 @@ function SkuDetailsPageContent() {
                             <div className="px-4 py-2">
                                 {pendingTxs.length > 0 && (
                                     <div
-                                        className="w-full bg-red-500/10 border-b border-red-500/20 px-4 py-2.5 cursor-pointer hover:bg-red-500/20 transition-colors"
-                                        onClick={() => {
-                                            const ids = new Set(pendingTxs.map(tx => tx._id));
-                                            setHighlightedTxIds(ids);
-                                            // Ensure all are loaded
-                                            const maxIdx = Math.max(...pendingTxs.map(tx => displayTransactions.findIndex(d => d._id === tx._id)));
-                                            if (maxIdx >= visibleCount) setVisibleCount(maxIdx + 5);
-                                            // Scroll to first match after render
-                                            setTimeout(() => {
-                                                const el = document.querySelector(`[data-tx-id="${pendingTxs[0]._id}"]`);
-                                                if (el && mainScrollRef.current) {
-                                                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                                }
-                                            }, 100);
-                                            // Clear highlight after 3s
-                                            setTimeout(() => setHighlightedTxIds(new Set()), 3000);
-                                        }}
+                                        className={cn(
+                                            "w-full border-b border-red-500/20 px-4 py-2.5 cursor-pointer transition-colors",
+                                            warningFilter === 'pending' ? "bg-red-500/25 ring-1 ring-red-500/40" : "bg-red-500/10 hover:bg-red-500/20"
+                                        )}
+                                        onClick={() => setWarningFilter(warningFilter === 'pending' ? null : 'pending')}
                                     >
                                         <div className="flex items-start space-x-2">
                                             <AlertTriangle className="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" />
-                                            <div>
+                                            <div className="flex-1">
                                                 <p className="text-[10px] font-bold text-red-400 uppercase tracking-wide">
                                                     {pendingTxs.length} Pending/Processing Production{pendingTxs.length > 1 ? 's' : ''}
                                                 </p>
@@ -663,29 +655,23 @@ function SkuDetailsPageContent() {
                                                     <span className="font-mono font-bold">+{pendingQty.toLocaleString()}</span> units not counted until fulfilled
                                                 </p>
                                             </div>
+                                            {warningFilter === 'pending' && (
+                                                <span className="text-[8px] text-red-400/60 uppercase tracking-wider font-bold self-center">Filtered</span>
+                                            )}
                                         </div>
                                     </div>
                                 )}
                                 {unfulfilledTxs.length > 0 && (
                                     <div
-                                        className="w-full bg-red-500/10 border-b border-red-500/20 px-4 py-2.5 cursor-pointer hover:bg-red-500/20 transition-colors"
-                                        onClick={() => {
-                                            const ids = new Set(unfulfilledTxs.map(tx => tx._id));
-                                            setHighlightedTxIds(ids);
-                                            const maxIdx = Math.max(...unfulfilledTxs.map(tx => displayTransactions.findIndex(d => d._id === tx._id)));
-                                            if (maxIdx >= visibleCount) setVisibleCount(maxIdx + 5);
-                                            setTimeout(() => {
-                                                const el = document.querySelector(`[data-tx-id="${unfulfilledTxs[0]._id}"]`);
-                                                if (el && mainScrollRef.current) {
-                                                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                                }
-                                            }, 100);
-                                            setTimeout(() => setHighlightedTxIds(new Set()), 3000);
-                                        }}
+                                        className={cn(
+                                            "w-full border-b border-red-500/20 px-4 py-2.5 cursor-pointer transition-colors",
+                                            warningFilter === 'unfulfilled' ? "bg-red-500/25 ring-1 ring-red-500/40" : "bg-red-500/10 hover:bg-red-500/20"
+                                        )}
+                                        onClick={() => setWarningFilter(warningFilter === 'unfulfilled' ? null : 'unfulfilled')}
                                     >
                                         <div className="flex items-start space-x-2">
                                             <AlertTriangle className="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" />
-                                            <div>
+                                            <div className="flex-1">
                                                 <p className="text-[10px] font-bold text-red-400 uppercase tracking-wide">
                                                     {unfulfilledTxs.length} Unfulfilled Consumption{unfulfilledTxs.length > 1 ? 's' : ''}
                                                 </p>
@@ -693,6 +679,9 @@ function SkuDetailsPageContent() {
                                                     <span className="font-mono font-bold">{unfulfilledQty.toLocaleString()}</span> units not counted until fulfilled
                                                 </p>
                                             </div>
+                                            {warningFilter === 'unfulfilled' && (
+                                                <span className="text-[8px] text-red-400/60 uppercase tracking-wider font-bold self-center">Filtered</span>
+                                            )}
                                         </div>
                                     </div>
                                 )}
@@ -1019,6 +1008,16 @@ function SkuDetailsPageContent() {
                             <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">Transaction Ledger</h3>
                             {isSaving && (
                                 <span className="text-[10px] font-bold text-blue-500 animate-pulse">Saving changes...</span>
+                            )}
+                            {warningFilter && (
+                                <button
+                                    onClick={() => setWarningFilter(null)}
+                                    className="flex items-center gap-1 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-red-500/15 text-red-400 rounded border border-red-500/25 hover:bg-red-500/25 transition-colors"
+                                >
+                                    <AlertTriangle className="w-2.5 h-2.5" />
+                                    {warningFilter === 'pending' ? 'Pending/Processing' : 'Unfulfilled'}
+                                    <X className="w-2.5 h-2.5 ml-0.5" />
+                                </button>
                             )}
                             <div className="relative" ref={filterRef}>
                                 <button onClick={() => setIsFilterOpen(!isFilterOpen)} className={cn("flex items-center space-x-1 px-3 py-1 text-[10px] font-bold border rounded transition-all", isFilterOpen ? "bg-foreground border-foreground text-background" : "bg-background border-border text-muted-foreground hover:bg-secondary shadow-sm")}>
