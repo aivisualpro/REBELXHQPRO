@@ -87,8 +87,8 @@ export async function getLotsWithBalances(skuId: string): Promise<LotInfo[]> {
         sku: skuId
     }).lean();
     mfgProduced.forEach((mo: any) => {
-        // Skip Pending productions - ledger excludes these from balance
-        if (mo.status === 'Pending') return;
+        // Skip Pending/Processing productions - ledger excludes these from balance
+        if (mo.status === 'Pending' || mo.status === 'Processing') return;
         
         const lot = normalizeLot(mo.lotNumber || mo.label);
         if (!lot) return;

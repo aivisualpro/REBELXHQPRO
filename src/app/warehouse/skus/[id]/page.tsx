@@ -358,7 +358,7 @@ function SkuDetailsPageContent() {
         return true;
     });
 
-    const isPendingProduction = (tx: Transaction) => tx.type === 'Produced' && tx.status === 'Pending';
+    const isPendingProduction = (tx: Transaction) => tx.type === 'Produced' && (tx.status === 'Pending' || tx.status === 'Processing');
     const isUnfulfilledConsumption = (tx: Transaction) => tx.type === 'Consumption' && tx.status !== 'Fulfilled';
 
     const displayTransactions = selectedLot === 'All' 
@@ -592,7 +592,7 @@ function SkuDetailsPageContent() {
 
                     {/* Warnings Section - stacked flush */}
                     {(() => {
-                        const pendingTxs = transactions.filter(tx => tx.type === 'Produced' && tx.status === 'Pending');
+                        const pendingTxs = transactions.filter(tx => tx.type === 'Produced' && (tx.status === 'Pending' || tx.status === 'Processing'));
                         const unfulfilledTxs = transactions.filter(tx => tx.type === 'Consumption' && tx.status !== 'Fulfilled');
                         if (pendingTxs.length === 0 && unfulfilledTxs.length === 0) return null;
                         const pendingQty = pendingTxs.reduce((acc, tx) => acc + tx.quantity, 0);
@@ -623,7 +623,7 @@ function SkuDetailsPageContent() {
                                             <AlertTriangle className="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" />
                                             <div>
                                                 <p className="text-[10px] font-bold text-red-400 uppercase tracking-wide">
-                                                    {pendingTxs.length} Pending Production{pendingTxs.length > 1 ? 's' : ''}
+                                                    {pendingTxs.length} Pending/Processing Production{pendingTxs.length > 1 ? 's' : ''}
                                                 </p>
                                                 <p className="text-[9px] text-red-400/70 mt-0.5">
                                                     <span className="font-mono font-bold">+{pendingQty.toLocaleString()}</span> units not counted until fulfilled

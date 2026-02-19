@@ -376,7 +376,7 @@ export async function GET(
             monthlyStats.set(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`, { revenue:0, qty:0, productionQty: 0, productionCost: 0 });
         }
 
-        const isPendingProduction = (t: any) => t.type === 'Produced' && t.status === 'Pending';
+        const isPendingProduction = (t: any) => t.type === 'Produced' && (t.status === 'Pending' || t.status === 'Processing');
         const isUnfulfilledConsumption = (t: any) => t.type === 'Consumption' && t.status !== 'Fulfilled';
 
         const filteredTransactions = (startDate ? transactions.filter(t => t.date >= startDate) : transactions).map(t => {
