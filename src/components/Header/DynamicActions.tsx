@@ -25,7 +25,7 @@ const DynamicActionsContent = () => {
     const searchParams = useSearchParams();
 
     // Routes that support search
-    const searchableRoutes = ['/crm/leads', '/crm/clients', '/crm/tasks', '/sales/wholesale-orders', '/warehouse/skus', '/warehouse/purchase-orders', '/warehouse/kits', '/warehouse/manufacturing', '/warehouse/audit-adjustments'];
+    const searchableRoutes = ['/crm/leads', '/crm/clients', '/crm/tasks', '/sales/wholesale-orders', '/warehouse/purchase-orders', '/warehouse/kits', '/warehouse/manufacturing', '/warehouse/audit-adjustments'];
     const isSearchable = searchableRoutes.includes(pathname);
 
     // Sync search value from URL
