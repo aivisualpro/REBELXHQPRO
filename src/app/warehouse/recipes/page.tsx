@@ -263,7 +263,7 @@ export default function RecipesPage() {
           <div className="flex-1" />
           <button onClick={() => openModal('create')} className="h-8 px-3 bg-primary text-black hover:opacity-90 transition-all rounded shadow-md flex items-center space-x-1.5 cursor-pointer">
             <Plus className="w-3 h-3" />
-            <span className="hidden sm:inline text-[10px] font-black uppercase tracking-widest">New</span>
+            <span className="hidden sm:inline text-[11px] font-black uppercase tracking-widest">New</span>
           </button>
         </>,
         headerPortalTarget
@@ -308,16 +308,16 @@ export default function RecipesPage() {
                 className="hover:bg-secondary/40 hover:scale-[1.002] hover:shadow-md transition-all duration-200 group relative z-0 hover:z-10 bg-background cursor-pointer"
                 onClick={() => router.push(`/warehouse/recipes/${recipe._id}`)}
               >
-                <td className="px-4 py-2 text-[11px] font-bold text-foreground whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px] border-r border-border">{recipe.name}</td>
-                <td className="px-4 py-2 text-[11px] text-foreground truncate max-w-[150px] border-r border-border font-medium">{renderSku(recipe.sku)}</td>
-                <td className="px-4 py-2 text-[11px] text-foreground font-mono border-r border-border">{recipe.qty}</td>
-                <td className="px-4 py-2 text-[10px] text-muted-foreground uppercase font-black tracking-widest border-r border-border">{recipe.uom}</td>
+                <td className="px-4 py-2 text-[11px] text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px] border-r border-border">{recipe.name}</td>
+                <td className="px-4 py-2 text-[11px] text-muted-foreground truncate max-w-[150px] border-r border-border">{renderSku(recipe.sku)}</td>
+                <td className="px-4 py-2 text-[11px] text-muted-foreground font-mono border-r border-border">{recipe.qty}</td>
+                <td className="px-4 py-2 text-[11px] text-muted-foreground uppercase tracking-widest border-r border-border">{recipe.uom}</td>
                 <td className="px-4 py-2 text-[11px] text-muted-foreground font-mono border-r border-border">{new Date(recipe.createdAt).toLocaleDateString()}</td>
-                <td className="px-4 py-2 text-[11px] text-foreground border-r border-border">
+                <td className="px-4 py-2 text-[11px] text-muted-foreground border-r border-border">
                   {recipe.createdBy ? `${recipe.createdBy.firstName} ${recipe.createdBy.lastName}` : '-'}
                 </td>
-                <td className="px-4 py-2 text-center text-[11px] font-bold text-muted-foreground border-r border-border">{recipe.lineItems?.length || 0}</td>
-                <td className="px-4 py-2 text-center text-[11px] font-bold text-muted-foreground">{recipe.steps?.length || 0}</td>
+                <td className="px-4 py-2 text-center text-[11px] text-muted-foreground border-r border-border">{recipe.lineItems?.length || 0}</td>
+                <td className="px-4 py-2 text-center text-[11px] text-muted-foreground">{recipe.steps?.length || 0}</td>
               </tr>
             ))}
           </tbody>
@@ -356,7 +356,7 @@ export default function RecipesPage() {
                 </div>
               )}
               <div>
-                <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">Recipe Name</label>
+                <label className="block text-[11px] font-black text-muted-foreground uppercase tracking-widest mb-2">Recipe Name</label>
                 <input
                   type="text"
                   className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 text-foreground font-medium"
@@ -366,7 +366,7 @@ export default function RecipesPage() {
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">product SKU {modalMode === 'copy' && '(Select New)'}</label>
+                <label className="block text-[11px] font-black text-muted-foreground uppercase tracking-widest mb-2">product SKU {modalMode === 'copy' && '(Select New)'}</label>
                 <SearchableSelect
                   options={skus.map(s => ({ value: s._id, label: s.name }))}
                   value={formData.sku}
@@ -376,7 +376,7 @@ export default function RecipesPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">Yield Quantity</label>
+                  <label className="block text-[11px] font-black text-muted-foreground uppercase tracking-widest mb-2">Yield Quantity</label>
                   <input
                     type="number"
                     className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 text-foreground font-mono"
@@ -385,7 +385,7 @@ export default function RecipesPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">UOM</label>
+                  <label className="block text-[11px] font-black text-muted-foreground uppercase tracking-widest mb-2">UOM</label>
                   <select
                     className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 text-foreground uppercase font-black"
                     value={formData.uom}

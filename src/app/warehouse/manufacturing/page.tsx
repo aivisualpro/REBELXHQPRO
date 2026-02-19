@@ -159,11 +159,11 @@ function ManufacturingContent() {
           </thead>
           <tbody className="divide-y divide-border">
             {loading ? (
-              <tr><td colSpan={12} className="px-2 py-4 text-center text-[10px] text-muted-foreground italic">Loading Orders...</td></tr>
+              <tr><td colSpan={12} className="px-2 py-4 text-center text-[11px] text-muted-foreground italic">Loading Orders...</td></tr>
             ) : error ? (
-              <tr><td colSpan={12} className="px-2 py-4 text-center text-destructive text-[10px] font-bold">{error}</td></tr>
+              <tr><td colSpan={12} className="px-2 py-4 text-center text-destructive text-[11px]">{error}</td></tr>
             ) : orders.length === 0 ? (
-              <tr><td colSpan={12} className="px-2 py-4 text-center text-[10px] text-muted-foreground uppercase font-medium tracking-tighter opacity-50">No Orders found</td></tr>
+              <tr><td colSpan={12} className="px-2 py-4 text-center text-[11px] text-muted-foreground uppercase tracking-tighter opacity-50">No Orders found</td></tr>
             ) : orders.map(order => {
               const unitCost = order.qty && order.qty > 0 ? (order.totalCost || 0) / order.qty : 0;
               return (
@@ -172,9 +172,9 @@ function ManufacturingContent() {
                 className="hover:bg-primary/5 transition-all duration-200 group relative z-0 hover:z-10 cursor-pointer"
                 onClick={() => router.push(`/warehouse/manufacturing/${order._id}`)}
               >
-                <td className="px-2 py-1.5 text-[10px] font-bold text-foreground tracking-tight font-mono group-hover:border-l-2 group-hover:border-l-primary transition-all">{order.label || '-'}</td>
-                <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono">{new Date(order.createdAt).toLocaleDateString()}</td>
-                <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-medium">
+                <td className="px-2 py-1.5 text-[11px] text-muted-foreground tracking-tight font-mono group-hover:border-l-2 group-hover:border-l-primary transition-all">{order.label || '-'}</td>
+                <td className="px-2 py-1.5 text-[11px] text-muted-foreground font-mono">{new Date(order.createdAt).toLocaleDateString()}</td>
+                <td className="px-2 py-1.5 text-[11px] text-muted-foreground">
                    <div className="flex items-center gap-1.5">
                       {(() => {
                         if (!order.sku || typeof order.sku !== 'object') return null;
@@ -196,8 +196,8 @@ function ManufacturingContent() {
                       </span>
                    </div>
                 </td>
-                <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono">{order.qty}</td>
-                <td className="px-2 py-1.5 text-[8px] uppercase font-bold text-muted-foreground">{order.priority}</td>
+                <td className="px-2 py-1.5 text-[11px] text-muted-foreground font-mono">{order.qty}</td>
+                <td className="px-2 py-1.5 text-[11px] uppercase text-muted-foreground">{order.priority}</td>
                 <td className="px-2 py-1.5">
                   <span className={cn(
                     "px-1.5 py-0.5 rounded-[2px] text-[8px] font-bold uppercase",
@@ -209,14 +209,14 @@ function ManufacturingContent() {
                     {order.status}
                   </span>
                 </td>
-                <td className="px-2 py-1.5 text-[10px] text-muted-foreground">
+                <td className="px-2 py-1.5 text-[11px] text-muted-foreground">
                   {order.createdBy ? `${order.createdBy.firstName} ${order.createdBy.lastName}` : '-'}
                 </td>
-                <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono">${(order.materialCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
-                <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono">${(order.packagingCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
-                <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono">${(order.laborCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
-                <td className="px-2 py-1.5 text-[10px] text-foreground font-mono font-bold">${(order.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
-                <td className="px-2 py-1.5 text-[10px] text-emerald-500 font-mono font-bold">${unitCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
+                <td className="px-2 py-1.5 text-[11px] text-muted-foreground font-mono">${(order.materialCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
+                <td className="px-2 py-1.5 text-[11px] text-muted-foreground font-mono">${(order.packagingCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
+                <td className="px-2 py-1.5 text-[11px] text-muted-foreground font-mono">${(order.laborCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
+                <td className="px-2 py-1.5 text-[11px] text-muted-foreground font-mono">${(order.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
+                <td className="px-2 py-1.5 text-[11px] text-muted-foreground font-mono">${unitCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</td>
               </tr>
             );
             })}

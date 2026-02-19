@@ -212,12 +212,12 @@ function KitsPageContent() {
                   key={kit._id}
                   className="hover:bg-secondary/40 transition-all duration-200 group relative z-0 hover:z-10 bg-background"
                 >
-                  <td className="px-4 py-2 text-[11px] font-bold text-foreground whitespace-nowrap overflow-hidden text-ellipsis max-w-[300px] border-r border-border">{kit.name}</td>
+                  <td className="px-4 py-2 text-[11px] text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis max-w-[300px] border-r border-border">{kit.name}</td>
                   <td className="px-4 py-2 text-[11px] text-muted-foreground font-mono border-r border-border">{new Date(kit.createdAt).toLocaleDateString()}</td>
-                  <td className="px-4 py-2 text-[11px] text-foreground border-r border-border">
+                  <td className="px-4 py-2 text-[11px] text-muted-foreground border-r border-border">
                     {kit.createdBy ? `${kit.createdBy.firstName} ${kit.createdBy.lastName}` : '-'}
                   </td>
-                  <td className="px-4 py-2 text-center text-[11px] font-bold text-muted-foreground border-r border-border">{kit.lineItems?.length || 0}</td>
+                  <td className="px-4 py-2 text-center text-[11px] text-muted-foreground border-r border-border">{kit.lineItems?.length || 0}</td>
                   <td className="px-4 py-2 text-right">
                     <div className="flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
@@ -273,7 +273,7 @@ function KitsPageContent() {
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">Kit Name</label>
+                <label className="block text-[11px] font-black text-muted-foreground uppercase tracking-widest mb-2">Kit Name</label>
                 <input
                   type="text"
                   className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 text-foreground font-medium"

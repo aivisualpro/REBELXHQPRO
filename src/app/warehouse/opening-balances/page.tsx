@@ -372,9 +372,9 @@ function OpeningBalancesContent() {
                         </thead>
                         <tbody className="divide-y divide-border bg-background/50">
                             {loading ? (
-                                <tr><td colSpan={8} className="px-2 py-12 text-center text-[10px] text-slate-400">Loading...</td></tr>
+                                <tr><td colSpan={8} className="px-2 py-12 text-center text-[11px] text-muted-foreground">Loading...</td></tr>
                             ) : balances.length === 0 ? (
-                                <tr><td colSpan={8} className="px-2 py-12 text-center text-[10px] text-slate-400 uppercase font-bold tracking-tighter opacity-50">No records found</td></tr>
+                                <tr><td colSpan={8} className="px-2 py-12 text-center text-[11px] text-muted-foreground uppercase tracking-tighter opacity-50">No records found</td></tr>
                             ) : balances.map(item => (
                                 <tr 
                                     key={item._id} 
@@ -400,12 +400,12 @@ function OpeningBalancesContent() {
                                     </td>
 
                                     {/* SKU Name */}
-                                    <td className="px-2 py-1 text-[10px] text-foreground font-medium border-r border-border whitespace-nowrap">
+                                    <td className="px-2 py-1 text-[11px] text-muted-foreground border-r border-border whitespace-nowrap">
                                         <span className="truncate max-w-[200px]" title={getSkuName(item.sku)}>{getSkuName(item.sku)}</span>
                                     </td>
 
                                     {/* Lot Number */}
-                                    <td className="px-2 py-1 text-[10px] text-foreground font-mono border-r border-border">
+                                    <td className="px-2 py-1 text-[11px] text-muted-foreground font-mono border-r border-border">
                                         <div className="flex items-center gap-2">
                                             <span className="tracking-tighter">{item.lotNumber}</span>
                                             <button 
@@ -429,23 +429,23 @@ function OpeningBalancesContent() {
                                     </td>
 
                                     {/* Qty */}
-                                    <td className="px-2 py-1 text-[10px] text-foreground border-r border-border text-center">{item.qty}</td>
+                                    <td className="px-2 py-1 text-[11px] text-muted-foreground border-r border-border text-center">{item.qty}</td>
 
                                     {/* UOM */}
-                                    <td className="px-2 py-1 text-[10px] uppercase text-foreground border-r border-border">{item.uom}</td>
+                                    <td className="px-2 py-1 text-[11px] uppercase text-muted-foreground border-r border-border">{item.uom}</td>
 
                                     {/* Cost */}
-                                    <td className="px-2 py-1 text-[10px] text-foreground font-mono border-r border-border text-right">
+                                    <td className="px-2 py-1 text-[11px] text-muted-foreground font-mono border-r border-border text-right">
                                         ${(item.cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
                                     </td>
 
                                     {/* Expires */}
-                                    <td className="px-2 py-1 text-[10px] text-foreground font-mono border-r border-border">
+                                    <td className="px-2 py-1 text-[11px] text-muted-foreground font-mono border-r border-border">
                                         {item.expirationDate ? new Date(item.expirationDate).toLocaleDateString() : '-'}
                                     </td>
 
                                     {/* Created At */}
-                                    <td className="px-2 py-1 text-[10px] text-foreground font-mono border-r border-border last:border-0">
+                                    <td className="px-2 py-1 text-[11px] text-muted-foreground font-mono border-r border-border last:border-0">
                                         {new Date(item.createdAt).toLocaleDateString()}
                                     </td>
                                 </tr>

@@ -193,14 +193,14 @@ export default function WebOrdersPage() {
             <Calendar className="w-3 h-3 text-muted-foreground" />
             <input
               type="date"
-              className="text-[10px] outline-none max-w-[90px] bg-transparent"
+              className="text-[11px] outline-none max-w-[90px] bg-transparent"
               value={dateRange.from}
               onChange={e => setDateRange({ ...dateRange, from: e.target.value })}
             />
             <span className="text-slate-300">-</span>
             <input
               type="date"
-              className="text-[10px] outline-none max-w-[90px] bg-transparent"
+              className="text-[11px] outline-none max-w-[90px] bg-transparent"
               value={dateRange.to}
               onChange={e => setDateRange({ ...dateRange, to: e.target.value })}
             />
@@ -249,9 +249,9 @@ export default function WebOrdersPage() {
           </thead>
           <tbody className="divide-y divide-border bg-background/50">
             {loading ? (
-              <tr><td colSpan={9} className="px-3 py-12 text-center text-[10px] text-slate-400">Loading Web Orders...</td></tr>
+              <tr><td colSpan={9} className="px-3 py-12 text-center text-[11px] text-muted-foreground">Loading Web Orders...</td></tr>
             ) : orders.length === 0 ? (
-              <tr><td colSpan={9} className="px-3 py-12 text-center text-[10px] text-slate-400 uppercase font-bold tracking-tighter opacity-50">No Orders Found</td></tr>
+              <tr><td colSpan={9} className="px-3 py-12 text-center text-[11px] text-muted-foreground uppercase tracking-tighter opacity-50">No Orders Found</td></tr>
             ) : orders.map(order => (
               <tr
                 key={order._id}
@@ -260,7 +260,7 @@ export default function WebOrdersPage() {
               >
                 <td className="px-3 py-1.5 border-r border-border">
                   <div className="flex flex-col">
-                    <span className="font-black text-foreground font-mono tracking-tighter">#{order.number}</span>
+                    <span className="text-[11px] text-muted-foreground font-mono tracking-tighter">#{order.number}</span>
                     <span className="font-mono text-[9px] text-muted-foreground">WC-{order.webId}</span>
                   </div>
                 </td>
@@ -278,7 +278,7 @@ export default function WebOrdersPage() {
                       <User className="w-2.5 h-2.5 text-muted-foreground" />
                     </div>
                     <div className="flex flex-col min-w-0">
-                      <span className="font-bold text-foreground text-[10px] truncate">{order.billing?.firstName} {order.billing?.lastName}</span>
+                      <span className="text-[11px] text-muted-foreground truncate">{order.billing?.firstName} {order.billing?.lastName}</span>
                       <span className="truncate max-w-[120px] text-[9px] text-muted-foreground">{order.billing?.email}</span>
                     </div>
                   </div>
@@ -291,12 +291,12 @@ export default function WebOrdersPage() {
                     {order.status}
                   </span>
                 </td>
-                <td className="px-3 py-1.5 border-r border-border font-mono text-[10px] text-muted-foreground">
+                <td className="px-3 py-1.5 border-r border-border font-mono text-[11px] text-muted-foreground">
                   {order.dateCreated ? new Date(order.dateCreated).toLocaleDateString() : '-'}
                 </td>
                 <td className="px-3 py-1.5 border-r border-border">
                   <div className="flex flex-col">
-                    <span className="font-black text-foreground font-mono text-[10px]">${order.total?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    <span className="text-muted-foreground font-mono text-[11px]">${order.total?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                     {order.shippingTotal > 0 && (
                       <span className="flex items-center space-x-0.5 text-[9px] text-muted-foreground">
                         <Truck className="w-2.5 h-2.5" />
@@ -306,7 +306,7 @@ export default function WebOrdersPage() {
                   </div>
                 </td>
                 <td className="px-3 py-1.5 border-r border-border">
-                  <div className="flex items-center space-x-1.5 text-[10px] text-muted-foreground">
+                  <div className="flex items-center space-x-1.5 text-[11px] text-muted-foreground">
                     <CreditCard className="w-3 h-3 opacity-50" />
                     <span className="truncate max-w-[80px]">{order.paymentMethodTitle || '-'}</span>
                   </div>
@@ -316,7 +316,7 @@ export default function WebOrdersPage() {
                     {order.lineItems?.length || 0}
                   </span>
                 </td>
-                <td className="px-3 py-1.5 text-[9px] text-muted-foreground truncate max-w-[100px]">
+                <td className="px-3 py-1.5 text-[11px] text-muted-foreground truncate max-w-[100px]">
                   {order.billing?.city}, {order.billing?.state}
                 </td>
               </tr>

@@ -243,9 +243,9 @@ function AuditAdjustmentsPage() {
                     </thead>
                     <tbody className="divide-y divide-border bg-background/50">
                         {loading ? (
-                            <tr><td colSpan={8} className="px-2 py-12 text-center text-[10px] text-slate-400">Loading...</td></tr>
+                            <tr><td colSpan={8} className="px-2 py-12 text-center text-[11px] text-muted-foreground">Loading...</td></tr>
                         ) : adjustments.length === 0 ? (
-                            <tr><td colSpan={8} className="px-2 py-12 text-center text-[10px] text-slate-400 uppercase font-bold tracking-tighter opacity-50">No records found</td></tr>
+                            <tr><td colSpan={8} className="px-2 py-12 text-center text-[11px] text-muted-foreground uppercase tracking-tighter opacity-50">No records found</td></tr>
                         ) : adjustments.map(item => {
                             const skuData = getSkuData(item.sku);
                             const imgSrc = skuData.image || missingImg || '';
@@ -274,7 +274,7 @@ function AuditAdjustmentsPage() {
                                         </div>
                                     </td>
                                     {/* SKU Name with Tier */}
-                                    <td className="px-2 py-1.5 text-[10px] text-foreground border-r border-border">
+                                    <td className="px-2 py-1.5 text-[11px] text-muted-foreground border-r border-border">
                                         <div className="flex items-center space-x-1.5">
                                             {skuTier ? (
                                                 <span className={cn(
@@ -289,16 +289,16 @@ function AuditAdjustmentsPage() {
                                             <span className="truncate max-w-[200px]" title={skuData.name}>{skuData.name}</span>
                                         </div>
                                     </td>
-                                    <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono tracking-tighter border-r border-border">{item.lotNumber}</td>
+                                    <td className="px-2 py-1.5 text-[11px] text-muted-foreground font-mono tracking-tighter border-r border-border">{item.lotNumber}</td>
                                     <td className={cn(
-                                        "px-2 py-1.5 text-[10px] font-mono border-r border-border",
+                                        "px-2 py-1.5 text-[11px] font-mono border-r border-border",
                                         item.qty > 0 ? "text-emerald-600" : "text-rose-600"
                                     )}>
                                         {item.qty > 0 ? '+' : ''}{item.qty.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 8 })}
                                     </td>
-                                    <td className="px-2 py-1.5 text-[10px] text-muted-foreground max-w-xs truncate border-r border-border" title={item.reason}>{item.reason}</td>
-                                    <td className="px-2 py-1.5 text-[10px] text-muted-foreground border-r border-border">{renderUser(item.createdBy)}</td>
-                                    <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono border-r border-border last:border-0">
+                                    <td className="px-2 py-1.5 text-[11px] text-muted-foreground max-w-xs truncate border-r border-border" title={item.reason}>{item.reason}</td>
+                                    <td className="px-2 py-1.5 text-[11px] text-muted-foreground border-r border-border">{renderUser(item.createdBy)}</td>
+                                    <td className="px-2 py-1.5 text-[11px] text-muted-foreground font-mono border-r border-border last:border-0">
                                         {new Date(item.createdAt).toLocaleDateString()}
                                     </td>
                                 </tr>

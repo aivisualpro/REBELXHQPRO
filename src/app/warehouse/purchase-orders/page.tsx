@@ -577,11 +577,11 @@ function PurchaseOrdersContent() {
           </thead>
           <tbody className="divide-y divide-border bg-background/50">
             {loading ? (
-              <tr><td colSpan={10} className="px-4 py-12 text-center text-xs text-slate-400">Loading Orders...</td></tr>
+              <tr><td colSpan={10} className="px-4 py-12 text-center text-[11px] text-muted-foreground">Loading Orders...</td></tr>
             ) : error ? (
               <tr><td colSpan={10} className="px-4 py-12 text-center text-red-500 text-xs font-bold">{error}</td></tr>
             ) : orders.length === 0 ? (
-              <tr><td colSpan={10} className="px-4 py-12 text-center text-xs text-slate-400 uppercase font-bold tracking-tighter opacity-50">No Orders found</td></tr>
+              <tr><td colSpan={10} className="px-4 py-12 text-center text-[11px] text-muted-foreground uppercase tracking-tighter opacity-50">No Orders found</td></tr>
             ) : orders.map(order => (
               <tr
                 key={order._id}
@@ -589,10 +589,10 @@ function PurchaseOrdersContent() {
                 className="group relative z-0 bg-background transition-colors duration-150 cursor-pointer hover:bg-secondary/30"
               >
                 <td className="px-2 py-1.5 border-r border-border group-hover:border-l-2 group-hover:border-l-primary transition-all">
-                  <span className="text-[10px] font-bold text-foreground tracking-tight font-mono whitespace-nowrap overflow-hidden text-ellipsis max-w-[100px]">{order.label || '-'}</span>
+                  <span className="text-[11px] text-muted-foreground tracking-tight font-mono whitespace-nowrap overflow-hidden text-ellipsis max-w-[100px]">{order.label || '-'}</span>
                 </td>
-                <td className="px-2 py-1.5 text-[10px] text-foreground font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px] border-r border-border">{renderVendor(order)}</td>
-                <td className="px-2 py-1.5 text-[10px] text-muted-foreground border-r border-border">{order.paymentTerms || '-'}</td>
+                <td className="px-2 py-1.5 text-[11px] text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px] border-r border-border">{renderVendor(order)}</td>
+                <td className="px-2 py-1.5 text-[11px] text-muted-foreground border-r border-border">{order.paymentTerms || '-'}</td>
                 <td className="px-2 py-1.5 border-r border-border text-center">
                   <span className={cn(
                     "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider",
@@ -605,16 +605,16 @@ function PurchaseOrdersContent() {
                     {order.status}
                   </span>
                 </td>
-                <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono border-r border-border">{formatDate(order.scheduledDelivery)}</td>
-                <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono border-r border-border">{formatDate(order.receivedDate)}</td>
-                <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono border-r border-border">{formatDate(order.createdAt)}</td>
-                <td className="px-2 py-1.5 text-[10px] text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px] border-r border-border">
+                <td className="px-2 py-1.5 text-[11px] text-muted-foreground font-mono border-r border-border">{formatDate(order.scheduledDelivery)}</td>
+                <td className="px-2 py-1.5 text-[11px] text-muted-foreground font-mono border-r border-border">{formatDate(order.receivedDate)}</td>
+                <td className="px-2 py-1.5 text-[11px] text-muted-foreground font-mono border-r border-border">{formatDate(order.createdAt)}</td>
+                <td className="px-2 py-1.5 text-[11px] text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px] border-r border-border">
                   {order.createdBy ? `${order.createdBy.firstName} ${order.createdBy.lastName}` : '-'}
                 </td>
-                <td className="px-2 py-1.5 text-[10px] font-bold text-foreground font-mono text-right border-r border-border">
+                <td className="px-2 py-1.5 text-[11px] text-muted-foreground font-mono text-right border-r border-border">
                   {formatCurrency(calculateTotal(order))}
                 </td>
-                <td className="px-2 py-1.5 text-[10px] font-bold text-muted-foreground text-center">
+                <td className="px-2 py-1.5 text-[11px] text-muted-foreground text-center">
                   {order.lineItems?.length || 0}
                 </td>
               </tr>

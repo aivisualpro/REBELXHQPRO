@@ -226,15 +226,15 @@ function LabResultsPageContent() {
               <tr><td colSpan={8} className="px-4 py-12 text-center text-xs text-muted-foreground uppercase font-bold tracking-tighter opacity-50">No records found</td></tr>
             ) : results.map(item => (
               <tr key={item._id} className="hover:bg-secondary/30 transition-colors group">
-                <td className="px-4 py-1.5 text-[10px] font-bold text-foreground border-r border-border">{item.name}</td>
-                <td className="px-4 py-1.5 text-[10px] text-muted-foreground border-r border-border">
+                <td className="px-4 py-1.5 text-[11px] text-muted-foreground border-r border-border">{item.name}</td>
+                <td className="px-4 py-1.5 text-[11px] text-muted-foreground border-r border-border">
                   <div className="flex flex-wrap gap-1 max-w-[200px]">
                     {item.variations?.map((v, i) => (
                       <span key={i} className="inline-block px-1.5 py-0.5 bg-secondary rounded text-[9px] text-muted-foreground">{v}</span>
                     ))}
                   </div>
                 </td>
-                <td className="px-4 py-1.5 text-[10px] text-muted-foreground font-medium border-r border-border">{item.brand}</td>
+                <td className="px-4 py-1.5 text-[11px] text-muted-foreground border-r border-border">{item.brand}</td>
                 <td className="px-4 py-1.5 border-r border-border">
                   <span className={cn(
                     "px-2 py-0.5 text-[9px] font-bold uppercase rounded-full border",
@@ -245,11 +245,11 @@ function LabResultsPageContent() {
                     {item.labTestStatus || 'PENDING'}
                   </span>
                 </td>
-                <td className="px-4 py-1.5 text-[10px] text-muted-foreground border-r border-border">
+                <td className="px-4 py-1.5 text-[11px] text-muted-foreground border-r border-border">
                   {item.labResultDate ? new Date(item.labResultDate).toLocaleDateString() : '-'}
                 </td>
-                <td className="px-4 py-1.5 text-[10px] text-muted-foreground border-r border-border">{item.company}</td>
-                <td className="px-4 py-1.5 text-[10px] border-r border-border">
+                <td className="px-4 py-1.5 text-[11px] text-muted-foreground border-r border-border">{item.company}</td>
+                <td className="px-4 py-1.5 text-[11px] border-r border-border">
                   {item.link ? (
                     <a href={item.link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 flex items-center space-x-1">
                       <span>View</span>

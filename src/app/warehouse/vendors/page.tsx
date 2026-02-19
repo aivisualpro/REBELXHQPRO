@@ -115,7 +115,7 @@ export default function VendorsPage() {
             className="h-8 px-3 bg-primary text-black hover:opacity-90 transition-all rounded shadow-md flex items-center space-x-1.5 cursor-pointer"
           >
             <Plus className="w-3 h-3" />
-            <span className="hidden sm:inline text-[10px] font-black uppercase tracking-widest">New</span>
+            <span className="hidden sm:inline text-[11px] font-black uppercase tracking-widest">New</span>
           </button>
         </>,
         headerPortalTarget
@@ -153,24 +153,24 @@ export default function VendorsPage() {
           </thead>
           <tbody className="divide-y divide-border bg-background/50">
             {loading ? (
-              <tr><td colSpan={8} className="px-2 py-4 text-center text-[10px] text-muted-foreground italic tracking-tight">Loading Vendors...</td></tr>
+              <tr><td colSpan={8} className="px-2 py-4 text-center text-[11px] text-muted-foreground italic tracking-tight">Loading Vendors...</td></tr>
             ) : error ? (
-              <tr><td colSpan={8} className="px-2 py-4 text-center text-destructive text-[10px] font-bold">{error}</td></tr>
+              <tr><td colSpan={8} className="px-2 py-4 text-center text-destructive text-[11px]">{error}</td></tr>
             ) : vendors.length === 0 ? (
-              <tr><td colSpan={8} className="px-2 py-4 text-center text-[10px] text-muted-foreground uppercase font-medium tracking-tighter opacity-50">No Vendors found</td></tr>
+              <tr><td colSpan={8} className="px-2 py-4 text-center text-[11px] text-muted-foreground uppercase tracking-tighter opacity-50">No Vendors found</td></tr>
             ) : vendors.map(vendor => (
               <tr
                 key={vendor._id}
                 onClick={() => router.push(`/warehouse/vendors/${vendor._id}`)}
                 className="hover:bg-secondary/40 transition-colors duration-200 group bg-background cursor-pointer"
               >
-                <td className="px-2 py-1.5 text-[10px] font-bold text-foreground tracking-tight border-l-3 border-l-transparent group-hover:border-l-primary">{vendor.name}</td>
-                <td className="px-2 py-1.5 text-[10px] text-muted-foreground truncate max-w-[200px]" title={vendor.address}>{vendor.address || '-'}</td>
-                <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono tracking-tighter">{vendor.phone || '-'}</td>
-                <td className="px-2 py-1.5 text-[10px] text-muted-foreground truncate max-w-[150px]">{vendor.email || '-'}</td>
-                <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[100px]">{vendor.contactName || '-'}</td>
-                <td className="px-2 py-1.5 text-[8px] text-muted-foreground uppercase font-bold">{vendor.paymentTerms || '-'}</td>
-                <td className="px-2 py-1.5 text-[10px] text-muted-foreground truncate max-w-[100px]">{vendor.carrierPreference || '-'}</td>
+                <td className="px-2 py-1.5 text-[11px] text-muted-foreground tracking-tight border-l-3 border-l-transparent group-hover:border-l-primary">{vendor.name}</td>
+                <td className="px-2 py-1.5 text-[11px] text-muted-foreground truncate max-w-[200px]" title={vendor.address}>{vendor.address || '-'}</td>
+                <td className="px-2 py-1.5 text-[11px] text-muted-foreground font-mono tracking-tighter">{vendor.phone || '-'}</td>
+                <td className="px-2 py-1.5 text-[11px] text-muted-foreground truncate max-w-[150px]">{vendor.email || '-'}</td>
+                <td className="px-2 py-1.5 text-[11px] text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis max-w-[100px]">{vendor.contactName || '-'}</td>
+                <td className="px-2 py-1.5 text-[11px] text-muted-foreground uppercase">{vendor.paymentTerms || '-'}</td>
+                <td className="px-2 py-1.5 text-[11px] text-muted-foreground truncate max-w-[100px]">{vendor.carrierPreference || '-'}</td>
                 <td className="px-2 py-1.5">
                   <span className={cn(
                     "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider",
