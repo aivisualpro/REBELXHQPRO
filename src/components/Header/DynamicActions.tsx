@@ -76,6 +76,50 @@ const DynamicActionsContent = () => {
 
     return (
         <div className="flex items-center justify-end space-x-1 w-full h-full">
+            {/* Search Bar */}
+            {isSearchable && (
+                <AnimatePresence mode="wait">
+                    {isSearchOpen ? (
+                        <motion.div
+                            key="search-input"
+                            initial={{ width: 0, opacity: 0 }}
+                            animate={{ width: 200, opacity: 1 }}
+                            exit={{ width: 0, opacity: 0 }}
+                            transition={{ duration: 0.2, ease: 'easeInOut' }}
+                            className="relative flex items-center overflow-hidden"
+                        >
+                            <Search className="absolute left-2 w-3 h-3 text-muted-foreground pointer-events-none" />
+                            <input
+                                ref={searchInputRef}
+                                type="text"
+                                value={searchValue}
+                                onChange={(e) => handleSearchChange(e.target.value)}
+                                placeholder="Search..."
+                                className="w-full h-7 pl-7 pr-7 text-xs bg-secondary/80 border border-border rounded-full text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/30 transition-all"
+                            />
+                            <button
+                                onClick={handleSearchClose}
+                                className="absolute right-1.5 p-0.5 text-muted-foreground hover:text-foreground rounded-full hover:bg-secondary transition-colors cursor-pointer"
+                            >
+                                <X className="w-3 h-3" />
+                            </button>
+                        </motion.div>
+                    ) : (
+                        <motion.button
+                            key="search-icon"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setIsSearchOpen(true)}
+                            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-all cursor-pointer"
+                            title="Search"
+                        >
+                            <Search className="w-4 h-4" />
+                        </motion.button>
+                    )}
+                </AnimatePresence>
+            )}
+
             {/* Global Actions */}
             <button 
                 onClick={() => setIsPanelOpen(true)}

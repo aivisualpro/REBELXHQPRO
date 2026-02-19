@@ -20,7 +20,9 @@ import {
     Pencil,
     Trash2,
     X,
-    Save
+    Save,
+    ExternalLink,
+    Link
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -85,6 +87,29 @@ interface Financials {
     }[];
 }
 
+interface LinkedWebProduct {
+    _id: string;
+    name: string;
+    image?: string;
+    website?: string;
+    webId?: number;
+    type?: string;
+    status?: string;
+    permalink?: string;
+    price?: number;
+    salePrice?: number;
+    totalWebOrders: number;
+    isDirectLink: boolean;
+    linkedVariations: {
+        _id: string;
+        id?: number;
+        name?: string;
+        sku?: string;
+        price?: number;
+        image?: string;
+    }[];
+}
+
 const PAGE_SIZE = 20; // Load 20 rows at a time
 
 function SkuDetailsPageContent() {
@@ -134,6 +159,10 @@ function SkuDetailsPageContent() {
     const [editForm, setEditForm] = useState<any>(null);
     const [isEditSaving, setIsEditSaving] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    // Linked web products
+    const [linkedWebProducts, setLinkedWebProducts] = useState<LinkedWebProduct[]>([]);
+    const [loadingLinkedProducts, setLoadingLinkedProducts] = useState(false);
 
     // Warning click -> highlight ledger rows
     const [highlightedTxIds, setHighlightedTxIds] = useState<Set<string>>(new Set());
@@ -214,6 +243,14 @@ function SkuDetailsPageContent() {
                     .then(r => r.json())
                     .then(lotsData => setLots(lotsData.lots || []))
                     .catch(() => {}); // Silently fail if lots fetch fails
+
+                // Fetch linked web products
+                setLoadingLinkedProducts(true);
+                fetch(`/api/warehouse/skus/${id}/linked-web-products`)
+                    .then(r => r.json())
+                    .then(wpData => setLinkedWebProducts(wpData.linkedProducts || []))
+                    .catch(() => {})
+                    .finally(() => setLoadingLinkedProducts(false));
             } else {
                 if (!background) toast.error("Failed to load SKU details");
             }
@@ -680,6 +717,121 @@ function SkuDetailsPageContent() {
                                     </tbody>
                                 </table>
                             </div>
+                        </div>
+                    )}
+
+                    {/* Linked Web Products Section */}
+                    {(linkedWebProducts.length > 0 || loadingLinkedProducts) && (
+                        <div className="p-4 bg-background border-b border-border">
+                            <h3 className="text-xs font-bold text-foreground uppercase tracking-wider mb-3 border-b border-border pb-2 flex items-center gap-2">
+                                <Link className="w-3.5 h-3.5 text-indigo-400" />
+                                Linked Web Products
+                            </h3>
+                            {loadingLinkedProducts ? (
+                                <div className="flex items-center justify-center py-4">
+                                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                                    <span className="text-[10px] text-muted-foreground ml-2">Loading…</span>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {linkedWebProducts.map((wp) => (
+                                        <div
+                                            key={wp._id}
+                                            className="group border border-border rounded-lg overflow-hidden hover:border-indigo-500/40 transition-all bg-secondary/20 hover:bg-secondary/40 cursor-pointer"
+                                            onClick={() => router.push(`/warehouse/web-products?search=${encodeURIComponent(wp.name)}`)}
+                                        >
+                                            {/* Header row: Website badge + product name */}
+                                            <div className="flex items-center gap-2 px-3 py-2">
+                                                {/* Product image */}
+                                                {wp.image ? (
+                                                    <img
+                                                        src={wp.image}
+                                                        alt={wp.name}
+                                                        className="w-8 h-8 rounded object-cover border border-border shrink-0"
+                                                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                                    />
+                                                ) : (
+                                                    <div className="w-8 h-8 rounded bg-secondary flex items-center justify-center shrink-0 border border-border">
+                                                        <Globe className="w-3.5 h-3.5 text-muted-foreground" />
+                                                    </div>
+                                                )}
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-[10px] font-bold text-foreground truncate leading-tight" title={wp.name}>{wp.name}</p>
+                                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                                        {wp.website && (
+                                                            <span className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                                                                {wp.website}
+                                                            </span>
+                                                        )}
+                                                        <span className={cn(
+                                                            "text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded",
+                                                            wp.status === 'publish' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' :
+                                                            wp.status === 'draft' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' :
+                                                            'bg-secondary text-muted-foreground border border-border'
+                                                        )}>
+                                                            {wp.status || 'Unknown'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                {wp.permalink && (
+                                                    <a
+                                                        href={wp.permalink}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="p-1 hover:bg-secondary rounded transition-colors opacity-0 group-hover:opacity-100"
+                                                        title="Open in store"
+                                                    >
+                                                        <ExternalLink className="w-3 h-3 text-muted-foreground hover:text-indigo-400" />
+                                                    </a>
+                                                )}
+                                            </div>
+
+                                            {/* Details row */}
+                                            <div className="flex items-center justify-between px-3 py-1.5 border-t border-border/50 bg-secondary/30">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-[9px] text-muted-foreground">
+                                                        <span className="font-bold text-foreground">
+                                                            {wp.price != null ? `$${wp.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '-'}
+                                                        </span>
+                                                    </span>
+                                                    <span className={cn(
+                                                        "text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded",
+                                                        wp.type === 'variable' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
+                                                        'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                                                    )}>
+                                                        {wp.type || 'simple'}
+                                                    </span>
+                                                </div>
+                                                <span className="text-[9px] font-mono font-bold text-muted-foreground">
+                                                    {wp.totalWebOrders} orders
+                                                </span>
+                                            </div>
+
+                                            {/* Linked Variations (for variable products) */}
+                                            {wp.linkedVariations.length > 0 && (
+                                                <div className="border-t border-border/50 px-3 py-1.5 bg-indigo-500/5">
+                                                    <p className="text-[8px] font-bold text-indigo-400 uppercase tracking-wider mb-1">Linked Variations</p>
+                                                    <div className="space-y-0.5">
+                                                        {wp.linkedVariations.map((v) => (
+                                                            <div key={v._id} className="flex items-center justify-between">
+                                                                <span className="text-[9px] text-muted-foreground truncate" title={v.name || v.sku}>
+                                                                    {v.name || v.sku || `Variation #${v.id}`}
+                                                                </span>
+                                                                {v.price != null && (
+                                                                    <span className="text-[9px] font-mono text-foreground/70">
+                                                                        ${v.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
 

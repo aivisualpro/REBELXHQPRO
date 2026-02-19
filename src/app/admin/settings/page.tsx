@@ -36,7 +36,10 @@ import {
     PackageCheck,
     MessageSquare,
     Download,
-    Search
+    Search,
+    Loader2,
+    Plus,
+    X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -103,6 +106,24 @@ function SettingsPageContent() {
     const importMfgLaborRef = useRef<HTMLInputElement>(null);
     const importMfgNotesRef = useRef<HTMLInputElement>(null);
     const importMfgQualityChecksRef = useRef<HTMLInputElement>(null);
+
+    // Web Products Sync & Management
+    const importWebProductsCsvRef = useRef<HTMLInputElement>(null);
+    const [wpSyncStatus, setWpSyncStatus] = useState({
+        isSyncing: false,
+        currentStep: '',
+        progress: 0,
+        total: 0,
+    });
+    const [wpModalOpen, setWpModalOpen] = useState(false);
+    const [wpSubmitting, setWpSubmitting] = useState(false);
+    const [wpEditing, setWpEditing] = useState<any>(null);
+    const wpInitialForm = {
+        _id: '', webId: 0, sku_code: '', name: '', image: '', website: '',
+        category: '', subCategory: '', materialType: '', uom: '',
+        salePrice: 0, orderUpto: 0, reOrderPoint: 0, kitApplied: false, isLotApplied: false
+    };
+    const [wpFormData, setWpFormData] = useState(wpInitialForm);
 
     const [settings, setSettings] = useState({
         companyName: 'RebelX Headquarters',
@@ -248,6 +269,117 @@ function SettingsPageContent() {
                 }
             }
         });
+    };
+
+    // Web Products Sync
+    const handleWebProductSync = async (fullSync = false) => {
+        try {
+            const url = fullSync
+                ? '/api/retail/web-products/sync?full=true'
+                : '/api/retail/web-products/sync';
+            const res = await fetch(url, { method: 'POST' });
+            if (res.ok) {
+                toast.success(fullSync ? 'Full sync started' : 'Incremental sync started');
+                pollWebProductSyncProgress();
+            } else {
+                const err = await res.json();
+                toast.error('Failed to start sync: ' + err.error);
+            }
+        } catch (e) {
+            toast.error('Sync start error');
+        }
+    };
+
+    const pollWebProductSyncProgress = useCallback(async () => {
+        const timer = setInterval(async () => {
+            try {
+                const res = await fetch('/api/retail/web-products/sync');
+                const data = await res.json();
+                setWpSyncStatus(data);
+                if (!data.isSyncing && (data.currentStep === 'Complete' || data.currentStep === 'Failed')) {
+                    clearInterval(timer);
+                    if (data.currentStep === 'Complete') {
+                        toast.success('Web product sync completed successfully');
+                    } else {
+                        toast.error('Web product sync failed. Check details.');
+                    }
+                }
+            } catch (e) {
+                console.error('WP polling error:', e);
+            }
+        }, 1000);
+    }, []);
+
+    // Check initial web product sync status when on warehouse tab
+    useEffect(() => {
+        if (activeTab === 'modules' && moduleSubTab === 'warehouse') {
+            fetch('/api/retail/web-products/sync').then(res => res.json()).then(data => {
+                if (data.isSyncing) {
+                    setWpSyncStatus(data);
+                    pollWebProductSyncProgress();
+                }
+            }).catch(() => {});
+        }
+    }, [activeTab, moduleSubTab, pollWebProductSyncProgress]);
+
+    // Web Products CSV Import
+    const handleWebProductImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        e.target.value = '';
+
+        Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: async (results) => {
+                try {
+                    const loadingToast = toast.loading('Importing web products...');
+                    const res = await fetch('/api/skus/import', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ skus: results.data })
+                    });
+                    toast.dismiss(loadingToast);
+                    if (res.ok) {
+                        const data = await res.json();
+                        toast.success(`Imported/Updated ${data.count} items`);
+                    } else {
+                        const err = await res.json();
+                        toast.error('Import failed: ' + err.error);
+                    }
+                } catch (e) {
+                    toast.error('Import error');
+                    console.error(e);
+                }
+            }
+        });
+    };
+
+    // Web Product Add/Edit Submit
+    const handleWebProductSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setWpSubmitting(true);
+        try {
+            const url = wpEditing ? `/api/retail/web-products/${wpEditing._id}` : '/api/retail/web-products';
+            const method = wpEditing ? 'PATCH' : 'POST';
+            const res = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...wpFormData })
+            });
+            if (res.ok) {
+                setWpModalOpen(false);
+                toast.success(wpEditing ? 'Product updated' : 'Product created');
+            } else {
+                const err = await res.json();
+                toast.error('Error: ' + (err.error || err.message));
+            }
+        } catch (error) {
+            console.error(error);
+            toast.error('Failed to save');
+        } finally {
+            setWpSubmitting(false);
+        }
     };
 
     const tabs = [
@@ -900,6 +1032,117 @@ function SettingsPageContent() {
                                 {/* Warehouse Module Settings */}
                                 {moduleSubTab === 'warehouse' && (
                                     <div className="space-y-6 animate-in fade-in duration-200">
+
+                                        {/* Web Products Sync & Management */}
+                                        <div className="space-y-4">
+                                            <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground border-b border-border pb-2">Web Products Sync & Management</h2>
+
+                                            {/* Sync Progress */}
+                                            {wpSyncStatus.isSyncing && (
+                                                <div className="bg-primary px-4 py-3 flex items-center justify-between text-black animate-in slide-in-from-top duration-300 rounded-lg shadow-md">
+                                                    <div className="flex items-center space-x-3 flex-1">
+                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                        <span className="text-[10px] font-black uppercase tracking-widest">{wpSyncStatus.currentStep}</span>
+                                                        {wpSyncStatus.total > 0 && (
+                                                            <div className="flex-1 max-w-sm bg-black/10 h-1.5 rounded-full overflow-hidden mx-6">
+                                                                <div
+                                                                    className="bg-black h-full transition-all duration-500"
+                                                                    style={{ width: `${(wpSyncStatus.progress / wpSyncStatus.total) * 100}%` }}
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-[10px] font-black uppercase tracking-widest ml-4">
+                                                        {wpSyncStatus.total > 0 ? `${Math.round((wpSyncStatus.progress / wpSyncStatus.total) * 100)}% (${wpSyncStatus.progress}/${wpSyncStatus.total})` : 'Initializing...'}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <div className="p-4 border border-blue-500/20 bg-blue-500/10 rounded-lg flex items-start space-x-4 mb-4">
+                                                <div className="shrink-0 mt-0.5">
+                                                    <Globe className="w-5 h-5 text-blue-600" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-blue-600 dark:text-blue-400">WooCommerce Sync</h4>
+                                                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                                                        Sync web products from all connected WooCommerce stores. <strong>Incremental</strong> only syncs recently changed products. <strong>Full</strong> re-syncs everything from scratch.
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <input
+                                                type="file"
+                                                accept=".csv"
+                                                className="hidden"
+                                                ref={importWebProductsCsvRef}
+                                                onChange={handleWebProductImport}
+                                            />
+
+                                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                                {/* Incremental Sync */}
+                                                <button
+                                                    onClick={() => handleWebProductSync(false)}
+                                                    disabled={wpSyncStatus.isSyncing}
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-lg hover:border-blue-400 hover:bg-blue-500/10 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center mb-3 group-hover:bg-blue-500/30 transition-colors">
+                                                        {wpSyncStatus.isSyncing ? <Loader2 className="w-6 h-6 text-blue-600 animate-spin" /> : <Globe className="w-6 h-6 text-blue-600" />}
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-muted-foreground">Sync</h4>
+                                                    <p className="text-[10px] text-muted-foreground mt-1 text-center">
+                                                        Incremental - changed products only
+                                                    </p>
+                                                </button>
+
+                                                {/* Full Sync */}
+                                                <button
+                                                    onClick={() => handleWebProductSync(true)}
+                                                    disabled={wpSyncStatus.isSyncing}
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-lg hover:border-amber-400 hover:bg-amber-500/10 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center mb-3 group-hover:bg-amber-500/30 transition-colors">
+                                                        <Globe className="w-6 h-6 text-amber-600" />
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-muted-foreground">Full Sync</h4>
+                                                    <p className="text-[10px] text-muted-foreground mt-1 text-center">
+                                                        All products from scratch
+                                                    </p>
+                                                </button>
+
+                                                {/* Import CSV */}
+                                                <button
+                                                    onClick={() => importWebProductsCsvRef.current?.click()}
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-lg hover:border-teal-400 hover:bg-teal-500/10 transition-colors group"
+                                                >
+                                                    <div className="w-12 h-12 rounded-full bg-teal-500/20 flex items-center justify-center mb-3 group-hover:bg-teal-500/30 transition-colors">
+                                                        <Upload className="w-6 h-6 text-teal-600" />
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-muted-foreground">Import CSV</h4>
+                                                    <p className="text-[10px] text-muted-foreground mt-1 text-center">
+                                                        Import products from CSV file
+                                                    </p>
+                                                </button>
+
+                                                {/* Add Product */}
+                                                <button
+                                                    onClick={() => {
+                                                        setWpEditing(null);
+                                                        setWpFormData(wpInitialForm);
+                                                        setWpModalOpen(true);
+                                                    }}
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-lg hover:border-primary hover:bg-primary/10 transition-colors group"
+                                                >
+                                                    <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mb-3 group-hover:bg-primary/30 transition-colors">
+                                                        <Plus className="w-6 h-6 text-primary" />
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-muted-foreground">Add Product</h4>
+                                                    <p className="text-[10px] text-muted-foreground mt-1 text-center">
+                                                        Manually add a web product
+                                                    </p>
+                                                </button>
+                                            </div>
+                                        </div>
+
                                         {/* Hidden File Inputs for SKU Import */}
                                         <input
                                             type="file"
@@ -1692,6 +1935,117 @@ function SettingsPageContent() {
                                                         <p>woNumber (parent legacyId), checkedBy, packagedBy, label, lot, seal, packageQuality, repackaged, weight, target, actualWeight, qualityCheckedBy, createdAt</p>
                                                     </div>
                                                 </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Web Product Add Modal */}
+                                {wpModalOpen && (
+                                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                                        <div className="bg-background w-full max-w-2xl shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh] rounded border border-border">
+                                            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-secondary/50 shrink-0">
+                                                <h2 className="text-sm font-black uppercase tracking-widest text-foreground">
+                                                    {wpEditing ? 'Edit Product' : 'Add New Web Product'}
+                                                </h2>
+                                                <button onClick={() => setWpModalOpen(false)} className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+                                                    <X className="w-5 h-5" />
+                                                </button>
+                                            </div>
+                                            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                                                <form id="wp-form" onSubmit={handleWebProductSubmit} className="space-y-6">
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div className="space-y-1">
+                                                            <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Name <span className="text-destructive">*</span></label>
+                                                            <input type="text" required value={wpFormData.name} onChange={e => setWpFormData({...wpFormData, name: e.target.value})} className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground font-medium" />
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Website <span className="text-destructive">*</span></label>
+                                                            <input type="text" required placeholder="e.g. KINGKKRATOM" value={wpFormData.website} onChange={e => setWpFormData({...wpFormData, website: e.target.value})} className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground font-medium" />
+                                                        </div>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div className="space-y-1">
+                                                            <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Web ID (WooCommerce) <span className="text-destructive">*</span></label>
+                                                            <input type="number" required value={wpFormData.webId} onChange={e => setWpFormData({...wpFormData, webId: Number(e.target.value)})} className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground font-medium" />
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Linked SKU Code</label>
+                                                            <input type="text" placeholder="Matches internal SKU" value={wpFormData.sku_code} onChange={e => setWpFormData({...wpFormData, sku_code: e.target.value})} className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground font-medium" />
+                                                        </div>
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Image URL</label>
+                                                        <input type="text" placeholder="https://..." value={wpFormData.image} onChange={e => setWpFormData({...wpFormData, image: e.target.value})} className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground font-medium" />
+                                                    </div>
+                                                    <div className="grid grid-cols-3 gap-4">
+                                                        <div className="space-y-1">
+                                                            <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Category</label>
+                                                            <select className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground" value={wpFormData.category} onChange={e => setWpFormData({...wpFormData, category: e.target.value})}>
+                                                                <option value="">Select Category</option>
+                                                                {["Finished Goods","High Priority","Lab Testing","Maintenance","Packaging","Part","Shipping Category"].map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                                            </select>
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Sub Category</label>
+                                                            <select className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground" value={wpFormData.subCategory} onChange={e => setWpFormData({...wpFormData, subCategory: e.target.value})}>
+                                                                <option value="">Select Sub-Category</option>
+                                                                {["Bags","Bottle and Lids","Display Boxes","Disposable Vape","Edibles","Flavors","Hemp","Kava","Kratom","Kratom Extract","Kratom Powder","Labels/Shrink-Bands","Marketing Material","Packagings","R&D (Research and Developement)","Raw Ingredients","simple","variable"].map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                                            </select>
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Material Type</label>
+                                                            <select className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground" value={wpFormData.materialType} onChange={e => setWpFormData({...wpFormData, materialType: e.target.value})}>
+                                                                <option value="">Select Material Type</option>
+                                                                {["Bag","Bottle","Box","Capsule","Clings","Crystal","Dropper","Edible","Extracts","Label","Lid/Top","Liquid","Oils","Postcards","Posters","Powder","Sample Boxes","Seal","Shipping Boxes","Shrinkband","Smokables","Stickers","Suppository","SWAG","Table Tents","Tablets","Terpenes","Topicals"].map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                    <div className="grid grid-cols-4 gap-4">
+                                                        <div className="space-y-1">
+                                                            <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">UOM</label>
+                                                            <input list="wp-uom-options" className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground" value={wpFormData.uom} onChange={e => setWpFormData({...wpFormData, uom: e.target.value})} placeholder="Select or Type..." />
+                                                            <datalist id="wp-uom-options">
+                                                                {["Bottle","Box","Case","EA","Grams","Hour","Kg","Kit","Liter","Meter","Pallet","Roll"].map(opt => <option key={opt} value={opt} />)}
+                                                            </datalist>
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Sale Price ($)</label>
+                                                            <input type="number" value={wpFormData.salePrice} onChange={e => setWpFormData({...wpFormData, salePrice: Number(e.target.value)})} className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground font-medium" />
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Order Upto</label>
+                                                            <input type="number" value={wpFormData.orderUpto} onChange={e => setWpFormData({...wpFormData, orderUpto: Number(e.target.value)})} className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground font-medium" />
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Re-Order Point</label>
+                                                            <input type="number" value={wpFormData.reOrderPoint} onChange={e => setWpFormData({...wpFormData, reOrderPoint: Number(e.target.value)})} className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground font-medium" />
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center space-x-6 pt-2">
+                                                        <label className="flex items-center space-x-2 cursor-pointer group">
+                                                            <div className="relative flex items-center">
+                                                                <input type="checkbox" className="peer h-4 w-4 cursor-pointer appearance-none rounded border border-border bg-background transition-all checked:bg-primary" checked={wpFormData.kitApplied} onChange={e => setWpFormData({...wpFormData, kitApplied: e.target.checked})} />
+                                                                <svg className="pointer-events-none absolute h-3 w-3 translate-x-[2px] text-black opacity-0 peer-checked:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                                            </div>
+                                                            <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors">Kit Applied</span>
+                                                        </label>
+                                                        <label className="flex items-center space-x-2 cursor-pointer group">
+                                                            <div className="relative flex items-center">
+                                                                <input type="checkbox" className="peer h-4 w-4 cursor-pointer appearance-none rounded border border-border bg-background transition-all checked:bg-primary" checked={wpFormData.isLotApplied} onChange={e => setWpFormData({...wpFormData, isLotApplied: e.target.checked})} />
+                                                                <svg className="pointer-events-none absolute h-3 w-3 translate-x-[2px] text-black opacity-0 peer-checked:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                                            </div>
+                                                            <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors">Lot Applied (Traceability)</span>
+                                                        </label>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                            <div className="px-6 py-4 border-t border-border bg-secondary/50 shrink-0 flex justify-end space-x-3">
+                                                <button type="button" onClick={() => setWpModalOpen(false)} className="px-6 h-10 text-[11px] font-black uppercase tracking-widest text-muted-foreground hover:text-foreground hover:bg-secondary rounded transition-all cursor-pointer">Cancel</button>
+                                                <button type="submit" form="wp-form" disabled={wpSubmitting} className="px-8 h-10 bg-primary text-black text-[11px] font-black uppercase tracking-widest rounded hover:opacity-90 transition-all shadow-md disabled:opacity-50 flex items-center space-x-3 cursor-pointer">
+                                                    {wpSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                                                    <span>{wpEditing ? 'Save Changes' : 'Create Product'}</span>
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
