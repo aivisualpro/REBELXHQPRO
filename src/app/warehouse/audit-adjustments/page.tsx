@@ -1,10 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
     ArrowUpDown,
     X,
-    Save
+    Save,
+    Search,
+    Loader2,
+    Plus
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -13,6 +17,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Suspense } from 'react';
+import { TableColumnHeader } from '@/components/ui/TableColumnHeader';
 
 interface AuditAdjustment {
     _id: string;
@@ -26,7 +31,7 @@ interface AuditAdjustment {
 
 export default function AuditAdjustmentsPageWrapper() {
     return (
-        <Suspense fallback={<div className="flex items-center justify-center h-[calc(100vh-48px)]"><span className="text-xs text-muted-foreground">Loading...</span></div>}>
+        <Suspense fallback={<div className="flex items-center justify-center h-[calc(100vh-48px)]"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>}>
             <AuditAdjustmentsPage />
         </Suspense>
     );
@@ -35,6 +40,26 @@ export default function AuditAdjustmentsPageWrapper() {
 function AuditAdjustmentsPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+
+    useEffect(() => {
+        const checkTarget = () => {
+             const el = document.getElementById('header-portal-target');
+             if (el) {
+                 setPortalTarget(el);
+             }
+        };
+        
+        checkTarget();
+        const interval = setInterval(checkTarget, 50);
+        const timeout = setTimeout(() => clearInterval(interval), 1000);
+
+        return () => {
+            clearInterval(interval);
+            clearTimeout(timeout);
+        };
+    }, []);
+
     const [adjustments, setAdjustments] = useState<AuditAdjustment[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -43,9 +68,9 @@ function AuditAdjustmentsPage() {
     const [totalPages, setTotalPages] = useState(1);
     const [totalItems, setTotalItems] = useState(0);
 
-    // Search from URL params (main header)
-    const search = searchParams.get('search') || '';
-    const [debouncedSearch, setDebouncedSearch] = useState(search);
+    // Search - local state with debounce
+    const [search, setSearch] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
     const [sortBy, setSortBy] = useState('createdAt');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
@@ -86,7 +111,7 @@ function AuditAdjustmentsPage() {
             });
     }, []);
 
-    // Debounce search from URL
+    // Debounce search
     useEffect(() => {
         const timer = setTimeout(() => {
             setDebouncedSearch(search);
@@ -126,13 +151,9 @@ function AuditAdjustmentsPage() {
         }
     };
 
-    const handleSort = (column: string) => {
-        if (sortBy === column) {
-            setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-        } else {
-            setSortBy(column);
-            setSortOrder('asc');
-        }
+    const handleOpenAdd = () => {
+        setEditingItem(null);
+        setIsModalOpen(true);
     };
 
     const getSkuData = (val: any) => {
@@ -149,13 +170,52 @@ function AuditAdjustmentsPage() {
     const missingImg = globalSettings?.missingSkuImage || '';
 
     return (
-        <div className="flex flex-col h-[calc(100vh-48px)] bg-background relative">
+        <div className="flex flex-col h-[calc(100vh-36px)] bg-background relative transition-colors duration-300">
+            {/* Portal search + title + Add button into the header */}
+            {portalTarget && createPortal(
+                <div className="flex items-center justify-between w-full h-full">
+                    <div className="flex items-center gap-3">
+                        <h1 className="text-sm font-bold text-foreground uppercase tracking-tight whitespace-nowrap">Audit Adjustments</h1>
+                        <div className="relative">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                            <input
+                                type="text"
+                                placeholder="Search SKU, lot, reason..."
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                                className="pl-8 pr-8 h-8 w-64 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
+                            />
+                            {search && (
+                                <button 
+                                    onClick={() => setSearch('')}
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors z-20 cursor-pointer"
+                                >
+                                    <X className="h-3 w-3" />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenAdd();
+                        }}
+                        className="flex items-center space-x-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm transition-all cursor-pointer relative z-50 pointer-events-auto"
+                    >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add</span>
+                    </button>
+                </div>,
+                portalTarget
+            )}
+
             {/* Table */}
-            <div className="flex-1 overflow-auto">
-                <table className="w-full border-collapse text-left">
-                    <thead className="sticky top-0 bg-secondary/50 z-10 border-b border-border">
+            <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
+                <div className="min-w-full px-2 py-2">
+                <table className="w-full text-left border-separate border-spacing-0 relative z-0">
+                    <thead className="sticky top-0 bg-secondary/80 z-10 border-b border-border backdrop-blur-md transition-colors">
                         <tr>
-                            <th className="px-2 py-1 text-[8px] font-medium text-muted-foreground uppercase tracking-widest w-8 border-r border-border">Img</th>
+                            <th className="px-2 py-1 text-[8px] font-bold text-muted-foreground uppercase tracking-widest w-8 border-r border-border">Img</th>
                             {[
                                 { key: 'sku', label: 'SKU' },
                                 { key: 'lotNumber', label: 'Lot #' },
@@ -166,22 +226,25 @@ function AuditAdjustmentsPage() {
                             ].map(col => (
                                 <th
                                     key={col.key}
-                                    onClick={() => handleSort(col.key)}
-                                    className="px-2 py-1 text-[8px] font-medium text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary transition-colors border-r border-border"
+                                    className="border-r border-border last:border-0"
                                 >
-                                    <div className="flex items-center space-x-1">
-                                        <span>{col.label}</span>
-                                        <ArrowUpDown className={cn("w-2 h-2", sortBy === col.key ? "text-foreground" : "text-muted-foreground/30")} />
-                                    </div>
+                                    <TableColumnHeader
+                                        column={col.key}
+                                        title={col.label}
+                                        currentSortBy={sortBy}
+                                        currentSortOrder={sortOrder}
+                                        onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
+                                        className="text-muted-foreground"
+                                    />
                                 </th>
                             ))}
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-border">
+                    <tbody className="divide-y divide-border bg-background/50">
                         {loading ? (
-                            <tr><td colSpan={8} className="px-4 py-12 text-center text-xs text-muted-foreground">Loading...</td></tr>
+                            <tr><td colSpan={8} className="px-2 py-12 text-center text-[10px] text-slate-400">Loading...</td></tr>
                         ) : adjustments.length === 0 ? (
-                            <tr><td colSpan={8} className="px-4 py-12 text-center text-xs text-muted-foreground uppercase tracking-tighter opacity-50">No records found</td></tr>
+                            <tr><td colSpan={8} className="px-2 py-12 text-center text-[10px] text-slate-400 uppercase font-bold tracking-tighter opacity-50">No records found</td></tr>
                         ) : adjustments.map(item => {
                             const skuData = getSkuData(item.sku);
                             const imgSrc = skuData.image || missingImg || '';
@@ -189,11 +252,11 @@ function AuditAdjustmentsPage() {
                             return (
                                 <tr
                                     key={item._id}
-                                    className="hover:bg-secondary/30 transition-colors group cursor-pointer"
+                                    className="group relative z-0 bg-background hover:bg-secondary/40 transition-colors duration-150 cursor-pointer"
                                     onClick={() => router.push(`/warehouse/audit-adjustments/${item._id}`)}
                                 >
                                     {/* Image */}
-                                    <td className="px-1 py-0.5 w-8 border-r border-border">
+                                    <td className="px-2 py-1 border-r border-border group-hover:border-l-2 group-hover:border-l-primary transition-all">
                                         <div className="w-6 h-6 rounded overflow-hidden bg-secondary flex items-center justify-center border border-border">
                                             <img
                                                 src={imgSrc || missingImg || '/sku-placeholder.png'}
@@ -234,7 +297,7 @@ function AuditAdjustmentsPage() {
                                     </td>
                                     <td className="px-2 py-1.5 text-[10px] text-muted-foreground max-w-xs truncate border-r border-border" title={item.reason}>{item.reason}</td>
                                     <td className="px-2 py-1.5 text-[10px] text-muted-foreground border-r border-border">{renderUser(item.createdBy)}</td>
-                                    <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono border-r border-border">
+                                    <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono border-r border-border last:border-0">
                                         {new Date(item.createdAt).toLocaleDateString()}
                                     </td>
                                 </tr>
@@ -242,16 +305,19 @@ function AuditAdjustmentsPage() {
                         })}
                     </tbody>
                 </table>
+                </div>
             </div>
 
-            <Pagination
-                currentPage={page}
-                totalPages={totalPages}
-                onPageChange={setPage}
-                totalItems={totalItems}
-                itemsPerPage={20}
-                itemName="Items"
-            />
+            <div className="border-t border-border bg-background transition-colors duration-300">
+                <Pagination
+                    currentPage={page}
+                    totalPages={totalPages}
+                    onPageChange={setPage}
+                    totalItems={totalItems}
+                    itemsPerPage={20}
+                    itemName="Items"
+                />
+            </div>
             {isModalOpen && (
                 <AdjustmentModal 
                     isOpen={isModalOpen}
@@ -310,26 +376,26 @@ function AdjustmentModal({ isOpen, onClose, initialData, skus, sessionUser, onSu
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-background rounded-lg shadow-xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200 border border-border">
-                <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-bold text-foreground">
+        <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-background border border-border w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh] rounded-md">
+                <div className="flex items-center justify-between px-4 h-9 border-b border-border shrink-0 bg-background">
+                    <h2 className="text-[10px] font-black uppercase tracking-widest text-foreground">
                         {initialData ? 'Edit Adjustment' : 'New Adjustment'}
                     </h2>
-                    <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
-                        <X className="w-5 h-5" />
+                    <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
+                        <X className="w-4 h-4" />
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">SKU</label>
+                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
+                    <div className="space-y-1.5">
+                        <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">SKU</label>
                         {initialData ? (
                              <input 
                                 type="text"
                                 value={typeof initialData.sku === 'object' ? initialData.sku.name : initialData.sku}
                                 disabled
-                                className="w-full px-3 py-2 bg-secondary border border-border rounded text-sm text-muted-foreground cursor-not-allowed"
+                                className="w-full px-3 h-9 bg-secondary border border-border rounded text-[11px] text-muted-foreground cursor-not-allowed"
                              />
                         ) : (
                             <SearchableSelect 
@@ -342,55 +408,50 @@ function AdjustmentModal({ isOpen, onClose, initialData, skus, sessionUser, onSu
                         )}
                     </div>
 
-                    <div>
-                        <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Lot Number</label>
-                        <input 
-                            type="text"
-                            value={formData.lotNumber}
-                            onChange={e => setFormData({...formData, lotNumber: e.target.value})}
-                            className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:border-primary transition-colors"
-                            placeholder="Enter Lot #"
-                        />
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                            <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">Lot Number</label>
+                            <input 
+                                type="text"
+                                value={formData.lotNumber}
+                                onChange={e => setFormData({...formData, lotNumber: e.target.value})}
+                                className="w-full px-3 h-9 bg-secondary/50 border border-border rounded text-[11px] outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/50 transition-colors"
+                                placeholder="Enter Lot #"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">Quantity</label>
+                            <input 
+                                type="number"
+                                step="any"
+                                value={formData.qty}
+                                onChange={e => setFormData({...formData, qty: parseFloat(e.target.value)})}
+                                className="w-full px-3 h-9 bg-secondary/50 border border-border rounded text-[11px] outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/50 transition-colors"
+                                placeholder="0"
+                            />
+                            <p className="text-[10px] text-muted-foreground">Positive adds, negative removes.</p>
+                        </div>
                     </div>
 
-                    <div>
-                        <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Quantity Adjustment</label>
-                        <input 
-                            type="number"
-                            step="any"
-                            value={formData.qty}
-                            onChange={e => setFormData({...formData, qty: parseFloat(e.target.value)})}
-                            className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:border-primary transition-colors"
-                            placeholder="0"
-                        />
-                        <p className="text-[10px] text-muted-foreground mt-1">Positive adds stock, negative removes stock.</p>
-                    </div>
-
-                    <div>
-                        <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Reason</label>
+                    <div className="space-y-1.5">
+                        <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">Reason</label>
                         <textarea 
                             value={formData.reason}
                             onChange={e => setFormData({...formData, reason: e.target.value})}
-                            className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:border-primary transition-colors min-h-[80px]"
+                            className="w-full px-3 py-2 bg-secondary/50 border border-border rounded text-[11px] outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/50 transition-colors min-h-[80px]"
                             placeholder="Why is this being adjusted?"
                         />
                     </div>
 
-                    <div className="flex justify-end pt-4">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary rounded mr-2 transition-colors"
-                        >
-                            Cancel
-                        </button>
+                    <div className="h-10 pt-1 flex gap-2 border-t border-border mt-2">
+                        <button type="button" onClick={onClose} className="flex-1 flex items-center justify-center bg-secondary text-muted-foreground hover:text-foreground text-[10px] font-bold uppercase tracking-widest hover:bg-secondary/80 transition-colors rounded-sm">Cancel</button>
                         <button
                             type="submit"
                             disabled={loading || (!initialData && !formData.sku)}
-                            className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary rounded hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                            className="flex-1 flex items-center justify-center bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-widest hover:bg-primary/90 transition-colors rounded-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            {loading && <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary-foreground"></div>}
-                            <span>{initialData ? 'Save Changes' : 'Create Adjustment'}</span>
+                            {loading && <Loader2 className="w-3 h-3 animate-spin mr-1.5" />}
+                            <span>{initialData ? 'Save Changes' : 'Create'}</span>
                         </button>
                     </div>
                 </form>

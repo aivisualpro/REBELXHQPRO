@@ -286,18 +286,18 @@ function OpeningBalancesContent() {
                     <div className="flex items-center gap-3">
                         <h1 className="text-sm font-bold text-foreground uppercase tracking-tight whitespace-nowrap">Opening Balances</h1>
                         <div className="relative">
-                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                             <input
                                 type="text"
                                 placeholder="Search SKU or lot..."
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
-                                className="w-40 lg:w-56 pl-7 pr-7 py-1 text-[10px] bg-secondary/50 border border-border rounded-md focus:outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/60 transition-colors"
+                                className="pl-8 pr-8 h-8 w-64 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
                             />
                             {search && (
                                 <button 
                                     onClick={() => setSearch('')}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors z-20 cursor-pointer"
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors z-20 cursor-pointer"
                                 >
                                     <X className="h-3 w-3" />
                                 </button>
