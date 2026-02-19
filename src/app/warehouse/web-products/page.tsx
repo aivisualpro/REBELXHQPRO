@@ -14,6 +14,8 @@ import {
   ChevronsDownUp,
   ChevronsUpDown,
   ExternalLink,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Pagination } from '@/components/ui/Pagination';
@@ -102,6 +104,12 @@ function WebProductsPageContent() {
 
   // Linking state
   const [linkingProductId, setLinkingProductId] = useState<string | null>(null);
+
+  // Track which row has an active SKU dropdown open
+  const [activeDropdownRow, setActiveDropdownRow] = useState<string | null>(null);
+
+  // Toggle to hide zero-order products
+  const [hideZeroOrders, setHideZeroOrders] = useState(false);
 
   const [globalSettings, setGlobalSettings] = useState<any>(null);
 
@@ -387,6 +395,7 @@ function WebProductsPageContent() {
           placeholder="Link SKU..."
           className="w-full"
           triggerClassName="h-6 text-[10px] rounded border border-dashed transition-all bg-rose-500/5 border-rose-500/20 text-rose-400 hover:bg-rose-500/10"
+          onOpenChange={(open) => setActiveDropdownRow(open ? cellKey : null)}
         />
       </div>
     );
@@ -448,6 +457,21 @@ function WebProductsPageContent() {
           </div>
 
           <div className="flex-1" />
+
+          {/* Hide Zero Orders Toggle */}
+          <button
+            onClick={() => setHideZeroOrders(!hideZeroOrders)}
+            className={cn(
+              "flex items-center gap-1.5 px-2.5 py-1 rounded text-[9px] font-bold uppercase tracking-wider transition-colors",
+              hideZeroOrders
+                ? "bg-primary/10 text-primary border border-primary/20"
+                : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+            )}
+            title={hideZeroOrders ? "Showing products with orders only" : "Show all products"}
+          >
+            {hideZeroOrders ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+            {hideZeroOrders ? '0 hidden' : '0 shown'}
+          </button>
 
           {/* Expand / Collapse All */}
           <div className="flex items-center gap-0.5">
@@ -549,7 +573,7 @@ function WebProductsPageContent() {
               <tr><td colSpan={7} className="px-2 py-12 text-center text-red-500 text-[10px] font-bold">{error}</td></tr>
             ) : products.length === 0 ? (
               <tr><td colSpan={7} className="px-2 py-12 text-center text-[10px] text-slate-400 uppercase font-bold tracking-tighter opacity-50">No products found</td></tr>
-            ) : products.map(product => {
+            ) : products.filter(p => !hideZeroOrders || (p.totalWebOrders && p.totalWebOrders > 0)).map(product => {
               const isVariable = product.type === 'variable' && product.variations && product.variations.length > 0;
               const isExpanded = expandedRows.has(product._id);
 
@@ -576,6 +600,7 @@ function WebProductsPageContent() {
                       allLinked && "border-l-2 border-l-emerald-500",
                       someLinked && !allLinked && "border-l-2 border-l-amber-500",
                       !someLinked && !allLinked && "border-l-2 border-l-rose-500/40",
+                      activeDropdownRow === product._id && "!bg-primary/5 ring-1 ring-inset ring-primary/20",
                     )}
                     onClick={() => {
                       if (isVariable) {
@@ -709,7 +734,8 @@ function WebProductsPageContent() {
                           "group bg-secondary/10 transition-colors duration-150",
                           "hover:bg-secondary/30",
                           "animate-in fade-in slide-in-from-top-1 duration-200",
-                          vLinked ? "border-l-2 border-l-emerald-500/50" : "border-l-2 border-l-rose-500/20"
+                          vLinked ? "border-l-2 border-l-emerald-500/50" : "border-l-2 border-l-rose-500/20",
+                          activeDropdownRow === `${product._id}-${vid}` && "!bg-primary/5 ring-1 ring-inset ring-primary/20"
                         )}
                         style={{ animationDelay: `${vIdx * 30}ms` }}
                       >

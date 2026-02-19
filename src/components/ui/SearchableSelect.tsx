@@ -19,6 +19,7 @@ interface SearchableSelectProps {
     required?: boolean;
     creatable?: boolean;
     triggerClassName?: string;
+    onOpenChange?: (open: boolean) => void;
 }
 
 export function SearchableSelect({
@@ -29,7 +30,8 @@ export function SearchableSelect({
     className,
     triggerClassName,
     required,
-    creatable
+    creatable,
+    onOpenChange
 }: SearchableSelectProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState('');
@@ -42,6 +44,11 @@ export function SearchableSelect({
     useEffect(() => {
         setMounted(true); // eslint-disable-line react-hooks/set-state-in-effect
     }, []);
+
+    // Notify parent of open/close changes
+    useEffect(() => {
+        onOpenChange?.(isOpen);
+    }, [isOpen]);
 
     const selectedOption = options.find(o => o.value === value);
 
