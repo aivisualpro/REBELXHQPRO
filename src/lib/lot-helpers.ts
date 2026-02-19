@@ -88,7 +88,7 @@ export async function getLotsWithBalances(skuId: string): Promise<LotInfo[]> {
     }).lean();
     mfgProduced.forEach((mo: any) => {
         // Skip Pending/Processing productions - ledger excludes these from balance
-        if (mo.status === 'Pending' || mo.status === 'Processing') return;
+        if (['pending', 'processing'].includes((mo.status || '').toLowerCase())) return;
         
         const lot = normalizeLot(mo.lotNumber || mo.label);
         if (!lot) return;
@@ -141,7 +141,7 @@ export async function getLotsWithBalances(skuId: string): Promise<LotInfo[]> {
     }).lean();
     mfgConsumed.forEach((mo: any) => {
         // Skip unfulfilled consumption - ledger excludes these from balance
-        if (mo.status !== 'Fulfilled' && mo.status !== 'fulfilled') return;
+        if ((mo.status || '').toLowerCase() !== 'fulfilled') return;
         
         mo.lineItems?.forEach((li: any) => {
             const liSkuId = (typeof li.sku === 'object' && li.sku !== null) ? li.sku._id : li.sku;

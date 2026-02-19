@@ -358,8 +358,8 @@ function SkuDetailsPageContent() {
         return true;
     });
 
-    const isPendingProduction = (tx: Transaction) => tx.type === 'Produced' && (tx.status === 'Pending' || tx.status === 'Processing');
-    const isUnfulfilledConsumption = (tx: Transaction) => tx.type === 'Consumption' && tx.status !== 'Fulfilled';
+    const isPendingProduction = (tx: Transaction) => tx.type === 'Produced' && ['pending', 'processing'].includes((tx.status || '').toLowerCase());
+    const isUnfulfilledConsumption = (tx: Transaction) => tx.type === 'Consumption' && (tx.status || '').toLowerCase() !== 'fulfilled';
 
     const displayTransactions = selectedLot === 'All' 
         ? finalTransactions 
@@ -1159,16 +1159,20 @@ function SkuDetailsPageContent() {
                                         )}>{tx.quantity > 0 ? '+' : ''}{tx.quantity}</span>
                                     </td>
                                     <td className="px-3 py-2">
-                                        {tx.status ? (
-                                            <span className={cn(
-                                                "text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-sm",
-                                                tx.status === 'Completed' || tx.status === 'Delivered' || tx.status === 'Shipped' || tx.status === 'Fulfilled' ? 'text-emerald-500 bg-emerald-500/10' :
-                                                tx.status === 'In Progress' || tx.status === 'Processing' || tx.status === 'Ready to QC' ? 'text-blue-500 bg-blue-500/10' :
-                                                tx.status === 'Cancelled' || tx.status === 'Rejected' ? 'text-rose-500 bg-rose-500/10' :
-                                                tx.status === 'Pending' || tx.status === 'Draft' ? 'text-amber-500 bg-amber-500/10' :
-                                                'text-muted-foreground bg-secondary'
-                                            )}>{tx.status}</span>
-                                        ) : <span className="text-[10px] text-muted-foreground/50">-</span>}
+                                        {tx.status ? (() => {
+                                            const s = tx.status.toLowerCase();
+                                            const colorClass = 
+                                                ['completed', 'delivered', 'shipped', 'fulfilled', 'received'].includes(s) ? 'text-emerald-500 bg-emerald-500/10' :
+                                                ['in progress', 'processing', 'ready to qc'].includes(s) ? 'text-blue-500 bg-blue-500/10' :
+                                                ['cancelled', 'rejected', 'failed'].includes(s) ? 'text-rose-500 bg-rose-500/10' :
+                                                ['pending', 'draft', 'on-hold', 'on hold'].includes(s) ? 'text-amber-500 bg-amber-500/10' :
+                                                'text-muted-foreground bg-secondary';
+                                            return (
+                                                <span className={cn("text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-sm", colorClass)}>
+                                                    {tx.status}
+                                                </span>
+                                            );
+                                        })() : <span className="text-[10px] text-muted-foreground/50">-</span>}
                                     </td>
                                     <td className="px-3 py-2 text-right text-[10px] font-bold text-foreground font-mono">
                                         {(isPendingProduction(tx) || isUnfulfilledConsumption(tx)) ? <span className="text-muted-foreground/50">-</span> : tx.balance.toLocaleString()}
