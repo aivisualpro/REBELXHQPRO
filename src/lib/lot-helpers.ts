@@ -82,11 +82,14 @@ export async function getLotsWithBalances(skuId: string): Promise<LotInfo[]> {
     });
 
     // 3. Manufacturing (Produced)
+    // Skip Pending - they are shown in ledger but NOT counted towards balance
     const mfgProduced = await Manufacturing.find({ 
         sku: skuId
-        // Removed status check to match Ledger logic
     }).lean();
     mfgProduced.forEach((mo: any) => {
+        // Skip Pending productions - ledger excludes these from balance
+        if (mo.status === 'Pending') return;
+        
         const lot = normalizeLot(mo.lotNumber || mo.label);
         if (!lot) return;
         
@@ -132,11 +135,14 @@ export async function getLotsWithBalances(skuId: string): Promise<LotInfo[]> {
     // ==================== PHASE 2: CONSUMPTIONS (Only deduct from EXISTING lots) ====================
 
     // 5. Manufacturing (Consumed) - where this SKU is an INGREDIENT
+    // Skip non-Fulfilled - ledger excludes unfulfilled consumption from balance
     const mfgConsumed = await Manufacturing.find({ 
         'lineItems.sku': skuId
-        // Removed status check to match Ledger logic
     }).lean();
     mfgConsumed.forEach((mo: any) => {
+        // Skip unfulfilled consumption - ledger excludes these from balance
+        if (mo.status !== 'Fulfilled' && mo.status !== 'fulfilled') return;
+        
         mo.lineItems?.forEach((li: any) => {
             const liSkuId = (typeof li.sku === 'object' && li.sku !== null) ? li.sku._id : li.sku;
             if (liSkuId?.toString() !== skuId) return;
@@ -148,9 +154,14 @@ export async function getLotsWithBalances(skuId: string): Promise<LotInfo[]> {
             const existing = lotData.get(lot);
             if (!existing) return;  // Skip - lot doesn't exist as a source
             
-            const bomConsumed = (li.recipeQty || 0) * (mo.qty || 0);
-            const extraConsumed = (li.qtyExtra || 0) + (li.qtyScrapped || 0);
-            const totalConsumed = bomConsumed + extraConsumed;
+            // Match ledger's consumption formula: BOM + SA% + scrapped
+            const orderQty = mo.qty || 0;
+            const recipeQty = li.recipeQty || 0;
+            const bomQty = orderQty * recipeQty;
+            const saPercent = li.sa || 0;
+            const saExtra = saPercent > 0 ? (bomQty / (saPercent / 100)) - bomQty : 0;
+            const qtyScrapped = li.qtyScrapped || 0;
+            const totalConsumed = bomQty + qtyScrapped + saExtra;
             
             if (totalConsumed > 0) {
                 lotData.set(lot, {
@@ -162,13 +173,15 @@ export async function getLotsWithBalances(skuId: string): Promise<LotInfo[]> {
     });
 
     // 6. Sale Orders (Wholesale)
+    // Ledger includes all sale orders - they use qtyShipped which is 0 for non-shipped
     const saleOrders = await SaleOrder.find({ 
         'lineItems.sku': skuId
-        // Removed status check to match Ledger logic
     }).lean();
     saleOrders.forEach((so: any) => {
         so.lineItems?.forEach((li: any) => {
-            if (li.sku?.toString() !== skuId || !li.qtyShipped) return;
+            if (li.sku?.toString() !== skuId) return;
+            const qty = li.qtyShipped || li.qty || 0;
+            if (qty <= 0) return;
             
             const lot = normalizeLot(li.lotNumber);
             if (!lot) return;
@@ -179,18 +192,18 @@ export async function getLotsWithBalances(skuId: string): Promise<LotInfo[]> {
             
             lotData.set(lot, {
                 ...existing,
-                balance: existing.balance - Math.abs(li.qtyShipped)
+                balance: existing.balance - Math.abs(qty)
             });
         });
     });
 
     // 7. Web Orders (Retail)
+    // Ledger includes ALL web orders (no status filter) - they all deduct from stock
     const webOrders = await WebOrder.find({
         $or: [
             { 'lineItems.sku': skuId },
             { 'lineItems.linkedSkuId': skuId }
         ]
-        // Removed status check to match Ledger logic
     }).lean();
     webOrders.forEach((wo: any) => {
         wo.lineItems?.forEach((li: any) => {

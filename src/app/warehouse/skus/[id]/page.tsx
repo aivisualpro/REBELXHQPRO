@@ -673,7 +673,7 @@ function SkuDetailsPageContent() {
                             <div className="overflow-hidden">
                                 <table className="w-full text-left">
                                     <thead>
-                                        <tr className="text-[8px] font-bold text-muted-foreground uppercase tracking-wider">
+                                        <tr className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
                                             <th className="pb-2">Lot #</th>
                                             <th className="pb-2">Type</th>
                                             <th className="pb-2">Date</th>
@@ -686,7 +686,7 @@ function SkuDetailsPageContent() {
                                             <tr 
                                                 key={lot.lotNumber} 
                                                 className={cn(
-                                                    "text-[10px] hover:bg-secondary/50 cursor-pointer transition-colors",
+                                                    "text-[11px] hover:bg-secondary/50 cursor-pointer transition-colors",
                                                     selectedLot === lot.lotNumber && "bg-primary/10 hover:bg-primary/15"
                                                 )}
                                                 onClick={() => setSelectedLot(selectedLot === lot.lotNumber ? 'All' : lot.lotNumber)}
@@ -708,7 +708,7 @@ function SkuDetailsPageContent() {
                                                 </td>
                                                 <td className={cn(
                                                     "py-1.5 text-right font-mono font-bold",
-                                                    lot.balance > 0 ? "text-emerald-600" : lot.balance < 0 ? "text-rose-600" : "text-muted-foreground"
+                                                    lot.balance > 0 ? "text-emerald-500" : lot.balance < 0 ? "text-rose-500" : "text-muted-foreground"
                                                 )}>
                                                     {lot.balance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                                                 </td>
