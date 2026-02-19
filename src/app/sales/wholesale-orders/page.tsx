@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Plus,
@@ -11,14 +12,15 @@ import {
   Printer,
   RefreshCw,
   Loader2,
-  Package
+  Package,
+  Search
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { TableColumnHeader } from '@/components/ui/TableColumnHeader';
 import { Pagination } from '@/components/ui/Pagination';
-import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal'; // Import Lot Modal
+import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
 
 
 interface LineItem {
@@ -132,6 +134,13 @@ function SaleOrdersContent() {
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [selectedPaymentMethods, setSelectedPaymentMethods] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<{ from: string; to: string }>({ from: '', to: '' });
+
+  // Header portal
+  const [headerPortalTarget, setHeaderPortalTarget] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const el = document.getElementById('header-portal-target');
+    if (el) setHeaderPortalTarget(el);
+  }, []);
 
   // Filter Options
   const [clientOptions, setClientOptions] = useState<{ label: string; value: string }[]>([]);
@@ -748,6 +757,39 @@ function SaleOrdersContent() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-36px)] bg-background relative transition-colors duration-300">
+      {/* Header Portal: search + Add button */}
+      {headerPortalTarget && createPortal(
+        <>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search orders..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8 pr-8 h-8 w-64 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors z-20 cursor-pointer"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+          <div className="flex-1" />
+          <button
+            onClick={() => { setEditingOrderId(null); openCreateModal(); }}
+            className="h-8 px-3 bg-primary text-black hover:opacity-90 transition-all rounded shadow-md flex items-center space-x-1.5 cursor-pointer"
+          >
+            <Plus className="w-3 h-3" />
+            <span className="hidden sm:inline text-[10px] font-black uppercase tracking-widest">Add</span>
+          </button>
+        </>,
+        headerPortalTarget
+      )}
+
       <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
         <div className="min-w-full px-2 py-2">
             <table className="w-full text-left border-separate border-spacing-0 relative z-0">
@@ -1022,7 +1064,7 @@ function SaleOrdersContent() {
 
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-7xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[95vh]">
+          <div className="bg-background rounded-lg shadow-2xl w-full max-w-7xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[95vh] border border-border">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-secondary/20 shrink-0">
               <h2 className="text-sm font-bold uppercase text-foreground tracking-wider flex items-center gap-2">
                 {editingOrderId ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
@@ -1047,7 +1089,7 @@ function SaleOrdersContent() {
                                     value={newOrder.clientId}
                                     onChange={handleClientChange}
                                     placeholder="Select Client..."
-                                    className="w-full h-9 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-slate-900"
+                                    className="w-full h-9 bg-secondary/50 border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
                                 />
                             </div>
                             <div className="space-y-1.5">
@@ -1057,7 +1099,7 @@ function SaleOrdersContent() {
                                     value={newOrder.salesRep}
                                     onChange={(val) => setNewOrder({ ...newOrder, salesRep: val })}
                                     placeholder="Select Rep..."
-                                    className="w-full h-9 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-slate-900"
+                                    className="w-full h-9 bg-secondary/50 border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
                                 />
                             </div>
                         </div>
@@ -1070,7 +1112,7 @@ function SaleOrdersContent() {
                                     value={newOrder.paymentMethod}
                                     onChange={(val) => setNewOrder({ ...newOrder, paymentMethod: val })}
                                     placeholder="Select Method..."
-                                    className="w-full h-9 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-slate-900"
+                                    className="w-full h-9 bg-secondary/50 border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
                                 />
                             </div>
                             <div className="space-y-1.5">
@@ -1086,7 +1128,7 @@ function SaleOrdersContent() {
                                     ]}
                                     value={newOrder.orderStatus}
                                     onChange={(val) => setNewOrder({ ...newOrder, orderStatus: val })}
-                                    className="w-full h-9 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-slate-900"
+                                    className="w-full h-9 bg-secondary/50 border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
                                 />
                             </div>
                              <div className="space-y-1.5">
@@ -1094,7 +1136,7 @@ function SaleOrdersContent() {
                                 <input
                                 type="date"
                                 disabled
-                                className="w-full h-9 px-3 bg-slate-50 border border-slate-200 rounded text-xs text-slate-500 cursor-not-allowed"
+                                className="w-full h-9 px-3 bg-secondary/30 border border-border rounded text-xs text-muted-foreground cursor-not-allowed"
                                 value={new Date().toISOString().split('T')[0]}
                                 />
                             </div>
@@ -1108,9 +1150,9 @@ function SaleOrdersContent() {
                              <div className="text-3xl font-black text-primary">{newOrder.label || '---'}</div>
                              <div className="flex items-center gap-2 mt-2">
                                  <span className={cn("px-2 py-0.5 text-[10px] uppercase font-bold rounded border",
-                                     newOrder.orderStatus === 'Completed' ? "bg-emerald-100 text-emerald-700 border-emerald-200" :
-                                     newOrder.orderStatus === 'Pending Payment' ? "bg-amber-100 text-amber-700 border-amber-200" :
-                                     "bg-slate-100 text-slate-700 border-slate-200"
+                                     newOrder.orderStatus === 'Completed' ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/30" :
+                                     newOrder.orderStatus === 'Pending Payment' ? "bg-amber-500/10 text-amber-500 border-amber-500/30" :
+                                     "bg-secondary text-muted-foreground border-border"
                                  )}>
                                      {newOrder.orderStatus}
                                  </span>
@@ -1131,7 +1173,7 @@ function SaleOrdersContent() {
                                     onChange={(val) => setNewOrder({ ...newOrder, shippingMethod: val })}
                                     creatable
                                     placeholder="Select Method..."
-                                    className="w-full h-9 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-slate-900"
+                                    className="w-full h-9 bg-secondary/50 border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
                                 />
                             </div>
                              <div className="col-span-2 space-y-1.5">
@@ -1140,7 +1182,7 @@ function SaleOrdersContent() {
                                 type="text"
                                 value={newOrder.trackingNumber}
                                 onChange={e => setNewOrder({ ...newOrder, trackingNumber: e.target.value })}
-                                className="w-full h-9 px-3 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-slate-900"
+                                className="w-full h-9 px-3 bg-secondary/50 border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
                                 />
                             </div>
                              <div className="space-y-1.5">
@@ -1149,7 +1191,7 @@ function SaleOrdersContent() {
                                 type="date"
                                 value={newOrder.shippedDate ? new Date(newOrder.shippedDate).toISOString().split('T')[0] : ''}
                                 onChange={e => setNewOrder({ ...newOrder, shippedDate: e.target.value })}
-                                className="w-full h-9 px-3 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-slate-900"
+                                className="w-full h-9 px-3 bg-secondary/50 border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
                                 />
                             </div>
                              <div className="col-span-3">
@@ -1159,7 +1201,7 @@ function SaleOrdersContent() {
                                     type="text"
                                     value={newOrder.shippingAddress}
                                     onChange={e => setNewOrder({ ...newOrder, shippingAddress: e.target.value })}
-                                    className="w-full h-9 px-3 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-slate-900"
+                                    className="w-full h-9 px-3 bg-secondary/50 border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
                                     placeholder="Street Address, City, State, Zip"
                                     />
                                 </div>
@@ -1182,7 +1224,7 @@ function SaleOrdersContent() {
                                     value={newOrder.shippingCost}
                                     onWheel={(e) => e.currentTarget.blur()}
                                     onChange={e => setNewOrder({ ...newOrder, shippingCost: e.target.value })}
-                                    className="w-full h-9 pl-5 pr-2 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-slate-900"
+                                    className="w-full h-9 pl-5 pr-2 bg-secondary/50 border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
                                     placeholder="0.00"
                                     />
                                 </div>
@@ -1198,7 +1240,7 @@ function SaleOrdersContent() {
                                     value={newOrder.discount}
                                     onWheel={(e) => e.currentTarget.blur()}
                                     onChange={e => setNewOrder({ ...newOrder, discount: e.target.value })}
-                                    className="w-full h-9 pl-5 pr-2 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-slate-900"
+                                    className="w-full h-9 pl-5 pr-2 bg-secondary/50 border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
                                     placeholder="0.00"
                                     />
                                 </div>
@@ -1214,7 +1256,7 @@ function SaleOrdersContent() {
                                     value={newOrder.tax}
                                     onWheel={(e) => e.currentTarget.blur()}
                                     onChange={e => setNewOrder({ ...newOrder, tax: e.target.value })}
-                                    className="w-full h-9 pl-5 pr-2 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-slate-900"
+                                    className="w-full h-9 pl-5 pr-2 bg-secondary/50 border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
                                     placeholder="0.00"
                                     />
                                 </div>
@@ -1409,7 +1451,7 @@ function SaleOrdersContent() {
               </form>
             </div>
 
-            <div className="p-4 border-t border-border bg-secondary/50 flex justify-end shrink-0">
+            <div className="p-4 border-t border-border bg-secondary/30 flex justify-end shrink-0">
               <button
                 type="submit"
                 form="create-so-form"
@@ -1438,19 +1480,19 @@ function SaleOrdersContent() {
       {/* Delete Confirmation Modal */}
       {deleteConfirm.isOpen && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+          <div className="bg-background rounded-lg shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200 border border-border">
             <div className="p-6 text-center">
-              <div className="w-10 h-10 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-10 h-10 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Trash2 className="w-5 h-5 text-red-500" />
               </div>
-              <h3 className="text-sm font-bold text-slate-900 uppercase mb-2">Confirm Delete</h3>
-              <p className="text-xs text-slate-500 mb-6 leading-relaxed">
+              <h3 className="text-sm font-bold text-foreground uppercase mb-2">Confirm Delete</h3>
+              <p className="text-xs text-muted-foreground mb-6 leading-relaxed">
                 Are you sure you want to delete this order? This action cannot be undone.
               </p>
               <div className="flex space-x-3">
                 <button
                   onClick={() => setDeleteConfirm({ isOpen: false, orderId: null })}
-                  className="flex-1 px-4 py-2 bg-slate-100 text-slate-700 text-xs font-bold uppercase rounded hover:bg-slate-200 transition-colors"
+                  className="flex-1 px-4 py-2 bg-secondary text-foreground text-xs font-bold uppercase rounded hover:bg-secondary/80 transition-colors"
                 >
                   Cancel
                 </button>
