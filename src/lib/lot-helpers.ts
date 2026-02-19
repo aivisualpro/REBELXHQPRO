@@ -37,9 +37,11 @@ export async function getLotsWithBalances(skuId: string): Promise<LotInfo[]> {
     const lotData = new Map<string, { balance: number; cost: number; date: Date; source: string }>();
 
     // Helper to normalize lot numbers
-    const normalizeLot = (lot: string | undefined | null): string | null => {
-        if (!lot || lot.trim() === '' || lot === 'N/A') return null;
-        return lot.trim();
+    const normalizeLot = (lot: any): string | null => {
+        if (lot === null || lot === undefined) return null;
+        const s = String(lot).trim();
+        if (s === '' || s === 'N/A') return null;
+        return s;
     };
 
     // ==================== PHASE 1: SOURCES (Create lot entries) ====================
@@ -292,9 +294,11 @@ export async function getLotTransactions(skuId: string): Promise<LotTransaction[
     
     const transactions: LotTransaction[] = [];
     
-    const normalizeLot = (lot: string | undefined | null): string | null => {
-        if (!lot || lot.trim() === '' || lot === 'N/A') return null;
-        return lot.trim();
+    const normalizeLot = (lot: any): string | null => {
+        if (lot === null || lot === undefined) return null;
+        const s = String(lot).trim();
+        if (s === '' || s === 'N/A') return null;
+        return s;
     };
 
     // 1. Opening Balances (SOURCE)
