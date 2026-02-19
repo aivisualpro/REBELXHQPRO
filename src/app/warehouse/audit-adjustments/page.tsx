@@ -18,6 +18,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Suspense } from 'react';
 import { TableColumnHeader } from '@/components/ui/TableColumnHeader';
+import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
 
 interface AuditAdjustment {
     _id: string;
@@ -343,6 +344,7 @@ function AdjustmentModal({ isOpen, onClose, initialData, skus, sessionUser, onSu
         reason: initialData?.reason || '',
     });
     const [loading, setLoading] = useState(false);
+    const [isLotModalOpen, setIsLotModalOpen] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -411,13 +413,24 @@ function AdjustmentModal({ isOpen, onClose, initialData, skus, sessionUser, onSu
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                             <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">Lot Number</label>
-                            <input 
-                                type="text"
-                                value={formData.lotNumber}
-                                onChange={e => setFormData({...formData, lotNumber: e.target.value})}
-                                className="w-full px-3 h-9 bg-secondary/50 border border-border rounded text-[11px] outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/50 transition-colors"
-                                placeholder="Enter Lot #"
-                            />
+                            <div className="flex gap-1.5">
+                                <input 
+                                    type="text"
+                                    value={formData.lotNumber}
+                                    onChange={e => setFormData({...formData, lotNumber: e.target.value})}
+                                    className="flex-1 px-3 h-9 bg-secondary/50 border border-border rounded text-[11px] outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/50 transition-colors"
+                                    placeholder="Enter Lot #"
+                                />
+                                {formData.sku && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsLotModalOpen(true)}
+                                        className="px-2 h-9 bg-primary/10 border border-primary/30 rounded text-[9px] font-bold uppercase tracking-wider text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
+                                    >
+                                        Pick
+                                    </button>
+                                )}
+                            </div>
                         </div>
                         <div className="space-y-1.5">
                             <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">Quantity</label>
@@ -455,6 +468,20 @@ function AdjustmentModal({ isOpen, onClose, initialData, skus, sessionUser, onSu
                         </button>
                     </div>
                 </form>
+
+                {isLotModalOpen && formData.sku && (
+                    <LotSelectionModal
+                        isOpen={isLotModalOpen}
+                        onClose={() => setIsLotModalOpen(false)}
+                        onSelect={(lotNumber) => {
+                            setFormData({...formData, lotNumber});
+                            setIsLotModalOpen(false);
+                        }}
+                        skuId={formData.sku}
+                        currentLotNumber={formData.lotNumber}
+                        title="Select Lot"
+                    />
+                )}
             </div>
         </div>
     );
