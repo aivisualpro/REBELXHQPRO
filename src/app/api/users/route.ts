@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import User from '@/models/User';
 import { applyDateFilter } from '@/lib/global-settings';
+import { buildFuzzySearchQuery } from '@/lib/fuzzy-search';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,14 +22,11 @@ export async function GET(request: Request) {
         const sortOrder = searchParams.get('sortOrder') === 'desc' ? -1 : 1;
         const search = searchParams.get('search') || '';
 
-        let query: any = search ? {
-            $or: [
-                { firstName: { $regex: search, $options: 'i' } },
-                { lastName: { $regex: search, $options: 'i' } },
-                { email: { $regex: search, $options: 'i' } },
-                { department: { $regex: search, $options: 'i' } },
-            ]
-        } : {};
+        let query: any = {};
+        if (search) {
+            const fuzzyQuery = buildFuzzySearchQuery(search, ['firstName', 'lastName', 'email', 'department']);
+            if (fuzzyQuery) Object.assign(query, fuzzyQuery);
+        }
 
         // Apply Global Date Filter
         query = await applyDateFilter(query, 'createdAt');

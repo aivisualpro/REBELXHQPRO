@@ -3,6 +3,7 @@ import dbConnect from '@/lib/mongoose';
 import { Kit } from '@/models/Kit';
 import Sku from '@/models/Sku';
 import User from '@/models/User';
+import { buildFuzzySearchQuery } from '@/lib/fuzzy-search';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,9 +24,8 @@ export async function GET(request: Request) {
         let query: any = {};
 
         if (search) {
-            query.$or = [
-                { name: { $regex: search, $options: 'i' } }
-            ];
+            const fuzzyQuery = buildFuzzySearchQuery(search, ['name']);
+            if (fuzzyQuery) Object.assign(query, fuzzyQuery);
         }
 
         const skip = (page - 1) * limit;

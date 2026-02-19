@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import WebOrder from '@/models/WebOrder';
+import { buildFuzzySearchQuery } from '@/lib/fuzzy-search';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,14 +22,8 @@ export async function GET(request: Request) {
         let query: any = {};
 
         if (search) {
-             query.$or = [
-                { _id: { $regex: search, $options: 'i' } },
-                { number: { $regex: search, $options: 'i' } },
-                { 'billing.firstName': { $regex: search, $options: 'i' } },
-                { 'billing.lastName': { $regex: search, $options: 'i' } },
-                { 'billing.email': { $regex: search, $options: 'i' } },
-                { 'billing.phone': { $regex: search, $options: 'i' } }
-            ];
+            const fuzzyQuery = buildFuzzySearchQuery(search, ['_id', 'number', 'billing.firstName', 'billing.lastName', 'billing.email', 'billing.phone']);
+            if (fuzzyQuery) Object.assign(query, fuzzyQuery);
         }
 
         if (website) {

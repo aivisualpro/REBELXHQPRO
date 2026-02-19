@@ -7,6 +7,7 @@ import User from '@/models/User';
 import { applyDateFilter } from '@/lib/global-settings';
 import { getSkuTiers } from '@/lib/sku-tiers';
 import { syncManufacturingToAppSheet, syncManufacturingLineItemsToAppSheet } from '@/lib/appsheet';
+import { buildFuzzySearchQuery, buildFuzzyRegex } from '@/lib/fuzzy-search';
 
 export async function GET(request: Request) {
     try {
@@ -33,16 +34,21 @@ export async function GET(request: Request) {
         // If searching, first find matching SKU IDs by name
         let matchingSkuIds: string[] = [];
         if (search) {
+            const fuzzyRegex = buildFuzzyRegex(search);
             const matchingSkus = await Sku.find({
-                name: { $regex: search, $options: 'i' }
+                name: { $regex: fuzzyRegex, $options: 'i' }
             }).select('_id').lean();
             matchingSkuIds = matchingSkus.map((s: any) => s._id);
             
-            query.$or = [
-                { label: { $regex: search, $options: 'i' } }, // Search by label
-                { legacyId: { $regex: search, $options: 'i' } }, // or legacy WO ID
-                ...(matchingSkuIds.length > 0 ? [{ sku: { $in: matchingSkuIds } }] : [])
-            ];
+            const fuzzyQuery = buildFuzzySearchQuery(search, ['label', 'legacyId']);
+            if (fuzzyQuery) {
+                query.$and = fuzzyQuery.$and.map((cond: any) => ({
+                    $or: [
+                        ...cond.$or,
+                        ...(matchingSkuIds.length > 0 ? [{ sku: { $in: matchingSkuIds } }] : [])
+                    ]
+                }));
+            }
         }
 
         if (sku) {

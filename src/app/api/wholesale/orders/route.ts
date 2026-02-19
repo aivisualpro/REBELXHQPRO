@@ -6,6 +6,7 @@ import Client from '@/models/Client';
 import RXHQUsers from '@/models/User';
 import { applyDateFilter } from '@/lib/global-settings';
 import { syncOrderToAppSheet } from '@/lib/appsheet';
+import { buildFuzzySearchQuery, buildFuzzyRegex } from '@/lib/fuzzy-search';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,18 +35,22 @@ export async function GET(request: Request) {
         let query: any = {};
 
         if (search) {
-            // Find clients matching the search term (for searching by client name)
+            const fuzzyRegex = buildFuzzyRegex(search);
             const matchingClients = await Client.find(
-                { name: { $regex: search, $options: 'i' } },
+                { name: { $regex: fuzzyRegex, $options: 'i' } },
                 { _id: 1 }
             ).lean();
             const matchingClientIds = matchingClients.map((c: any) => c._id);
 
-            query.$or = [
-                { label: { $regex: search, $options: 'i' } },
-                { paymentMethod: { $regex: search, $options: 'i' } },
-                ...(matchingClientIds.length > 0 ? [{ clientId: { $in: matchingClientIds } }] : [])
-            ];
+            const fuzzyQuery = buildFuzzySearchQuery(search, ['label', 'paymentMethod']);
+            if (fuzzyQuery) {
+                query.$and = fuzzyQuery.$and.map((cond: any) => ({
+                    $or: [
+                        ...cond.$or,
+                        ...(matchingClientIds.length > 0 ? [{ clientId: { $in: matchingClientIds } }] : [])
+                    ]
+                }));
+            }
         }
 
         if (client) {

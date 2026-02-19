@@ -1,4 +1,5 @@
 import { NextResponse, after } from 'next/server';
+import { buildFuzzySearchQuery } from '@/lib/fuzzy-search';
 import dbConnect from '@/lib/mongoose';
 import Sku from '@/models/Sku';
 import OpeningBalance from '@/models/OpeningBalance';
@@ -38,16 +39,9 @@ export async function GET(request: Request) {
             query = await applyDateFilter(query, 'createdAt');
         }
 
-        const escapeRegex = (string: string) => {
-            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        }
-
         if (search) {
-            const escapedSearch = escapeRegex(search);
-            query.$or = [
-                { name: { $regex: escapedSearch, $options: 'i' } },
-                { _id: { $regex: escapedSearch, $options: 'i' } } // Search by SKU (which is _id)
-            ];
+            const fuzzyQuery = buildFuzzySearchQuery(search, ['name', '_id']);
+            if (fuzzyQuery) Object.assign(query, fuzzyQuery);
         }
 
         if (category) {

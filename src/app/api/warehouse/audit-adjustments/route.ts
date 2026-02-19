@@ -4,6 +4,7 @@ import dbConnect from '@/lib/mongoose';
 import AuditAdjustment from '@/models/AuditAdjustment';
 import Sku from '@/models/Sku';
 import User from '@/models/User';
+import { buildFuzzySearchQuery, buildFuzzyRegex } from '@/lib/fuzzy-search';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,16 +24,22 @@ export async function GET(request: Request) {
         let query: any = {};
 
         if (search) {
-             const matchingSkus = await Sku.find({ name: { $regex: search, $options: 'i' } }).select('_id legacyId').lean();
+             const fuzzyRegex = buildFuzzyRegex(search);
+             const matchingSkus = await Sku.find({ name: { $regex: fuzzyRegex, $options: 'i' } }).select('_id legacyId').lean();
              const skuIds = matchingSkus.map(s => s._id.toString());
              const skuLegacyIds = matchingSkus.map((s: any) => s.legacyId).filter(Boolean);
 
-             query.$or = [
-                { lotNumber: { $regex: search, $options: 'i' } },
-                { reason: { $regex: search, $options: 'i' } },
-                { createdBy: { $regex: search, $options: 'i' } },
-                { sku: { $in: [...skuIds, ...skuLegacyIds] } }
-            ];
+             const fuzzyQuery = buildFuzzySearchQuery(search, ['lotNumber', 'reason', 'createdBy']);
+             // Merge fuzzy field search with SKU ID match
+             if (fuzzyQuery) {
+                 // Each token must match in at least one place: direct fields OR sku match
+                 query.$and = fuzzyQuery.$and.map((cond: any) => ({
+                     $or: [
+                         ...cond.$or,
+                         ...(skuIds.length > 0 ? [{ sku: { $in: [...skuIds, ...skuLegacyIds] } }] : [])
+                     ]
+                 }));
+             }
         }
 
         const sortObj: any = { [sortBy]: sortOrder };

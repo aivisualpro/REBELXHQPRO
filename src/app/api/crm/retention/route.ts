@@ -4,6 +4,7 @@ import RetentionTask from '@/models/RetentionTask';
 import Client from '@/models/Client';
 import RXHQUsers from '@/models/User';
 import mongoose from 'mongoose';
+import { buildFuzzyRegex } from '@/lib/fuzzy-search';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,8 +38,9 @@ export async function GET(request: NextRequest) {
 
         // If search, we need to find matching client IDs first
         if (search) {
+            const fuzzyRegex = buildFuzzyRegex(search);
             const matchingClients = await Client.find(
-                { name: { $regex: search, $options: 'i' } },
+                { name: { $regex: fuzzyRegex, $options: 'i' } },
                 '_id'
             ).lean();
             const matchingClientIds = matchingClients.map((c: any) => c._id);

@@ -4,6 +4,7 @@ import OpeningBalance from '@/models/OpeningBalance';
 import Sku from '@/models/Sku'; // Ensure Sku model is registered
 import User from '@/models/User'; // Ensure User model is registered
 import mongoose from 'mongoose';
+import { buildFuzzySearchQuery, buildFuzzyRegex } from '@/lib/fuzzy-search';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,11 +26,12 @@ export async function GET(request: Request) {
 
         if (search) {
             // Find SKUs with matching names using raw driver for cross-type matching
+            const fuzzyRegex = buildFuzzyRegex(search);
             const db = mongoose.connection.db;
             let matchingSkuIds: any[] = [];
             if (db) {
                 const matchedSkus = await db.collection('skus').find(
-                    { name: { $regex: search, $options: 'i' } },
+                    { name: { $regex: fuzzyRegex, $options: 'i' } },
                     { projection: { _id: 1 } }
                 ).toArray();
                 // Include both string and ObjectId forms for cross-type matching
@@ -39,10 +41,15 @@ export async function GET(request: Request) {
                 });
             }
 
-            query.$or = [
-                { lotNumber: { $regex: search, $options: 'i' } },
-                ...(matchingSkuIds.length > 0 ? [{ sku: { $in: matchingSkuIds } }] : [])
-            ];
+            const fuzzyQuery = buildFuzzySearchQuery(search, ['lotNumber']);
+            if (fuzzyQuery) {
+                query.$and = fuzzyQuery.$and.map((cond: any) => ({
+                    $or: [
+                        ...cond.$or,
+                        ...(matchingSkuIds.length > 0 ? [{ sku: { $in: matchingSkuIds } }] : [])
+                    ]
+                }));
+            }
         }
 
         if (skuFilter) {

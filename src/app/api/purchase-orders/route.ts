@@ -7,6 +7,7 @@ import Sku from '@/models/Sku';
 import Vendor from '@/models/Vendor';
 import User from '@/models/User';
 import { applyDateFilter } from '@/lib/global-settings';
+import { buildFuzzySearchQuery, buildFuzzyRegex } from '@/lib/fuzzy-search';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,22 +35,22 @@ export async function GET(request: Request) {
         let query: any = {};
 
         if (search) {
-            // Find vendors whose name matches the search term
+            const fuzzyRegex = buildFuzzyRegex(search);
             const matchingVendors = await Vendor.find(
-                { name: { $regex: search, $options: 'i' } },
+                { name: { $regex: fuzzyRegex, $options: 'i' } },
                 { _id: 1 }
             ).lean();
             const matchingVendorIds = matchingVendors.map((v: any) => v._id);
 
-            query.$or = [
-                { label: { $regex: search, $options: 'i' } },
-                { legacyId: { $regex: search, $options: 'i' } },
-                { paymentTerms: { $regex: search, $options: 'i' } },
-                { status: { $regex: search, $options: 'i' } },
-                { 'lineItems.lotNumber': { $regex: search, $options: 'i' } },
-                { 'lineItems.uom': { $regex: search, $options: 'i' } },
-                ...(matchingVendorIds.length > 0 ? [{ vendor: { $in: matchingVendorIds } }] : [])
-            ];
+            const fuzzyQuery = buildFuzzySearchQuery(search, ['label', 'legacyId', 'paymentTerms', 'status', 'lineItems.lotNumber', 'lineItems.uom']);
+            if (fuzzyQuery) {
+                query.$and = fuzzyQuery.$and.map((cond: any) => ({
+                    $or: [
+                        ...cond.$or,
+                        ...(matchingVendorIds.length > 0 ? [{ vendor: { $in: matchingVendorIds } }] : [])
+                    ]
+                }));
+            }
         }
 
         if (vendor) {

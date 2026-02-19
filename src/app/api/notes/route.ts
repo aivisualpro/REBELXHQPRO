@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import Client from '@/models/Client';
 import mongoose from 'mongoose';
+import { buildFuzzyRegex } from '@/lib/fuzzy-search';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,12 +63,13 @@ export async function GET(request: Request) {
         );
 
         if (search) {
+            const fuzzyRegex = buildFuzzyRegex(search);
             pipeline.push({
                 $match: {
                     $or: [
-                        { note: { $regex: search, $options: 'i' } },
-                        { clientName: { $regex: search, $options: 'i' } },
-                        { createdBy: { $regex: search, $options: 'i' } }
+                        { note: { $regex: fuzzyRegex, $options: 'i' } },
+                        { clientName: { $regex: fuzzyRegex, $options: 'i' } },
+                        { createdBy: { $regex: fuzzyRegex, $options: 'i' } }
                     ]
                 }
             });

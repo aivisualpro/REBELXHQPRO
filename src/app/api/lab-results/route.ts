@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import LabResult from '@/models/LabResult';
+import { buildFuzzySearchQuery } from '@/lib/fuzzy-search';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,11 +20,8 @@ export async function GET(request: Request) {
         let query: any = {};
 
         if (search) {
-            query.$or = [
-                { name: { $regex: search, $options: 'i' } },
-                { brand: { $regex: search, $options: 'i' } },
-                { company: { $regex: search, $options: 'i' } }
-            ];
+            const fuzzyQuery = buildFuzzySearchQuery(search, ['name', 'brand', 'company']);
+            if (fuzzyQuery) Object.assign(query, fuzzyQuery);
         }
 
         const queryObj = LabResult.find(query).sort({ [sortBy]: sortOrder as any });
