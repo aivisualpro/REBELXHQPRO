@@ -19,6 +19,17 @@ export const dynamic = 'force-dynamic';
 // Helper to round to max 8 decimal places for cleaner display
 const round8 = (num: number): number => Math.round(num * 100000000) / 100000000;
 
+// Helper to clean lot numbers — strips locale formatting (commas, trailing .00)
+const cleanLot = (lot: any): string => {
+    if (lot === null || lot === undefined) return '';
+    let s = String(lot).trim();
+    // Remove commas (locale formatting)
+    s = s.replace(/,/g, '');
+    // Remove trailing .00 or .0 (numeric artifact)
+    s = s.replace(/\.0+$/, '');
+    return s;
+};
+
 export async function GET(
     request: NextRequest,
     context: { params: Promise<{ id: string }> }
@@ -207,7 +218,7 @@ export async function GET(
                 date: new Date(ob.createdAt),
                 type: 'Opening',
                 reference: ob._id.toString(),
-                lotNumber: String(ob.lotNumber || 'N/A'),
+                lotNumber: cleanLot(ob.lotNumber) || 'N/A',
                 quantity: round8(ob.qty || 0),
                 uom: ob.uom,
                 cost: round8(lotCosts.get(ob.lotNumber) || ob.cost || 0),
@@ -227,7 +238,7 @@ export async function GET(
                         date: line.receivedDate ? new Date(line.receivedDate) : new Date(po.createdAt),
                         type: 'Purchase Order',
                         reference: po.label || po._id,
-                        lotNumber: String(line.lotNumber || ''),
+                        lotNumber: cleanLot(line.lotNumber),
                         quantity: round8(line.qtyReceived),
                         uom: line.uom,
                         cost: round8(lotCosts.get(line.lotNumber) || line.cost || line.price || 0),
@@ -251,7 +262,7 @@ export async function GET(
                     date: job.scheduledFinish ? new Date(job.scheduledFinish) : new Date(job.createdAt),
                     type: 'Produced',
                     reference: job.label || job._id,
-                    lotNumber: String(lot),
+                    lotNumber: cleanLot(lot),
                     quantity: round8(actualQtyManufactured),
                     uom: job.uom,
                     cost: round8(lotCosts.get(lot) || 0),
@@ -281,7 +292,7 @@ export async function GET(
                             date: line.createdAt ? new Date(line.createdAt) : (job.scheduledStart ? new Date(job.scheduledStart) : new Date(job.createdAt)),
                             type: 'Consumption',
                             reference: job.label || job._id,
-                            lotNumber: String(line.lotNumber || ''),
+                            lotNumber: cleanLot(line.lotNumber),
                             quantity: round8(-totalQty),
                             uom: line.uom,
                             cost: round8(lotCosts.get(line.lotNumber) || line.cost || 0),
@@ -306,7 +317,7 @@ export async function GET(
                         date: so.shippedDate ? new Date(so.shippedDate) : new Date(so.createdAt),
                         type: 'Orders',
                         reference: so.label || so._id,
-                        lotNumber: String(lot),
+                        lotNumber: cleanLot(lot),
                         quantity: round8(-Math.abs(line.qtyShipped || line.qty)), 
                         uom: line.uom,
                         cost: round8(virtualCost !== undefined ? virtualCost : (line.cost || 0)),
@@ -326,7 +337,7 @@ export async function GET(
                 date: new Date(adj.createdAt),
                 type: 'Audit',
                 reference: adj.reference || '',
-                lotNumber: String(adj.lotNumber || 'N/A'),
+                lotNumber: cleanLot(adj.lotNumber) || 'N/A',
                 quantity: round8(adj.qty),
                 uom: sku.uom || 'Unit',
                 cost: round8(lotCosts.get(adj.lotNumber) || adj.cost || 0),
@@ -348,7 +359,7 @@ export async function GET(
                            date: wo.dateCompleted ? new Date(wo.dateCompleted) : new Date(wo.createdAt),
                            type: 'Web Order',
                            reference: line.varianceId ? `${wo._id} (${line.varianceId})` : wo._id,
-                           lotNumber: String(lot || 'N/A'),
+                           lotNumber: cleanLot(lot) || 'N/A',
                            quantity: round8(-Math.abs(line.quantity || 0)),
                            uom: 'Unit',
                            cost: round8(virtualCost !== undefined ? virtualCost : (line.cost || 0)),

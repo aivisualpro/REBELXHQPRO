@@ -39,7 +39,9 @@ export async function getLotsWithBalances(skuId: string): Promise<LotInfo[]> {
     // Helper to normalize lot numbers
     const normalizeLot = (lot: any): string | null => {
         if (lot === null || lot === undefined) return null;
-        const s = String(lot).trim();
+        let s = String(lot).trim();
+        // Strip locale formatting (commas) and trailing decimal zeros
+        s = s.replace(/,/g, '').replace(/\.0+$/, '');
         if (s === '' || s === 'N/A') return null;
         return s;
     };
@@ -296,7 +298,9 @@ export async function getLotTransactions(skuId: string): Promise<LotTransaction[
     
     const normalizeLot = (lot: any): string | null => {
         if (lot === null || lot === undefined) return null;
-        const s = String(lot).trim();
+        let s = String(lot).trim();
+        // Strip locale formatting (commas) and trailing decimal zeros
+        s = s.replace(/,/g, '').replace(/\.0+$/, '');
         if (s === '' || s === 'N/A') return null;
         return s;
     };

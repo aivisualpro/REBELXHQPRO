@@ -384,6 +384,9 @@ function SkuDetailsPageContent() {
 
     const uniqueLots = Array.from(new Set(transactions.map(t => t.lotNumber).filter(l => l && l !== '')));
 
+    const isPendingProduction = (tx: Transaction) => tx.type === 'Produced' && ['pending', 'processing'].includes((tx.status || '').toLowerCase());
+    const isUnfulfilledConsumption = (tx: Transaction) => tx.type === 'Consumption' && (tx.status || '').toLowerCase() !== 'fulfilled';
+
     const finalTransactions = filteredTransactions.filter(tx => {
         if (selectedLot !== 'All' && tx.lotNumber !== selectedLot) return false;
         if (selectedVarianceId) {
@@ -395,9 +398,6 @@ function SkuDetailsPageContent() {
         if (warningFilter === 'unfulfilled') return isUnfulfilledConsumption(tx);
         return true;
     });
-
-    const isPendingProduction = (tx: Transaction) => tx.type === 'Produced' && ['pending', 'processing'].includes((tx.status || '').toLowerCase());
-    const isUnfulfilledConsumption = (tx: Transaction) => tx.type === 'Consumption' && (tx.status || '').toLowerCase() !== 'fulfilled';
 
     const displayTransactions = selectedLot === 'All' 
         ? finalTransactions 
