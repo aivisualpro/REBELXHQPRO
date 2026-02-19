@@ -870,6 +870,17 @@ function SaleOrdersContent() {
                   className="text-muted-foreground"
                 />
               </th>
+              {/* Tax */}
+              <th className="border-r border-border">
+                <TableColumnHeader
+                  column="tax"
+                  title="Tax"
+                  currentSortBy={sortBy}
+                  currentSortOrder={sortOrder}
+                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
+                  className="text-muted-foreground"
+                />
+              </th>
               {/* Grandtotal */}
               <th className="border-r border-border">
                 <TableColumnHeader
@@ -918,11 +929,11 @@ function SaleOrdersContent() {
           </thead>
           <tbody className="divide-y divide-border bg-background/50">
             {loading ? (
-              <tr><td colSpan={12} className="px-4 py-12 text-center text-xs text-slate-400">Loading Orders...</td></tr>
+              <tr><td colSpan={14} className="px-4 py-12 text-center text-xs text-slate-400">Loading Orders...</td></tr>
             ) : error ? (
-              <tr><td colSpan={12} className="px-4 py-12 text-center text-red-500 text-xs font-bold">{error}</td></tr>
+              <tr><td colSpan={14} className="px-4 py-12 text-center text-red-500 text-xs font-bold">{error}</td></tr>
             ) : orders.length === 0 ? (
-              <tr><td colSpan={12} className="px-4 py-12 text-center text-xs text-slate-400 uppercase font-bold tracking-tighter opacity-50">No Orders found</td></tr>
+              <tr><td colSpan={14} className="px-4 py-12 text-center text-xs text-slate-400 uppercase font-bold tracking-tighter opacity-50">No Orders found</td></tr>
             ) : orders.map(order => {
                 const subtotal = calculateTotal(order);
                 const shipping = order.shippingCost || 0;
@@ -974,6 +985,9 @@ function SaleOrdersContent() {
                     </td>
                     <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono text-right border-r border-border">
                         {formatCurrency(discount)}
+                    </td>
+                    <td className="px-2 py-1.5 text-[10px] text-muted-foreground font-mono text-right border-r border-border">
+                        {formatCurrency(tax)}
                     </td>
                     <td className="px-2 py-1.5 text-[10px] font-black text-foreground bg-secondary/10 font-mono text-right border-r border-border">
                         {formatCurrency(grandTotal)}

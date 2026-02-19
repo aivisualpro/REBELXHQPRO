@@ -257,7 +257,7 @@ export default function SaleOrderDetailPage() {
   // Calculations
   const totalQty = order?.lineItems?.reduce((sum, item) => sum + (item.qtyShipped || 0), 0) || 0;
   const subtotal = order?.lineItems?.reduce((sum, item) => sum + ((item.qtyShipped || 0) * (item.price || 0)), 0) || 0;
-  const grandTotal = subtotal + (order?.shippingCost || 0) - (order?.discount || 0);
+  const grandTotal = subtotal + (order?.shippingCost || 0) + (order?.tax || 0) - (order?.discount || 0);
   const totalPayments = order?.payments?.reduce((sum, p) => sum + (p.paymentAmount || 0), 0) || 0;
   const balance = grandTotal - totalPayments;
 
@@ -816,6 +816,10 @@ export default function SaleOrderDetailPage() {
                         <div className="flex justify-between items-center group">
                             <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">Discount</span>
                             <span className="text-sm font-mono font-medium text-red-500">-{formatCurrency(order.discount || 0)}</span>
+                        </div>
+                        <div className="flex justify-between items-center group">
+                            <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">Tax</span>
+                            <span className="text-sm font-mono font-medium text-foreground">{formatCurrency(order.tax || 0)}</span>
                         </div>
                         <div className="flex justify-between items-center group pt-1 border-t border-border">
                             <span className="text-sm text-foreground font-bold">Order Total</span>
