@@ -561,17 +561,6 @@ function WebProductsPageContent() {
                 />
               </th>
 
-              {/* Type */}
-              <th className="border-r border-border">
-                <TableColumnHeader
-                  column="type"
-                  title="Type"
-                  currentSortBy={sortBy}
-                  currentSortOrder={sortOrder}
-                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
-                  className="text-muted-foreground"
-                />
-              </th>
 
               {/* Sale Price */}
               <th className="border-r border-border">
@@ -603,11 +592,11 @@ function WebProductsPageContent() {
           </thead>
           <tbody className="divide-y divide-border bg-background/50">
             {loading ? (
-              <tr><td colSpan={7} className="px-2 py-12 text-center text-[10px] text-slate-400">Loading Web Products...</td></tr>
+              <tr><td colSpan={6} className="px-2 py-12 text-center text-[10px] text-slate-400">Loading Web Products...</td></tr>
             ) : error ? (
-              <tr><td colSpan={7} className="px-2 py-12 text-center text-red-500 text-[10px] font-bold">{error}</td></tr>
+              <tr><td colSpan={6} className="px-2 py-12 text-center text-red-500 text-[10px] font-bold">{error}</td></tr>
             ) : products.length === 0 ? (
-              <tr><td colSpan={7} className="px-2 py-12 text-center text-[10px] text-slate-400 uppercase font-bold tracking-tighter opacity-50">No products found</td></tr>
+              <tr><td colSpan={6} className="px-2 py-12 text-center text-[10px] text-slate-400 uppercase font-bold tracking-tighter opacity-50">No products found</td></tr>
             ) : products.map(product => {
               const isVariable = product.type === 'variable' && product.variations && product.variations.length > 0;
               const isExpanded = expandedRows.has(product._id);
@@ -666,11 +655,6 @@ function WebProductsPageContent() {
                         </div>
                         <div className="flex flex-col min-w-0">
                           <span className="text-[11px] font-semibold text-foreground truncate" title={product.name}>{highlightText(product.name)}</span>
-                          {isVariable && (
-                            <span className="text-[8px] text-muted-foreground font-bold uppercase tracking-wider">
-                              {linkedCount}/{totalCount} linked
-                            </span>
-                          )}
                         </div>
                         {/* Detail page link for variable products */}
                         {isVariable && (
@@ -703,22 +687,6 @@ function WebProductsPageContent() {
                       </span>
                     </td>
 
-                    {/* Type */}
-                    <td className="px-2 py-1.5 border-r border-border whitespace-nowrap">
-                      <span className={cn(
-                        "px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border",
-                        product.type === 'variable'
-                          ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
-                          : "bg-secondary text-muted-foreground border-border"
-                      )}>
-                        {product.type || 'simple'}
-                      </span>
-                      {isVariable && (
-                        <span className="ml-1.5 text-[8px] text-muted-foreground font-bold">
-                          ({product.variations!.length})
-                        </span>
-                      )}
-                    </td>
 
                     {/* Sale Price */}
                     <td className="px-2 py-1.5 text-[11px] text-muted-foreground font-mono border-r border-border">
@@ -798,12 +766,6 @@ function WebProductsPageContent() {
                         {/* Website - empty for variations */}
                         <td className="px-2 py-1 border-r border-border" />
 
-                        {/* Type - empty for variations */}
-                        <td className="px-2 py-1 border-r border-border">
-                          <span className="text-[8px] text-muted-foreground/50 font-bold uppercase tracking-wider">
-                            VAR
-                          </span>
-                        </td>
 
                         {/* Variation Price */}
                         <td className="px-2 py-1 text-[10px] text-muted-foreground/80 font-mono border-r border-border">
