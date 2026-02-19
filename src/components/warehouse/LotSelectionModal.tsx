@@ -48,10 +48,47 @@ export function LotSelectionModal({
         setLoading(true);
         setError(null);
         try {
-            const res = await fetch(`/api/warehouse/skus/${skuId}/lots`);
+            const res = await fetch(`/api/warehouse/skus/${skuId}/ledger`);
             if (res.ok) {
                 const data = await res.json();
-                setLots(data.lots || []);
+                const txList = data.transactions || [];
+                
+                // Derive lots from ledger transactions (single source of truth)
+                const isPendingProd = (t: any) => t.type === 'Produced' && ['pending', 'processing'].includes((t.status || '').toLowerCase());
+                const isUnfulfilledCons = (t: any) => t.type === 'Consumption' && (t.status || '').toLowerCase() !== 'fulfilled';
+                
+                const lotMap = new Map<string, { balance: number; source: string; date: string; cost: number }>();
+                const sorted = [...txList].sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                
+                for (const tx of sorted) {
+                    const lot = tx.lotNumber;
+                    if (!lot || lot === '' || lot === 'N/A' || lot === '-') continue;
+                    if (isPendingProd(tx) || isUnfulfilledCons(tx)) continue;
+                    
+                    const existing = lotMap.get(lot);
+                    const sourceType = 
+                        tx.type === 'Opening' ? 'Opening Balance' :
+                        tx.type === 'Purchase Order' ? 'Purchase Order' :
+                        tx.type === 'Produced' ? 'Manufacturing' :
+                        tx.type === 'Audit' ? 'Audit Adjustment' :
+                        tx.type;
+                    
+                    lotMap.set(lot, {
+                        balance: (existing?.balance || 0) + (tx.quantity || 0),
+                        source: existing?.source || sourceType,
+                        date: existing?.date || tx.date,
+                        cost: tx.cost > 0 && !existing?.cost ? tx.cost : (existing?.cost || 0),
+                    });
+                }
+                
+                const derivedLots = Array.from(lotMap.entries())
+                    .map(([lotNumber, d]) => ({ lotNumber, balance: d.balance, source: d.source, date: d.date, cost: d.cost }))
+                    .sort((a, b) => {
+                        const dateA = a.date ? new Date(a.date).getTime() : 0;
+                        const dateB = b.date ? new Date(b.date).getTime() : 0;
+                        return dateA - dateB;
+                    });
+                setLots(derivedLots);
             } else {
                 setError('Failed to fetch lots');
                 toast.error('Failed to fetch available lots');
