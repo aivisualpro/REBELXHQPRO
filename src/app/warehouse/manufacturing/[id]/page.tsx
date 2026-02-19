@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { ArrowLeft, Package, Calendar, User, Clock, Tag, Clipboard, Layers, Pencil, Trash2, X, Plus, Copy, Play, Square, MoreVertical } from 'lucide-react';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { confirmDeleteToast } from '@/lib/confirmToast';
@@ -112,8 +113,6 @@ export default function ManufacturingDetailPage() {
 
     // SKU List for adding line items
     const [skuList, setSkuList] = useState<{ _id: string; name: string; category?: string; image?: string }[]>([]);
-    const [skuSearch, setSkuSearch] = useState('');
-    const [isSkuDropdownOpen, setIsSkuDropdownOpen] = useState(false);
 
     // Line Item Actions Menu State
     const [openActionMenu, setOpenActionMenu] = useState<{ id: string; x: number; y: number } | null>(null);
@@ -929,7 +928,6 @@ export default function ManufacturingDetailPage() {
                                             recipeQty: 0, sa: 0, qtyExtra: 0, qtyScrapped: 0,
                                             createdAt: new Date().toISOString()
                                         });
-                                        setSkuSearch('');
                                         setIsEditModalOpen(true);
                                     }}
                                     className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors flex items-center space-x-1"
@@ -1607,69 +1605,39 @@ export default function ManufacturingDetailPage() {
                                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">SKU</label>
                                 {editingItem._id ? (
                                     <div className="text-sm font-medium text-foreground/80 bg-secondary px-3 py-2 rounded border border-border">
-                                        {typeof editingItem.sku === 'object' ? editingItem.sku.name : editingItem.sku || '-'}
+                                        {typeof editingItem.sku === 'object' ? editingItem.sku.name : (skuList.find(s => s._id === editingItem.sku)?.name || editingItem.sku || '-')}
                                     </div>
                                 ) : (
-                                    <div className="relative">
-                                        <input
-                                            type="text"
-                                            value={skuSearch}
-                                            onChange={e => {
-                                                setSkuSearch(e.target.value);
-                                                setIsSkuDropdownOpen(true);
-                                            }}
-                                            onFocus={() => setIsSkuDropdownOpen(true)}
-                                            className="w-full px-3 py-2 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-black/10"
-                                            placeholder="Search SKU..."
-                                        />
-                                        {isSkuDropdownOpen && (
-                                            <div className="absolute z-20 w-full mt-1 bg-background border border-border rounded shadow-lg max-h-48 overflow-auto">
-                                                {skuList
-                                                    .filter(s => !skuSearch || s.name.toLowerCase().includes(skuSearch.toLowerCase()) || s._id.toLowerCase().includes(skuSearch.toLowerCase()))
-                                                    .slice(0, 20)
-                                                    .map(s => (
-                                                        <button
-                                                            key={s._id}
-                                                            type="button"
-                                                            onClick={async () => {
-                                                                setEditingItem({ ...editingItem, sku: s._id });
-                                                                setSkuSearch(s.name);
-                                                                setIsSkuDropdownOpen(false);
-                                                                
-                                                                // Auto-fetch oldest lot for this SKU
-                                                                try {
-                                                                    const res = await fetch(`/api/warehouse/skus/${s._id}/lots`);
-                                                                    if (res.ok) {
-                                                                        const data = await res.json();
-                                                                        // Get oldest lot with positive balance (sorted by date ascending)
-                                                                        const lotsWithBalance = (data.lots || [])
-                                                                            .filter((l: any) => l.balance > 0)
-                                                                            .sort((a: any, b: any) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime());
-                                                                        if (lotsWithBalance.length > 0) {
-                                                                            setEditingItem(prev => prev ? { 
-                                                                                ...prev, 
-                                                                                sku: s._id, 
-                                                                                lotNumber: lotsWithBalance[0].lotNumber,
-                                                                                cost: lotsWithBalance[0].cost || 0
-                                                                            } : prev);
-                                                                        }
-                                                                    }
-                                                                } catch (e) {
-                                                                    // Silently fail - user can still select lot manually
-                                                                }
-                                                            }}
-                                                            className="w-full text-left px-3 py-2 text-sm hover:bg-secondary transition-colors"
-                                                        >
-                                                            <span className="font-medium">{s.name}</span>
-                                                            <span className="text-xs text-muted-foreground ml-2">({s._id})</span>
-                                                        </button>
-                                                    ))}
-                                                {skuList.filter(s => !skuSearch || s.name.toLowerCase().includes(skuSearch.toLowerCase()) || s._id.toLowerCase().includes(skuSearch.toLowerCase())).length === 0 && (
-                                                    <div className="px-3 py-2 text-sm text-muted-foreground">No SKUs found</div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
+                                    <SearchableSelect
+                                        options={skuList.map(s => ({ value: s._id, label: s.name }))}
+                                        value={typeof editingItem.sku === 'string' ? editingItem.sku : (editingItem.sku as any)?._id || ''}
+                                        onChange={async (skuId: string) => {
+                                            setEditingItem({ ...editingItem, sku: skuId });
+                                            
+                                            // Auto-fetch oldest lot for this SKU
+                                            try {
+                                                const res = await fetch(`/api/warehouse/skus/${skuId}/lots`);
+                                                if (res.ok) {
+                                                    const data = await res.json();
+                                                    const lotsWithBalance = (data.lots || [])
+                                                        .filter((l: any) => l.balance > 0)
+                                                        .sort((a: any, b: any) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime());
+                                                    if (lotsWithBalance.length > 0) {
+                                                        setEditingItem(prev => prev ? { 
+                                                            ...prev, 
+                                                            sku: skuId, 
+                                                            lotNumber: lotsWithBalance[0].lotNumber,
+                                                            cost: lotsWithBalance[0].cost || 0
+                                                        } : prev);
+                                                    }
+                                                }
+                                            } catch (e) {
+                                                // Silently fail - user can still select lot manually
+                                            }
+                                        }}
+                                        placeholder="Search SKU..."
+                                        triggerClassName="rounded border-border h-9 bg-background"
+                                    />
                                 )}
                             </div>
                             
