@@ -22,12 +22,22 @@ export async function GET(request: NextRequest) {
         let query: any = {};
 
         if (search) {
-            const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            query.$or = [
-                { name: { $regex: escapedSearch, $options: 'i' } },
-                { _id: { $regex: escapedSearch, $options: 'i' } },
-                { sku_code: { $regex: escapedSearch, $options: 'i' } } // Added SKU search too
-            ];
+            // Tokenize: split search into individual words for flexible matching
+            const tokens = search.trim().split(/\s+/).filter(Boolean);
+            if (tokens.length > 0) {
+                // Each token must match at least one of name, _id, or sku_code
+                query.$and = tokens.map(token => {
+                    const escapedToken = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    return {
+                        $or: [
+                            { name: { $regex: escapedToken, $options: 'i' } },
+                            { 'variations.name': { $regex: escapedToken, $options: 'i' } },
+                            { _id: { $regex: escapedToken, $options: 'i' } },
+                            { sku_code: { $regex: escapedToken, $options: 'i' } },
+                        ]
+                    };
+                });
+            }
         }
 
         if (website) {
