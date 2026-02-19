@@ -38,6 +38,15 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
         };
     }
 
+    // Subscriptions
+    if (pathname === '/sales/subscriptions') {
+        return {
+            title: '',
+            actions: [],
+            isPortal: true
+        };
+    }
+
     // Wholesale Order Detail
     if (pathname.match(/^\/sales\/wholesale-orders\/[^/]+$/)) {
         return {
