@@ -111,6 +111,9 @@ function WebProductsPageContent() {
   // Toggle to hide zero-order products
   const [hideZeroOrders, setHideZeroOrders] = useState(false);
 
+  // Global link stats from API (across all matching products)
+  const [globalLinkStats, setGlobalLinkStats] = useState<{ totalLinkable: number; totalLinked: number }>({ totalLinkable: 0, totalLinked: 0 });
+
   const [globalSettings, setGlobalSettings] = useState<any>(null);
 
   // Debounce search + sync to URL
@@ -150,6 +153,9 @@ function WebProductsPageContent() {
         setProducts(data.webProducts || []);
         setTotalPages(data.totalPages || 1);
         setTotalProducts(data.total || 0);
+        if (data.linkStats) {
+          setGlobalLinkStats(data.linkStats);
+        }
       } else {
         setError(data.error || 'Failed to fetch web products');
       }
@@ -320,23 +326,11 @@ function WebProductsPageContent() {
     }
   };
 
-  // Compute link stats
+  // Compute link stats from API-provided global stats
   const linkStats = useMemo(() => {
-    let totalLinkable = 0;
-    let totalLinked = 0;
-
-    products.forEach(p => {
-      if (p.type === 'variable' && p.variations && p.variations.length > 0) {
-        totalLinkable += p.variations.length;
-        totalLinked += p.variations.filter(v => v.linkedSkuId).length;
-      } else {
-        totalLinkable++;
-        if (p.linkedSkuId) totalLinked++;
-      }
-    });
-
+    const { totalLinkable, totalLinked } = globalLinkStats;
     return { totalLinkable, totalLinked, pct: totalLinkable > 0 ? Math.round((totalLinked / totalLinkable) * 100) : 0 };
-  }, [products]);
+  }, [globalLinkStats]);
 
   // Strip parent product name from variation name for cleaner display
   const getVariationLabel = (product: WebProduct, variation: Variation) => {
@@ -451,7 +445,7 @@ function WebProductsPageContent() {
                 "text-[9px] font-black uppercase tracking-wider",
                 linkStats.pct === 100 ? "text-emerald-500" : linkStats.pct > 50 ? "text-amber-500" : "text-rose-500"
               )}>
-                {linkStats.totalLinked}/{linkStats.totalLinkable} linked
+                {linkStats.totalLinked}/{linkStats.totalLinkable}
               </span>
             </div>
           </div>
@@ -462,15 +456,14 @@ function WebProductsPageContent() {
           <button
             onClick={() => setHideZeroOrders(!hideZeroOrders)}
             className={cn(
-              "flex items-center gap-1.5 px-2.5 py-1 rounded text-[9px] font-bold uppercase tracking-wider transition-colors",
+              "p-1.5 rounded transition-colors",
               hideZeroOrders
                 ? "bg-primary/10 text-primary border border-primary/20"
                 : "text-muted-foreground hover:text-foreground hover:bg-secondary"
             )}
             title={hideZeroOrders ? "Showing products with orders only" : "Show all products"}
           >
-            {hideZeroOrders ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-            {hideZeroOrders ? '0 hidden' : '0 shown'}
+            {hideZeroOrders ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
 
           {/* Expand / Collapse All */}
