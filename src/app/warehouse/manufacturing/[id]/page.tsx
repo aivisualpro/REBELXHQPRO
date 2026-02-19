@@ -812,15 +812,24 @@ export default function ManufacturingDetailPage() {
                                 { label: 'Checked By', value: lastQc ? formatUser(lastQc.checkedBy) : '-' },
                                 { label: 'Packaged By', value: lastQc ? formatUser(lastQc.packagedBy) : '-' },
                                 { label: 'Created At', value: new Date(order.createdAt).toLocaleDateString() },
-                                { label: 'Recipe', value: (typeof order.recipesId === 'object' && order.recipesId) ? order.recipesId.name : (order.recipesId || '-') },
-                            ];
+                                { label: 'Recipe', value: (typeof order.recipesId === 'object' && order.recipesId) ? order.recipesId.name : (order.recipesId || '-'), recipeId: (typeof order.recipesId === 'object' && order.recipesId) ? order.recipesId._id : (order.recipesId || null) },
+                            ] as { label: string; value: string; recipeId?: string | null }[];
                         })().map((item, idx) => (
                             <div key={idx} className={cn(
                                 "flex items-center justify-between px-3 py-2",
                                 idx % 2 === 0 ? "bg-background" : "bg-secondary/50"
                             )}>
                                 <span className="text-[9px] text-muted-foreground uppercase tracking-widest font-bold">{item.label}</span>
-                                <span className="text-[11px] font-medium text-muted-foreground text-right max-w-[55%] truncate">{item.value}</span>
+                                {item.recipeId ? (
+                                    <span 
+                                        className="text-[11px] font-medium text-muted-foreground text-right max-w-[55%] truncate hover:text-blue-500 hover:underline cursor-pointer transition-colors"
+                                        onClick={() => router.push(`/warehouse/recipes/${item.recipeId}`)}
+                                    >
+                                        {item.value}
+                                    </span>
+                                ) : (
+                                    <span className="text-[11px] font-medium text-muted-foreground text-right max-w-[55%] truncate">{item.value}</span>
+                                )}
                             </div>
                         ))}
                     </div>
