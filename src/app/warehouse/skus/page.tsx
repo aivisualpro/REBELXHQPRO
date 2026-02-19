@@ -290,7 +290,7 @@ function SkusPageContent() {
           <thead className="sticky top-0 bg-secondary/80 z-10 border-b border-border backdrop-blur-md transition-colors">
             <tr>
               {/* Name */}
-              <th className="border-r border-border max-w-[220px]">
+              <th className="border-r border-border">
                 <TableColumnHeader
                   column="name"
                   title="Name"
@@ -417,7 +417,7 @@ function SkusPageContent() {
                         {sku.tier}
                       </span>
                     ) : null}
-                    <span className="truncate max-w-[200px]" title={sku.name}>{sku.name}</span>
+                    <span className="truncate" title={sku.name}>{sku.name}</span>
                   </div>
                 </td>
                 <td className="px-2 py-1 text-[10px] uppercase font-bold text-muted-foreground border-r border-border">{sku.category}</td>

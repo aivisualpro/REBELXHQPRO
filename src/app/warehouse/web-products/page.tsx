@@ -145,6 +145,7 @@ function WebProductsPageContent() {
       });
 
       if (selectedWebsites.length) params.append('website', selectedWebsites.join(','));
+      if (hideZeroOrders) params.append('hideZeroOrders', 'true');
 
       const res = await fetch(`/api/retail/web-products?${params.toString()}`);
       const data = await res.json();
@@ -164,7 +165,7 @@ function WebProductsPageContent() {
     } finally {
       setLoading(false);
     }
-  }, [page, debouncedSearch, sortBy, sortOrder, selectedWebsites]);
+  }, [page, debouncedSearch, sortBy, sortOrder, selectedWebsites, hideZeroOrders]);
 
   useEffect(() => {
     fetchProducts();
@@ -495,7 +496,7 @@ function WebProductsPageContent() {
 
           {/* Hide Zero Orders Toggle */}
           <button
-            onClick={() => setHideZeroOrders(!hideZeroOrders)}
+            onClick={() => { setHideZeroOrders(!hideZeroOrders); setPage(1); }}
             className={cn(
               "p-1.5 rounded transition-colors",
               hideZeroOrders
@@ -607,7 +608,7 @@ function WebProductsPageContent() {
               <tr><td colSpan={7} className="px-2 py-12 text-center text-red-500 text-[10px] font-bold">{error}</td></tr>
             ) : products.length === 0 ? (
               <tr><td colSpan={7} className="px-2 py-12 text-center text-[10px] text-slate-400 uppercase font-bold tracking-tighter opacity-50">No products found</td></tr>
-            ) : products.filter(p => !hideZeroOrders || (p.totalWebOrders && p.totalWebOrders > 0)).map(product => {
+            ) : products.map(product => {
               const isVariable = product.type === 'variable' && product.variations && product.variations.length > 0;
               const isExpanded = expandedRows.has(product._id);
 

@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
         const sortOrder = searchParams.get('sortOrder') === 'asc' ? 1 : -1;
         const search = searchParams.get('search') || '';
         const website = searchParams.get('website');
+        const hideZeroOrders = searchParams.get('hideZeroOrders') === 'true';
 
         let query: any = {};
 
@@ -29,6 +30,10 @@ export async function GET(request: NextRequest) {
 
         if (website) {
             query.website = { $in: website.split(',') };
+        }
+
+        if (hideZeroOrders) {
+            query.totalWebOrders = { $gt: 0 };
         }
 
         const queryObj = WebProduct.find(query).sort({ [sortBy]: sortOrder });
