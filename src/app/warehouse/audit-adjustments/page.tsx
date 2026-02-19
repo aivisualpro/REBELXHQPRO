@@ -286,7 +286,7 @@ function AuditAdjustmentsPage() {
                                                     {skuTier}
                                                 </span>
                                             ) : null}
-                                            <span className="truncate max-w-[200px]" title={skuData.name}>{skuData.name}</span>
+                                            <span title={skuData.name}>{skuData.name}</span>
                                         </div>
                                     </td>
                                     <td className="px-2 py-1.5 text-[11px] text-muted-foreground font-mono tracking-tighter border-r border-border">{item.lotNumber}</td>
