@@ -110,7 +110,7 @@ function highlightLabel(label: string, searchQuery: string): React.ReactNode {
                 {parts.map((part, i) => {
                     if (!part) return null;
                     if (testRegex.test(part)) {
-                        return <span key={i} className="bg-primary/25 text-primary font-bold rounded-sm">{part}</span>;
+                        return <span key={i} className="underline decoration-2 decoration-primary font-bold">{part}</span>;
                     }
                     return <span key={i}>{part}</span>;
                 })}
