@@ -238,11 +238,45 @@ function SkuDetailsPageContent() {
                 setFinancials(data.financials || null);
                 if (data.settings?.missingSkuImage) setFallbackImage(data.settings.missingSkuImage);
                 
-                // Fetch lots data after main data loads
-                fetch(`/api/warehouse/skus/${id}/lots`)
-                    .then(r => r.json())
-                    .then(lotsData => setLots(lotsData.lots || []))
-                    .catch(() => {}); // Silently fail if lots fetch fails
+                // Derive lots from ledger transactions (single source of truth)
+                const txList = data.transactions || [];
+                const lotMap = new Map<string, { balance: number; source: string; date: string | null; cost: number }>();
+                const isPendingProd = (t: any) => t.type === 'Produced' && ['pending', 'processing'].includes((t.status || '').toLowerCase());
+                const isUnfulfilledCons = (t: any) => t.type === 'Consumption' && (t.status || '').toLowerCase() !== 'fulfilled';
+                
+                // Sort oldest first for proper source/date attribution
+                const sorted = [...txList].sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                
+                for (const tx of sorted) {
+                    const lot = tx.lotNumber;
+                    if (!lot || lot === '' || lot === 'N/A' || lot === '-') continue;
+                    // Skip pending/processing and unfulfilled — same as ledger balance logic
+                    if (isPendingProd(tx) || isUnfulfilledCons(tx)) continue;
+                    
+                    const existing = lotMap.get(lot);
+                    const sourceType = 
+                        tx.type === 'Opening' ? 'Opening Balance' :
+                        tx.type === 'Purchase Order' ? 'Purchase Order' :
+                        tx.type === 'Produced' ? 'Manufacturing' :
+                        tx.type === 'Audit' ? 'Audit Adjustment' :
+                        tx.type;
+                    
+                    lotMap.set(lot, {
+                        balance: (existing?.balance || 0) + (tx.quantity || 0),
+                        source: existing?.source || sourceType,
+                        date: existing?.date || tx.date,
+                        cost: tx.cost > 0 && !existing?.cost ? tx.cost : (existing?.cost || 0),
+                    });
+                }
+                
+                const derivedLots = Array.from(lotMap.entries())
+                    .map(([lotNumber, data]) => ({ lotNumber, ...data }))
+                    .sort((a, b) => {
+                        const dateA = a.date ? new Date(a.date).getTime() : 0;
+                        const dateB = b.date ? new Date(b.date).getTime() : 0;
+                        return dateA - dateB;
+                    });
+                setLots(derivedLots);
 
                 // Fetch linked web products
                 setLoadingLinkedProducts(true);
