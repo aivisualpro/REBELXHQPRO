@@ -61,26 +61,6 @@ export default function WebOrdersPage() {
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState({ from: '', to: '' });
 
-  const [syncStatus, setSyncStatus] = useState({
-    isSyncing: false,
-    currentStep: '',
-    progress: 0,
-    total: 0,
-    logs: [] as string[],
-    currentOrderNumber: '',
-    currentOrderDate: '',
-    currentOrderTotal: 0,
-    currentOrderCustomer: '',
-    currentSite: '',
-    fetchingPhase: false,
-    fetchingPage: 0,
-    fetchingFound: 0,
-    fetchingSite: '',
-    isFullSync: false,
-    stats: { added: 0, updated: 0, skipped: 0 },
-    debug: { logsCount: 0, lastLog: null as string | null }
-  });
-
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
@@ -125,55 +105,6 @@ export default function WebOrdersPage() {
     fetchOrders();
   }, [fetchOrders]);
 
-  const handleSync = async (fullSync = false) => {
-    try {
-      const url = fullSync 
-        ? '/api/retail/web-orders/sync?full=true' 
-        : '/api/retail/web-orders/sync';
-      const res = await fetch(url, { method: 'POST' });
-      if (res.ok) {
-        toast.success(fullSync ? 'Full sync started' : 'Incremental sync started');
-        pollSyncProgress();
-      } else {
-        const err = await res.json();
-        toast.error('Failed: ' + err.error);
-      }
-    } catch (e) {
-      toast.error('Sync error');
-    }
-  };
-
-  const pollSyncProgress = useCallback(async () => {
-    const timer = setInterval(async () => {
-      try {
-        const res = await fetch('/api/retail/web-orders/sync');
-        const data = await res.json();
-        setSyncStatus(data);
-
-        if (!data.isSyncing && (data.currentStep === 'Complete' || data.currentStep === 'Failed')) {
-          clearInterval(timer);
-          if (data.currentStep === 'Complete') {
-            toast.success('Orders synced!');
-            fetchOrders();
-          } else {
-            toast.error('Sync failed');
-          }
-        }
-      } catch (e) {
-        console.error('Polling error:', e);
-      }
-    }, 1000);
-  }, [fetchOrders]);
-
-  useEffect(() => {
-    fetch('/api/retail/web-orders/sync').then(res => res.json()).then(data => {
-      if (data.isSyncing) {
-        setSyncStatus(data);
-        pollSyncProgress();
-      }
-    });
-  }, [pollSyncProgress]);
-
   const handleSort = (col: string) => {
     if (sortBy === col) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -205,70 +136,6 @@ export default function WebOrdersPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-48px)] bg-background transition-colors duration-300">
-      {syncStatus.isSyncing && (
-        <div className="bg-primary px-4 py-2 flex items-center justify-between text-primary-foreground animate-in slide-in-from-top duration-300 shadow-lg">
-          <div className="flex items-center space-x-4 flex-1 min-w-0">
-            <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-            
-            {/* Fetching Phase Display */}
-            {syncStatus.fetchingPhase ? (
-              <>
-                <div className="bg-black/20 px-2.5 py-0.5 rounded-full shrink-0">
-                  <span className="text-[10px] font-black uppercase tracking-wider">Fetching</span>
-                </div>
-                <div className="h-4 w-px bg-primary-foreground/30 shrink-0" />
-                <div className="flex items-center space-x-3 min-w-0">
-                  <span className="px-2 py-0.5 bg-black/10 rounded text-[10px] font-black uppercase tracking-wider shrink-0">
-                    {syncStatus.fetchingSite}
-                  </span>
-                  <span className="text-[10px] font-bold shrink-0 text-primary-foreground/80">
-                    Page {syncStatus.fetchingPage}
-                  </span>
-                  <div className="h-4 w-px bg-primary-foreground/30 shrink-0" />
-                  <span className="text-[11px] font-black font-mono bg-black/20 px-2 py-0.5 rounded shrink-0">
-                    {syncStatus.fetchingFound} orders found
-                  </span>
-                </div>
-              </>
-            ) : (
-              <>
-                {/* Syncing Phase - Progress percentage */}
-                <div className="bg-black/20 px-2 py-0.5 rounded-full shrink-0">
-                  <span className="text-[11px] font-black font-mono">
-                    {syncStatus.total > 0 ? `${Math.round((syncStatus.progress / syncStatus.total) * 100)}%` : '0%'}
-                  </span>
-                </div>
-                
-                {/* Current order details */}
-                {syncStatus.currentOrderNumber ? (
-                  <>
-                    <div className="h-4 w-px bg-primary-foreground/30 shrink-0" />
-                    <div className="flex items-center space-x-3 min-w-0">
-                      <span className="text-[10px] font-black uppercase tracking-wider shrink-0">Order #{syncStatus.currentOrderNumber}</span>
-                      <span className="text-[9px] text-primary-foreground/70 font-medium truncate max-w-[100px]">{syncStatus.currentOrderCustomer}</span>
-                      <span className="text-[10px] font-black font-mono bg-black/10 px-1.5 py-0.5 rounded shrink-0">
-                        ${syncStatus.currentOrderTotal?.toFixed(2)}
-                      </span>
-                    </div>
-                  </>
-                ) : (
-                  <span className="text-[10px] font-bold text-primary-foreground/80 truncate">
-                    {syncStatus.currentStep || syncStatus.debug?.lastLog || 'Initializing...'}
-                  </span>
-                )}
-              </>
-            )}
-          </div>
-          
-          {/* Counter */}
-          <div className="text-[10px] font-mono font-bold bg-black/10 px-2 py-1 rounded shrink-0 border border-black/5">
-            {syncStatus.fetchingPhase 
-              ? `Scanning ${syncStatus.fetchingSite}...`
-              : `${syncStatus.progress} / ${syncStatus.total}`
-            }
-          </div>
-        </div>
-      )}
 
       {/* Action Bar */}
       <div className="flex items-center justify-between px-4 h-11 border-b border-border bg-secondary/50 transition-colors">
@@ -338,28 +205,6 @@ export default function WebOrdersPage() {
               onChange={e => setDateRange({ ...dateRange, to: e.target.value })}
             />
           </div>
-
-          <div className="w-px h-6 bg-border mx-2" />
-
-          <button
-            onClick={() => handleSync(false)}
-            disabled={syncStatus.isSyncing}
-            className="h-8 px-3 bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-md flex items-center space-x-2 rounded cursor-pointer disabled:opacity-50"
-            title="Incremental Sync - Only changed orders"
-          >
-            {syncStatus.isSyncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
-            <span className="text-[10px] font-bold uppercase tracking-wider">Sync</span>
-          </button>
-          
-          <button
-            onClick={() => handleSync(true)}
-            disabled={syncStatus.isSyncing}
-            className="h-8 px-3 bg-card border border-border text-foreground hover:bg-secondary transition-all shadow-sm flex items-center space-x-2 rounded cursor-pointer disabled:opacity-50"
-            title="Full Sync - All orders from scratch"
-          >
-            <Globe className="w-3.5 h-3.5 text-muted-foreground" />
-            <span className="text-[10px] font-bold uppercase tracking-wider">Full</span>
-          </button>
         </div>
       </div>
 

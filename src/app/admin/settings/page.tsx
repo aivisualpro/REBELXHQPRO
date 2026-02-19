@@ -115,6 +115,18 @@ function SettingsPageContent() {
         progress: 0,
         total: 0,
     });
+
+    // Web Orders Sync
+    const [woSyncStatus, setWoSyncStatus] = useState({
+        isSyncing: false,
+        currentStep: '',
+        progress: 0,
+        total: 0,
+        fetchingPhase: false,
+        fetchingPage: 0,
+        fetchingFound: 0,
+        fetchingSite: '',
+    });
     const [wpModalOpen, setWpModalOpen] = useState(false);
     const [wpSubmitting, setWpSubmitting] = useState(false);
     const [wpEditing, setWpEditing] = useState<any>(null);
@@ -319,8 +331,53 @@ function SettingsPageContent() {
                     pollWebProductSyncProgress();
                 }
             }).catch(() => {});
+            fetch('/api/retail/web-orders/sync').then(res => res.json()).then(data => {
+                if (data.isSyncing) {
+                    setWoSyncStatus(data);
+                    pollWebOrderSyncProgress();
+                }
+            }).catch(() => {});
         }
     }, [activeTab, moduleSubTab, pollWebProductSyncProgress]);
+
+    // Web Orders Sync
+    const handleWebOrderSync = async (fullSync = false) => {
+        try {
+            const url = fullSync
+                ? '/api/retail/web-orders/sync?full=true'
+                : '/api/retail/web-orders/sync';
+            const res = await fetch(url, { method: 'POST' });
+            if (res.ok) {
+                toast.success(fullSync ? 'Full order sync started' : 'Incremental order sync started');
+                pollWebOrderSyncProgress();
+            } else {
+                const err = await res.json();
+                toast.error('Failed to start sync: ' + err.error);
+            }
+        } catch (e) {
+            toast.error('Sync start error');
+        }
+    };
+
+    const pollWebOrderSyncProgress = useCallback(async () => {
+        const timer = setInterval(async () => {
+            try {
+                const res = await fetch('/api/retail/web-orders/sync');
+                const data = await res.json();
+                setWoSyncStatus(data);
+                if (!data.isSyncing && (data.currentStep === 'Complete' || data.currentStep === 'Failed')) {
+                    clearInterval(timer);
+                    if (data.currentStep === 'Complete') {
+                        toast.success('Web order sync completed successfully');
+                    } else {
+                        toast.error('Web order sync failed.');
+                    }
+                }
+            } catch (e) {
+                console.error('WO polling error:', e);
+            }
+        }, 1000);
+    }, []);
 
     // Web Products CSV Import
     const handleWebProductImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1138,6 +1195,80 @@ function SettingsPageContent() {
                                                     <h4 className="text-sm font-bold text-muted-foreground">Add Product</h4>
                                                     <p className="text-[10px] text-muted-foreground mt-1 text-center">
                                                         Manually add a web product
+                                                    </p>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* ─── Web Orders Sync ─── */}
+                                        <div className="space-y-4">
+                                            <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground border-b border-border pb-2">Web Orders Sync</h2>
+
+                                            {/* Sync Progress */}
+                                            {woSyncStatus.isSyncing && (
+                                                <div className="bg-primary px-4 py-3 flex items-center justify-between text-black animate-in slide-in-from-top duration-300 rounded-lg shadow-md">
+                                                    <div className="flex items-center space-x-3 flex-1">
+                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                        <span className="text-[10px] font-black uppercase tracking-widest">
+                                                            {woSyncStatus.fetchingPhase ? `Fetching ${woSyncStatus.fetchingSite}...` : woSyncStatus.currentStep}
+                                                        </span>
+                                                        {woSyncStatus.total > 0 && (
+                                                            <div className="flex-1 max-w-sm bg-black/10 h-1.5 rounded-full overflow-hidden mx-6">
+                                                                <div
+                                                                    className="bg-black h-full transition-all duration-500"
+                                                                    style={{ width: `${(woSyncStatus.progress / woSyncStatus.total) * 100}%` }}
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-[10px] font-black uppercase tracking-widest ml-4">
+                                                        {woSyncStatus.fetchingPhase
+                                                            ? `Page ${woSyncStatus.fetchingPage} · ${woSyncStatus.fetchingFound} found`
+                                                            : woSyncStatus.total > 0 ? `${Math.round((woSyncStatus.progress / woSyncStatus.total) * 100)}% (${woSyncStatus.progress}/${woSyncStatus.total})` : 'Initializing...'}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <div className="p-4 border border-purple-500/20 bg-purple-500/10 rounded-lg flex items-start space-x-4 mb-4">
+                                                <div className="shrink-0 mt-0.5">
+                                                    <ShoppingCart className="w-5 h-5 text-purple-600" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-purple-600 dark:text-purple-400">WooCommerce Orders Sync</h4>
+                                                    <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">
+                                                        Sync web orders from all connected WooCommerce stores. <strong>Incremental</strong> only syncs recently changed orders. <strong>Full</strong> re-syncs everything from scratch.
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                                {/* Incremental Sync */}
+                                                <button
+                                                    onClick={() => handleWebOrderSync(false)}
+                                                    disabled={woSyncStatus.isSyncing}
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-lg hover:border-purple-400 hover:bg-purple-500/10 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <div className="w-12 h-12 rounded-full bg-purple-500/20 flex items-center justify-center mb-3 group-hover:bg-purple-500/30 transition-colors">
+                                                        {woSyncStatus.isSyncing ? <Loader2 className="w-6 h-6 text-purple-600 animate-spin" /> : <ShoppingCart className="w-6 h-6 text-purple-600" />}
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-muted-foreground">Sync Orders</h4>
+                                                    <p className="text-[10px] text-muted-foreground mt-1 text-center">
+                                                        Incremental - changed orders only
+                                                    </p>
+                                                </button>
+
+                                                {/* Full Sync */}
+                                                <button
+                                                    onClick={() => handleWebOrderSync(true)}
+                                                    disabled={woSyncStatus.isSyncing}
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-lg hover:border-amber-400 hover:bg-amber-500/10 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center mb-3 group-hover:bg-amber-500/30 transition-colors">
+                                                        <ShoppingCart className="w-6 h-6 text-amber-600" />
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-muted-foreground">Full Sync</h4>
+                                                    <p className="text-[10px] text-muted-foreground mt-1 text-center">
+                                                        All orders from scratch
                                                     </p>
                                                 </button>
                                             </div>
