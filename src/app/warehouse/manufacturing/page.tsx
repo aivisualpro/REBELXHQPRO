@@ -249,6 +249,7 @@ function ManufacturingContent() {
                     order.status === 'Fulfilled' ? "bg-green-500/10 text-green-500" :
                       order.status === 'Processing' ? "bg-blue-500/10 text-blue-500" :
                         order.status === 'Ready to QC' ? "bg-amber-500/10 text-amber-500" :
+                          order.status === 'Pending' ? "bg-slate-500/10 text-slate-400" :
                           "bg-muted text-muted-foreground"
                   )}>
                     {order.status}

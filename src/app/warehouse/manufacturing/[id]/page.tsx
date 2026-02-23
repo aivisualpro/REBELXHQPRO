@@ -728,6 +728,7 @@ export default function ManufacturingDetailPage() {
                                     order.status === 'Fulfilled' ? "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25" :
                                     order.status === 'Processing' ? "bg-blue-500/15 text-blue-400 hover:bg-blue-500/25" :
                                     order.status === 'Ready to QC' ? "bg-amber-500/15 text-amber-400 hover:bg-amber-500/25" :
+                                    order.status === 'Pending' ? "bg-slate-500/15 text-slate-400 hover:bg-slate-500/25" :
                                     "bg-secondary text-muted-foreground hover:bg-secondary/80"
                                 )}
                             >
@@ -761,7 +762,7 @@ export default function ManufacturingDetailPage() {
                                     "w-full px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-center cursor-pointer transition-all",
                                     order.priority === 'Extreme' ? "bg-red-500/15 text-red-400 hover:bg-red-500/25" :
                                     order.priority === 'High' ? "bg-orange-500/15 text-orange-400 hover:bg-orange-500/25" :
-                                    "bg-secondary text-muted-foreground hover:bg-secondary/80"
+                                    "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25"
                                 )}
                             >
                                 {order.priority}
@@ -1646,12 +1647,12 @@ export default function ManufacturingDetailPage() {
             {isEditModalOpen && editingItem && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={handleCloseEditModal}>
                     <div className="bg-background rounded-lg shadow-xl w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-                            <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">
+                        <div className="flex items-center justify-between px-4 h-9 border-b border-border">
+                            <h3 className="text-[10px] font-black text-foreground uppercase tracking-widest">
                                 {editingItem._id ? 'Edit Item' : 'Add Line Item'}
                             </h3>
                             <button onClick={handleCloseEditModal} className="p-1 hover:bg-secondary rounded transition-colors">
-                                <X className="w-4 h-4 text-muted-foreground" />
+                                <X className="w-3.5 h-3.5 text-muted-foreground" />
                             </button>
                         </div>
                         <div className="p-6 space-y-4">
@@ -1791,16 +1792,16 @@ export default function ManufacturingDetailPage() {
                                 </div>
                             </div>
                         </div>
-                        <div className="flex items-center justify-end space-x-3 px-6 py-4 border-t border-border bg-secondary/50">
+                        <div className="flex items-center justify-end space-x-3 px-4 h-9 border-t border-border bg-secondary/50">
                             <button
                                 onClick={handleCloseEditModal}
-                                className="px-4 py-2 text-xs font-bold uppercase text-muted-foreground hover:text-foreground/80 transition-colors"
+                                className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground/80 transition-colors"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleSaveItem}
-                                className="px-4 py-2 text-xs font-bold uppercase bg-foreground text-background hover:bg-foreground/80 transition-colors rounded"
+                                className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest bg-foreground text-background hover:bg-foreground/80 transition-colors"
                             >
                                 {editingItem._id ? 'Save Changes' : 'Add Item'}
                             </button>
@@ -1938,15 +1939,14 @@ export default function ManufacturingDetailPage() {
                                                     // Filter by search
                                                     const matchesSearch = `${u.firstName} ${u.lastName}`.toLowerCase().includes(userSearch.toLowerCase());
                                                     
-                                                    // Filter out users already in labor list (ONLY for new entries)
-                                                    // If editing, we allow the current user to be displayed, but typically user doesn't change when editing
-                                                    // User requested "when adding new labor it will give me only options of users which is not in the related list already"
+                                                    // Filter out users already in labor list with the SAME type (ONLY for new entries)
+                                                    // Same user CAN be added again if the labor type is different
                                                     // So we only filter if !editingLabor._id
                                                     let isAlreadyAdded = false;
                                                     if (!editingLabor._id && order && order.labor) {
                                                         isAlreadyAdded = order.labor.some(l => {
                                                             const lUserId = typeof l.user === 'object' ? (l.user as any)._id : l.user;
-                                                            return lUserId === u._id;
+                                                            return lUserId === u._id && l.type === editingLabor.type;
                                                         });
                                                     }
                                                     
