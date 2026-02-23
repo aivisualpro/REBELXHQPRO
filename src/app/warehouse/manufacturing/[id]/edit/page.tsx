@@ -26,6 +26,7 @@ export default function EditManufacturingOrderPage() {
     // Form State
     const [sku, setSku] = useState('');
     const [recipeId, setRecipeId] = useState('');
+    const [originalRecipeId, setOriginalRecipeId] = useState('');
     const [label, setLabel] = useState('');
     const [qty, setQty] = useState<number>(0);
     const [uom, setUom] = useState('');
@@ -79,6 +80,7 @@ export default function EditManufacturingOrderPage() {
                     ? order.recipesId._id
                     : order.recipesId;
                 setRecipeId(recId || '');
+                setOriginalRecipeId(recId || '');
 
                 setLabel(order.label || '');
                 setQty(order.qty || 0);
@@ -114,6 +116,10 @@ export default function EditManufacturingOrderPage() {
         }
     };
 
+    const handleRecipeChange = (newRecipeId: string) => {
+        setRecipeId(newRecipeId);
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!sku) return toast.error('Please select a SKU');
@@ -134,6 +140,23 @@ export default function EditManufacturingOrderPage() {
 
             if (label) {
                 payload.label = label;
+            }
+
+            // If recipe changed, regenerate lineItems from the new recipe
+            if (recipeId !== originalRecipeId) {
+                if (recipeId) {
+                    const selectedRecipe = recipes.find((r: any) => r._id === recipeId);
+                    const recipeLineItems = selectedRecipe?.lineItems?.map((item: any) => ({
+                        sku: typeof item.sku === 'object' && item.sku ? item.sku._id : item.sku,
+                        uom: item.uom || '',
+                        recipeQty: item.qty || 0,
+                        recipeId: recipeId,
+                    })) || [];
+                    payload.lineItems = recipeLineItems;
+                } else {
+                    // Recipe cleared — reset line items to empty
+                    payload.lineItems = [];
+                }
             }
 
             const res = await fetch(`/api/manufacturing/${id}`, {
@@ -225,7 +248,7 @@ export default function EditManufacturingOrderPage() {
                                             <SearchableSelect
                                                 options={recipeOptions}
                                                 value={recipeId}
-                                                onChange={setRecipeId}
+                                                onChange={handleRecipeChange}
                                                 placeholder={sku ? (recipeOptions.length > 0 ? "Select recipe" : "No recipes found") : "Select SKU first"}
                                                 triggerClassName="rounded-md border-border h-9 bg-background"
                                             />
@@ -233,6 +256,12 @@ export default function EditManufacturingOrderPage() {
                                                 <p className="text-[9px] text-amber-500 flex items-center gap-1">
                                                     <AlertCircle className="w-3 h-3" />
                                                     No recipe found for this SKU.
+                                                </p>
+                                            )}
+                                            {recipeId !== originalRecipeId && (
+                                                <p className="text-[9px] text-amber-500 flex items-center gap-1 mt-1">
+                                                    <AlertCircle className="w-3 h-3" />
+                                                    Recipe changed — all line items will be reset to the new recipe&apos;s ingredients on save.
                                                 </p>
                                             )}
                                         </div>
