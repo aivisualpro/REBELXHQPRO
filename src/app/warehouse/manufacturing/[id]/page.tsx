@@ -478,9 +478,9 @@ export default function ManufacturingDetailPage() {
         if (!order || !editingLotItemId) return;
         
         try {
-            const updatedLineItems = order.lineItems?.map(item => 
+            const updatedLineItems = (order.lineItems?.map(item => 
                 item._id === editingLotItemId ? { ...item, lotNumber, cost: cost || 0 } : item
-            ) || [];
+            ) || []).map(sanitizeLineItem);
 
             const res = await fetch(`/api/manufacturing/${order._id}`, {
                 method: 'PATCH',
@@ -526,6 +526,14 @@ export default function ManufacturingDetailPage() {
         setEditingItem(null);
     };
 
+    // Sanitize a line item for API: extract SKU ID string from populated objects, strip empty _id
+    const sanitizeLineItem = (item: any) => {
+        const skuId = typeof item.sku === 'object' && item.sku !== null ? item.sku._id : item.sku;
+        const cleaned: any = { ...item, sku: skuId };
+        if (!cleaned._id) delete cleaned._id;
+        return cleaned;
+    };
+
     const handleSaveItem = async () => {
         if (!order || !editingItem) return;
         
@@ -533,14 +541,14 @@ export default function ManufacturingDetailPage() {
             let updatedLineItems;
             if (editingItem._id) {
                 updatedLineItems = order.lineItems?.map(item => 
-                    item._id === editingItem._id ? editingItem : item
+                    item._id === editingItem._id ? sanitizeLineItem(editingItem) : sanitizeLineItem(item)
                 ) || [];
             } else {
-                const newItem = {
+                const newItem = sanitizeLineItem({
                     ...editingItem,
                     createdAt: new Date().toISOString()
-                };
-                updatedLineItems = [...(order.lineItems || []), newItem];
+                });
+                updatedLineItems = [...(order.lineItems || []).map(sanitizeLineItem), newItem];
             }
 
             const res = await fetch(`/api/manufacturing/${order._id}`, {
@@ -562,6 +570,32 @@ export default function ManufacturingDetailPage() {
         }
     };
 
+    const handleCopyItem = async (sourceItem: LineItem) => {
+        if (!order) return;
+        try {
+            const copiedItem = sanitizeLineItem({
+                ...sourceItem,
+                _id: undefined,
+                createdAt: new Date().toISOString()
+            });
+            const updatedLineItems = [...(order.lineItems || []).map(sanitizeLineItem), copiedItem];
+            const res = await fetch(`/api/manufacturing/${order._id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lineItems: updatedLineItems })
+            });
+            if (res.ok) {
+                const updatedOrder = await res.json();
+                setOrder(updatedOrder);
+                toast.success('Item duplicated successfully');
+            } else {
+                toast.error('Failed to duplicate item');
+            }
+        } catch (e) {
+            toast.error('Error duplicating item');
+        }
+    };
+
     const handleDeleteItem = async (itemId: string) => {
         toast((t) => (
             <div className="flex flex-col gap-2">
@@ -579,7 +613,7 @@ export default function ManufacturingDetailPage() {
                             toast.dismiss(t.id);
                             if (!order) return;
                             try {
-                                const updatedLineItems = order.lineItems?.filter(item => item._id !== itemId) || [];
+                                const updatedLineItems = (order.lineItems?.filter(item => item._id !== itemId) || []).map(sanitizeLineItem);
                                 const res = await fetch(`/api/manufacturing/${order._id}`, {
                                     method: 'PATCH',
                                     headers: { 'Content-Type': 'application/json' },
@@ -1559,6 +1593,17 @@ export default function ManufacturingDetailPage() {
                             onClick={(e) => {
                                 e.stopPropagation();
                                 setOpenActionMenu(null);
+                                handleCopyItem(targetItem);
+                            }}
+                            className="w-full text-left px-3 py-2 text-[10px] text-foreground/70 hover:bg-secondary hover:text-emerald-500 flex items-center space-x-1.5 transition-colors"
+                        >
+                            <Copy className="w-3 h-3" />
+                            <span>Duplicate</span>
+                        </button>
+                        <button 
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenActionMenu(null);
                                 handleDeleteItem(targetItem._id);
                             }}
                             className="w-full text-left px-3 py-2 text-[10px] text-foreground/70 hover:bg-red-500/10 hover:text-red-500 flex items-center space-x-1.5 transition-colors"
@@ -1687,12 +1732,16 @@ export default function ManufacturingDetailPage() {
                                 {/* UOM */}
                                 <div>
                                     <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">UOM</label>
-                                    <input
-                                        type="text"
+                                    <select
                                         value={editingItem.uom || ''}
                                         onChange={e => setEditingItem({ ...editingItem, uom: e.target.value })}
-                                        className="w-full px-3 py-2 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-black/10"
-                                    />
+                                        className="w-full px-3 py-2 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-black/10 bg-background"
+                                    >
+                                        <option value="">Select...</option>
+                                        {['g', 'kg', 'oz', 'lb', 'ml', 'L', 'unit', 'each', 'ct', 'capsule', 'tablet'].map(u => (
+                                            <option key={u} value={u}>{u}</option>
+                                        ))}
+                                    </select>
                                 </div>
                             </div>
 

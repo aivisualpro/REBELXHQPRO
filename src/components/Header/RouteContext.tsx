@@ -56,6 +56,15 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
         };
     }
 
+    // Web Order Detail
+    if (pathname.match(/^\/sales\/web-orders\/[^/]+$/)) {
+        return {
+            title: '',
+            actions: [],
+            isPortal: true
+        };
+    }
+
     // Leads
     if (pathname === '/crm/leads') {
         return {
