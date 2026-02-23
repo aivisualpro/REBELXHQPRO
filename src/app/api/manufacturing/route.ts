@@ -201,14 +201,12 @@ export async function POST(request: Request) {
                             (populatedOrder as any).sku = skuDoc;
                         }
                     }
-                    // Sync parent order and line items in parallel
-                    const promises: Promise<any>[] = [
-                        syncManufacturingToAppSheet(populatedOrder, 'Add')
-                    ];
+                    // Sync parent order FIRST, then line items (parent must exist before children)
+                    await syncManufacturingToAppSheet(populatedOrder, 'Add');
+
                     if (populatedOrder.lineItems && populatedOrder.lineItems.length > 0) {
-                        promises.push(syncManufacturingLineItemsToAppSheet(populatedOrder, populatedOrder.lineItems, 'Add'));
+                        await syncManufacturingLineItemsToAppSheet(populatedOrder, populatedOrder.lineItems, 'Add');
                     }
-                    await Promise.all(promises);
                     console.log('✅ Manufacturing order + line items synced to AppSheet:', newItem._id);
                 }
             } catch (syncError) {
