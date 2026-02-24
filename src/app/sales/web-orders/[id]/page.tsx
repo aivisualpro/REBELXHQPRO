@@ -29,6 +29,8 @@ interface LineItem {
     parentProductId?: string;
     webProductId?: string;
     linkedSkuId?: string;
+    linkedSkuName?: string;
+    variationName?: string;
     lotNumber?: string;
     cost?: number;
     attributes?: any[];
@@ -262,21 +264,7 @@ export default function WebOrderDetailPage() {
 
     return (
         <div className="flex flex-col h-[calc(100vh-48px)] bg-background relative">
-            {/* Header Portal Content */}
-            {headerPortal && order && createPortal(
-                <>
-                    <div className="flex items-center space-x-2">
-                        <button
-                            onClick={() => router.back()}
-                            className="flex items-center space-x-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded transition-all cursor-pointer border border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
-                        >
-                            <ArrowLeft className="w-3.5 h-3.5" />
-                            <span>Back</span>
-                        </button>
-                    </div>
-                </>,
-                headerPortal
-            )}
+
 
             <div className="flex flex-1 overflow-hidden">
                 {/* Left Sidebar: Details (30%) */}
@@ -523,12 +511,10 @@ export default function WebOrderDetailPage() {
                                 <table className="w-full border-collapse text-left">
                                     <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
                                         <tr>
-                                            <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[50px]">Image</th>
                                             <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">Product</th>
-                                            <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[80px]">Variation</th>
-                                            <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[120px]">Linked SKU</th>
+                                            <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[140px]">Variation</th>
+                                            <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[150px]">Linked SKU</th>
                                             <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[100px]">Lot #</th>
-                                            <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[80px]">SKU</th>
                                             <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap text-center w-[50px]">Qty</th>
                                             <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[70px]">Cost</th>
                                             <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[70px]">Price</th>
@@ -542,27 +528,13 @@ export default function WebOrderDetailPage() {
                                                 className="hover:bg-secondary/50 transition-colors"
                                             >
                                                 <td className="px-3 py-1.5">
-                                                    <div
-                                                        className={cn(
-                                                            "w-9 h-9 border border-border bg-background overflow-hidden shrink-0",
-                                                            item.parentProductId && "cursor-pointer hover:border-amber-500/50"
-                                                        )}
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            if (item.parentProductId) router.push(`/warehouse/web-products/${item.parentProductId}`);
-                                                        }}
-                                                    >
-                                                        <img src={item.image || '/sku-placeholder.png'} className="w-full h-full object-cover" alt="" />
-                                                    </div>
-                                                </td>
-                                                <td className="px-3 py-1.5">
                                                     {(item.webProductId || item.parentProductId) ? (
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 router.push(`/warehouse/web-products/${item.webProductId || item.parentProductId}`);
                                                             }}
-                                                            className="text-[10px] font-bold text-foreground hover:text-blue-600 hover:underline line-clamp-2 text-left transition-colors"
+                                                            className="text-[10px] font-bold text-foreground cursor-pointer line-clamp-2 text-left transition-colors"
                                                         >
                                                             {item.name}
                                                         </button>
@@ -572,7 +544,7 @@ export default function WebOrderDetailPage() {
                                                 </td>
                                                 <td className="px-3 py-1.5">
                                                     {item.variationId > 0 ? (
-                                                        <span className="text-[9px] font-mono text-muted-foreground">{item.variationId}</span>
+                                                        <span className="text-[9px] text-muted-foreground truncate max-w-[130px] block" title={item.variationName || String(item.variationId)}>{item.variationName || item.variationId}</span>
                                                     ) : (
                                                         <span className="text-[9px] text-muted-foreground/50">-</span>
                                                     )}
@@ -584,9 +556,9 @@ export default function WebOrderDetailPage() {
                                                                 e.stopPropagation();
                                                                 router.push(`/warehouse/skus/${item.linkedSkuId}`);
                                                             }}
-                                                            className="flex items-center space-x-1 text-[9px] font-mono text-foreground hover:text-blue-600 hover:underline transition-colors group"
+                                                            className="flex items-center space-x-1 text-[9px] font-mono text-foreground cursor-pointer transition-colors group"
                                                         >
-                                                            <span className="truncate max-w-[80px]">{item.linkedSkuId}</span>
+                                                            <span className="truncate max-w-[120px]">{item.linkedSkuName || item.linkedSkuId}</span>
                                                             <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                                                         </button>
                                                     ) : (
@@ -612,7 +584,7 @@ export default function WebOrderDetailPage() {
                                                         </button>
                                                     </div>
                                                 </td>
-                                                <td className="px-3 py-1.5 text-[9px] font-mono text-muted-foreground">{item.sku || '-'}</td>
+
                                                 <td className="px-3 py-1.5 text-center text-[10px] text-muted-foreground font-mono">{item.quantity}</td>
                                                 <td className="px-3 py-1.5 text-[10px] text-orange-600 font-mono whitespace-nowrap">{item.cost ? formatCurrency(item.cost) : '-'}</td>
                                                 <td className="px-3 py-1.5 text-[10px] text-muted-foreground font-mono">{formatCurrency(item.price)}</td>
@@ -621,7 +593,7 @@ export default function WebOrderDetailPage() {
                                         ))}
                                         {(!order.lineItems || order.lineItems.length === 0) && (
                                             <tr>
-                                                <td colSpan={10} className="px-3 py-6 text-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                                                <td colSpan={8} className="px-3 py-6 text-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                                                     No line items
                                                 </td>
                                             </tr>
@@ -630,7 +602,7 @@ export default function WebOrderDetailPage() {
                                     {order.lineItems && order.lineItems.length > 0 && (
                                         <tfoot className="bg-secondary border-t border-border">
                                             <tr>
-                                                <td colSpan={6} className="px-3 py-1.5 text-[10px] font-bold text-muted-foreground uppercase text-right">Subtotal</td>
+                                                <td colSpan={4} className="px-3 py-1.5 text-[10px] font-bold text-muted-foreground uppercase text-right">Subtotal</td>
                                                 <td className="px-3 py-1.5 text-[10px] font-bold text-foreground text-center">
                                                     {order.lineItems.reduce((sum, item) => sum + (item.quantity || 0), 0)}
                                                 </td>

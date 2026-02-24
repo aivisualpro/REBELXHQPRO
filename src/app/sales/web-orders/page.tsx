@@ -5,21 +5,14 @@ import { useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import {
   Search,
-  ArrowUpDown,
-  Globe,
   Loader2,
-  Calendar,
-  ShoppingBag,
-  Package,
   CreditCard,
   Truck,
-  User,
   X,
-  Plus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
-import { MultiSelectFilter } from '@/components/ui/filters/MultiSelectFilter';
+
 import { Pagination } from '@/components/ui/Pagination';
 import { TableColumnHeader } from '@/components/ui/TableColumnHeader';
 
@@ -60,9 +53,7 @@ export default function WebOrdersPage() {
   const [sortBy, setSortBy] = useState('dateCreated');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
-  const [selectedWebsites, setSelectedWebsites] = useState<string[]>([]);
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
-  const [dateRange, setDateRange] = useState({ from: '', to: '' });
+
 
   // Header portal
   const [headerPortalTarget, setHeaderPortalTarget] = useState<HTMLElement | null>(null);
@@ -88,10 +79,7 @@ export default function WebOrdersPage() {
         search: debouncedSearch,
         sortBy,
         sortOrder,
-        website: selectedWebsites.join(','),
-        status: selectedStatuses.join(','),
-        fromDate: dateRange.from,
-        toDate: dateRange.to
+
       });
 
       const res = await fetch(`/api/retail/web-orders?${params.toString()}`);
@@ -109,7 +97,7 @@ export default function WebOrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, debouncedSearch, sortBy, sortOrder, selectedWebsites, selectedStatuses, dateRange]);
+  }, [page, debouncedSearch, sortBy, sortOrder]);
 
   useEffect(() => {
     fetchOrders();
@@ -136,12 +124,12 @@ export default function WebOrdersPage() {
   };
 
   const getWebsiteColor = (website: string) => {
-    if (website?.includes('KING')) return 'bg-amber-500';
-    if (website?.includes('GRASS')) return 'bg-emerald-500';
-    if (website?.includes('GRHK')) return 'bg-blue-500';
-    if (website?.includes('REBEL')) return 'bg-purple-500';
-    if (website?.includes('GUD')) return 'bg-orange-500';
-    return 'bg-slate-500';
+    if (website?.includes('KING')) return 'bg-gradient-to-r from-amber-600 to-orange-500';
+    if (website?.includes('GRASS')) return 'bg-gradient-to-r from-emerald-600 to-green-500';
+    if (website?.includes('GRHK')) return 'bg-gradient-to-r from-sky-600 to-blue-500';
+    if (website?.includes('REBEL')) return 'bg-gradient-to-r from-violet-600 to-purple-500';
+    if (website?.includes('GUD')) return 'bg-gradient-to-r from-rose-600 to-pink-500';
+    return 'bg-zinc-500';
   };
 
   return (
@@ -172,59 +160,7 @@ export default function WebOrdersPage() {
         headerPortalTarget
       )}
 
-      {/* Filter Bar */}
-      <div className="flex items-center justify-end px-4 h-11 border-b border-border bg-secondary/50 transition-colors">
-        <div className="flex items-center space-x-2">
-          <MultiSelectFilter
-            label="Website"
-            icon={Globe}
-            options={[
-              { label: 'KINGKKRATOM', value: 'KINGKKRATOM' },
-              { label: 'GRASSROOTSHARVEST', value: 'GRASSROOTSHARVEST' },
-              { label: 'GRHKTATOM', value: 'GRHKTATOM' },
-              { label: 'REBELXBRANDS', value: 'REBELXBRANDS' },
-              { label: 'GUDTONICS', value: 'GUDTONICS' }
-            ]}
-            selectedValues={selectedWebsites}
-            onChange={setSelectedWebsites}
-            className="h-8"
-          />
 
-          <MultiSelectFilter
-            label="Status"
-            icon={Package}
-            options={[
-              { label: 'Completed', value: 'completed' },
-              { label: 'Processing', value: 'processing' },
-              { label: 'Pending', value: 'pending' },
-              { label: 'On Hold', value: 'on-hold' },
-              { label: 'Cancelled', value: 'cancelled' },
-              { label: 'Refunded', value: 'refunded' },
-              { label: 'Failed', value: 'failed' }
-            ]}
-            selectedValues={selectedStatuses}
-            onChange={setSelectedStatuses}
-            className="h-8"
-          />
-
-          <div className="flex items-center space-x-1 border border-border bg-card px-3 h-8 rounded">
-            <Calendar className="w-3 h-3 text-muted-foreground" />
-            <input
-              type="date"
-              className="text-[11px] outline-none max-w-[90px] bg-transparent"
-              value={dateRange.from}
-              onChange={e => setDateRange({ ...dateRange, from: e.target.value })}
-            />
-            <span className="text-slate-300">-</span>
-            <input
-              type="date"
-              className="text-[11px] outline-none max-w-[90px] bg-transparent"
-              value={dateRange.to}
-              onChange={e => setDateRange({ ...dateRange, to: e.target.value })}
-            />
-          </div>
-        </div>
-      </div>
 
       {/* Table */}
       <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
@@ -233,13 +169,13 @@ export default function WebOrdersPage() {
           <thead className="sticky top-0 bg-secondary/80 z-10 border-b border-border backdrop-blur-md transition-colors">
             <tr>
               {[
+                { key: 'dateCreated', label: 'Date' },
                 { key: 'number', label: 'Order #' },
-                { key: 'website', label: 'Source' },
+                { key: 'website', label: 'Website' },
                 { key: 'billing.firstName', label: 'Customer' },
                 { key: 'status', label: 'Status' },
-                { key: 'dateCreated', label: 'Date' },
                 { key: 'total', label: 'Total' },
-                { key: 'paymentMethodTitle', label: 'Payment' },
+                { key: 'paymentMethodTitle', label: 'Payment Type' },
               ].map(col => (
                 <th
                   key={col.key}
@@ -262,7 +198,7 @@ export default function WebOrdersPage() {
                 </th>
               ))}
               <th className="px-4 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-center border-r border-border">Items</th>
-               <th className="px-4 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Location</th>
+              <th className="px-4 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Location</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border bg-background/50">
@@ -276,42 +212,37 @@ export default function WebOrdersPage() {
                 onClick={() => router.push(`/sales/web-orders/${order._id}`)}
                 className="hover:bg-secondary/40 hover:scale-[1.002] hover:shadow-md transition-all duration-200 group relative z-0 hover:z-10 bg-background cursor-pointer"
               >
-                <td className="px-3 py-1.5 border-r border-border">
-                  <div className="flex flex-col">
-                    <span className="text-[11px] text-muted-foreground font-mono tracking-tighter">#{order.number}</span>
-                    <span className="font-mono text-[9px] text-muted-foreground">WC-{order.webId}</span>
-                  </div>
+                {/* Date */}
+                <td className="px-3 py-1.5 border-r border-border font-mono text-[11px] text-muted-foreground">
+                  {order.dateCreated ? new Date(order.dateCreated).toLocaleDateString() : '-'}
                 </td>
-                <td className="px-3 py-1.5 border-r border-border text-center">
+                {/* Order # */}
+                <td className="px-3 py-1.5 border-r border-border">
+                  <span className="text-[11px] text-muted-foreground font-mono tracking-tighter">#{order.number}</span>
+                </td>
+                {/* Website */}
+                <td className="px-3 py-1.5 border-r border-border">
                   <span className={cn(
-                    "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest shadow-sm border border-black/5",
+                    "px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider text-white shadow-sm",
                     getWebsiteColor(order.website)
                   )}>
-                    {order.website}
+                    {order.website || 'N/A'}
                   </span>
                 </td>
+                {/* Customer */}
                 <td className="px-3 py-1.5 border-r border-border">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-5 h-5 rounded bg-secondary flex items-center justify-center shrink-0">
-                      <User className="w-2.5 h-2.5 text-muted-foreground" />
-                    </div>
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-[11px] text-muted-foreground truncate">{order.billing?.firstName} {order.billing?.lastName}</span>
-                      <span className="truncate max-w-[120px] text-[9px] text-muted-foreground">{order.billing?.email}</span>
-                    </div>
-                  </div>
+                  <span className="text-[11px] text-muted-foreground truncate">{order.billing?.firstName} {order.billing?.lastName}</span>
                 </td>
+                {/* Status */}
                 <td className="px-3 py-1.5 border-r border-border text-center">
                   <span className={cn(
                     "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border",
-                    getStatusColor(order.status).replace('bg-', 'bg-').replace('text-', 'text-')
+                    getStatusColor(order.status)
                   )}>
                     {order.status}
                   </span>
                 </td>
-                <td className="px-3 py-1.5 border-r border-border font-mono text-[11px] text-muted-foreground">
-                  {order.dateCreated ? new Date(order.dateCreated).toLocaleDateString() : '-'}
-                </td>
+                {/* Total */}
                 <td className="px-3 py-1.5 border-r border-border">
                   <div className="flex flex-col">
                     <span className="text-muted-foreground font-mono text-[11px]">${order.total?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
@@ -323,17 +254,20 @@ export default function WebOrdersPage() {
                     )}
                   </div>
                 </td>
+                {/* Payment Type */}
                 <td className="px-3 py-1.5 border-r border-border">
                   <div className="flex items-center space-x-1.5 text-[11px] text-muted-foreground">
                     <CreditCard className="w-3 h-3 opacity-50" />
                     <span className="truncate max-w-[80px]">{order.paymentMethodTitle || '-'}</span>
                   </div>
                 </td>
+                {/* Items */}
                 <td className="px-3 py-1.5 border-r border-border text-center">
                   <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-secondary text-[9px] font-black text-foreground/70">
                     {order.lineItems?.length || 0}
                   </span>
                 </td>
+                {/* Location */}
                 <td className="px-3 py-1.5 text-[11px] text-muted-foreground truncate max-w-[100px]">
                   {order.billing?.city}, {order.billing?.state}
                 </td>
