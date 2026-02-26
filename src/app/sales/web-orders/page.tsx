@@ -170,21 +170,43 @@ export default function WebOrdersPage() {
     setImporting(true);
     const toastId = toast.loading('Parsing CSV...');
 
+    const BATCH_SIZE = 2000;
+
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
       complete: async (results) => {
         try {
-          toast.loading(`Uploading ${results.data.length} rows...`, { id: toastId });
-          const res = await fetch('/api/retail/web-orders/update-lineitems', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ data: results.data })
-          });
-          const json = await res.json();
-          if (!res.ok) throw new Error(json.error || 'Import failed');
+          const allRows = results.data as any[];
+          const totalRows = allRows.length;
+          const totalBatches = Math.ceil(totalRows / BATCH_SIZE);
+
+          let totalUpdated = 0;
+          let totalSkipped = 0;
+          let totalErrors = 0;
+
+          for (let i = 0; i < totalBatches; i++) {
+            const batch = allRows.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE);
+            toast.loading(
+              `Uploading batch ${i + 1}/${totalBatches} (${Math.min((i + 1) * BATCH_SIZE, totalRows)}/${totalRows} rows)...`,
+              { id: toastId }
+            );
+
+            const res = await fetch('/api/retail/web-orders/update-lineitems', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ data: batch })
+            });
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error || `Batch ${i + 1} failed`);
+
+            totalUpdated += json.updated || 0;
+            totalSkipped += json.skipped || 0;
+            totalErrors += json.errorCount || 0;
+          }
+
           toast.success(
-            `Updated: ${json.updated} | Skipped: ${json.skipped}${json.errorCount ? ` | Errors: ${json.errorCount}` : ''}`,
+            `Done! Updated: ${totalUpdated} | Skipped: ${totalSkipped}${totalErrors ? ` | Errors: ${totalErrors}` : ''}`,
             { id: toastId, duration: 6000 }
           );
           fetchOrders();
@@ -201,6 +223,7 @@ export default function WebOrdersPage() {
       }
     });
   };
+
 
   return (
     <div className="flex flex-col h-[calc(100vh-48px)] bg-background transition-colors duration-300">
@@ -258,118 +281,118 @@ export default function WebOrdersPage() {
       {/* Table */}
       <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
         <div className="min-w-full px-2 py-2">
-            <table className="w-full text-left border-separate border-spacing-0 relative z-0">
-          <thead className="sticky top-0 bg-secondary/80 z-10 border-b border-border backdrop-blur-md transition-colors">
-            <tr>
-              {[
-                { key: 'dateCreated', label: 'Date' },
-                { key: 'number', label: 'Order #' },
-                { key: 'website', label: 'Website' },
-                { key: 'billing.firstName', label: 'Customer' },
-                { key: 'status', label: 'Status' },
-                { key: 'total', label: 'Total' },
-                { key: 'paymentMethodTitle', label: 'Payment Type' },
-              ].map(col => (
-                <th
-                  key={col.key}
-                  className="border-r border-border last:border-0"
-                >
-                  <TableColumnHeader
-                    column={col}
-                    title={col.label}
-                    currentSortBy={sortBy}
-                    currentSortOrder={sortOrder}
-                    onSort={(key, dir) => {
-                      setSortBy(key);
-                      setSortOrder(dir);
-                    }}
-                    onFilter={(key) => {
-                      toast(`Filtering by ${col.label} implementation pending`);
-                    }}
-                    className="text-muted-foreground"
-                  />
-                </th>
-              ))}
-              <th className="px-4 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-center border-r border-border">Items</th>
-              <th className="px-4 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Location</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border bg-background/50">
-            {loading ? (
-              <tr><td colSpan={9} className="px-3 py-12 text-center text-[11px] text-muted-foreground">Loading Web Orders...</td></tr>
-            ) : orders.length === 0 ? (
-              <tr><td colSpan={9} className="px-3 py-12 text-center text-[11px] text-muted-foreground uppercase tracking-tighter opacity-50">No Orders Found</td></tr>
-            ) : orders.map(order => (
-              <tr
-                key={order._id}
-                onClick={() => router.push(`/sales/web-orders/${order._id}`)}
-                className="hover:bg-secondary/40 hover:scale-[1.002] hover:shadow-md transition-all duration-200 group relative z-0 hover:z-10 bg-background cursor-pointer"
-              >
-                {/* Date */}
-                <td className="px-3 py-1.5 border-r border-border font-mono text-[11px] text-muted-foreground">
-                  {order.dateCreated ? new Date(order.dateCreated).toLocaleDateString() : '-'}
-                </td>
-                {/* Order # */}
-                <td className="px-3 py-1.5 border-r border-border">
-                  <span className="text-[11px] text-muted-foreground font-mono tracking-tighter">#{order.number}</span>
-                </td>
-                {/* Website */}
-                <td className="px-3 py-1.5 border-r border-border">
-                  <span className={cn(
-                    "px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider text-white shadow-sm",
-                    getWebsiteColor(order.website)
-                  )}>
-                    {order.website || 'N/A'}
-                  </span>
-                </td>
-                {/* Customer */}
-                <td className="px-3 py-1.5 border-r border-border">
-                  <span className="text-[11px] text-muted-foreground truncate">{order.billing?.firstName} {order.billing?.lastName}</span>
-                </td>
-                {/* Status */}
-                <td className="px-3 py-1.5 border-r border-border text-center">
-                  <span className={cn(
-                    "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border",
-                    getStatusColor(order.status)
-                  )}>
-                    {order.status}
-                  </span>
-                </td>
-                {/* Total */}
-                <td className="px-3 py-1.5 border-r border-border">
-                  <div className="flex flex-col">
-                    <span className="text-muted-foreground font-mono text-[11px]">${order.total?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                    {order.shippingTotal > 0 && (
-                      <span className="flex items-center space-x-0.5 text-[9px] text-muted-foreground">
-                        <Truck className="w-2.5 h-2.5" />
-                        <span>+${order.shippingTotal?.toFixed(2)}</span>
-                      </span>
-                    )}
-                  </div>
-                </td>
-                {/* Payment Type */}
-                <td className="px-3 py-1.5 border-r border-border">
-                  <div className="flex items-center space-x-1.5 text-[11px] text-muted-foreground">
-                    <CreditCard className="w-3 h-3 opacity-50" />
-                    <span className="truncate max-w-[80px]">{order.paymentMethodTitle || '-'}</span>
-                  </div>
-                </td>
-                {/* Items */}
-                <td className="px-3 py-1.5 border-r border-border text-center">
-                  <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-secondary text-[9px] font-black text-foreground/70">
-                    {order.lineItems?.length || 0}
-                  </span>
-                </td>
-                {/* Location */}
-                <td className="px-3 py-1.5 text-[11px] text-muted-foreground truncate max-w-[100px]">
-                  {order.billing?.city}, {order.billing?.state}
-                </td>
+          <table className="w-full text-left border-separate border-spacing-0 relative z-0">
+            <thead className="sticky top-0 bg-secondary/80 z-10 border-b border-border backdrop-blur-md transition-colors">
+              <tr>
+                {[
+                  { key: 'dateCreated', label: 'Date' },
+                  { key: 'number', label: 'Order #' },
+                  { key: 'website', label: 'Website' },
+                  { key: 'billing.firstName', label: 'Customer' },
+                  { key: 'status', label: 'Status' },
+                  { key: 'total', label: 'Total' },
+                  { key: 'paymentMethodTitle', label: 'Payment Type' },
+                ].map(col => (
+                  <th
+                    key={col.key}
+                    className="border-r border-border last:border-0"
+                  >
+                    <TableColumnHeader
+                      column={col}
+                      title={col.label}
+                      currentSortBy={sortBy}
+                      currentSortOrder={sortOrder}
+                      onSort={(key, dir) => {
+                        setSortBy(key);
+                        setSortOrder(dir);
+                      }}
+                      onFilter={(key) => {
+                        toast(`Filtering by ${col.label} implementation pending`);
+                      }}
+                      className="text-muted-foreground"
+                    />
+                  </th>
+                ))}
+                <th className="px-4 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-center border-r border-border">Items</th>
+                <th className="px-4 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Location</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-border bg-background/50">
+              {loading ? (
+                <tr><td colSpan={9} className="px-3 py-12 text-center text-[11px] text-muted-foreground">Loading Web Orders...</td></tr>
+              ) : orders.length === 0 ? (
+                <tr><td colSpan={9} className="px-3 py-12 text-center text-[11px] text-muted-foreground uppercase tracking-tighter opacity-50">No Orders Found</td></tr>
+              ) : orders.map(order => (
+                <tr
+                  key={order._id}
+                  onClick={() => router.push(`/sales/web-orders/${order._id}`)}
+                  className="hover:bg-secondary/40 hover:scale-[1.002] hover:shadow-md transition-all duration-200 group relative z-0 hover:z-10 bg-background cursor-pointer"
+                >
+                  {/* Date */}
+                  <td className="px-3 py-1.5 border-r border-border font-mono text-[11px] text-muted-foreground">
+                    {order.dateCreated ? new Date(order.dateCreated).toLocaleDateString() : '-'}
+                  </td>
+                  {/* Order # */}
+                  <td className="px-3 py-1.5 border-r border-border">
+                    <span className="text-[11px] text-muted-foreground font-mono tracking-tighter">#{order.number}</span>
+                  </td>
+                  {/* Website */}
+                  <td className="px-3 py-1.5 border-r border-border">
+                    <span className={cn(
+                      "px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider text-white shadow-sm",
+                      getWebsiteColor(order.website)
+                    )}>
+                      {order.website || 'N/A'}
+                    </span>
+                  </td>
+                  {/* Customer */}
+                  <td className="px-3 py-1.5 border-r border-border">
+                    <span className="text-[11px] text-muted-foreground truncate">{order.billing?.firstName} {order.billing?.lastName}</span>
+                  </td>
+                  {/* Status */}
+                  <td className="px-3 py-1.5 border-r border-border text-center">
+                    <span className={cn(
+                      "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border",
+                      getStatusColor(order.status)
+                    )}>
+                      {order.status}
+                    </span>
+                  </td>
+                  {/* Total */}
+                  <td className="px-3 py-1.5 border-r border-border">
+                    <div className="flex flex-col">
+                      <span className="text-muted-foreground font-mono text-[11px]">${order.total?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      {order.shippingTotal > 0 && (
+                        <span className="flex items-center space-x-0.5 text-[9px] text-muted-foreground">
+                          <Truck className="w-2.5 h-2.5" />
+                          <span>+${order.shippingTotal?.toFixed(2)}</span>
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  {/* Payment Type */}
+                  <td className="px-3 py-1.5 border-r border-border">
+                    <div className="flex items-center space-x-1.5 text-[11px] text-muted-foreground">
+                      <CreditCard className="w-3 h-3 opacity-50" />
+                      <span className="truncate max-w-[80px]">{order.paymentMethodTitle || '-'}</span>
+                    </div>
+                  </td>
+                  {/* Items */}
+                  <td className="px-3 py-1.5 border-r border-border text-center">
+                    <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-secondary text-[9px] font-black text-foreground/70">
+                      {order.lineItems?.length || 0}
+                    </span>
+                  </td>
+                  {/* Location */}
+                  <td className="px-3 py-1.5 text-[11px] text-muted-foreground truncate max-w-[100px]">
+                    {order.billing?.city}, {order.billing?.state}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
 
       <div className="border-t border-border bg-background transition-colors duration-300">
         <Pagination
