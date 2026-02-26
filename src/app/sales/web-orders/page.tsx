@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import {
@@ -9,7 +9,10 @@ import {
   CreditCard,
   Truck,
   X,
+  Download,
+  Upload,
 } from 'lucide-react';
+import Papa from 'papaparse';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
@@ -132,6 +135,73 @@ export default function WebOrdersPage() {
     return 'bg-zinc-500';
   };
 
+  // === Export / Import ===
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+
+  const handleExportLineItems = async () => {
+    setExporting(true);
+    const toastId = toast.loading('Exporting line items...');
+    try {
+      const res = await fetch('/api/retail/web-orders/export-lineitems');
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Export failed');
+
+      const csv = Papa.unparse(json.data);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `web-order-lineitems-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Exported ${json.total} line items`, { id: toastId });
+    } catch (e: any) {
+      toast.error(e.message || 'Export failed', { id: toastId });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleImportLineItems = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    const toastId = toast.loading('Parsing CSV...');
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        try {
+          toast.loading(`Uploading ${results.data.length} rows...`, { id: toastId });
+          const res = await fetch('/api/retail/web-orders/update-lineitems', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ data: results.data })
+          });
+          const json = await res.json();
+          if (!res.ok) throw new Error(json.error || 'Import failed');
+          toast.success(
+            `Updated: ${json.updated} | Skipped: ${json.skipped}${json.errorCount ? ` | Errors: ${json.errorCount}` : ''}`,
+            { id: toastId, duration: 6000 }
+          );
+          fetchOrders();
+        } catch (err: any) {
+          toast.error(err.message || 'Import failed', { id: toastId });
+        } finally {
+          setImporting(false);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+      },
+      error: (err) => {
+        toast.error(`CSV parse error: ${err.message}`, { id: toastId });
+        setImporting(false);
+      }
+    });
+  };
+
   return (
     <div className="flex flex-col h-[calc(100vh-48px)] bg-background transition-colors duration-300">
       {/* Header Portal: search */}
@@ -156,6 +226,29 @@ export default function WebOrdersPage() {
             )}
           </div>
           <div className="flex-1" />
+          <button
+            onClick={handleExportLineItems}
+            disabled={exporting}
+            className="flex items-center space-x-1.5 px-3 h-8 text-[10px] font-bold uppercase tracking-wider rounded border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer disabled:opacity-50"
+          >
+            {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+            <span>Export</span>
+          </button>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importing}
+            className="flex items-center space-x-1.5 px-3 h-8 text-[10px] font-bold uppercase tracking-wider rounded border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer disabled:opacity-50"
+          >
+            {importing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+            <span>Import</span>
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv"
+            onChange={handleImportLineItems}
+            className="hidden"
+          />
         </>,
         headerPortalTarget
       )}
