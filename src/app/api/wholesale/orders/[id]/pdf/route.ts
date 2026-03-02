@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import SaleOrder from '@/models/SaleOrder';
+import User from '@/models/User';
 import { generatePdfFromTemplate } from '@/lib/google-docs';
 
 export const dynamic = 'force-dynamic';
@@ -15,10 +16,14 @@ export async function GET(
         await dbConnect();
         const { id } = await context.params;
 
+        // Ensure User model is registered for populate
+        void User;
+
         // Fetch the sale order with populated refs
         const order = await SaleOrder.findById(id)
             .populate('clientId', 'name addresses')
             .populate('lineItems.sku', 'name')
+            .populate('salesRep', 'firstName lastName email')
             .lean() as any;
 
         if (!order) {
@@ -52,8 +57,27 @@ export async function GET(
             ? order.clientId.name || ''
             : '';
 
-        // Get sales rep name
-        const salesRepName = order.salesRep || '';
+        // Get sales rep name (populated object with firstName/lastName, or fallback to string)
+        let salesRepName = '';
+        if (typeof order.salesRep === 'object' && order.salesRep !== null) {
+            salesRepName = `${order.salesRep.firstName || ''} ${order.salesRep.lastName || ''}`.trim();
+            if (!salesRepName) salesRepName = order.salesRep.email || '';
+        } else if (typeof order.salesRep === 'string') {
+            salesRepName = order.salesRep;
+        }
+
+        // Calculate totals
+        const subtotal = (order.lineItems || []).reduce((sum: number, item: any) => {
+            return sum + ((item.qtyShipped || 0) * (item.price || 0));
+        }, 0);
+        const discount = order.discount || 0;
+        const tax = order.tax || 0;
+        const shippingCost = order.shippingCost || 0;
+        const grandTotal = subtotal + shippingCost + tax - discount;
+        const amountPaid = (order.payments || []).reduce((sum: number, p: any) => {
+            return sum + (p.paymentAmount || 0);
+        }, 0);
+        const totalBalance = grandTotal - amountPaid;
 
         // Simple replacements (header fields)
         const replacements: Record<string, string> = {
@@ -65,6 +89,14 @@ export async function GET(
             '{{paymentMethod}}': order.paymentMethod || '-',
             '{{shippingMethod}}': order.shippingMethod || '-',
             '{{shippingDate}}': formatDate(order.shippedDate),
+            // Order totals
+            '{{Totalsubtotal}}': formatCurrency(subtotal),
+            '{{Totaldiscount}}': formatCurrency(discount),
+            '{{Totaltax}}': formatCurrency(tax),
+            '{{TotalshippingCost}}': formatCurrency(shippingCost),
+            '{{TotalGrandTotal}}': formatCurrency(grandTotal),
+            '{{AmountPaid}}': formatCurrency(amountPaid),
+            '{{TotalBalance}}': formatCurrency(totalBalance),
         };
 
         // Line item rows
