@@ -20,18 +20,16 @@ export async function GET(request: Request) {
         const fields = searchParams.get('fields');
 
         // ─── FAST PATH: Lightweight list for client-side filtering ────────────
-        // Returns ALL orders with minimal fields — no lineItems, labor, notes.
-        // Client does search/sort/filter locally for instant UX.
+        // Returns ALL orders with computed costs. Client does search/sort/filter locally.
         if (fields === 'list') {
             let query: any = {};
 
             // Apply Global Date Filter only
             query = await applyDateFilter(query, 'createdAt');
 
-            const listFields = '_id label sku uom qty qtyDifference priority status createdBy finishedBy createdAt materialCost packagingCost laborCost totalCost';
-
+            // Load orders WITH lineItems and labor for cost computation, but exclude notes/qualityCheck
             const orders = await Manufacturing.find(query)
-                .select(listFields)
+                .select('-notes -qualityCheck -__v')
                 .populate('createdBy', 'firstName lastName')
                 .populate('finishedBy', 'firstName lastName')
                 .sort({ createdAt: -1 })
@@ -39,7 +37,9 @@ export async function GET(request: Request) {
 
             // SKU hydration (batch — single query)
             const rawSkuIds = new Set<string>();
-            orders.forEach((o: any) => { if (o.sku) rawSkuIds.add(String(o.sku)); });
+            orders.forEach((o: any) => {
+                if (o.sku) rawSkuIds.add(String(o.sku));
+            });
 
             const db = mongoose.connection.db;
             const skuById = new Map<string, any>();
@@ -57,7 +57,7 @@ export async function GET(request: Request) {
                         { _id: { $in: objectIds } },
                         { legacyId: { $in: rawSkuArr } }
                     ]
-                } as any, { projection: { _id: 1, name: 1, legacyId: 1 } }).toArray();
+                } as any, { projection: { _id: 1, name: 1, category: 1, legacyId: 1 } }).toArray();
 
                 allSkus.forEach((s: any) => {
                     skuById.set(String(s._id), s);
@@ -65,16 +65,97 @@ export async function GET(request: Request) {
                 });
             }
 
-            // Hydrate + Tiers in a single pass
+            // Also build a map of lineItem SKU categories for cost classification
+            const liSkuIds = new Set<string>();
+            orders.forEach((o: any) => {
+                o.lineItems?.forEach((li: any) => {
+                    if (li.sku) liSkuIds.add(String(li.sku));
+                });
+            });
+
+            const liSkuCategoryMap = new Map<string, string>();
+            if (db && liSkuIds.size > 0) {
+                const liSkuArr = Array.from(liSkuIds);
+                const liObjectIds = liSkuArr
+                    .filter(id => mongoose.Types.ObjectId.isValid(id))
+                    .map(id => new mongoose.Types.ObjectId(id));
+
+                const liSkus = await db.collection('skus').find({
+                    $or: [
+                        { _id: { $in: liSkuArr } },
+                        { _id: { $in: liObjectIds } },
+                        { legacyId: { $in: liSkuArr } }
+                    ]
+                } as any, { projection: { _id: 1, category: 1, legacyId: 1 } }).toArray();
+
+                liSkus.forEach((s: any) => {
+                    liSkuCategoryMap.set(String(s._id), s.category || '');
+                    if (s.legacyId) liSkuCategoryMap.set(String(s.legacyId), s.category || '');
+                });
+            }
+
+            // Helper to parse "HH:MM:SS" to decimal hours
+            const parseDur = (d: string): number => {
+                if (!d) return 0;
+                const p = d.split(':').map(v => parseFloat(v) || 0);
+                return p.length === 3 ? p[0] + p[1] / 60 + p[2] / 3600 :
+                    p.length === 2 ? p[0] + p[1] / 60 : 0;
+            };
+
+            // Hydrate + compute costs + tiers in a single pass, then strip heavy arrays
             const tierSkuIds = new Set<string>();
             orders.forEach((o: any) => {
-                if (!o.sku) return;
-                const skuStr = String(o.sku);
-                const found = skuById.get(skuStr) || skuByLegacy.get(skuStr);
-                if (found) {
-                    o.sku = { _id: String(found._id), name: found.name };
-                    tierSkuIds.add(String(found._id));
+                // SKU hydration
+                if (o.sku) {
+                    const skuStr = String(o.sku);
+                    const found = skuById.get(skuStr) || skuByLegacy.get(skuStr);
+                    if (found) {
+                        o.sku = { _id: String(found._id), name: found.name };
+                        tierSkuIds.add(String(found._id));
+                    }
                 }
+
+                // Compute costs from lineItems and labor
+                let materialCost = 0;
+                let packagingCost = 0;
+                let laborCost = 0;
+
+                if (o.lineItems && Array.isArray(o.lineItems)) {
+                    for (const li of o.lineItems) {
+                        const bomQty = (li.recipeQty || 0) * (o.qty || 0);
+                        const sa = li.sa ? li.sa / 100 : 0;
+                        const qtyExtra = sa > 0 ? (bomQty / sa) - bomQty : 0;
+                        const qtyScrapped = li.qtyScrapped || 0;
+                        const totalQty = bomQty + qtyExtra + qtyScrapped;
+                        const unitCost = li.cost || 0;
+                        const lineCost = totalQty * unitCost;
+
+                        // Classify: Packaging vs Material
+                        const liSkuId = String(li.sku || '');
+                        const category = liSkuCategoryMap.get(liSkuId) || '';
+                        if (category === 'Packaging') {
+                            packagingCost += lineCost;
+                        } else {
+                            materialCost += lineCost;
+                        }
+                    }
+                }
+
+                if (o.labor && Array.isArray(o.labor)) {
+                    for (const l of o.labor) {
+                        laborCost += parseDur(l.duration) * (l.hourlyRate || 0);
+                    }
+                }
+
+                o.materialCost = materialCost;
+                o.packagingCost = packagingCost;
+                o.laborCost = laborCost;
+                o.totalCost = materialCost + packagingCost + laborCost;
+
+                // Strip heavy arrays from response
+                delete o.lineItems;
+                delete o.labor;
+                delete o.recipesId;
             });
 
             const tiers = await getSkuTiers(Array.from(tierSkuIds));
