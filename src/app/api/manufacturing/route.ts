@@ -12,252 +12,221 @@ import { getSkuTiers } from '@/lib/sku-tiers';
 import { syncManufacturingToAppSheet, syncManufacturingLineItemsToAppSheet } from '@/lib/appsheet';
 import { buildFuzzySearchQuery, buildFuzzyRegex } from '@/lib/fuzzy-search';
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const parseDuration = (d: string): number => {
+    if (!d) return 0;
+    const p = d.split(':').map(v => parseFloat(v) || 0);
+    return p.length === 3 ? p[0] + p[1] / 60 + p[2] / 3600 :
+        p.length === 2 ? p[0] + p[1] / 60 : 0;
+};
+
+// Ensure indexes exist (runs once in background, idempotent)
+let indexesEnsured = false;
+async function ensureIndexes() {
+    if (indexesEnsured) return;
+    indexesEnsured = true;
+    try {
+        const db = mongoose.connection.db;
+        if (!db) return;
+        await Promise.all([
+            db.collection('manufacturings').createIndex({ createdAt: -1 }, { background: true }),
+            db.collection('manufacturings').createIndex({ sku: 1 }, { background: true }),
+            db.collection('manufacturings').createIndex({ label: 1 }, { background: true }),
+            db.collection('openingbalances').createIndex({ sku: 1, lotNumber: 1 }, { background: true }),
+            db.collection('purchaseorders').createIndex({ 'lineItems.sku': 1, 'lineItems.lotNumber': 1 }, { background: true }),
+            db.collection('auditadjustments').createIndex({ sku: 1, lotNumber: 1 }, { background: true }),
+        ]);
+    } catch { /* indexes may already exist */ }
+}
+
+// ─── SKU Hydration (batch) ────────────────────────────────────────────────────
+
+async function hydrateSkus(orders: any[]) {
+    const rawSkuIds = new Set<string>();
+    orders.forEach((o: any) => { if (o.sku) rawSkuIds.add(String(o.sku)); });
+    if (rawSkuIds.size === 0) return;
+
+    const db = mongoose.connection.db;
+    if (!db) return;
+
+    const rawSkuArr = Array.from(rawSkuIds);
+    const objectIds = rawSkuArr
+        .filter(id => mongoose.Types.ObjectId.isValid(id))
+        .map(id => new mongoose.Types.ObjectId(id));
+
+    const allSkus = await db.collection('skus').find({
+        $or: [
+            { _id: { $in: rawSkuArr } },
+            { _id: { $in: objectIds } },
+            { legacyId: { $in: rawSkuArr } }
+        ]
+    } as any, { projection: { _id: 1, name: 1, category: 1, legacyId: 1 } }).toArray();
+
+    const byId = new Map<string, any>();
+    const byLegacy = new Map<string, any>();
+    allSkus.forEach((s: any) => {
+        byId.set(String(s._id), s);
+        if (s.legacyId) byLegacy.set(String(s.legacyId), s);
+    });
+
+    orders.forEach((o: any) => {
+        if (!o.sku) return;
+        const found = byId.get(String(o.sku)) || byLegacy.get(String(o.sku));
+        if (found) o.sku = { _id: String(found._id), name: found.name };
+    });
+}
+
+// ─── Cost Enrichment (batch, parallel, indexed) ──────────────────────────────
+
+async function enrichOrderCosts(orders: any[]) {
+    const db = mongoose.connection.db;
+    if (!db) return;
+
+    // 1. Build lineItem SKU category map
+    const liSkuIds = new Set<string>();
+    const allCostSkuIds = new Set<string>();
+    const allCostLots = new Set<string>();
+
+    orders.forEach((o: any) => {
+        o.lineItems?.forEach((li: any) => {
+            const skuId = String(li.sku || '');
+            if (skuId) { liSkuIds.add(skuId); allCostSkuIds.add(skuId); }
+            if (li.lotNumber) allCostLots.add(li.lotNumber);
+        });
+    });
+
+    if (allCostSkuIds.size === 0) {
+        // No line items — just compute labor
+        orders.forEach((o: any) => {
+            let laborCost = 0;
+            if (o.labor && Array.isArray(o.labor)) {
+                for (const l of o.labor) laborCost += parseDuration(l.duration) * (l.hourlyRate || 0);
+            }
+            o.materialCost = 0; o.packagingCost = 0; o.laborCost = laborCost;
+            o.totalCost = laborCost;
+        });
+        return;
+    }
+
+    const costSkuArr = Array.from(allCostSkuIds);
+    const costLotArr = Array.from(allCostLots);
+    const liSkuArr = Array.from(liSkuIds);
+    const liObjectIds = liSkuArr.filter(id => mongoose.Types.ObjectId.isValid(id)).map(id => new mongoose.Types.ObjectId(id));
+
+    // 2. Parallel: fetch cost sources + SKU categories at once
+    const [openingBalances, purchaseOrders, mfgJobs, auditAdjs, liSkus] = await Promise.all([
+        costLotArr.length > 0 ? OpeningBalance.find({
+            sku: { $in: costSkuArr }, lotNumber: { $in: costLotArr }
+        }).select('sku lotNumber cost').lean() : [],
+
+        costLotArr.length > 0 ? PurchaseOrder.find({
+            'lineItems.sku': { $in: costSkuArr }, 'lineItems.lotNumber': { $in: costLotArr }
+        }).select('lineItems.sku lineItems.lotNumber lineItems.cost lineItems.price').lean() : [],
+
+        costLotArr.length > 0 ? Manufacturing.find({
+            $or: [
+                { sku: { $in: costSkuArr }, lotNumber: { $in: costLotArr } },
+                { sku: { $in: costSkuArr }, label: { $in: costLotArr } }
+            ]
+        }).select('sku lotNumber label totalCost qty qtyDifference').lean() : [],
+
+        costLotArr.length > 0 ? AuditAdjustment.find({
+            sku: { $in: costSkuArr }, lotNumber: { $in: costLotArr }
+        }).select('sku lotNumber cost').lean() : [],
+
+        db.collection('skus').find({
+            $or: [
+                { _id: { $in: liSkuArr } },
+                { _id: { $in: liObjectIds } },
+                { legacyId: { $in: liSkuArr } }
+            ]
+        } as any, { projection: { _id: 1, category: 1, legacyId: 1 } }).toArray()
+    ]);
+
+    // 3. Build cost map
+    const costMap = new Map<string, number>();
+
+    openingBalances.forEach((ob: any) => {
+        const key = `${ob.sku?.toString()}:${ob.lotNumber}`;
+        if (ob.cost && !costMap.has(key)) costMap.set(key, ob.cost);
+    });
+
+    purchaseOrders.forEach((po: any) => {
+        po.lineItems?.forEach((line: any) => {
+            const skuId = line.sku?._id?.toString() || line.sku?.toString();
+            const key = `${skuId}:${line.lotNumber}`;
+            if (!costMap.has(key) && (line.cost || line.price)) costMap.set(key, line.cost || line.price);
+        });
+    });
+
+    mfgJobs.forEach((job: any) => {
+        const skuId = job.sku?._id?.toString() || job.sku?.toString();
+        const lot = job.lotNumber || job.label;
+        const key = `${skuId}:${lot}`;
+        if (!costMap.has(key) && job.totalCost) {
+            const qtyP = (job.qty || 0) + (job.qtyDifference || 0);
+            if (qtyP > 0) costMap.set(key, job.totalCost / qtyP);
+        }
+    });
+
+    auditAdjs.forEach((adj: any) => {
+        const key = `${adj.sku?.toString()}:${adj.lotNumber}`;
+        if (!costMap.has(key) && adj.cost) costMap.set(key, adj.cost);
+    });
+
+    // 4. Build category map
+    const catMap = new Map<string, string>();
+    liSkus.forEach((s: any) => {
+        catMap.set(String(s._id), s.category || '');
+        if (s.legacyId) catMap.set(String(s.legacyId), s.category || '');
+    });
+
+    // 5. Compute costs per order
+    orders.forEach((o: any) => {
+        let materialCost = 0, packagingCost = 0, laborCost = 0;
+
+        if (o.lineItems && Array.isArray(o.lineItems)) {
+            for (const li of o.lineItems) {
+                const bomQty = (li.recipeQty || 0) * (o.qty || 0);
+                const sa = li.sa ? li.sa / 100 : 0;
+                const qtyExtra = sa > 0 ? (bomQty / sa) - bomQty : 0;
+                const totalQty = bomQty + qtyExtra + (li.qtyScrapped || 0);
+                const liSkuId = String(li.sku || '');
+                const unitCost = costMap.get(`${liSkuId}:${li.lotNumber || ''}`) || li.cost || 0;
+                const lineCost = totalQty * unitCost;
+                if (catMap.get(liSkuId) === 'Packaging') packagingCost += lineCost;
+                else materialCost += lineCost;
+            }
+        }
+
+        if (o.labor && Array.isArray(o.labor)) {
+            for (const l of o.labor) laborCost += parseDuration(l.duration) * (l.hourlyRate || 0);
+        }
+
+        o.materialCost = materialCost;
+        o.packagingCost = packagingCost;
+        o.laborCost = laborCost;
+        o.totalCost = materialCost + packagingCost + laborCost;
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// GET — Fast paginated list with costs
+// ═══════════════════════════════════════════════════════════════════════════════
+
 export async function GET(request: Request) {
     try {
         await dbConnect();
-        // Ensure models are registered for populate()
-        void Sku;
-        void User;
-        void OpeningBalance;
-        void PurchaseOrder;
-        void AuditAdjustment;
+        void Sku; void User; void OpeningBalance; void PurchaseOrder; void AuditAdjustment;
 
         const { searchParams } = new URL(request.url);
-        const fields = searchParams.get('fields');
 
-        // ─── FAST PATH: Lightweight list for client-side filtering ────────────
-        // Returns ALL orders with computed costs. Client does search/sort/filter locally.
-        if (fields === 'list') {
-            let query: any = {};
+        // Ensure indexes in background (runs once per cold start)
+        after(() => ensureIndexes());
 
-            // Apply Global Date Filter only
-            query = await applyDateFilter(query, 'createdAt');
-
-            // Load orders WITH lineItems and labor for cost computation, but exclude notes/qualityCheck
-            const orders = await Manufacturing.find(query)
-                .select('-notes -qualityCheck -__v')
-                .populate('createdBy', 'firstName lastName')
-                .populate('finishedBy', 'firstName lastName')
-                .sort({ createdAt: -1 })
-                .lean();
-
-            // SKU hydration (batch — single query)
-            const rawSkuIds = new Set<string>();
-            orders.forEach((o: any) => {
-                if (o.sku) rawSkuIds.add(String(o.sku));
-            });
-
-            const db = mongoose.connection.db;
-            const skuById = new Map<string, any>();
-            const skuByLegacy = new Map<string, any>();
-
-            if (db && rawSkuIds.size > 0) {
-                const rawSkuArr = Array.from(rawSkuIds);
-                const objectIds = rawSkuArr
-                    .filter(id => mongoose.Types.ObjectId.isValid(id))
-                    .map(id => new mongoose.Types.ObjectId(id));
-
-                const allSkus = await db.collection('skus').find({
-                    $or: [
-                        { _id: { $in: rawSkuArr } },
-                        { _id: { $in: objectIds } },
-                        { legacyId: { $in: rawSkuArr } }
-                    ]
-                } as any, { projection: { _id: 1, name: 1, category: 1, legacyId: 1 } }).toArray();
-
-                allSkus.forEach((s: any) => {
-                    skuById.set(String(s._id), s);
-                    if (s.legacyId) skuByLegacy.set(String(s.legacyId), s);
-                });
-            }
-
-            // Also build a map of lineItem SKU categories for cost classification
-            const liSkuIds = new Set<string>();
-            orders.forEach((o: any) => {
-                o.lineItems?.forEach((li: any) => {
-                    if (li.sku) liSkuIds.add(String(li.sku));
-                });
-            });
-
-            const liSkuCategoryMap = new Map<string, string>();
-            if (db && liSkuIds.size > 0) {
-                const liSkuArr = Array.from(liSkuIds);
-                const liObjectIds = liSkuArr
-                    .filter(id => mongoose.Types.ObjectId.isValid(id))
-                    .map(id => new mongoose.Types.ObjectId(id));
-
-                const liSkus = await db.collection('skus').find({
-                    $or: [
-                        { _id: { $in: liSkuArr } },
-                        { _id: { $in: liObjectIds } },
-                        { legacyId: { $in: liSkuArr } }
-                    ]
-                } as any, { projection: { _id: 1, category: 1, legacyId: 1 } }).toArray();
-
-                liSkus.forEach((s: any) => {
-                    liSkuCategoryMap.set(String(s._id), s.category || '');
-                    if (s.legacyId) liSkuCategoryMap.set(String(s.legacyId), s.category || '');
-                });
-            }
-
-            // ─── Batch cost lookup from OB, PO, Mfg, AuditAdj ───────────────
-            // Same logic as enrichLineItemsWithCost in [id] API
-
-            // Collect all unique sku+lot combos from ALL orders' lineItems
-            const allSkuIdsForCost = new Set<string>();
-            const allLotNumbers = new Set<string>();
-            orders.forEach((o: any) => {
-                o.lineItems?.forEach((li: any) => {
-                    const skuId = li.sku?.toString();
-                    if (skuId) allSkuIdsForCost.add(skuId);
-                    if (li.lotNumber) allLotNumbers.add(li.lotNumber);
-                });
-            });
-
-            const costMap = new Map<string, number>();
-            const costSkuArr = Array.from(allSkuIdsForCost);
-            const costLotArr = Array.from(allLotNumbers);
-
-            if (costSkuArr.length > 0 && costLotArr.length > 0) {
-                const [openingBalances, purchaseOrders, mfgJobs, auditAdjs] = await Promise.all([
-                    OpeningBalance.find({
-                        sku: { $in: costSkuArr },
-                        lotNumber: { $in: costLotArr }
-                    }).select('sku lotNumber cost').lean(),
-
-                    PurchaseOrder.find({
-                        'lineItems.sku': { $in: costSkuArr },
-                        'lineItems.lotNumber': { $in: costLotArr }
-                    }).select('lineItems.sku lineItems.lotNumber lineItems.cost lineItems.price').lean(),
-
-                    Manufacturing.find({
-                        $or: [
-                            { sku: { $in: costSkuArr }, lotNumber: { $in: costLotArr } },
-                            { sku: { $in: costSkuArr }, label: { $in: costLotArr } }
-                        ]
-                    }).select('sku lotNumber label totalCost qty qtyDifference').lean(),
-
-                    AuditAdjustment.find({
-                        sku: { $in: costSkuArr },
-                        lotNumber: { $in: costLotArr }
-                    }).select('sku lotNumber cost').lean()
-                ]);
-
-                // 1. Opening Balances (highest priority)
-                openingBalances.forEach((ob: any) => {
-                    const key = `${ob.sku?.toString()}:${ob.lotNumber}`;
-                    if (ob.cost && !costMap.has(key)) costMap.set(key, ob.cost);
-                });
-
-                // 2. Purchase Orders
-                purchaseOrders.forEach((po: any) => {
-                    po.lineItems?.forEach((line: any) => {
-                        const skuId = line.sku?._id?.toString() || line.sku?.toString();
-                        const key = `${skuId}:${line.lotNumber}`;
-                        if (!costMap.has(key) && (line.cost || line.price)) {
-                            costMap.set(key, line.cost || line.price);
-                        }
-                    });
-                });
-
-                // 3. Manufacturing Jobs (per-unit cost)
-                mfgJobs.forEach((job: any) => {
-                    const skuId = job.sku?._id?.toString() || job.sku?.toString();
-                    const lot = job.lotNumber || job.label;
-                    const key = `${skuId}:${lot}`;
-                    if (!costMap.has(key) && job.totalCost) {
-                        const qtyProduced = (job.qty || 0) + (job.qtyDifference || 0);
-                        if (qtyProduced > 0) costMap.set(key, job.totalCost / qtyProduced);
-                    }
-                });
-
-                // 4. Audit Adjustments
-                auditAdjs.forEach((adj: any) => {
-                    const key = `${adj.sku?.toString()}:${adj.lotNumber}`;
-                    if (!costMap.has(key) && adj.cost) costMap.set(key, adj.cost);
-                });
-            }
-
-            // Helper to parse "HH:MM:SS" to decimal hours
-            const parseDur = (d: string): number => {
-                if (!d) return 0;
-                const p = d.split(':').map(v => parseFloat(v) || 0);
-                return p.length === 3 ? p[0] + p[1] / 60 + p[2] / 3600 :
-                    p.length === 2 ? p[0] + p[1] / 60 : 0;
-            };
-
-            // Hydrate + compute costs + tiers in a single pass, then strip heavy arrays
-            const tierSkuIds = new Set<string>();
-            orders.forEach((o: any) => {
-                // SKU hydration
-                if (o.sku) {
-                    const skuStr = String(o.sku);
-                    const found = skuById.get(skuStr) || skuByLegacy.get(skuStr);
-                    if (found) {
-                        o.sku = { _id: String(found._id), name: found.name };
-                        tierSkuIds.add(String(found._id));
-                    }
-                }
-
-                // Compute costs from lineItems (with looked-up costs) and labor
-                let materialCost = 0;
-                let packagingCost = 0;
-                let laborCost = 0;
-
-                if (o.lineItems && Array.isArray(o.lineItems)) {
-                    for (const li of o.lineItems) {
-                        const bomQty = (li.recipeQty || 0) * (o.qty || 0);
-                        const sa = li.sa ? li.sa / 100 : 0;
-                        const qtyExtra = sa > 0 ? (bomQty / sa) - bomQty : 0;
-                        const qtyScrapped = li.qtyScrapped || 0;
-                        const totalQty = bomQty + qtyExtra + qtyScrapped;
-
-                        // Look up cost from OB/PO/Mfg/AuditAdj
-                        const liSkuId = String(li.sku || '');
-                        const costKey = `${liSkuId}:${li.lotNumber || ''}`;
-                        const unitCost = costMap.get(costKey) || li.cost || 0; // Fallback to li.cost if not found
-                        const lineCost = totalQty * unitCost;
-
-                        // Classify: Packaging vs Material
-                        const category = liSkuCategoryMap.get(liSkuId) || '';
-                        if (category === 'Packaging') {
-                            packagingCost += lineCost;
-                        } else {
-                            materialCost += lineCost;
-                        }
-                    }
-                }
-
-                if (o.labor && Array.isArray(o.labor)) {
-                    for (const l of o.labor) {
-                        laborCost += parseDur(l.duration) * (l.hourlyRate || 0);
-                    }
-                }
-
-                o.materialCost = materialCost;
-                o.packagingCost = packagingCost;
-                o.laborCost = laborCost;
-                o.totalCost = materialCost + packagingCost + laborCost;
-
-                // Strip heavy arrays from response
-                delete o.lineItems;
-                delete o.labor;
-                delete o.recipesId;
-            });
-
-            const tiers = await getSkuTiers(Array.from(tierSkuIds));
-            orders.forEach((o: any) => {
-                if (o.sku && typeof o.sku === 'object') {
-                    o.sku.tier = tiers[(o.sku._id || o.sku).toString()];
-                }
-            });
-
-            return NextResponse.json({ orders, total: orders.length });
-        }
-
-        // ─── STANDARD PATH: Paginated with server-side search ────────────────
         const page = parseInt(searchParams.get('page') || '1');
-        const limit = parseInt(searchParams.get('limit') || '20');
+        const limit = parseInt(searchParams.get('limit') || '50');
         const sortBy = searchParams.get('sortBy') || 'createdAt';
         const sortOrder = searchParams.get('sortOrder') === 'desc' ? -1 : 1;
         const search = searchParams.get('search') || '';
@@ -269,7 +238,7 @@ export async function GET(request: Request) {
 
         let query: any = {};
 
-        // If searching, first find matching SKU IDs by name
+        // Search: find matching SKU IDs then OR with label/legacyId
         let matchingSkuIds: string[] = [];
         if (search) {
             const fuzzyRegex = buildFuzzyRegex(search);
@@ -289,13 +258,8 @@ export async function GET(request: Request) {
             }
         }
 
-        if (sku) {
-            query.sku = { $in: sku.split(',') };
-        }
-
-        if (createdBy) {
-            query.createdBy = { $in: createdBy.split(',') };
-        }
+        if (sku) query.sku = { $in: sku.split(',') };
+        if (createdBy) query.createdBy = { $in: createdBy.split(',') };
 
         if (fromDate || toDate) {
             query.createdAt = {};
@@ -303,111 +267,75 @@ export async function GET(request: Request) {
             if (toDate) query.createdAt.$lte = new Date(toDate);
         }
 
-        // Apply Global Date Filter
         query = await applyDateFilter(query, 'createdAt');
 
-        const total = await Manufacturing.countDocuments(query);
-
+        // ─── Fast query: limit+1 trick (no count query needed) ───────────────
         let orders: any[];
 
         if (sortBy === 'label') {
-            // Label is stored as string but represents a number — use aggregation for numeric sort
             orders = await Manufacturing.aggregate([
                 { $match: query },
                 { $addFields: { _numericLabel: { $toInt: { $ifNull: ['$label', '0'] } } } },
                 { $sort: { _numericLabel: sortOrder as 1 | -1 } },
                 { $skip: (page - 1) * limit },
-                { $limit: limit },
-                { $project: { _numericLabel: 0 } }
+                { $limit: limit + 1 },
+                { $project: { _numericLabel: 0, notes: 0, qualityCheck: 0, __v: 0 } }
             ]);
-            // Manually populate since aggregate doesn't support populate
             await Manufacturing.populate(orders, [
                 { path: 'createdBy', select: 'firstName lastName' },
                 { path: 'finishedBy', select: 'firstName lastName' },
             ]);
         } else {
             orders = await Manufacturing.find(query)
+                .select('-notes -qualityCheck -__v')
                 .populate('createdBy', 'firstName lastName')
                 .populate('finishedBy', 'firstName lastName')
                 .sort({ [sortBy]: sortOrder as any })
                 .skip((page - 1) * limit)
-                .limit(limit)
+                .limit(limit + 1)
                 .lean();
         }
 
-        // Manual SKU hydration using native driver (handles String _id, ObjectId _id, and legacyId)
-        const rawSkuIds = new Set<string>();
+        // hasMore = got more than limit results
+        const hasMore = orders.length > limit;
+        orders = orders.slice(0, limit);
+
+        // ─── Parallel enrichment: SKU hydration + costs + tiers ──────────────
+        await Promise.all([
+            hydrateSkus(orders),
+            enrichOrderCosts(orders),
+        ]);
+
+        // Tiers (needs hydrated SKU IDs)
+        const tierSkuIds = new Set<string>();
         orders.forEach((o: any) => {
-            if (o.sku) rawSkuIds.add(String(o.sku));
-            o.lineItems?.forEach((li: any) => { if (li.sku) rawSkuIds.add(String(li.sku)); });
+            if (o.sku && typeof o.sku === 'object') tierSkuIds.add(String(o.sku._id));
         });
-
-        const db = mongoose.connection.db;
-        let skuById = new Map<string, any>();
-        let skuByLegacy = new Map<string, any>();
-
-        if (db && rawSkuIds.size > 0) {
-            const rawSkuArr = Array.from(rawSkuIds);
-            const objectIds = rawSkuArr
-                .filter(id => mongoose.Types.ObjectId.isValid(id))
-                .map(id => new mongoose.Types.ObjectId(id));
-
-            const allSkus = await db.collection('skus').find({
-                $or: [
-                    { _id: { $in: rawSkuArr } },
-                    { _id: { $in: objectIds } },
-                    { legacyId: { $in: rawSkuArr } }
-                ]
-            } as any, { projection: { _id: 1, name: 1, image: 1, category: 1, legacyId: 1 } }).toArray();
-
-            allSkus.forEach((s: any) => {
-                skuById.set(String(s._id), s);
-                if (s.legacyId) skuByLegacy.set(String(s.legacyId), s);
-            });
-        }
-
-        // Hydrate orders with SKU data
+        const tiers = await getSkuTiers(Array.from(tierSkuIds));
         orders.forEach((o: any) => {
-            if (!o.sku) return;
-            const skuStr = String(o.sku);
-            const found = skuById.get(skuStr) || skuByLegacy.get(skuStr);
-            if (found) {
-                o.sku = { _id: String(found._id), name: found.name };
-            }
+            if (o.sku && typeof o.sku === 'object') o.sku.tier = tiers[o.sku._id?.toString()];
         });
 
-        // Enrich with Tiers
-        const allSkuIds = new Set<string>();
+        // Strip heavy arrays from response
         orders.forEach((o: any) => {
-            if (o.sku) {
-                const id = (typeof o.sku === 'object' ? (o.sku._id || o.sku) : o.sku).toString();
-                allSkuIds.add(id);
-            }
-        });
-        const tiers = await getSkuTiers(Array.from(allSkuIds));
-        orders.forEach((o: any) => {
-            if (o.sku && typeof o.sku === 'object') {
-                o.sku.tier = tiers[(o.sku._id || o.sku).toString()];
-            }
+            delete o.lineItems; delete o.labor; delete o.recipesId;
         });
 
-        return NextResponse.json({
-            orders,
-            total,
-            page,
-            totalPages: Math.ceil(total / limit)
-        });
+        return NextResponse.json({ orders, hasMore, page });
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// POST — Create manufacturing order
+// ═══════════════════════════════════════════════════════════════════════════════
 
 export async function POST(request: Request) {
     try {
         await dbConnect();
         const body = await request.json();
 
-        // Auto-generate label: find the highest numeric label and increment
         if (!body.label) {
             const result = await Manufacturing.aggregate([
                 { $addFields: { numericLabel: { $toInt: { $ifNull: ['$label', '0'] } } } },
@@ -415,14 +343,12 @@ export async function POST(request: Request) {
                 { $limit: 1 },
                 { $project: { numericLabel: 1 } }
             ]);
-
             const maxLabel = result[0]?.numericLabel || 0;
             body.label = String(maxLabel + 1);
         }
 
         const newItem: any = await Manufacturing.create(body);
 
-        // Background sync to AppSheet using Next.js after()
         after(async () => {
             try {
                 await dbConnect();
@@ -432,16 +358,11 @@ export async function POST(request: Request) {
                     .lean();
 
                 if (populatedOrder) {
-                    // Hydrate SKU with legacyId for AppSheet mapping
                     if (populatedOrder.sku) {
                         const skuDoc = await Sku.findById(populatedOrder.sku).select('name legacyId').lean();
-                        if (skuDoc) {
-                            (populatedOrder as any).sku = skuDoc;
-                        }
+                        if (skuDoc) (populatedOrder as any).sku = skuDoc;
                     }
-                    // Sync parent order FIRST, then line items (parent must exist before children)
                     await syncManufacturingToAppSheet(populatedOrder, 'Add');
-
                     if (populatedOrder.lineItems && populatedOrder.lineItems.length > 0) {
                         await syncManufacturingLineItemsToAppSheet(populatedOrder, populatedOrder.lineItems, 'Add');
                     }

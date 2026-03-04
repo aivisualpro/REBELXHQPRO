@@ -9,6 +9,7 @@ import {
   Plus,
   X,
   Factory,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -18,7 +19,6 @@ interface ManufacturingOrder {
   _id: string;
   label?: string;
   sku: { _id: string; name: string; tier?: number } | string;
-  recipesId: string;
   uom: string;
   qty: number;
   qtyDifference: number;
@@ -37,16 +37,21 @@ interface ManufacturingOrder {
 
 interface CacheEntry {
   orders: ManufacturingOrder[];
+  hasMore: boolean;
+  page: number;
+  sortBy: string;
+  sortOrder: string;
+  search: string;
   timestamp: number;
-  isComplete: boolean; // true = full dataset
 }
 
 const globalCache: { current: CacheEntry | null } = { current: null };
 const CACHE_TTL = 120_000;
+const PAGE_SIZE = 50;
 
 // ─── Table Columns ───────────────────────────────────────────────────────────
 
-const COLUMNS: { key: string; label: string; width: string; align?: string }[] = [
+const COLUMNS = [
   { key: 'label', label: 'WO#', width: 'w-[60px]' },
   { key: 'createdAt', label: 'Date', width: 'w-[80px]' },
   { key: 'sku', label: 'SKU', width: '' },
@@ -63,76 +68,17 @@ const COLUMNS: { key: string; label: string; width: string; align?: string }[] =
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function getSkuName(order: ManufacturingOrder): string {
-  return typeof order.sku === 'object' && order.sku !== null ? order.sku.name : String(order.sku || '');
+function getSkuName(o: ManufacturingOrder) {
+  return typeof o.sku === 'object' && o.sku ? o.sku.name : String(o.sku || '');
 }
 
-function getCreatedByName(order: ManufacturingOrder): string {
-  return order.createdBy ? `${order.createdBy.firstName} ${order.createdBy.lastName}` : '';
+function getCreatedByName(o: ManufacturingOrder) {
+  return o.createdBy ? `${o.createdBy.firstName} ${o.createdBy.lastName}` : '';
 }
 
-function matchesSearch(order: ManufacturingOrder, terms: string[]): boolean {
-  if (terms.length === 0) return true;
-  const haystack = [
-    order.label || '',
-    getSkuName(order),
-    getCreatedByName(order),
-    order.status,
-    order.priority,
-  ].join(' ').toLowerCase();
-  return terms.every(term => haystack.includes(term));
-}
-
-function sortOrders(orders: ManufacturingOrder[], sortBy: string, sortOrder: 'asc' | 'desc'): ManufacturingOrder[] {
-  const dir = sortOrder === 'asc' ? 1 : -1;
-  return [...orders].sort((a, b) => {
-    let cmp = 0;
-    switch (sortBy) {
-      case 'label': cmp = (parseInt(a.label || '0') || 0) - (parseInt(b.label || '0') || 0); break;
-      case 'createdAt': cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(); break;
-      case 'sku': cmp = getSkuName(a).localeCompare(getSkuName(b)); break;
-      case 'qty': cmp = (a.qty || 0) - (b.qty || 0); break;
-      case 'priority': {
-        const p: Record<string, number> = { Extreme: 3, High: 2, Normal: 1 };
-        cmp = (p[a.priority] || 0) - (p[b.priority] || 0); break;
-      }
-      case 'status': cmp = (a.status || '').localeCompare(b.status || ''); break;
-      case 'createdBy': cmp = getCreatedByName(a).localeCompare(getCreatedByName(b)); break;
-      case 'materialCost': cmp = (a.materialCost || 0) - (b.materialCost || 0); break;
-      case 'packagingCost': cmp = (a.packagingCost || 0) - (b.packagingCost || 0); break;
-      case 'laborCost': cmp = (a.laborCost || 0) - (b.laborCost || 0); break;
-      case 'totalCost': cmp = (a.totalCost || 0) - (b.totalCost || 0); break;
-      case 'unitCost': {
-        const ucA = a.qty > 0 ? (a.totalCost || 0) / a.qty : 0;
-        const ucB = b.qty > 0 ? (b.totalCost || 0) / b.qty : 0;
-        cmp = ucA - ucB; break;
-      }
-    }
-    return cmp * dir;
-  });
-}
-
-// ─── Skeleton Row ────────────────────────────────────────────────────────────
-
-function SkeletonRow({ index }: { index: number }) {
-  return (
-    <tr className="border-b border-border/30" style={{ animationDelay: `${index * 20}ms` }}>
-      {COLUMNS.map((col) => (
-        <td key={col.key} className={cn('px-2 py-2', col.width)}>
-          <div
-            className={cn(
-              'h-3 rounded-sm bg-secondary/80 animate-pulse',
-              col.key === 'sku' ? 'w-4/5' :
-                col.key === 'status' ? 'w-14' :
-                  col.key === 'createdBy' ? 'w-16' :
-                    col.key === 'label' ? 'w-8' : 'w-10'
-            )}
-            style={{ animationDelay: `${index * 20 + 100}ms` }}
-          />
-        </td>
-      ))}
-    </tr>
-  );
+function formatCurrency(v: number) {
+  if (!v) return <span className="text-muted-foreground/30">—</span>;
+  return <span className="tabular-nums">${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>;
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
@@ -157,8 +103,7 @@ function PriorityBadge({ priority }: { priority: string }) {
   return (
     <span className={cn(
       'text-[9px] font-black uppercase tracking-wider',
-      priority === 'Extreme' ? 'text-red-500' :
-        priority === 'High' ? 'text-orange-500' : 'text-muted-foreground'
+      priority === 'Extreme' ? 'text-red-500' : 'text-orange-500'
     )}>
       {priority === 'Extreme' ? '⚡ Ext' : '↑ High'}
     </span>
@@ -176,33 +121,42 @@ function TierBadge({ tier }: { tier: number }) {
   );
 }
 
-function formatCurrency(value: number) {
-  if (!value) return <span className="text-muted-foreground/30">—</span>;
-  return <span className="tabular-nums">${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>;
+function SkeletonRow({ index }: { index: number }) {
+  return (
+    <tr className="border-b border-border/30">
+      {COLUMNS.map((col) => (
+        <td key={col.key} className={cn('px-2 py-2', col.width)}>
+          <div
+            className={cn(
+              'h-3 rounded-sm bg-secondary/80 animate-pulse',
+              col.key === 'sku' ? 'w-4/5' :
+                col.key === 'status' ? 'w-14' :
+                  col.key === 'createdBy' ? 'w-16' :
+                    col.key === 'label' ? 'w-8' : 'w-10'
+            )}
+            style={{ animationDelay: `${index * 30}ms` }}
+          />
+        </td>
+      ))}
+    </tr>
+  );
 }
 
 // ─── Table Row ───────────────────────────────────────────────────────────────
 
 const TableRow = React.memo(function TableRow({
-  order,
-  onClick,
+  order, onClick
 }: {
-  order: ManufacturingOrder;
-  onClick: () => void;
+  order: ManufacturingOrder; onClick: () => void;
 }) {
-  const unitCost = order.qty && order.qty > 0 ? (order.totalCost || 0) / order.qty : 0;
+  const unitCost = order.qty > 0 ? (order.totalCost || 0) / order.qty : 0;
   const skuName = getSkuName(order);
-  const tier = typeof order.sku === 'object' && order.sku !== null ? order.sku.tier : null;
+  const tier = typeof order.sku === 'object' && order.sku ? order.sku.tier : null;
 
   return (
-    <tr
-      className="group hover:bg-primary/[0.03] transition-colors duration-150 cursor-pointer border-b border-border/30"
-      onClick={onClick}
-    >
+    <tr className="group hover:bg-primary/[0.03] transition-colors duration-150 cursor-pointer border-b border-border/30" onClick={onClick}>
       <td className="px-2 py-1.5 w-[60px] text-[11px] font-mono text-muted-foreground group-hover:text-foreground transition-colors">
-        <span className="group-hover:border-l-2 group-hover:border-l-primary group-hover:pl-1.5 transition-all">
-          {order.label || '-'}
-        </span>
+        <span className="group-hover:border-l-2 group-hover:border-l-primary group-hover:pl-1.5 transition-all">{order.label || '-'}</span>
       </td>
       <td className="px-2 py-1.5 w-[80px] text-[10px] font-mono text-muted-foreground/70">
         {new Date(order.createdAt).toLocaleDateString()}
@@ -213,14 +167,10 @@ const TableRow = React.memo(function TableRow({
           <span className="whitespace-nowrap">{skuName}</span>
         </div>
       </td>
-      <td className="px-2 py-1.5 w-[60px] text-[11px] font-mono text-right text-muted-foreground">
-        {order.qty?.toLocaleString() || '-'}
-      </td>
+      <td className="px-2 py-1.5 w-[60px] text-[11px] font-mono text-right text-muted-foreground">{order.qty?.toLocaleString() || '-'}</td>
       <td className="px-2 py-1.5 w-[72px]"><PriorityBadge priority={order.priority} /></td>
       <td className="px-2 py-1.5 w-[90px]"><StatusBadge status={order.status} /></td>
-      <td className="px-2 py-1.5 w-[100px] text-[10px] text-muted-foreground/70 truncate">
-        {getCreatedByName(order) || '-'}
-      </td>
+      <td className="px-2 py-1.5 w-[100px] text-[10px] text-muted-foreground/70 truncate">{getCreatedByName(order) || '-'}</td>
       <td className="px-2 py-1.5 w-[80px] text-[10px] font-mono text-right text-muted-foreground/70">{formatCurrency(order.materialCost || 0)}</td>
       <td className="px-2 py-1.5 w-[70px] text-[10px] font-mono text-right text-muted-foreground/70">{formatCurrency(order.packagingCost || 0)}</td>
       <td className="px-2 py-1.5 w-[70px] text-[10px] font-mono text-right text-muted-foreground/70">{formatCurrency(order.laborCost || 0)}</td>
@@ -229,11 +179,6 @@ const TableRow = React.memo(function TableRow({
     </tr>
   );
 });
-
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-const INITIAL_RENDER = 60;
-const LOAD_MORE_CHUNK = 80;
 
 // ─── Main Export ──────────────────────────────────────────────────────────────
 
@@ -274,24 +219,22 @@ function ManufacturingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // All data
-  const [allOrders, setAllOrders] = useState<ManufacturingOrder[]>(globalCache.current?.orders || []);
+  const [orders, setOrders] = useState<ManufacturingOrder[]>(globalCache.current?.orders || []);
   const [isLoading, setIsLoading] = useState(!globalCache.current);
-  const [isRevalidating, setIsRevalidating] = useState(false);
-  const [isComplete, setIsComplete] = useState(globalCache.current?.isComplete ?? false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(globalCache.current?.hasMore ?? true);
   const [error, setError] = useState<string | null>(null);
 
-  // View state
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [renderCount, setRenderCount] = useState(INITIAL_RENDER);
 
-  // Refs
+  const pageRef = useRef(globalCache.current?.page || 0);
   const mountedRef = useRef(true);
+  const fetchingRef = useRef(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const fullFetchStartedRef = useRef(false);
 
   // Header portal
   const [headerPortalTarget, setHeaderPortalTarget] = useState<HTMLElement | null>(null);
@@ -305,113 +248,104 @@ function ManufacturingContent() {
     return () => { mountedRef.current = false; };
   }, []);
 
-  // ─── Phase 1: Quick first page (30 records, fast API) ────────────────────
+  // ─── Debounced search ────────────────────────────────────────────────────
 
-  const fetchQuickPage = useCallback(async () => {
-    try {
-      const res = await fetch('/api/manufacturing?page=1&limit=30&sortBy=createdAt&sortOrder=desc');
-      const data = await res.json();
-      if (!mountedRef.current) return;
-      if (res.ok) {
-        setAllOrders(data.orders || []);
-        setIsLoading(false);
-      }
-    } catch { /* Phase 2 will handle */ }
-  }, []);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 250);
+    return () => clearTimeout(timer);
+  }, [search]);
 
-  // ─── Phase 2: Full dataset (all records with costs) ──────────────────────
+  // ─── Fetch a page ────────────────────────────────────────────────────────
 
-  const fetchFullDataset = useCallback(async (isBackground = false) => {
-    if (isBackground) setIsRevalidating(true);
-    fullFetchStartedRef.current = true;
+  const fetchPage = useCallback(async (pageNum: number, isAppend: boolean) => {
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
+
+    if (isAppend) setIsLoadingMore(true);
+    else setIsLoading(true);
 
     try {
-      const res = await fetch('/api/manufacturing?fields=list');
+      const params = new URLSearchParams({
+        page: String(pageNum),
+        limit: String(PAGE_SIZE),
+        sortBy,
+        sortOrder,
+        search: debouncedSearch,
+      });
+
+      const res = await fetch(`/api/manufacturing?${params}`);
       const data = await res.json();
+
       if (!mountedRef.current) return;
 
       if (res.ok) {
-        const orders = data.orders || [];
-        setAllOrders(orders);
-        setIsComplete(true);
+        const newOrders = data.orders || [];
+        const newHasMore = data.hasMore ?? false;
+
+        if (isAppend) {
+          // Deduplicate by _id
+          setOrders(prev => {
+            const existingIds = new Set(prev.map(o => o._id));
+            const filtered = newOrders.filter((o: ManufacturingOrder) => !existingIds.has(o._id));
+            const merged = [...prev, ...filtered];
+            // Update cache
+            globalCache.current = {
+              orders: merged, hasMore: newHasMore, page: pageNum,
+              sortBy, sortOrder, search: debouncedSearch, timestamp: Date.now()
+            };
+            return merged;
+          });
+        } else {
+          setOrders(newOrders);
+          globalCache.current = {
+            orders: newOrders, hasMore: newHasMore, page: pageNum,
+            sortBy, sortOrder, search: debouncedSearch, timestamp: Date.now()
+          };
+        }
+
+        setHasMore(newHasMore);
+        pageRef.current = pageNum;
         setError(null);
-        globalCache.current = { orders, timestamp: Date.now(), isComplete: true };
       } else {
-        if (!isBackground) setError(data.error || 'Failed to fetch');
+        setError(data.error || 'Failed to fetch');
       }
     } catch (e: any) {
-      if (!isBackground && mountedRef.current) setError(e.message);
+      if (mountedRef.current) setError(e.message);
     } finally {
+      fetchingRef.current = false;
       if (mountedRef.current) {
         setIsLoading(false);
-        setIsRevalidating(false);
+        setIsLoadingMore(false);
       }
     }
-  }, []);
+  }, [sortBy, sortOrder, debouncedSearch]);
 
-  // ─── Boot sequence ──────────────────────────────────────────────────────
+  // ─── Initial load ────────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (globalCache.current && globalCache.current.isComplete) {
-      // Cache hit — instant render, full dataset available
-      setAllOrders(globalCache.current.orders);
-      setIsComplete(true);
+    // Check cache validity
+    if (
+      globalCache.current &&
+      globalCache.current.sortBy === sortBy &&
+      globalCache.current.sortOrder === sortOrder &&
+      globalCache.current.search === debouncedSearch &&
+      Date.now() - globalCache.current.timestamp < CACHE_TTL
+    ) {
+      setOrders(globalCache.current.orders);
+      setHasMore(globalCache.current.hasMore);
+      pageRef.current = globalCache.current.page;
       setIsLoading(false);
-
-      // Stale? Background refresh
-      if (Date.now() - globalCache.current.timestamp > CACHE_TTL) {
-        fetchFullDataset(true);
-      }
       return;
     }
 
-    if (globalCache.current && !globalCache.current.isComplete) {
-      // Partial cache (from quick page) — show it, then fetch full
-      setAllOrders(globalCache.current.orders);
-      setIsLoading(false);
-      fetchFullDataset(true);
-      return;
-    }
+    // Fresh fetch
+    pageRef.current = 0;
+    setOrders([]);
+    setHasMore(true);
+    fetchPage(1, false);
+  }, [sortBy, sortOrder, debouncedSearch, fetchPage]);
 
-    // No cache — two-phase load
-    // Phase 1: Quick page (fast, ~1-2s) — shows data immediately
-    setIsLoading(true);
-    fetchQuickPage().then(() => {
-      // Phase 2: Full dataset in background
-      if (mountedRef.current) {
-        fetchFullDataset(true);
-      }
-    });
-  }, [fetchQuickPage, fetchFullDataset]);
-
-  // ─── Client-side search + sort (instant) ─────────────────────────────────
-
-  const searchTerms = useMemo(
-    () => search.toLowerCase().split(/\s+/).filter(Boolean),
-    [search]
-  );
-
-  const processedOrders = useMemo(() => {
-    const filtered = searchTerms.length > 0
-      ? allOrders.filter(o => matchesSearch(o, searchTerms))
-      : allOrders;
-    return sortOrders(filtered, sortBy, sortOrder);
-  }, [allOrders, searchTerms, sortBy, sortOrder]);
-
-  // Reset render count when filter/sort changes
-  useEffect(() => {
-    setRenderCount(INITIAL_RENDER);
-    scrollRef.current?.scrollTo({ top: 0 });
-  }, [search, sortBy, sortOrder]);
-
-  const visibleOrders = useMemo(
-    () => processedOrders.slice(0, renderCount),
-    [processedOrders, renderCount]
-  );
-
-  const hasMore = renderCount < processedOrders.length;
-
-  // ─── Infinite scroll ─────────────────────────────────────────────────────
+  // ─── Scroll to load more ─────────────────────────────────────────────────
 
   useEffect(() => {
     const sentinel = sentinelRef.current;
@@ -419,16 +353,16 @@ function ManufacturingContent() {
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore) {
-          setRenderCount(prev => Math.min(prev + LOAD_MORE_CHUNK, processedOrders.length));
+        if (entries[0].isIntersecting && hasMore && !fetchingRef.current && !isLoading) {
+          fetchPage(pageRef.current + 1, true);
         }
       },
-      { rootMargin: '600px' }
+      { rootMargin: '400px' }
     );
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [hasMore, processedOrders.length]);
+  }, [hasMore, isLoading, fetchPage]);
 
   // ─── Sort handler ────────────────────────────────────────────────────────
 
@@ -439,6 +373,7 @@ function ManufacturingContent() {
       setSortBy(column);
       setSortOrder('asc');
     }
+    scrollRef.current?.scrollTo({ top: 0 });
   };
 
   // ─── Render ──────────────────────────────────────────────────────────────
@@ -470,30 +405,12 @@ function ManufacturingContent() {
 
             <div className="flex-1" />
 
-            {/* Counter + Status */}
             <div className="flex items-center gap-3 mr-3">
-              {allOrders.length > 0 && (
+              {orders.length > 0 && (
                 <span className="text-[9px] text-muted-foreground font-mono tabular-nums">
-                  {search ? (
-                    <>
-                      <span className="text-foreground font-bold">{processedOrders.length}</span>
-                      <span className="text-muted-foreground/50"> results</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-foreground font-bold">{allOrders.length}</span>
-                      <span className="text-muted-foreground/50"> orders</span>
-                    </>
-                  )}
+                  <span className="text-foreground font-bold">{orders.length}</span>
+                  <span className="text-muted-foreground/50">{hasMore ? '+' : ''} orders</span>
                 </span>
-              )}
-              {isRevalidating && (
-                <div className="flex items-center gap-1.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                  <span className="text-[9px] text-blue-400 font-bold uppercase tracking-widest">
-                    {isComplete ? 'Syncing' : 'Loading all'}
-                  </span>
-                </div>
               )}
             </div>
 
@@ -526,12 +443,7 @@ function ManufacturingContent() {
                   >
                     <div className={cn('flex items-center gap-1', col.align === 'text-right' && 'justify-end')}>
                       <span>{col.label}</span>
-                      <ArrowUpDown
-                        className={cn(
-                          'w-2 h-2 transition-colors',
-                          sortBy === col.key ? 'text-foreground' : 'text-muted-foreground/20'
-                        )}
-                      />
+                      <ArrowUpDown className={cn('w-2 h-2 transition-colors', sortBy === col.key ? 'text-foreground' : 'text-muted-foreground/20')} />
                     </div>
                   </th>
                 ))}
@@ -544,17 +456,17 @@ function ManufacturingContent() {
                 <tr>
                   <td colSpan={12} className="px-2 py-8 text-center text-destructive text-[11px]">{error}</td>
                 </tr>
-              ) : visibleOrders.length === 0 ? (
+              ) : orders.length === 0 ? (
                 <tr>
                   <td colSpan={12} className="px-2 py-16 text-center">
                     <Factory className="w-8 h-8 mx-auto mb-3 text-muted-foreground/20" />
                     <p className="text-[11px] text-muted-foreground/50 uppercase tracking-widest font-bold">
-                      {search ? 'No matching orders' : 'No orders found'}
+                      {debouncedSearch ? 'No matching orders' : 'No orders found'}
                     </p>
                   </td>
                 </tr>
               ) : (
-                visibleOrders.map((order) => (
+                orders.map((order) => (
                   <TableRow
                     key={order._id}
                     order={order}
@@ -562,16 +474,23 @@ function ManufacturingContent() {
                   />
                 ))
               )}
+
+              {/* Loading more skeleton rows */}
+              {isLoadingMore && (
+                Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={`loading-${i}`} index={i} />)
+              )}
             </tbody>
           </table>
 
+          {/* Sentinel for infinite scroll */}
           <div ref={sentinelRef} className="h-1" />
 
-          {!isLoading && !hasMore && visibleOrders.length > 0 && (
+          {/* End marker */}
+          {!isLoading && !hasMore && orders.length > 0 && (
             <div className="flex items-center justify-center py-4 gap-2">
               <div className="h-px w-12 bg-border" />
               <span className="text-[9px] text-muted-foreground/40 uppercase tracking-widest font-bold">
-                {processedOrders.length} orders
+                {orders.length} orders loaded
               </span>
               <div className="h-px w-12 bg-border" />
             </div>
