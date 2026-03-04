@@ -4,24 +4,12 @@ import Manufacturing from '@/models/Manufacturing';
 import mongoose from 'mongoose';
 import Sku from '@/models/Sku';
 import User from '@/models/User';
-import OpeningBalance from '@/models/OpeningBalance';
-import PurchaseOrder from '@/models/PurchaseOrder';
-import AuditAdjustment from '@/models/AuditAdjustment';
 import { applyDateFilter } from '@/lib/global-settings';
 import { getSkuTiers } from '@/lib/sku-tiers';
 import { syncManufacturingToAppSheet, syncManufacturingLineItemsToAppSheet } from '@/lib/appsheet';
 import { buildFuzzySearchQuery, buildFuzzyRegex } from '@/lib/fuzzy-search';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const parseDuration = (d: string): number => {
-    if (!d) return 0;
-    const p = d.split(':').map(v => parseFloat(v) || 0);
-    return p.length === 3 ? p[0] + p[1] / 60 + p[2] / 3600 :
-        p.length === 2 ? p[0] + p[1] / 60 : 0;
-};
-
-// Ensure indexes exist (runs once in background, idempotent)
+// Ensure indexes once per cold start
 let indexesEnsured = false;
 async function ensureIndexes() {
     if (indexesEnsured) return;
@@ -31,17 +19,13 @@ async function ensureIndexes() {
         if (!db) return;
         await Promise.all([
             db.collection('manufacturings').createIndex({ createdAt: -1 }, { background: true }),
-            db.collection('manufacturings').createIndex({ sku: 1 }, { background: true }),
             db.collection('manufacturings').createIndex({ label: 1 }, { background: true }),
-            db.collection('openingbalances').createIndex({ sku: 1, lotNumber: 1 }, { background: true }),
-            db.collection('purchaseorders').createIndex({ 'lineItems.sku': 1, 'lineItems.lotNumber': 1 }, { background: true }),
-            db.collection('auditadjustments').createIndex({ sku: 1, lotNumber: 1 }, { background: true }),
+            db.collection('manufacturings').createIndex({ sku: 1 }, { background: true }),
         ]);
-    } catch { /* indexes may already exist */ }
+    } catch { /* already exist */ }
 }
 
-// ─── SKU Hydration (batch) ────────────────────────────────────────────────────
-
+// SKU hydration (single batch query)
 async function hydrateSkus(orders: any[]) {
     const rawSkuIds = new Set<string>();
     orders.forEach((o: any) => { if (o.sku) rawSkuIds.add(String(o.sku)); });
@@ -77,103 +61,8 @@ async function hydrateSkus(orders: any[]) {
     });
 }
 
-// ─── Background: Compute & Persist Costs ─────────────────────────────────────
-// Runs via after() — computes costs for orders that have totalCost === 0
-// and saves them back to MongoDB so future list queries are instant.
-
-async function computeAndPersistCosts(orderIds: string[]) {
-    if (orderIds.length === 0) return;
-
-    try {
-        await dbConnect();
-
-        // Load the full orders with lineItems + labor
-        const fullOrders = await Manufacturing.find({ _id: { $in: orderIds } })
-            .select('_id sku qty lineItems labor')
-            .lean();
-
-        if (fullOrders.length === 0) return;
-
-        // Collect all sku+lot combos
-        const allCostSkuIds = new Set<string>();
-        const allCostLots = new Set<string>();
-        const allLiSkuIds = new Set<string>();
-
-        fullOrders.forEach((o: any) => {
-            o.lineItems?.forEach((li: any) => {
-                const skuId = String(li.sku || '');
-                if (skuId) { allCostSkuIds.add(skuId); allLiSkuIds.add(skuId); }
-                if (li.lotNumber) allCostLots.add(li.lotNumber);
-            });
-        });
-
-        const costSkuArr = Array.from(allCostSkuIds);
-        const costLotArr = Array.from(allCostLots);
-        const costMap = new Map<string, number>();
-        const catMap = new Map<string, string>();
-
-        if (costSkuArr.length > 0 && costLotArr.length > 0) {
-            const db = mongoose.connection.db;
-            const liSkuArr = Array.from(allLiSkuIds);
-            const liObjIds = liSkuArr.filter(id => mongoose.Types.ObjectId.isValid(id)).map(id => new mongoose.Types.ObjectId(id));
-
-            const [obs, pos, mfgs, adjs, liSkus] = await Promise.all([
-                OpeningBalance.find({ sku: { $in: costSkuArr }, lotNumber: { $in: costLotArr } }).select('sku lotNumber cost').lean(),
-                PurchaseOrder.find({ 'lineItems.sku': { $in: costSkuArr }, 'lineItems.lotNumber': { $in: costLotArr } }).select('lineItems.sku lineItems.lotNumber lineItems.cost lineItems.price').lean(),
-                Manufacturing.find({ $or: [{ sku: { $in: costSkuArr }, lotNumber: { $in: costLotArr } }, { sku: { $in: costSkuArr }, label: { $in: costLotArr } }] }).select('sku lotNumber label totalCost qty qtyDifference').lean(),
-                AuditAdjustment.find({ sku: { $in: costSkuArr }, lotNumber: { $in: costLotArr } }).select('sku lotNumber cost').lean(),
-                db ? db.collection('skus').find({ $or: [{ _id: { $in: liSkuArr } }, { _id: { $in: liObjIds } }, { legacyId: { $in: liSkuArr } }] } as any, { projection: { _id: 1, category: 1, legacyId: 1 } }).toArray() : []
-            ]);
-
-            obs.forEach((ob: any) => { const k = `${ob.sku?.toString()}:${ob.lotNumber}`; if (ob.cost && !costMap.has(k)) costMap.set(k, ob.cost); });
-            pos.forEach((po: any) => { po.lineItems?.forEach((l: any) => { const k = `${l.sku?._id?.toString() || l.sku?.toString()}:${l.lotNumber}`; if (!costMap.has(k) && (l.cost || l.price)) costMap.set(k, l.cost || l.price); }); });
-            mfgs.forEach((j: any) => { const k = `${j.sku?._id?.toString() || j.sku?.toString()}:${j.lotNumber || j.label}`; if (!costMap.has(k) && j.totalCost) { const q = (j.qty || 0) + (j.qtyDifference || 0); if (q > 0) costMap.set(k, j.totalCost / q); } });
-            adjs.forEach((a: any) => { const k = `${a.sku?.toString()}:${a.lotNumber}`; if (!costMap.has(k) && a.cost) costMap.set(k, a.cost); });
-            liSkus.forEach((s: any) => { catMap.set(String(s._id), s.category || ''); if (s.legacyId) catMap.set(String(s.legacyId), s.category || ''); });
-        }
-
-        // Compute and save for each order
-        const bulkOps: any[] = [];
-        fullOrders.forEach((o: any) => {
-            let materialCost = 0, packagingCost = 0, laborCost = 0;
-
-            if (o.lineItems && Array.isArray(o.lineItems)) {
-                for (const li of o.lineItems) {
-                    const bomQty = (li.recipeQty || 0) * (o.qty || 0);
-                    const sa = li.sa ? li.sa / 100 : 0;
-                    const qtyExtra = sa > 0 ? (bomQty / sa) - bomQty : 0;
-                    const totalQty = bomQty + qtyExtra + (li.qtyScrapped || 0);
-                    const liSkuId = String(li.sku || '');
-                    const unitCost = costMap.get(`${liSkuId}:${li.lotNumber || ''}`) || li.cost || 0;
-                    const lineCost = totalQty * unitCost;
-                    if (catMap.get(liSkuId) === 'Packaging') packagingCost += lineCost;
-                    else materialCost += lineCost;
-                }
-            }
-
-            if (o.labor && Array.isArray(o.labor)) {
-                for (const l of o.labor) laborCost += parseDuration(l.duration) * (l.hourlyRate || 0);
-            }
-
-            bulkOps.push({
-                updateOne: {
-                    filter: { _id: o._id },
-                    update: { $set: { materialCost, packagingCost, laborCost, totalCost: materialCost + packagingCost + laborCost } }
-                }
-            });
-        });
-
-        if (bulkOps.length > 0) {
-            await Manufacturing.bulkWrite(bulkOps, { ordered: false });
-            console.log(`✅ Persisted costs for ${bulkOps.length} manufacturing orders`);
-        }
-    } catch (e) {
-        console.error('❌ Background cost computation failed:', e);
-    }
-}
-
 // ═══════════════════════════════════════════════════════════════════════════════
-// GET — Blazing fast paginated list (reads stored costs, no computation)
+// GET — Lean paginated list. Reads stored fields only. No background thrashing.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export async function GET(request: Request) {
@@ -183,7 +72,7 @@ export async function GET(request: Request) {
 
         const { searchParams } = new URL(request.url);
 
-        // Ensure indexes in background
+        // Background: ensure indexes (once, fast)
         after(() => ensureIndexes());
 
         const page = parseInt(searchParams.get('page') || '1');
@@ -199,14 +88,18 @@ export async function GET(request: Request) {
 
         let query: any = {};
 
+        // ─── Smart search ────────────────────────────────────────────────────
         if (search) {
-            const isNumericSearch = /^\d+$/.test(search.trim());
+            const trimmed = search.trim();
+            const isNumeric = /^\d+$/.test(trimmed);
 
-            if (isNumericSearch) {
-                // Exact match on label for WO# lookups — instant, precise, no fuzzy
-                query.label = search.trim();
+            if (isNumeric) {
+                // WO# search: indexed prefix match on label field
+                // "10922" → finds exactly WO# 10922
+                // "1092"  → finds WO# 10921, 10922, 10923, etc.
+                query.label = { $regex: `^${trimmed}` };
             } else {
-                // Text search: fuzzy match on label/legacyId + SKU name lookup
+                // Text search: fuzzy match on SKU names + label
                 const fuzzyRegex = buildFuzzyRegex(search);
                 const matchingSkus = await Sku.find({
                     name: { $regex: fuzzyRegex, $options: 'i' }
@@ -232,9 +125,7 @@ export async function GET(request: Request) {
 
         query = await applyDateFilter(query, 'createdAt');
 
-        // ─── FAST QUERY: Only stored fields, NO lineItems/labor ──────────────
-        // This makes the query 5-10x faster because MongoDB doesn't read/transfer
-        // the huge lineItems[] and labor[] arrays from disk.
+        // ─── LEAN QUERY: stored fields only, NO lineItems/labor ──────────────
         const listFields = '_id label sku qty qtyDifference priority status createdBy finishedBy createdAt materialCost packagingCost laborCost totalCost';
 
         let orders: any[];
@@ -266,27 +157,17 @@ export async function GET(request: Request) {
         const hasMore = orders.length > limit;
         orders = orders.slice(0, limit);
 
-        // SKU hydration + tiers (2 fast queries)
+        // SKU hydration + tiers (2 fast indexed queries)
         await hydrateSkus(orders);
 
         const tierSkuIds = new Set<string>();
         orders.forEach((o: any) => {
             if (o.sku && typeof o.sku === 'object') tierSkuIds.add(String(o.sku._id));
         });
-        const tiers = await getSkuTiers(Array.from(tierSkuIds));
-        orders.forEach((o: any) => {
-            if (o.sku && typeof o.sku === 'object') o.sku.tier = tiers[o.sku._id?.toString()];
-        });
-
-        // ─── Background: compute & persist costs for orders that need it ─────
-        const uncostIds = orders.filter((o: any) => !o.totalCost || o.totalCost === 0).map((o: any) => o._id);
-        if (uncostIds.length > 0) {
-            after(async () => {
-                try {
-                    await computeAndPersistCosts(uncostIds.map((id: any) => id.toString()));
-                } catch (e) {
-                    console.error('Background cost computation error:', e);
-                }
+        if (tierSkuIds.size > 0) {
+            const tiers = await getSkuTiers(Array.from(tierSkuIds));
+            orders.forEach((o: any) => {
+                if (o.sku && typeof o.sku === 'object') o.sku.tier = tiers[o.sku._id?.toString()];
             });
         }
 
@@ -335,10 +216,10 @@ export async function POST(request: Request) {
                     if (populatedOrder.lineItems && populatedOrder.lineItems.length > 0) {
                         await syncManufacturingLineItemsToAppSheet(populatedOrder, populatedOrder.lineItems, 'Add');
                     }
-                    console.log('✅ Manufacturing order + line items synced to AppSheet:', newItem._id);
+                    console.log('✅ Manufacturing order synced to AppSheet:', newItem._id);
                 }
             } catch (syncError) {
-                console.error('❌ Background AppSheet Manufacturing sync failed:', syncError);
+                console.error('❌ Background AppSheet sync failed:', syncError);
             }
         });
 
