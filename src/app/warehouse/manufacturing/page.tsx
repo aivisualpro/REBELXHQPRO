@@ -34,31 +34,31 @@ interface ManufacturingOrder {
 }
 
 // ─── In-Memory Cache ─────────────────────────────────────────────────────────
-// Persists across navigations within the session. Stores ALL orders.
 
 interface CacheEntry {
   orders: ManufacturingOrder[];
   timestamp: number;
+  isComplete: boolean; // true = full dataset
 }
 
 const globalCache: { current: CacheEntry | null } = { current: null };
-const CACHE_TTL = 120_000; // 2 min
+const CACHE_TTL = 120_000;
 
 // ─── Table Columns ───────────────────────────────────────────────────────────
 
 const COLUMNS: { key: string; label: string; width: string; align?: string }[] = [
-  { key: 'label', label: 'WO#', width: 'w-[70px]' },
-  { key: 'createdAt', label: 'Date', width: 'w-[90px]' },
-  { key: 'sku', label: 'SKU', width: 'min-w-[200px]' },
-  { key: 'qty', label: 'Qty', width: 'w-[70px]', align: 'text-right' },
-  { key: 'priority', label: 'Priority', width: 'w-[80px]' },
-  { key: 'status', label: 'Status', width: 'w-[100px]' },
-  { key: 'createdBy', label: 'Created By', width: 'w-[120px]' },
-  { key: 'materialCost', label: 'Material', width: 'w-[90px]', align: 'text-right' },
-  { key: 'packagingCost', label: 'Packaging', width: 'w-[90px]', align: 'text-right' },
-  { key: 'laborCost', label: 'Labor', width: 'w-[90px]', align: 'text-right' },
-  { key: 'totalCost', label: 'Total', width: 'w-[90px]', align: 'text-right' },
-  { key: 'unitCost', label: 'Unit Cost', width: 'w-[90px]', align: 'text-right' },
+  { key: 'label', label: 'WO#', width: 'w-[60px]' },
+  { key: 'createdAt', label: 'Date', width: 'w-[80px]' },
+  { key: 'sku', label: 'SKU', width: '' },
+  { key: 'qty', label: 'Qty', width: 'w-[60px]', align: 'text-right' },
+  { key: 'priority', label: 'Priority', width: 'w-[72px]' },
+  { key: 'status', label: 'Status', width: 'w-[90px]' },
+  { key: 'createdBy', label: 'Created By', width: 'w-[100px]' },
+  { key: 'materialCost', label: 'Material', width: 'w-[80px]', align: 'text-right' },
+  { key: 'packagingCost', label: 'Pkg', width: 'w-[70px]', align: 'text-right' },
+  { key: 'laborCost', label: 'Labor', width: 'w-[70px]', align: 'text-right' },
+  { key: 'totalCost', label: 'Total', width: 'w-[80px]', align: 'text-right' },
+  { key: 'unitCost', label: 'Unit', width: 'w-[70px]', align: 'text-right' },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -71,7 +71,6 @@ function getCreatedByName(order: ManufacturingOrder): string {
   return order.createdBy ? `${order.createdBy.firstName} ${order.createdBy.lastName}` : '';
 }
 
-// Client-side fuzzy search — matches all words in any order
 function matchesSearch(order: ManufacturingOrder, terms: string[]): boolean {
   if (terms.length === 0) return true;
   const haystack = [
@@ -81,59 +80,33 @@ function matchesSearch(order: ManufacturingOrder, terms: string[]): boolean {
     order.status,
     order.priority,
   ].join(' ').toLowerCase();
-
   return terms.every(term => haystack.includes(term));
 }
 
-// Client-side sort
 function sortOrders(orders: ManufacturingOrder[], sortBy: string, sortOrder: 'asc' | 'desc'): ManufacturingOrder[] {
   const dir = sortOrder === 'asc' ? 1 : -1;
   return [...orders].sort((a, b) => {
     let cmp = 0;
     switch (sortBy) {
-      case 'label':
-        cmp = (parseInt(a.label || '0') || 0) - (parseInt(b.label || '0') || 0);
-        break;
-      case 'createdAt':
-        cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-        break;
-      case 'sku':
-        cmp = getSkuName(a).localeCompare(getSkuName(b));
-        break;
-      case 'qty':
-        cmp = (a.qty || 0) - (b.qty || 0);
-        break;
+      case 'label': cmp = (parseInt(a.label || '0') || 0) - (parseInt(b.label || '0') || 0); break;
+      case 'createdAt': cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(); break;
+      case 'sku': cmp = getSkuName(a).localeCompare(getSkuName(b)); break;
+      case 'qty': cmp = (a.qty || 0) - (b.qty || 0); break;
       case 'priority': {
         const p: Record<string, number> = { Extreme: 3, High: 2, Normal: 1 };
-        cmp = (p[a.priority] || 0) - (p[b.priority] || 0);
-        break;
+        cmp = (p[a.priority] || 0) - (p[b.priority] || 0); break;
       }
-      case 'status':
-        cmp = (a.status || '').localeCompare(b.status || '');
-        break;
-      case 'createdBy':
-        cmp = getCreatedByName(a).localeCompare(getCreatedByName(b));
-        break;
-      case 'materialCost':
-        cmp = (a.materialCost || 0) - (b.materialCost || 0);
-        break;
-      case 'packagingCost':
-        cmp = (a.packagingCost || 0) - (b.packagingCost || 0);
-        break;
-      case 'laborCost':
-        cmp = (a.laborCost || 0) - (b.laborCost || 0);
-        break;
-      case 'totalCost':
-        cmp = (a.totalCost || 0) - (b.totalCost || 0);
-        break;
+      case 'status': cmp = (a.status || '').localeCompare(b.status || ''); break;
+      case 'createdBy': cmp = getCreatedByName(a).localeCompare(getCreatedByName(b)); break;
+      case 'materialCost': cmp = (a.materialCost || 0) - (b.materialCost || 0); break;
+      case 'packagingCost': cmp = (a.packagingCost || 0) - (b.packagingCost || 0); break;
+      case 'laborCost': cmp = (a.laborCost || 0) - (b.laborCost || 0); break;
+      case 'totalCost': cmp = (a.totalCost || 0) - (b.totalCost || 0); break;
       case 'unitCost': {
         const ucA = a.qty > 0 ? (a.totalCost || 0) / a.qty : 0;
         const ucB = b.qty > 0 ? (b.totalCost || 0) / b.qty : 0;
-        cmp = ucA - ucB;
-        break;
+        cmp = ucA - ucB; break;
       }
-      default:
-        cmp = 0;
     }
     return cmp * dir;
   });
@@ -149,10 +122,10 @@ function SkeletonRow({ index }: { index: number }) {
           <div
             className={cn(
               'h-3 rounded-sm bg-secondary/80 animate-pulse',
-              col.key === 'sku' ? 'w-3/4' :
+              col.key === 'sku' ? 'w-4/5' :
                 col.key === 'status' ? 'w-14' :
-                  col.key === 'createdBy' ? 'w-20' :
-                    col.key === 'label' ? 'w-10' : 'w-12'
+                  col.key === 'createdBy' ? 'w-16' :
+                    col.key === 'label' ? 'w-8' : 'w-10'
             )}
             style={{ animationDelay: `${index * 20 + 100}ms` }}
           />
@@ -167,7 +140,7 @@ function SkeletonRow({ index }: { index: number }) {
 function StatusBadge({ status }: { status: string }) {
   return (
     <span className={cn(
-      'inline-flex items-center px-2 py-0.5 text-[8px] font-black uppercase tracking-wider',
+      'inline-flex items-center px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wider',
       status === 'Fulfilled' ? 'bg-emerald-500/10 text-emerald-500' :
         status === 'Processing' ? 'bg-blue-500/10 text-blue-500' :
           status === 'Ready to QC' ? 'bg-amber-500/10 text-amber-400' :
@@ -183,11 +156,11 @@ function PriorityBadge({ priority }: { priority: string }) {
   if (priority === 'Normal') return <span className="text-[10px] text-muted-foreground/60">—</span>;
   return (
     <span className={cn(
-      'text-[10px] font-black uppercase tracking-wider',
+      'text-[9px] font-black uppercase tracking-wider',
       priority === 'Extreme' ? 'text-red-500' :
         priority === 'High' ? 'text-orange-500' : 'text-muted-foreground'
     )}>
-      {priority === 'Extreme' ? '⚡ Extreme' : priority === 'High' ? '↑ High' : priority}
+      {priority === 'Extreme' ? '⚡ Ext' : '↑ High'}
     </span>
   );
 }
@@ -195,7 +168,7 @@ function PriorityBadge({ priority }: { priority: string }) {
 function TierBadge({ tier }: { tier: number }) {
   return (
     <span className={cn(
-      'flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-black text-white shadow-sm',
+      'flex-shrink-0 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[7px] font-black text-white',
       tier === 1 ? 'bg-emerald-500' : tier === 2 ? 'bg-blue-500' : 'bg-orange-500'
     )} title={`Tier ${tier}`}>
       {tier}
@@ -226,41 +199,41 @@ const TableRow = React.memo(function TableRow({
       className="group hover:bg-primary/[0.03] transition-colors duration-150 cursor-pointer border-b border-border/30"
       onClick={onClick}
     >
-      <td className="px-2 py-1.5 text-[11px] font-mono text-muted-foreground group-hover:text-foreground transition-colors">
+      <td className="px-2 py-1.5 w-[60px] text-[11px] font-mono text-muted-foreground group-hover:text-foreground transition-colors">
         <span className="group-hover:border-l-2 group-hover:border-l-primary group-hover:pl-1.5 transition-all">
           {order.label || '-'}
         </span>
       </td>
-      <td className="px-2 py-1.5 text-[10px] font-mono text-muted-foreground/70">
+      <td className="px-2 py-1.5 w-[80px] text-[10px] font-mono text-muted-foreground/70">
         {new Date(order.createdAt).toLocaleDateString()}
       </td>
       <td className="px-2 py-1.5 text-[11px] text-muted-foreground group-hover:text-foreground transition-colors">
         <div className="flex items-center gap-1.5">
           {tier && <TierBadge tier={tier} />}
-          <span className="truncate max-w-[250px]">{skuName}</span>
+          <span className="whitespace-nowrap">{skuName}</span>
         </div>
       </td>
-      <td className="px-2 py-1.5 text-[11px] font-mono text-right text-muted-foreground">
+      <td className="px-2 py-1.5 w-[60px] text-[11px] font-mono text-right text-muted-foreground">
         {order.qty?.toLocaleString() || '-'}
       </td>
-      <td className="px-2 py-1.5"><PriorityBadge priority={order.priority} /></td>
-      <td className="px-2 py-1.5"><StatusBadge status={order.status} /></td>
-      <td className="px-2 py-1.5 text-[10px] text-muted-foreground/70 truncate max-w-[120px]">
+      <td className="px-2 py-1.5 w-[72px]"><PriorityBadge priority={order.priority} /></td>
+      <td className="px-2 py-1.5 w-[90px]"><StatusBadge status={order.status} /></td>
+      <td className="px-2 py-1.5 w-[100px] text-[10px] text-muted-foreground/70 truncate">
         {getCreatedByName(order) || '-'}
       </td>
-      <td className="px-2 py-1.5 text-[10px] font-mono text-right text-muted-foreground/70">{formatCurrency(order.materialCost || 0)}</td>
-      <td className="px-2 py-1.5 text-[10px] font-mono text-right text-muted-foreground/70">{formatCurrency(order.packagingCost || 0)}</td>
-      <td className="px-2 py-1.5 text-[10px] font-mono text-right text-muted-foreground/70">{formatCurrency(order.laborCost || 0)}</td>
-      <td className="px-2 py-1.5 text-[10px] font-mono text-right font-semibold text-muted-foreground group-hover:text-foreground transition-colors">{formatCurrency(order.totalCost || 0)}</td>
-      <td className="px-2 py-1.5 text-[10px] font-mono text-right text-muted-foreground/70">{formatCurrency(unitCost)}</td>
+      <td className="px-2 py-1.5 w-[80px] text-[10px] font-mono text-right text-muted-foreground/70">{formatCurrency(order.materialCost || 0)}</td>
+      <td className="px-2 py-1.5 w-[70px] text-[10px] font-mono text-right text-muted-foreground/70">{formatCurrency(order.packagingCost || 0)}</td>
+      <td className="px-2 py-1.5 w-[70px] text-[10px] font-mono text-right text-muted-foreground/70">{formatCurrency(order.laborCost || 0)}</td>
+      <td className="px-2 py-1.5 w-[80px] text-[10px] font-mono text-right font-semibold text-muted-foreground group-hover:text-foreground transition-colors">{formatCurrency(order.totalCost || 0)}</td>
+      <td className="px-2 py-1.5 w-[70px] text-[10px] font-mono text-right text-muted-foreground/70">{formatCurrency(unitCost)}</td>
     </tr>
   );
 });
 
-// ─── Render Chunk Size ───────────────────────────────────────────────────────
+// ─── Constants ───────────────────────────────────────────────────────────────
 
-const INITIAL_RENDER = 60; // Show 60 rows immediately
-const LOAD_MORE_CHUNK = 80; // Then 80 more per scroll
+const INITIAL_RENDER = 60;
+const LOAD_MORE_CHUNK = 80;
 
 // ─── Main Export ──────────────────────────────────────────────────────────────
 
@@ -301,13 +274,14 @@ function ManufacturingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // All data (from API or cache)
+  // All data
   const [allOrders, setAllOrders] = useState<ManufacturingOrder[]>(globalCache.current?.orders || []);
   const [isLoading, setIsLoading] = useState(!globalCache.current);
   const [isRevalidating, setIsRevalidating] = useState(false);
+  const [isComplete, setIsComplete] = useState(globalCache.current?.isComplete ?? false);
   const [error, setError] = useState<string | null>(null);
 
-  // View state (client-side)
+  // View state
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -317,6 +291,7 @@ function ManufacturingContent() {
   const mountedRef = useRef(true);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const fullFetchStartedRef = useRef(false);
 
   // Header portal
   const [headerPortalTarget, setHeaderPortalTarget] = useState<HTMLElement | null>(null);
@@ -330,23 +305,37 @@ function ManufacturingContent() {
     return () => { mountedRef.current = false; };
   }, []);
 
-  // ─── Fetch ALL data once ─────────────────────────────────────────────────
+  // ─── Phase 1: Quick first page (30 records, fast API) ────────────────────
 
-  const fetchAllOrders = useCallback(async (isBackground = false) => {
+  const fetchQuickPage = useCallback(async () => {
+    try {
+      const res = await fetch('/api/manufacturing?page=1&limit=30&sortBy=createdAt&sortOrder=desc');
+      const data = await res.json();
+      if (!mountedRef.current) return;
+      if (res.ok) {
+        setAllOrders(data.orders || []);
+        setIsLoading(false);
+      }
+    } catch { /* Phase 2 will handle */ }
+  }, []);
+
+  // ─── Phase 2: Full dataset (all records with costs) ──────────────────────
+
+  const fetchFullDataset = useCallback(async (isBackground = false) => {
     if (isBackground) setIsRevalidating(true);
-    else if (allOrders.length === 0) setIsLoading(true);
+    fullFetchStartedRef.current = true;
 
     try {
       const res = await fetch('/api/manufacturing?fields=list');
       const data = await res.json();
-
       if (!mountedRef.current) return;
 
       if (res.ok) {
         const orders = data.orders || [];
         setAllOrders(orders);
+        setIsComplete(true);
         setError(null);
-        globalCache.current = { orders, timestamp: Date.now() };
+        globalCache.current = { orders, timestamp: Date.now(), isComplete: true };
       } else {
         if (!isBackground) setError(data.error || 'Failed to fetch');
       }
@@ -360,20 +349,40 @@ function ManufacturingContent() {
     }
   }, []);
 
+  // ─── Boot sequence ──────────────────────────────────────────────────────
+
   useEffect(() => {
-    if (globalCache.current) {
-      // Cache hit — show instantly
+    if (globalCache.current && globalCache.current.isComplete) {
+      // Cache hit — instant render, full dataset available
       setAllOrders(globalCache.current.orders);
+      setIsComplete(true);
       setIsLoading(false);
 
       // Stale? Background refresh
       if (Date.now() - globalCache.current.timestamp > CACHE_TTL) {
-        fetchAllOrders(true);
+        fetchFullDataset(true);
       }
-    } else {
-      fetchAllOrders();
+      return;
     }
-  }, [fetchAllOrders]);
+
+    if (globalCache.current && !globalCache.current.isComplete) {
+      // Partial cache (from quick page) — show it, then fetch full
+      setAllOrders(globalCache.current.orders);
+      setIsLoading(false);
+      fetchFullDataset(true);
+      return;
+    }
+
+    // No cache — two-phase load
+    // Phase 1: Quick page (fast, ~1-2s) — shows data immediately
+    setIsLoading(true);
+    fetchQuickPage().then(() => {
+      // Phase 2: Full dataset in background
+      if (mountedRef.current) {
+        fetchFullDataset(true);
+      }
+    });
+  }, [fetchQuickPage, fetchFullDataset]);
 
   // ─── Client-side search + sort (instant) ─────────────────────────────────
 
@@ -383,23 +392,18 @@ function ManufacturingContent() {
   );
 
   const processedOrders = useMemo(() => {
-    // 1. Filter
     const filtered = searchTerms.length > 0
       ? allOrders.filter(o => matchesSearch(o, searchTerms))
       : allOrders;
-
-    // 2. Sort
     return sortOrders(filtered, sortBy, sortOrder);
   }, [allOrders, searchTerms, sortBy, sortOrder]);
 
   // Reset render count when filter/sort changes
   useEffect(() => {
     setRenderCount(INITIAL_RENDER);
-    // Scroll to top
     scrollRef.current?.scrollTo({ top: 0 });
   }, [search, sortBy, sortOrder]);
 
-  // Visible slice
   const visibleOrders = useMemo(
     () => processedOrders.slice(0, renderCount),
     [processedOrders, renderCount]
@@ -407,7 +411,7 @@ function ManufacturingContent() {
 
   const hasMore = renderCount < processedOrders.length;
 
-  // ─── Infinite scroll (just renders more from already-loaded data) ────────
+  // ─── Infinite scroll ─────────────────────────────────────────────────────
 
   useEffect(() => {
     const sentinel = sentinelRef.current;
@@ -486,7 +490,9 @@ function ManufacturingContent() {
               {isRevalidating && (
                 <div className="flex items-center gap-1.5">
                   <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                  <span className="text-[9px] text-blue-400 font-bold uppercase tracking-widest">Syncing</span>
+                  <span className="text-[9px] text-blue-400 font-bold uppercase tracking-widest">
+                    {isComplete ? 'Syncing' : 'Loading all'}
+                  </span>
                 </div>
               )}
             </div>
@@ -503,9 +509,9 @@ function ManufacturingContent() {
         )}
 
       {/* Table */}
-      <div ref={scrollRef} className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
-        <div className="min-w-full px-2 py-1">
-          <table className="w-full text-left border-separate border-spacing-0 relative z-0">
+      <div ref={scrollRef} className="flex-1 overflow-x-auto overflow-y-auto scrollbar-custom bg-background/50 relative">
+        <div className="min-w-fit px-2 py-1">
+          <table className="w-full text-left border-separate border-spacing-0 relative z-0 table-fixed">
             <thead className="bg-secondary/50 border-b border-border sticky top-0 z-10 transition-colors duration-300">
               <tr>
                 {COLUMNS.map((col) => (
@@ -559,10 +565,8 @@ function ManufacturingContent() {
             </tbody>
           </table>
 
-          {/* Infinite scroll sentinel */}
           <div ref={sentinelRef} className="h-1" />
 
-          {/* End marker */}
           {!isLoading && !hasMore && visibleOrders.length > 0 && (
             <div className="flex items-center justify-center py-4 gap-2">
               <div className="h-px w-12 bg-border" />
