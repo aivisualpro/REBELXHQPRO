@@ -200,17 +200,25 @@ export async function GET(request: Request) {
         let query: any = {};
 
         if (search) {
-            const fuzzyRegex = buildFuzzyRegex(search);
-            const matchingSkus = await Sku.find({
-                name: { $regex: fuzzyRegex, $options: 'i' }
-            }).select('_id').lean();
-            const matchingSkuIds = matchingSkus.map((s: any) => s._id);
+            const isNumericSearch = /^\d+$/.test(search.trim());
 
-            const fuzzyQuery = buildFuzzySearchQuery(search, ['label', 'legacyId']);
-            if (fuzzyQuery) {
-                query.$and = fuzzyQuery.$and.map((cond: any) => ({
-                    $or: [...cond.$or, ...(matchingSkuIds.length > 0 ? [{ sku: { $in: matchingSkuIds } }] : [])]
-                }));
+            if (isNumericSearch) {
+                // Exact match on label for WO# lookups — instant, precise, no fuzzy
+                query.label = search.trim();
+            } else {
+                // Text search: fuzzy match on label/legacyId + SKU name lookup
+                const fuzzyRegex = buildFuzzyRegex(search);
+                const matchingSkus = await Sku.find({
+                    name: { $regex: fuzzyRegex, $options: 'i' }
+                }).select('_id').lean();
+                const matchingSkuIds = matchingSkus.map((s: any) => s._id);
+
+                const fuzzyQuery = buildFuzzySearchQuery(search, ['label', 'legacyId']);
+                if (fuzzyQuery) {
+                    query.$and = fuzzyQuery.$and.map((cond: any) => ({
+                        $or: [...cond.$or, ...(matchingSkuIds.length > 0 ? [{ sku: { $in: matchingSkuIds } }] : [])]
+                    }));
+                }
             }
         }
 
