@@ -29,14 +29,14 @@ const parseDuration = (duration: string): number => {
 // Helper to get ingredient cost from OB or PO
 async function getIngredientCostFromSource(ingredientSkuId: string, ingredientLotNumber: string): Promise<number> {
     if (!ingredientSkuId || !ingredientLotNumber) return 0;
-    
+
     // Check Opening Balance
     const ob = await OpeningBalance.findOne({
         sku: ingredientSkuId,
         lotNumber: ingredientLotNumber
     }).select('cost').lean();
     if (ob) return ob.cost || 0;
-    
+
     // Check Purchase Orders
     const po = await PurchaseOrder.findOne({
         'lineItems': {
@@ -46,7 +46,7 @@ async function getIngredientCostFromSource(ingredientSkuId: string, ingredientLo
             }
         }
     }).select('lineItems').lean();
-    
+
     if (po && po.lineItems) {
         const line = po.lineItems.find((l: any) => {
             const lSku = l.sku?._id || l.sku;
@@ -54,7 +54,7 @@ async function getIngredientCostFromSource(ingredientSkuId: string, ingredientLo
         });
         if (line) return line.cost || line.price || 0;
     }
-    
+
     return 0;
 }
 
@@ -62,16 +62,16 @@ async function getIngredientCostFromSource(ingredientSkuId: string, ingredientLo
 async function calculateManufacturingJobCost(job: any): Promise<number> {
     const qtyManufactured = (job.qty || 0) + (job.qtyDifference || 0);
     if (qtyManufactured <= 0) return 0;
-    
+
     // If totalCost is already calculated and saved, use it
     if (job.totalCost && job.totalCost > 0) {
         return job.totalCost / qtyManufactured;
     }
-    
+
     // Otherwise, calculate on the fly from labor and ingredients
     let laborCost = 0;
     let ingredientCost = 0;
-    
+
     // Sum labor costs
     if (job.labor && Array.isArray(job.labor)) {
         job.labor.forEach((labor: any) => {
@@ -79,24 +79,24 @@ async function calculateManufacturingJobCost(job: any): Promise<number> {
             laborCost += hours * (labor.hourlyRate || 0);
         });
     }
-    
+
     // Sum ingredient costs - lookup costs from OpeningBalance/PurchaseOrder
     if (job.lineItems && Array.isArray(job.lineItems)) {
         for (const lineItem of job.lineItems) {
-            const itemSkuId = (typeof lineItem.sku === 'object' && lineItem.sku !== null) 
-                ? lineItem.sku._id?.toString() 
+            const itemSkuId = (typeof lineItem.sku === 'object' && lineItem.sku !== null)
+                ? lineItem.sku._id?.toString()
                 : lineItem.sku?.toString();
             const bomQty = (lineItem.recipeQty || 0) * (job.qty || 0);
             const qtyExtra = lineItem.qtyExtra || 0;
             const qtyScrapped = lineItem.qtyScrapped || 0;
             const totalConsumed = bomQty + qtyExtra + qtyScrapped;
-            
+
             // Lookup ingredient cost
             const unitCost = await getIngredientCostFromSource(itemSkuId, lineItem.lotNumber);
             ingredientCost += totalConsumed * unitCost;
         }
     }
-    
+
     const totalJobCost = laborCost + ingredientCost;
     return totalJobCost / qtyManufactured;
 }
@@ -104,11 +104,11 @@ async function calculateManufacturingJobCost(job: any): Promise<number> {
 // Optimized: Batch fetch all costs at once instead of sequential queries
 async function enrichLineItemsWithCost(lineItems: any[]) {
     if (!lineItems || lineItems.length === 0) return lineItems;
-    
+
     // Collect all unique sku+lot combinations
     const lookupKeys = new Set<string>();
     const lookupData: { skuId: string; lotNumber: string }[] = [];
-    
+
     lineItems.forEach(item => {
         const skuId = item.sku?._id?.toString() || item.sku?.toString();
         const lotNumber = item.lotNumber;
@@ -120,43 +120,43 @@ async function enrichLineItemsWithCost(lineItems: any[]) {
             }
         }
     });
-    
+
     if (lookupData.length === 0) {
         return lineItems.map(item => ({ ...item, cost: 0 }));
     }
-    
+
     // Extract unique values for queries
     const allSkuIds = [...new Set(lookupData.map(d => d.skuId))];
     const allLotNumbers = [...new Set(lookupData.map(d => d.lotNumber))];
-    
+
     // Batch fetch all potential cost sources in parallel
     const [openingBalances, purchaseOrders, manufacturingJobs, auditAdjustments] = await Promise.all([
         OpeningBalance.find({
             sku: { $in: allSkuIds },
             lotNumber: { $in: allLotNumbers }
         }).select('sku lotNumber cost').lean(),
-        
+
         PurchaseOrder.find({
             'lineItems.sku': { $in: allSkuIds },
             'lineItems.lotNumber': { $in: allLotNumbers }
         }).select('lineItems.sku lineItems.lotNumber lineItems.cost lineItems.price').lean(),
-        
+
         Manufacturing.find({
             $or: [
                 { sku: { $in: allSkuIds }, lotNumber: { $in: allLotNumbers } },
                 { sku: { $in: allSkuIds }, label: { $in: allLotNumbers } }
             ]
         }).select('sku lotNumber label totalCost qty qtyDifference').lean(),
-        
+
         AuditAdjustment.find({
             sku: { $in: allSkuIds },
             lotNumber: { $in: allLotNumbers }
         }).select('sku lotNumber cost').lean()
     ]);
-    
+
     // Build cost lookup map: key = "skuId:lotNumber" -> cost
     const costMap = new Map<string, number>();
-    
+
     // 1. Opening Balances (highest priority)
     openingBalances.forEach((ob: any) => {
         const key = `${ob.sku?.toString()}:${ob.lotNumber}`;
@@ -164,7 +164,7 @@ async function enrichLineItemsWithCost(lineItems: any[]) {
             costMap.set(key, ob.cost);
         }
     });
-    
+
     // 2. Purchase Orders
     purchaseOrders.forEach((po: any) => {
         po.lineItems?.forEach((line: any) => {
@@ -175,7 +175,7 @@ async function enrichLineItemsWithCost(lineItems: any[]) {
             }
         });
     });
-    
+
     // 3. Manufacturing Jobs (calculate per-unit cost)
     manufacturingJobs.forEach((job: any) => {
         const skuId = job.sku?._id?.toString() || job.sku?.toString();
@@ -188,7 +188,7 @@ async function enrichLineItemsWithCost(lineItems: any[]) {
             }
         }
     });
-    
+
     // 4. Audit Adjustments
     auditAdjustments.forEach((adj: any) => {
         const key = `${adj.sku?.toString()}:${adj.lotNumber}`;
@@ -196,7 +196,7 @@ async function enrichLineItemsWithCost(lineItems: any[]) {
             costMap.set(key, adj.cost);
         }
     });
-    
+
     // Map costs to line items
     return lineItems.map(item => {
         const skuId = item.sku?._id?.toString() || item.sku?.toString();
@@ -212,9 +212,9 @@ export async function GET(
 ) {
     try {
         await dbConnect();
-        void Sku; 
-        void User; 
-        void Recipe; 
+        void Sku;
+        void User;
+        void Recipe;
         void AuditAdjustment;
 
         const { id } = await context.params;
@@ -304,6 +304,47 @@ export async function GET(
             const id = li.sku?._id || li.sku;
             if (id && li.sku && typeof li.sku === 'object') {
                 li.sku.tier = tiers[id.toString()];
+            }
+        });
+
+        // ─── Background: Persist computed costs ──────────────────────────────
+        // Save materialCost, packagingCost, laborCost, totalCost to the document
+        // so the list API can read them directly without re-computing.
+        after(async () => {
+            try {
+                await dbConnect();
+                let materialCost = 0, packagingCost = 0, laborCost = 0;
+
+                if (order.lineItems && Array.isArray(order.lineItems)) {
+                    for (const li of order.lineItems as any[]) {
+                        const bomQty = (li.recipeQty || 0) * ((order as any).qty || 0);
+                        const sa = li.sa ? li.sa / 100 : 0;
+                        const qtyExtra = sa > 0 ? (bomQty / sa) - bomQty : 0;
+                        const totalQty = bomQty + qtyExtra + (li.qtyScrapped || 0);
+                        const unitCost = li.cost || 0;
+                        const lineCost = totalQty * unitCost;
+                        const category = li.sku?.category || '';
+                        if (category === 'Packaging') packagingCost += lineCost;
+                        else materialCost += lineCost;
+                    }
+                }
+
+                if ((order as any).labor && Array.isArray((order as any).labor)) {
+                    for (const l of (order as any).labor) {
+                        const dur = l.duration || '';
+                        const parts = dur.split(':').map((v: string) => parseFloat(v) || 0);
+                        const hours = parts.length === 3 ? parts[0] + parts[1] / 60 + parts[2] / 3600 : parts.length === 2 ? parts[0] + parts[1] / 60 : 0;
+                        laborCost += hours * (l.hourlyRate || 0);
+                    }
+                }
+
+                const totalCost = materialCost + packagingCost + laborCost;
+                await Manufacturing.updateOne(
+                    { _id: id },
+                    { $set: { materialCost, packagingCost, laborCost, totalCost } }
+                );
+            } catch (e) {
+                console.error('Background cost persist failed:', e);
             }
         });
 
