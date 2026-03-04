@@ -17,7 +17,77 @@ export async function GET(request: Request) {
         void User;
 
         const { searchParams } = new URL(request.url);
+        const fields = searchParams.get('fields');
 
+        // ─── FAST PATH: Lightweight list for client-side filtering ────────────
+        // Returns ALL orders with minimal fields — no lineItems, labor, notes.
+        // Client does search/sort/filter locally for instant UX.
+        if (fields === 'list') {
+            let query: any = {};
+
+            // Apply Global Date Filter only
+            query = await applyDateFilter(query, 'createdAt');
+
+            const listFields = '_id label sku uom qty qtyDifference priority status createdBy finishedBy createdAt materialCost packagingCost laborCost totalCost';
+
+            const orders = await Manufacturing.find(query)
+                .select(listFields)
+                .populate('createdBy', 'firstName lastName')
+                .populate('finishedBy', 'firstName lastName')
+                .sort({ createdAt: -1 })
+                .lean();
+
+            // SKU hydration (batch — single query)
+            const rawSkuIds = new Set<string>();
+            orders.forEach((o: any) => { if (o.sku) rawSkuIds.add(String(o.sku)); });
+
+            const db = mongoose.connection.db;
+            const skuById = new Map<string, any>();
+            const skuByLegacy = new Map<string, any>();
+
+            if (db && rawSkuIds.size > 0) {
+                const rawSkuArr = Array.from(rawSkuIds);
+                const objectIds = rawSkuArr
+                    .filter(id => mongoose.Types.ObjectId.isValid(id))
+                    .map(id => new mongoose.Types.ObjectId(id));
+
+                const allSkus = await db.collection('skus').find({
+                    $or: [
+                        { _id: { $in: rawSkuArr } },
+                        { _id: { $in: objectIds } },
+                        { legacyId: { $in: rawSkuArr } }
+                    ]
+                } as any, { projection: { _id: 1, name: 1, legacyId: 1 } }).toArray();
+
+                allSkus.forEach((s: any) => {
+                    skuById.set(String(s._id), s);
+                    if (s.legacyId) skuByLegacy.set(String(s.legacyId), s);
+                });
+            }
+
+            // Hydrate + Tiers in a single pass
+            const tierSkuIds = new Set<string>();
+            orders.forEach((o: any) => {
+                if (!o.sku) return;
+                const skuStr = String(o.sku);
+                const found = skuById.get(skuStr) || skuByLegacy.get(skuStr);
+                if (found) {
+                    o.sku = { _id: String(found._id), name: found.name };
+                    tierSkuIds.add(String(found._id));
+                }
+            });
+
+            const tiers = await getSkuTiers(Array.from(tierSkuIds));
+            orders.forEach((o: any) => {
+                if (o.sku && typeof o.sku === 'object') {
+                    o.sku.tier = tiers[(o.sku._id || o.sku).toString()];
+                }
+            });
+
+            return NextResponse.json({ orders, total: orders.length });
+        }
+
+        // ─── STANDARD PATH: Paginated with server-side search ────────────────
         const page = parseInt(searchParams.get('page') || '1');
         const limit = parseInt(searchParams.get('limit') || '20');
         const sortBy = searchParams.get('sortBy') || 'createdAt';
@@ -39,7 +109,7 @@ export async function GET(request: Request) {
                 name: { $regex: fuzzyRegex, $options: 'i' }
             }).select('_id').lean();
             matchingSkuIds = matchingSkus.map((s: any) => s._id);
-            
+
             const fuzzyQuery = buildFuzzySearchQuery(search, ['label', 'legacyId']);
             if (fuzzyQuery) {
                 query.$and = fuzzyQuery.$and.map((cond: any) => ({
@@ -69,9 +139,9 @@ export async function GET(request: Request) {
         query = await applyDateFilter(query, 'createdAt');
 
         const total = await Manufacturing.countDocuments(query);
-        
+
         let orders: any[];
-        
+
         if (sortBy === 'label') {
             // Label is stored as string but represents a number — use aggregation for numeric sort
             orders = await Manufacturing.aggregate([
@@ -177,7 +247,7 @@ export async function POST(request: Request) {
                 { $limit: 1 },
                 { $project: { numericLabel: 1 } }
             ]);
-            
+
             const maxLabel = result[0]?.numericLabel || 0;
             body.label = String(maxLabel + 1);
         }
