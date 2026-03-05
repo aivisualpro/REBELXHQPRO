@@ -37,7 +37,7 @@
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-card: var(--card);
-  
+
   --font-sans: var(--font-inter);
   --font-mono: var(--font-geist-mono);
 }
@@ -65,7 +65,6 @@ body {
     font-weight: 500;
     text-align: left;
     color: var(--foreground);
-    opacity: 0.8;
   }
 
   th {
@@ -90,7 +89,8 @@ body {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #fe9900; /* slightly darker yellow */
+  background: #fe9900;
+  /* slightly darker yellow */
 }
 
 .glass-header {
@@ -125,8 +125,15 @@ body {
 
 /* ── Idle breathing (subtle float) ──────────────────────────── */
 @keyframes logo-idle-breathe {
-  0%, 100% { transform: translateY(0) scale(1); }
-  50%      { transform: translateY(-1.5px) scale(1.04); }
+
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+
+  50% {
+    transform: translateY(-1.5px) scale(1.04);
+  }
 }
 
 /* ── Golden Aura Glow ───────────────────────────────────────── */
@@ -145,13 +152,31 @@ body {
 }
 
 @keyframes aura-pulse {
-  0%, 100% { opacity: 0.4; transform: scale(1); }
-  50%      { opacity: 0.7; transform: scale(1.15); }
+
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.7;
+    transform: scale(1.15);
+  }
 }
 
 @keyframes aura-flare {
-  0%, 100% { opacity: 0.6; transform: scale(1.1); }
-  50%      { opacity: 1;   transform: scale(1.35); }
+
+  0%,
+  100% {
+    opacity: 0.6;
+    transform: scale(1.1);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.35);
+  }
 }
 
 /* ── Pulse Ring ─────────────────────────────────────────────── */
@@ -171,8 +196,17 @@ body {
 }
 
 @keyframes pulse-ring-expand {
-  0%   { transform: scale(1);   opacity: 0.7; border-color: rgba(242, 182, 28, 0.7); }
-  100% { transform: scale(2.2); opacity: 0;   border-color: rgba(242, 182, 28, 0); }
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+    border-color: rgba(242, 182, 28, 0.7);
+  }
+
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+    border-color: rgba(242, 182, 28, 0);
+  }
 }
 
 /* ── Shimmer Streak ─────────────────────────────────────────── */
@@ -192,13 +226,11 @@ body {
   left: -60%;
   width: 40%;
   height: 200%;
-  background: linear-gradient(
-    105deg,
-    transparent 40%,
-    rgba(255, 255, 255, 0.35) 45%,
-    rgba(255, 255, 255, 0.1) 50%,
-    transparent 55%
-  );
+  background: linear-gradient(105deg,
+      transparent 40%,
+      rgba(255, 255, 255, 0.35) 45%,
+      rgba(255, 255, 255, 0.1) 50%,
+      transparent 55%);
   transform: skewX(-15deg);
   animation: shimmer-sweep 4s ease-in-out infinite;
 }
@@ -208,8 +240,13 @@ body {
 }
 
 @keyframes shimmer-sweep {
-  0%   { left: -60%; }
-  100% { left: 160%; }
+  0% {
+    left: -60%;
+  }
+
+  100% {
+    left: 160%;
+  }
 }
 
 /* ── Sparkle Particles ──────────────────────────────────────── */
@@ -231,10 +268,12 @@ body {
     transform: translate(-50%, -50%) translate(0, 0) scale(0);
     opacity: 0;
   }
+
   20% {
     opacity: 1;
     transform: translate(-50%, -50%) translate(calc(var(--sparkle-x, 0px) * 0.3), calc(var(--sparkle-y, 0px) * 0.3)) scale(1.2);
   }
+
   100% {
     opacity: 0;
     transform: translate(-50%, -50%) translate(var(--sparkle-x, 0px), var(--sparkle-y, 0px)) scale(0);
@@ -247,8 +286,17 @@ body {
 }
 
 @keyframes loading-text-glow {
-  0%, 100% { opacity: 0.4; color: var(--muted-foreground); }
-  50%      { opacity: 1;   color: #fe9900; }
+
+  0%,
+  100% {
+    opacity: 0.4;
+    color: var(--muted-foreground);
+  }
+
+  50% {
+    opacity: 1;
+    color: #fe9900;
+  }
 }
 
 /* ── Ledger Row Flash (Warning click highlight) ─────────── */
@@ -264,19 +312,21 @@ body {
 }
 
 @keyframes ledger-glow {
-  0%   {
+  0% {
     background-color: transparent;
     box-shadow:
       inset 0 0 0 rgba(239, 68, 68, 0),
       0 0 0 rgba(239, 68, 68, 0);
   }
-  50%  {
+
+  50% {
     background-color: rgba(239, 68, 68, 0.15);
     box-shadow:
       inset 0 0 30px rgba(239, 68, 68, 0.1),
       0 0 20px rgba(239, 68, 68, 0.2),
       0 0 6px rgba(239, 68, 68, 0.15);
   }
+
   100% {
     background-color: transparent;
     box-shadow:
@@ -287,16 +337,100 @@ body {
 
 /* ── Table Row Entrance ────────────────────────────────────── */
 @keyframes fadeSlideIn {
-  0%   { opacity: 0; transform: translateY(4px); }
-  100% { opacity: 1; transform: translateY(0); }
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Row Glow Highlight (scroll-back from detail) ──────────── */
+@keyframes rowGlow {
+  0% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+
+  50% {
+    background-color: rgba(254, 153, 0, 0.12);
+    box-shadow: inset 0 0 20px rgba(254, 153, 0, 0.08), 0 0 12px rgba(254, 153, 0, 0.1);
+  }
+
+  100% {
+    background-color: transparent;
+    box-shadow: none;
+  }
 }
 
 /* ── Bell Icon Wiggle ──────────────────────────────────────── */
 @keyframes wiggle {
-  0%, 100% { transform: rotate(0deg); }
-  15% { transform: rotate(14deg); }
-  30% { transform: rotate(-12deg); }
-  45% { transform: rotate(8deg); }
-  60% { transform: rotate(-6deg); }
-  75% { transform: rotate(3deg); }
+
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+
+  15% {
+    transform: rotate(14deg);
+  }
+
+  30% {
+    transform: rotate(-12deg);
+  }
+
+  45% {
+    transform: rotate(8deg);
+  }
+
+  60% {
+    transform: rotate(-6deg);
+  }
+
+  75% {
+    transform: rotate(3deg);
+  }
+}
+
+/* ── Status Badge dark mode overrides ───────────────────────────────────── */
+.dark .status-badge[data-status="Fulfilled"] {
+  background-color: rgba(16, 185, 129, 0.2) !important;
+  color: #34d399 !important;
+  border: none !important;
+}
+
+.dark .status-badge[data-status="Processing"] {
+  background-color: rgba(59, 130, 246, 0.2) !important;
+  color: #60a5fa !important;
+}
+
+.dark .status-badge[data-status="Ready to QC"] {
+  background-color: rgba(245, 158, 11, 0.2) !important;
+  color: #fbbf24 !important;
+}
+
+.dark .status-badge[data-status="Pending"] {
+  background-color: rgba(100, 116, 139, 0.2) !important;
+  color: #cbd5e1 !important;
+  border: 1px solid rgba(100, 116, 139, 0.3) !important;
+}
+
+/* ── Vendor Status Badge dark mode overrides ─────────────────────────────── */
+.dark .vendor-status-badge[data-status="Active"] {
+  background-color: rgba(22, 163, 74, 0.2) !important;
+  color: #4ade80 !important;
+}
+
+.dark .vendor-status-badge[data-status="Inactive"] {
+  background-color: rgba(220, 38, 38, 0.2) !important;
+  color: #f87171 !important;
+}
+
+.dark .vendor-status-badge[data-status="Pending"] {
+  background-color: rgba(100, 116, 139, 0.2) !important;
+  color: #cbd5e1 !important;
+  border: 1px solid rgba(100, 116, 139, 0.3) !important;
 }

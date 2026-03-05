@@ -282,11 +282,10 @@ export async function GET(
             }
         });
 
-        if (order.lineItems && Array.isArray(order.lineItems)) {
-            order.lineItems = await enrichLineItemsWithCost(order.lineItems) as any;
-        }
+        // Use cached costs from previous enrichment (already stored on lineItems)
+        // Don't wait for enrichLineItemsWithCost — it's slow (4 parallel DB queries)
 
-        // Enrich with Tiers
+        // Enrich with Tiers (fast: single lookup from cache)
         const allSkuIds = new Set<string>();
         if (order.sku && typeof order.sku === 'object' && order.sku !== null) {
             allSkuIds.add(((order.sku as any)._id || '').toString());
@@ -307,16 +306,22 @@ export async function GET(
             }
         });
 
-        // ─── Background: Persist computed costs ──────────────────────────────
-        // Save materialCost, packagingCost, laborCost, totalCost to the document
-        // so the list API can read them directly without re-computing.
+        // ─── Background: Enrich costs & persist ──────────────────────────────
+        // This runs AFTER the response is sent — making the initial load instant.
         after(async () => {
             try {
                 await dbConnect();
+
+                // Enrich line items with fresh costs
+                let enrichedItems = order.lineItems;
+                if (enrichedItems && Array.isArray(enrichedItems)) {
+                    enrichedItems = await enrichLineItemsWithCost(enrichedItems) as any;
+                }
+
                 let materialCost = 0, packagingCost = 0, laborCost = 0;
 
-                if (order.lineItems && Array.isArray(order.lineItems)) {
-                    for (const li of order.lineItems as any[]) {
+                if (enrichedItems && Array.isArray(enrichedItems)) {
+                    for (const li of enrichedItems as any[]) {
                         const bomQty = (li.recipeQty || 0) * ((order as any).qty || 0);
                         const sa = li.sa ? li.sa / 100 : 0;
                         const qtyExtra = sa > 0 ? (bomQty / sa) - bomQty : 0;
@@ -339,9 +344,11 @@ export async function GET(
                 }
 
                 const totalCost = materialCost + packagingCost + laborCost;
+
+                // Persist enriched line items + computed costs
                 await Manufacturing.updateOne(
                     { _id: id },
-                    { $set: { materialCost, packagingCost, laborCost, totalCost } }
+                    { $set: { materialCost, packagingCost, laborCost, totalCost, lineItems: enrichedItems } }
                 );
             } catch (e) {
                 console.error('Background cost persist failed:', e);

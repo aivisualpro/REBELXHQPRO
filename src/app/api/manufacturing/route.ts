@@ -21,6 +21,8 @@ async function ensureIndexes() {
             db.collection('manufacturings').createIndex({ createdAt: -1 }, { background: true }),
             db.collection('manufacturings').createIndex({ label: 1 }, { background: true }),
             db.collection('manufacturings').createIndex({ sku: 1 }, { background: true }),
+            db.collection('manufacturings').createIndex({ status: 1 }, { background: true }),
+            db.collection('manufacturings').createIndex({ priority: 1 }, { background: true }),
         ]);
     } catch { /* already exist */ }
 }
@@ -83,6 +85,8 @@ export async function GET(request: Request) {
 
         const sku = searchParams.get('sku');
         const createdBy = searchParams.get('createdBy');
+        const status = searchParams.get('status');
+        const priority = searchParams.get('priority');
         const fromDate = searchParams.get('fromDate');
         const toDate = searchParams.get('toDate');
 
@@ -117,6 +121,8 @@ export async function GET(request: Request) {
 
         if (sku) query.sku = { $in: sku.split(',') };
         if (createdBy) query.createdBy = { $in: createdBy.split(',') };
+        if (status) query.status = status;
+        if (priority) query.priority = { $regex: priority, $options: 'i' };
         if (fromDate || toDate) {
             query.createdAt = {};
             if (fromDate) query.createdAt.$gte = new Date(fromDate);
