@@ -13,9 +13,9 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
     try {
         await dbConnect();
-        void Sku; 
-        void Client; 
-        void RXHQUsers; 
+        void Sku;
+        void Client;
+        void RXHQUsers;
 
         const { searchParams } = new URL(request.url);
 
@@ -93,6 +93,7 @@ export async function GET(request: Request) {
             orders,
             total,
             page,
+            hasMore: page * limit < total,
             totalPages: Math.ceil(total / limit)
         });
     } catch (error: any) {
@@ -104,7 +105,7 @@ export async function POST(request: Request) {
     try {
         await dbConnect();
         const body = await request.json();
-        
+
         if (body.lineItems && Array.isArray(body.lineItems)) {
             body.lineItems = body.lineItems.map((item: any) => ({
                 ...item,

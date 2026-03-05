@@ -1,25 +1,16 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
-import { createPortal } from 'react-dom';
 import { useSession } from 'next-auth/react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import {
-    Search,
-    ArrowUpDown,
-    Loader2,
-    List,
-    Plus,
-    X
-} from 'lucide-react';
-import Papa from 'papaparse';
+import { Search, ArrowUpDown, Loader2, List, Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
 import toast from 'react-hot-toast';
 import { confirmDeleteToast } from '@/lib/confirmToast';
-import { Pagination } from '@/components/ui/Pagination';
-import { TableColumnHeader } from '@/components/ui/TableColumnHeader';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface OpeningBalance {
     _id: string;
@@ -32,113 +23,228 @@ interface OpeningBalance {
     createdAt: string;
 }
 
-export default function OpeningBalancesPage() {
+interface CacheEntry {
+    balances: OpeningBalance[];
+    hasMore: boolean;
+    page: number;
+    total: number;
+    sortBy: string;
+    sortOrder: string;
+    search: string;
+    timestamp: number;
+}
+
+// ─── Module-level cache ───────────────────────────────────────────────────────
+
+const globalCache: { current: CacheEntry | null } = { current: null };
+const CACHE_TTL = 60_000;
+const PAGE_SIZE = 50;
+
+// ─── Skeleton Row ─────────────────────────────────────────────────────────────
+
+const SkeletonRow = React.memo(function SkeletonRow({ index }: { index: number }) {
     return (
-        <Suspense fallback={<div className="flex items-center justify-center h-[calc(100vh-36px)]"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>}>
-            <OpeningBalancesContent />
-        </Suspense>
+        <tr className="border-b border-border/60" style={{ opacity: 1 - index * 0.04 }}>
+            <td className="px-2.5 py-2.5 w-10"><div className="w-6 h-6 rounded-md bg-muted-foreground/10 animate-pulse" /></td>
+            {[45, 20, 12, 10, 15, 15, 15].map((w, i) => (
+                <td key={i} className="px-2.5 py-2.5">
+                    <div className="h-3 rounded bg-muted-foreground/10 animate-pulse" style={{ width: `${w}%` }} />
+                </td>
+            ))}
+        </tr>
+    );
+});
+
+// ─── UOM Pill ─────────────────────────────────────────────────────────────────
+
+function UomPill({ value }: { value: string }) {
+    return (
+        <span style={{ backgroundColor: 'rgba(254,153,0,0.12)', color: '#b45309', border: '1px solid rgba(254,153,0,0.25)', borderRadius: '5px' }}
+            className="inline-flex items-center px-2 py-0.5 text-[10px] font-black font-mono uppercase tracking-widest">
+            {value}
+        </span>
     );
 }
+
+// ─── Expiry Badge ─────────────────────────────────────────────────────────────
+
+function ExpiryBadge({ date }: { date?: string }) {
+    if (!date) return <span className="text-muted-foreground/30 text-[11px]">—</span>;
+    const d = new Date(date);
+    const now = new Date();
+    const daysLeft = Math.floor((d.getTime() - now.getTime()) / 86_400_000);
+    const isExpired = daysLeft < 0;
+    const isSoon = daysLeft >= 0 && daysLeft <= 30;
+    return (
+        <span
+            style={isExpired
+                ? { backgroundColor: 'rgba(220,38,38,0.12)', color: '#dc2626', border: '1px solid rgba(220,38,38,0.25)', borderRadius: '5px' }
+                : isSoon
+                    ? { backgroundColor: 'rgba(217,119,6,0.12)', color: '#d97706', border: '1px solid rgba(217,119,6,0.25)', borderRadius: '5px' }
+                    : undefined}
+            className={cn(
+                'inline-flex items-center px-2 py-0.5 text-[11px] font-mono',
+                !isExpired && !isSoon && 'text-foreground/60',
+                (isExpired || isSoon) && 'font-bold'
+            )}
+        >
+            {d.toLocaleDateString()}
+        </span>
+    );
+}
+
+// ─── Form Modal ───────────────────────────────────────────────────────────────
+
+function OBModal({
+    editingId, formData, setFormData, allSkus, onClose, onSaved,
+    onOpenLotSelector
+}: {
+    editingId: string | null;
+    formData: any;
+    setFormData: React.Dispatch<React.SetStateAction<any>>;
+    allSkus: { _id: string; name: string }[];
+    onClose: () => void;
+    onSaved: () => void;
+    onOpenLotSelector: () => void;
+}) {
+    const [saving, setSaving] = useState(false);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!formData.sku) { toast.error('Please select a SKU'); return; }
+        setSaving(true);
+        try {
+            const url = editingId ? `/api/opening-balances/${editingId}` : '/api/opening-balances';
+            const res = await fetch(url, {
+                method: editingId ? 'PATCH' : 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+            if (res.ok) {
+                toast.success(editingId ? 'Updated successfully' : 'Created successfully');
+                globalCache.current = null;
+                onSaved();
+                onClose();
+            } else {
+                toast.error('Failed to save');
+            }
+        } catch { toast.error('Error saving item'); }
+        finally { setSaving(false); }
+    };
+
+    const inp = 'w-full px-3 h-9 bg-secondary/50 border border-border rounded-lg text-[12px] outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/50 transition-colors';
+
+    return (
+        <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-background border border-border w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh] rounded-xl">
+                <div className="flex items-center justify-between px-5 h-11 border-b border-border shrink-0 bg-secondary/30 rounded-t-xl">
+                    <h2 className="text-[10px] font-black uppercase tracking-widest">{editingId ? 'Edit Opening Balance' : 'Add Opening Balance'}</h2>
+                    <button onClick={onClose} className="p-1.5 hover:bg-secondary rounded-full transition-colors cursor-pointer"><X className="w-4 h-4 text-muted-foreground" /></button>
+                </div>
+                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-4 scrollbar-custom">
+                    <div className="space-y-1.5">
+                        <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">SKU</label>
+                        <SearchableSelect
+                            placeholder="Select SKU"
+                            options={allSkus.map(s => ({ value: s._id, label: s.name }))}
+                            value={formData.sku}
+                            onChange={val => setFormData((p: any) => ({ ...p, sku: val }))}
+                            className="w-full text-[12px]"
+                        />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                            <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">Lot Number</label>
+                            <div className="flex gap-2 h-9">
+                                <input type="text" value={formData.lotNumber} onChange={e => setFormData((p: any) => ({ ...p, lotNumber: e.target.value }))}
+                                    className="flex-1 px-3 h-full bg-secondary/50 border border-border rounded-lg text-[12px] outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/50 transition-colors"
+                                    placeholder="Enter Lot #" />
+                                <button type="button" onClick={onOpenLotSelector}
+                                    className="px-3 h-full bg-secondary border border-border rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors cursor-pointer" title="Select Existing Lot">
+                                    <List className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">Quantity</label>
+                            <input type="number" step="0.01" value={formData.qty} onChange={e => setFormData((p: any) => ({ ...p, qty: parseFloat(e.target.value) }))} className={inp} />
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                            <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">UOM</label>
+                            <input type="text" value={formData.uom} onChange={e => setFormData((p: any) => ({ ...p, uom: e.target.value }))} className={inp} />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">Cost ($)</label>
+                            <input type="number" step="0.01" value={formData.cost} onChange={e => setFormData((p: any) => ({ ...p, cost: parseFloat(e.target.value) }))} className={inp} />
+                        </div>
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">Expiration Date (Optional)</label>
+                        <input type="date" value={formData.expirationDate} onChange={e => setFormData((p: any) => ({ ...p, expirationDate: e.target.value }))} className={inp} />
+                    </div>
+                    <div className="h-10 pt-1 flex gap-2 border-t border-border mt-2">
+                        <button type="button" onClick={onClose} className="flex-1 flex items-center justify-center bg-secondary text-muted-foreground hover:text-foreground text-[10px] font-bold uppercase tracking-widest hover:bg-secondary/80 transition-colors rounded-lg cursor-pointer">Cancel</button>
+                        <button type="submit" disabled={saving} className="flex-1 flex items-center justify-center gap-2 bg-primary text-black text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-all rounded-lg disabled:opacity-50 cursor-pointer">
+                            {saving && <Loader2 className="w-3 h-3 animate-spin" />}
+                            Save
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
+// ─── Main Content ─────────────────────────────────────────────────────────────
+
+const EMPTY_FORM = { sku: '', lotNumber: '', qty: 0, uom: 'pcs', cost: 0, expirationDate: '' };
 
 function OpeningBalancesContent() {
     const router = useRouter();
     const { data: session } = useSession();
     const searchParams = useSearchParams();
-    const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
 
-    useEffect(() => {
-        const checkTarget = () => {
-             const el = document.getElementById('header-portal-target');
-             if (el) {
-                 setPortalTarget(el);
-             }
-        };
-        
-        checkTarget();
-        const interval = setInterval(checkTarget, 50);
-        const timeout = setTimeout(() => clearInterval(interval), 1000);
+    const [balances, setBalances] = useState<OpeningBalance[]>(globalCache.current?.balances || []);
+    const [isLoading, setIsLoading] = useState(!globalCache.current);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const [hasMore, setHasMore] = useState(globalCache.current?.hasMore ?? true);
+    const [total, setTotal] = useState(globalCache.current?.total || 0);
+    const [error, setError] = useState<string | null>(null);
 
-        return () => {
-            clearInterval(interval);
-            clearTimeout(timeout);
-        };
-    }, []);
-    const [balances, setBalances] = useState<OpeningBalance[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    // Pagination
-    const [page, setPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
-    const [totalItems, setTotalItems] = useState(0);
-
-    // Filters
     const [search, setSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [sortBy, setSortBy] = useState('createdAt');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
-    // CRUD State
+    // CRUD / Modal state
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
-    const [formData, setFormData] = useState({
-        sku: '',
-        lotNumber: '',
-        qty: 0,
-        uom: 'pcs',
-        cost: 0,
-        expirationDate: ''
-    });
+    const [formData, setFormData] = useState({ ...EMPTY_FORM });
     const [allSkus, setAllSkus] = useState<{ _id: string; name: string }[]>([]);
     const [globalSettings, setGlobalSettings] = useState<any>(null);
-    
-    // Lot Selection State
-    const [lotSelector, setLotSelector] = useState<{
-        isOpen: boolean;
-        mode: 'form' | 'row';
-        itemId?: string;
-        skuId: string;
-        currentLot: string;
-    }>({
-        isOpen: false,
-        mode: 'form',
-        skuId: '',
-        currentLot: ''
-    });
+    const [lotSelector, setLotSelector] = useState<{ isOpen: boolean; mode: 'form' | 'row'; itemId?: string; skuId: string; currentLot: string; }>({ isOpen: false, mode: 'form', skuId: '', currentLot: '' });
+    const [highlightId, setHighlightId] = useState<string | null>(null);
 
-    const handleLotSelect = async (lot: string) => {
-        if (lotSelector.mode === 'form') {
-            setFormData(prev => ({ ...prev, lotNumber: lot }));
-            setLotSelector(prev => ({ ...prev, isOpen: false }));
-        } else if (lotSelector.mode === 'row' && lotSelector.itemId) {
-            try {
-                const toastId = toast.loading('Updating lot number...');
-                const res = await fetch(`/api/opening-balances/${lotSelector.itemId}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ lotNumber: lot })
-                });
-                if (res.ok) {
-                    toast.success('Lot number updated', { id: toastId });
-                    fetchBalances();
-                } else {
-                    toast.error('Failed to update', { id: toastId });
-                }
-            } catch (e) {
-                toast.error('Error updating lot');
-            }
-            setLotSelector(prev => ({ ...prev, isOpen: false }));
-        }
-    };
+    const pageRef = useRef(globalCache.current?.page || 0);
+    const mountedRef = useRef(true);
+    const fetchingRef = useRef(false);
+    const sentinelRef = useRef<HTMLDivElement | null>(null);
+    const scrollRef = useRef<HTMLDivElement | null>(null);
+    const abortControllerRef = useRef<AbortController | null>(null);
+    const reqSeqRef = useRef(0);
+
+    useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
+
+    // ─── Side data ──────────────────────────────────────────────────────────
 
     useEffect(() => {
-        fetchSkus();
-        fetch('/api/settings')
-            .then(res => res.json())
-            .then(data => setGlobalSettings(data))
-            .catch(() => {});
+        fetch('/api/skus?limit=0&ignoreDate=true&simple=true').then(r => r.json()).then(d => setAllSkus(d.skus || [])).catch(() => { });
+        fetch('/api/settings').then(r => r.json()).then(setGlobalSettings).catch(() => { });
     }, []);
 
-    // Handle createNew URL param from header Add button
+    // Handle createNew URL param
     useEffect(() => {
         if (searchParams.get('createNew') === 'true') {
             handleOpenAdd();
@@ -148,71 +254,136 @@ function OpeningBalancesContent() {
         }
     }, [searchParams]);
 
-    const fetchSkus = async () => {
-        try {
-            const res = await fetch('/api/skus?limit=0&ignoreDate=true&simple=true');
-            if (res.ok) {
-                const data = await res.json();
-                setAllSkus(data.skus || []);
-            }
-        } catch (error) {
-            console.error("Error fetching SKUs");
-        }
-    };
+    // ─── Debounce ────────────────────────────────────────────────────────────
 
     useEffect(() => {
-        const timer = setTimeout(() => setDebouncedSearch(search), 500);
-        return () => clearTimeout(timer);
+        const t = setTimeout(() => setDebouncedSearch(search), 300);
+        return () => clearTimeout(t);
     }, [search]);
 
-    useEffect(() => {
-        setPage(1);
-    }, [debouncedSearch]);
+    // ─── Scroll-back highlight ───────────────────────────────────────────────
 
     useEffect(() => {
-        fetchBalances();
-    }, [page, debouncedSearch, sortBy, sortOrder]);
+        const savedId = sessionStorage.getItem('ob_scroll_to');
+        const savedScroll = sessionStorage.getItem('ob_scroll_top');
+        if (savedId) {
+            sessionStorage.removeItem('ob_scroll_to');
+            sessionStorage.removeItem('ob_scroll_top');
+            setHighlightId(savedId);
+            if (savedScroll && scrollRef.current) scrollRef.current.scrollTop = parseInt(savedScroll, 10);
+            const tryScroll = (attempts = 0) => {
+                const row = document.querySelector(`[data-ob-id="${savedId}"]`);
+                if (row) { setTimeout(() => row.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50); setTimeout(() => setHighlightId(null), 3000); }
+                else if (attempts < 30) setTimeout(() => tryScroll(attempts + 1), 200);
+            };
+            setTimeout(() => tryScroll(), 100);
+        }
+    }, []);
 
-    const fetchBalances = async () => {
-        setLoading(true);
+    // ─── Fetch ───────────────────────────────────────────────────────────────
+
+    const fetchPage = useCallback(async (pageNum: number, isAppend: boolean) => {
+        if (abortControllerRef.current) abortControllerRef.current.abort();
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+        const seq = ++reqSeqRef.current;
+
+        fetchingRef.current = true;
+        if (isAppend) setIsLoadingMore(true); else setIsLoading(true);
+
         try {
             const params = new URLSearchParams({
-                page: page.toString(),
-                limit: '20',
+                page: String(pageNum),
+                limit: String(PAGE_SIZE),
                 search: debouncedSearch,
                 sortBy,
-                sortOrder: sortOrder === 'asc' ? 'asc' : 'desc'
+                sortOrder,
             });
 
-            const res = await fetch(`/api/opening-balances?${params.toString()}`);
+            const res = await fetch(`/api/opening-balances?${params}`, { signal: controller.signal });
             const data = await res.json();
+
+            if (seq !== reqSeqRef.current || !mountedRef.current) return;
+
             if (res.ok) {
-                setBalances(data.openingBalances || []);
-                setTotalPages(data.totalPages || 1);
-                setTotalItems(data.total || 0);
+                const newBalances: OpeningBalance[] = data.openingBalances || [];
+                const newHasMore = data.hasMore ?? false;
+                const newTotal = data.total || 0;
+
+                if (isAppend) {
+                    setBalances(prev => {
+                        const ids = new Set(prev.map(b => b._id));
+                        const merged = [...prev, ...newBalances.filter(b => !ids.has(b._id))];
+                        globalCache.current = { balances: merged, hasMore: newHasMore, page: pageNum, total: newTotal, sortBy, sortOrder, search: debouncedSearch, timestamp: Date.now() };
+                        return merged;
+                    });
+                } else {
+                    setBalances(newBalances);
+                    setTotal(newTotal);
+                    globalCache.current = { balances: newBalances, hasMore: newHasMore, page: pageNum, total: newTotal, sortBy, sortOrder, search: debouncedSearch, timestamp: Date.now() };
+                }
+
+                setHasMore(newHasMore);
+                pageRef.current = pageNum;
+                setError(null);
             } else {
-                toast.error('Failed to fetch data');
+                setError(data.error || 'Failed to fetch');
             }
-        } catch (error) {
-            toast.error('Error loading data');
+        } catch (e: any) {
+            if (e?.name === 'AbortError') return;
+            if (mountedRef.current) setError(e.message);
         } finally {
-            setLoading(false);
+            fetchingRef.current = false;
+            if (mountedRef.current) { setIsLoading(false); setIsLoadingMore(false); }
         }
-    };
+    }, [sortBy, sortOrder, debouncedSearch]);
 
-    const handleOpenAdd = () => {
-        setEditingId(null);
-        setFormData({
-            sku: '',
-            lotNumber: '',
-            qty: 0,
-            uom: 'pcs',
-            cost: 0,
-            expirationDate: ''
-        });
-        setIsModalOpen(true);
-    };
+    // ─── Initial load / filter changes ──────────────────────────────────────
 
+    const fetchPageRef = useRef(fetchPage);
+    fetchPageRef.current = fetchPage;
+    const isFirstMount = useRef(true);
+    const prevFiltersRef = useRef({ sortBy, sortOrder, search: debouncedSearch });
+
+    useEffect(() => {
+        const prev = prevFiltersRef.current;
+        prevFiltersRef.current = { sortBy, sortOrder, search: debouncedSearch };
+
+        if (isFirstMount.current) {
+            isFirstMount.current = false;
+            const cache = globalCache.current;
+            if (cache && cache.balances.length > 0 && (Date.now() - cache.timestamp) < CACHE_TTL &&
+                cache.sortBy === sortBy && cache.sortOrder === sortOrder && cache.search === debouncedSearch) {
+                setBalances(cache.balances); setHasMore(cache.hasMore); setTotal(cache.total);
+                pageRef.current = cache.page; setIsLoading(false); return;
+            }
+        }
+
+        globalCache.current = null;
+        pageRef.current = 0;
+        setBalances([]);
+        setHasMore(true);
+        fetchPageRef.current(1, false);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sortBy, sortOrder, debouncedSearch]);
+
+    // ─── Infinite scroll ────────────────────────────────────────────────────
+
+    useEffect(() => {
+        const sentinel = sentinelRef.current;
+        const container = scrollRef.current;
+        if (!sentinel || !container) return;
+        const observer = new IntersectionObserver(
+            entries => { if (entries[0].isIntersecting && hasMore && !fetchingRef.current && !isLoading) fetchPageRef.current(pageRef.current + 1, true); },
+            { root: container, rootMargin: '400px' }
+        );
+        observer.observe(sentinel);
+        return () => observer.disconnect();
+    }, [hasMore, isLoading]);
+
+    // ─── CRUD Handlers ───────────────────────────────────────────────────────
+
+    const handleOpenAdd = () => { setEditingId(null); setFormData({ ...EMPTY_FORM }); setIsModalOpen(true); };
     const handleOpenEdit = (item: OpeningBalance) => {
         setEditingId(item._id);
         setFormData({
@@ -228,361 +399,259 @@ function OpeningBalancesContent() {
 
     const handleDelete = (id: string) => {
         confirmDeleteToast('Delete this opening balance?', async () => {
-        
             try {
                 const res = await fetch(`/api/opening-balances/${id}`, { method: 'DELETE' });
-                if (res.ok) {
-                     toast.success('Deleted successfully');
-                     fetchBalances();
-                } else {
-                     toast.error('Failed to delete');
-                }
-            } catch (e) {
-                toast.error('Error deleting item');
-            }
+                if (res.ok) { toast.success('Deleted successfully'); globalCache.current = null; pageRef.current = 0; fetchPageRef.current(1, false); }
+                else toast.error('Failed to delete');
+            } catch { toast.error('Error deleting item'); }
         });
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!formData.sku) {
-            toast.error('Please select a SKU');
-            return;
+    const handleLotSelect = async (lot: string) => {
+        if (lotSelector.mode === 'form') {
+            setFormData((p: any) => ({ ...p, lotNumber: lot }));
+            setLotSelector(p => ({ ...p, isOpen: false }));
+        } else if (lotSelector.mode === 'row' && lotSelector.itemId) {
+            try {
+                const toastId = toast.loading('Updating lot number...');
+                const res = await fetch(`/api/opening-balances/${lotSelector.itemId}`, {
+                    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lotNumber: lot })
+                });
+                if (res.ok) { toast.success('Lot number updated', { id: toastId }); globalCache.current = null; pageRef.current = 0; fetchPageRef.current(1, false); }
+                else toast.error('Failed to update', { id: toastId });
+            } catch { toast.error('Error updating lot'); }
+            setLotSelector(p => ({ ...p, isOpen: false }));
         }
+    };
 
-        try {
-            const url = editingId 
-                ? `/api/opening-balances/${editingId}` 
-                : '/api/opening-balances';
-            
-            const method = editingId ? 'PATCH' : 'POST';
-
-            const res = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
-            });
-
-            if (res.ok) {
-                toast.success(editingId ? 'Updated successfully' : 'Created successfully');
-                setIsModalOpen(false);
-                fetchBalances();
-            } else {
-                toast.error('Failed to save');
-            }
-        } catch (e) {
-            toast.error('Error saving item');
-        }
+    const handleSort = (col: string) => {
+        if (sortBy === col) setSortOrder(p => p === 'asc' ? 'desc' : 'asc');
+        else { setSortBy(col); setSortOrder('asc'); }
+        scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     const getSkuName = (val: any) => (typeof val === 'object' && val?.name ? val.name : val || '-');
     const getSkuImage = (val: any) => (typeof val === 'object' && val?.image ? val.image : '');
 
+    const COLS = [
+        { key: 'img', label: 'Img', sortable: false, width: 'w-10' },
+        { key: 'sku', label: 'SKU', sortable: true, width: 'w-[220px]' },
+        { key: 'lotNumber', label: 'Lot Number', sortable: true, width: 'w-[130px]' },
+        { key: 'qty', label: 'Qty', sortable: true, width: 'w-[80px]', align: 'text-right' },
+        { key: 'uom', label: 'UOM', sortable: true, width: 'w-[80px]' },
+        { key: 'cost', label: 'Cost ($)', sortable: true, width: 'w-[110px]', align: 'text-right' },
+        { key: 'expirationDate', label: 'Expires', sortable: true, width: 'w-[110px]' },
+        { key: 'createdAt', label: 'Created', sortable: true, width: 'w-[100px]' },
+    ];
+
     return (
-        <div className="flex flex-col h-[calc(100vh-36px)] bg-background relative transition-colors duration-300">
-            {/* Portal search + title + Add button into the header */}
-            {portalTarget && createPortal(
-                <div className="flex items-center justify-between w-full h-full">
-                    <div className="flex items-center gap-3">
-                        <h1 className="text-sm font-bold text-foreground uppercase tracking-tight whitespace-nowrap">Opening Balances</h1>
-                        <div className="relative">
-                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                            <input
-                                type="text"
-                                placeholder="Search SKU or lot..."
-                                value={search}
-                                onChange={e => setSearch(e.target.value)}
-                                className="pl-8 pr-8 h-8 w-64 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
-                            />
-                            {search && (
-                                <button 
-                                    onClick={() => setSearch('')}
-                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors z-20 cursor-pointer"
-                                >
-                                    <X className="h-3 w-3" />
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenAdd();
-                        }}
-                        className="flex items-center space-x-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm transition-all cursor-pointer relative z-50 pointer-events-auto"
-                    >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Add</span>
-                    </button>
-                </div>,
-                portalTarget
-            )}
+        <div className="flex flex-col h-[calc(100vh-48px)] bg-background transition-colors duration-300">
 
-            <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
-                <div className="min-w-full px-2 py-2">
+            {/* ─── Local Page Header ───────────────────────────────────────── */}
+            <div className="shrink-0 border-b border-border bg-background px-3 py-2 flex items-center gap-3 overflow-x-auto">
 
-                    <table className="w-full text-left border-separate border-spacing-0 relative z-0">
-                        <thead className="sticky top-0 bg-secondary/80 z-10 border-b border-border backdrop-blur-md transition-colors">
+                {/* Title + count */}
+                <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[11px] font-black uppercase tracking-widest text-foreground">OPENING BALANCES</span>
+                    <span className="text-[11px] font-bold text-muted-foreground/60 tabular-nums">{total > 0 ? total.toLocaleString() : ''}</span>
+                </div>
+
+                <div className="h-5 w-px bg-border shrink-0" />
+
+                {/* Search */}
+                <div className="relative flex items-center shrink-0">
+                    <Search className="absolute left-2.5 w-3.5 h-3.5 text-muted-foreground/50 pointer-events-none" />
+                    <input
+                        type="text"
+                        placeholder="Search SKU or lot..."
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        className="pl-8 pr-8 h-8 w-60 bg-secondary/60 border border-border text-[12px] rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50 placeholder:text-muted-foreground/50 text-foreground transition-all"
+                    />
+                    {search && (
+                        <button onClick={() => setSearch('')} className="absolute right-2.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+                            <X className="h-3.5 w-3.5" />
+                        </button>
+                    )}
+                </div>
+
+                <div className="flex-1" />
+
+                {/* ADD button */}
+                <button
+                    onClick={e => { e.stopPropagation(); handleOpenAdd(); }}
+                    className="h-8 px-3 bg-primary text-black hover:opacity-90 transition-all rounded-lg shadow flex items-center gap-1.5 cursor-pointer shrink-0"
+                >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span className="text-[11px] font-black uppercase tracking-widest">ADD</span>
+                </button>
+            </div>
+
+            {/* ─── Table ──────────────────────────────────────────────────── */}
+            <div ref={scrollRef} className="flex-1 overflow-x-auto overflow-y-auto scrollbar-custom relative">
+                <div className="min-w-fit px-2 py-1">
+                    <table className="w-full text-left border-separate border-spacing-0 relative z-0 table-fixed">
+                        <thead className="bg-background border-b border-border sticky top-0 z-10">
                             <tr>
-                                {/* Image */}
-                                <th className="px-2 py-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest w-10 border-r border-border">Img</th>
-                                
-                                {/* SKU Name */}
-                                <th className="border-r border-border">
-                                    <TableColumnHeader
-                                        column="sku"
-                                        title="SKU"
-                                        currentSortBy={sortBy}
-                                        currentSortOrder={sortOrder}
-                                        onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
-                                        className="text-muted-foreground"
-                                    />
-                                </th>
-
-                                {/* Lot Number */}
-                                <th className="border-r border-border">
-                                    <TableColumnHeader column="lotNumber" title="Lot Number" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
-                                </th>
-
-                                {/* Qty */}
-                                <th className="border-r border-border">
-                                    <TableColumnHeader column="qty" title="Qty" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
-                                </th>
-
-                                {/* UOM */}
-                                <th className="border-r border-border">
-                                    <TableColumnHeader column="uom" title="UOM" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
-                                </th>
-
-                                {/* Cost */}
-                                <th className="border-r border-border">
-                                    <TableColumnHeader column="cost" title="Cost ($)" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
-                                </th>
-
-                                {/* Expires */}
-                                <th className="border-r border-border">
-                                    <TableColumnHeader column="expirationDate" title="Expires" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
-                                </th>
-
-                                {/* Created At */}
-                                <th className="border-r border-border last:border-0">
-                                    <TableColumnHeader column="createdAt" title="Created At" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground" />
-                                </th>
+                                {COLS.map(col => (
+                                    <th
+                                        key={col.key}
+                                        onClick={col.sortable ? () => handleSort(col.key) : undefined}
+                                        className={cn(
+                                            'px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest border-r border-border/40 last:border-0 select-none shadow-[0_1px_0_0_hsl(var(--border))]',
+                                            col.width,
+                                            col.sortable && 'cursor-pointer hover:bg-secondary/60 transition-colors',
+                                        )}
+                                    >
+                                        <div className={cn('flex items-center gap-1', col.align === 'text-right' && 'justify-end')}>
+                                            <span>{col.label}</span>
+                                            {col.sortable && <ArrowUpDown className={cn('w-2.5 h-2.5', sortBy === col.key ? 'text-primary' : 'text-muted-foreground/25')} />}
+                                        </div>
+                                    </th>
+                                ))}
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-border bg-background/50">
-                            {loading ? (
-                                <tr><td colSpan={8} className="px-2 py-12 text-center text-[11px] text-muted-foreground">Loading...</td></tr>
+                        <tbody>
+                            {isLoading ? (
+                                Array.from({ length: 20 }).map((_, i) => <SkeletonRow key={i} index={i} />)
+                            ) : error ? (
+                                <tr><td colSpan={8} className="px-4 py-12 text-center text-[12px] text-destructive">{error}</td></tr>
                             ) : balances.length === 0 ? (
-                                <tr><td colSpan={8} className="px-2 py-12 text-center text-[11px] text-muted-foreground uppercase tracking-tighter opacity-50">No records found</td></tr>
+                                <tr><td colSpan={8} className="px-4 py-16 text-center text-[12px] text-muted-foreground/50 uppercase tracking-widest">No records found</td></tr>
                             ) : balances.map(item => (
-                                <tr 
-                                    key={item._id} 
-                                    className="group relative z-0 bg-background hover:bg-secondary/40 transition-colors duration-150 cursor-pointer"
-                                    onClick={() => router.push(`/warehouse/opening-balances/${item._id}`)}
+                                <tr
+                                    key={item._id}
+                                    data-ob-id={item._id}
+                                    className={cn(
+                                        'group hover:bg-muted/30 dark:hover:bg-muted/10 transition-colors duration-150 cursor-pointer border-b border-border/60',
+                                        highlightId === item._id && 'animate-[rowGlow_0.75s_ease-in-out_4] ring-1 ring-primary/40 bg-primary/[0.06]'
+                                    )}
+                                    onClick={() => {
+                                        sessionStorage.setItem('ob_scroll_to', item._id);
+                                        if (scrollRef.current) sessionStorage.setItem('ob_scroll_top', String(scrollRef.current.scrollTop));
+                                        router.push(`/warehouse/opening-balances/${item._id}`);
+                                    }}
                                 >
                                     {/* Image */}
-                                    <td className="px-2 py-1 border-r border-border group-hover:border-l-2 group-hover:border-l-primary transition-all">
-                                        <div className="w-6 h-6 rounded bg-secondary overflow-hidden relative border border-border">
-                                            <img 
-                                                src={getSkuImage(item.sku) || globalSettings?.missingSkuImage || '/sku-placeholder.png'} 
-                                                alt="" 
+                                    <td className="px-2.5 py-2.5 w-10 border-r border-border/40">
+                                        <div className="w-6 h-6 rounded-md bg-secondary overflow-hidden border border-border flex-shrink-0">
+                                            <img
+                                                src={getSkuImage(item.sku) || globalSettings?.missingSkuImage || '/sku-placeholder.png'}
+                                                alt=""
                                                 className="w-full h-full object-cover"
-                                                onError={(e) => {
-                                                    const target = e.target as HTMLImageElement;
-                                                    const fallback = globalSettings?.missingSkuImage || '/sku-placeholder.png';
-                                                    if (target.src !== fallback && target.src.indexOf('sku-placeholder.png') === -1) {
-                                                        target.src = fallback;
-                                                    }
-                                                }} 
+                                                onError={e => {
+                                                    const t = e.target as HTMLImageElement;
+                                                    const fb = globalSettings?.missingSkuImage || '/sku-placeholder.png';
+                                                    if (!t.src.includes('sku-placeholder.png')) t.src = fb;
+                                                }}
                                             />
                                         </div>
                                     </td>
 
                                     {/* SKU Name */}
-                                    <td className="px-2 py-1 text-[11px] text-muted-foreground border-r border-border whitespace-nowrap">
-                                        <span className="truncate max-w-[200px]" title={getSkuName(item.sku)}>{getSkuName(item.sku)}</span>
+                                    <td className="px-2.5 py-2.5 w-[220px] text-[12px] font-semibold text-foreground/90 group-hover:text-foreground transition-colors border-r border-border/40">
+                                        <span className="truncate block max-w-[200px]" title={getSkuName(item.sku)}>{getSkuName(item.sku)}</span>
                                     </td>
 
                                     {/* Lot Number */}
-                                    <td className="px-2 py-1 text-[11px] text-muted-foreground font-mono border-r border-border">
+                                    <td className="px-2.5 py-2.5 w-[130px] border-r border-border/40">
                                         <div className="flex items-center gap-2">
-                                            <span className="tracking-tighter">{item.lotNumber}</span>
-                                            <button 
-                                                onClick={(e) => {
+                                            <span className="text-[11px] font-mono text-foreground/70 tracking-tight">{item.lotNumber}</span>
+                                            <button
+                                                onClick={e => {
                                                     e.stopPropagation();
                                                     const skuId = typeof item.sku === 'object' ? item.sku._id : item.sku;
-                                                    setLotSelector({
-                                                        isOpen: true,
-                                                        mode: 'row',
-                                                        itemId: item._id,
-                                                        skuId: skuId,
-                                                        currentLot: item.lotNumber
-                                                    });
+                                                    setLotSelector({ isOpen: true, mode: 'row', itemId: item._id, skuId, currentLot: item.lotNumber });
                                                 }}
-                                                className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-secondary rounded text-muted-foreground hover:text-primary transition-all"
+                                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-secondary rounded-md text-muted-foreground hover:text-primary transition-all cursor-pointer"
                                                 title="Change Lot Number"
                                             >
-                                                <List className="w-2.5 h-2.5" />
+                                                <List className="w-3 h-3" />
                                             </button>
                                         </div>
                                     </td>
 
                                     {/* Qty */}
-                                    <td className="px-2 py-1 text-[11px] text-muted-foreground border-r border-border text-center">{item.qty}</td>
+                                    <td className="px-2.5 py-2.5 w-[80px] text-[12px] font-mono font-bold text-foreground/80 text-right border-r border-border/40">
+                                        {item.qty.toLocaleString()}
+                                    </td>
 
                                     {/* UOM */}
-                                    <td className="px-2 py-1 text-[11px] uppercase text-muted-foreground border-r border-border">{item.uom}</td>
+                                    <td className="px-2.5 py-2.5 w-[80px] border-r border-border/40">
+                                        <UomPill value={item.uom} />
+                                    </td>
 
                                     {/* Cost */}
-                                    <td className="px-2 py-1 text-[11px] text-muted-foreground font-mono border-r border-border text-right">
+                                    <td className="px-2.5 py-2.5 w-[110px] text-[12px] font-mono text-right text-foreground/80 border-r border-border/40">
                                         ${(item.cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
                                     </td>
 
                                     {/* Expires */}
-                                    <td className="px-2 py-1 text-[11px] text-muted-foreground font-mono border-r border-border">
-                                        {item.expirationDate ? new Date(item.expirationDate).toLocaleDateString() : '-'}
+                                    <td className="px-2.5 py-2.5 w-[110px] border-r border-border/40">
+                                        <ExpiryBadge date={item.expirationDate} />
                                     </td>
 
                                     {/* Created At */}
-                                    <td className="px-2 py-1 text-[11px] text-muted-foreground font-mono border-r border-border last:border-0">
+                                    <td className="px-2.5 py-2.5 w-[100px] text-[11px] font-mono text-foreground/50">
                                         {new Date(item.createdAt).toLocaleDateString()}
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
-                </div>
-            </div>
 
-            <div className="border-t border-border bg-background transition-colors duration-300">
-                <Pagination
-                    currentPage={page}
-                    totalPages={totalPages}
-                    onPageChange={setPage}
-                    totalItems={totalItems}
-                    itemsPerPage={20}
-                    itemName="Items"
-                />
-            </div>
+                    {/* Sentinel */}
+                    <div ref={sentinelRef} className="h-2" />
 
-            {/* Add/Edit Modal */}
-            {isModalOpen && (
-                <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-background border border-border w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh] rounded-md">
-                        <div className="flex items-center justify-between px-4 h-9 border-b border-border shrink-0 bg-background">
-                            <h2 className="text-[10px] font-black uppercase tracking-widest text-foreground">
-                                {editingId ? 'Edit Opening Balance' : 'Add Opening Balance'}
-                            </h2>
-                            <button onClick={() => setIsModalOpen(false)} className="text-muted-foreground hover:text-foreground transition-colors">
-                                <X className="w-4 h-4" />
-                            </button>
+                    {isLoadingMore && (
+                        <div className="flex items-center justify-center gap-2 py-4">
+                            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
+                            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
+                            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
                         </div>
-                        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
-                            <div className="space-y-1.5">
-                                <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">SKU</label>
-                                <SearchableSelect
-                                    placeholder="Select SKU"
-                                    options={allSkus.map(s => ({ value: s._id, label: s.name }))}
-                                    value={formData.sku}
-                                    onChange={(val) => setFormData({ ...formData, sku: val })}
-                                    className="w-full text-[11px]"
-                                />
-                            </div>
-                            
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1.5">
-                                    <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">Lot Number</label>
-                                    <div className="flex gap-2 h-9">
-                                        <input 
-                                            type="text" 
-                                            value={formData.lotNumber} 
-                                            onChange={e => setFormData({...formData, lotNumber: e.target.value})} 
-                                            className="flex-1 px-3 h-full bg-secondary/50 border border-border rounded text-[11px] outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/50 transition-colors"
-                                            placeholder="Enter Lot #"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                if (!formData.sku) {
-                                                    toast.error('Please select a SKU first');
-                                                    return;
-                                                }
-                                                setLotSelector({
-                                                    isOpen: true,
-                                                    mode: 'form',
-                                                    skuId: formData.sku,
-                                                    currentLot: formData.lotNumber
-                                                });
-                                            }}
-                                            className="px-3 h-full bg-secondary border border-border rounded text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
-                                            title="Select Existing Lot"
-                                        >
-                                            <List className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">Quantity</label>
-                                    <input 
-                                        type="number" 
-                                        step="0.01" 
-                                        value={formData.qty} 
-                                        onChange={e => setFormData({...formData, qty: parseFloat(e.target.value)})} 
-                                        className="w-full px-3 h-9 bg-secondary/50 border border-border rounded text-[11px] outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/50 transition-colors" 
-                                    />
-                                </div>
-                            </div>
+                    )}
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1.5">
-                                    <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">UOM</label>
-                                    <input 
-                                        type="text" 
-                                        value={formData.uom} 
-                                        onChange={e => setFormData({...formData, uom: e.target.value})} 
-                                        className="w-full px-3 h-9 bg-secondary/50 border border-border rounded text-[11px] outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/50 transition-colors" 
-                                    />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">Cost ($)</label>
-                                    <input 
-                                        type="number" 
-                                        step="0.01" 
-                                        value={formData.cost} 
-                                        onChange={e => setFormData({...formData, cost: parseFloat(e.target.value)})} 
-                                        className="w-full px-3 h-9 bg-secondary/50 border border-border rounded text-[11px] outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/50 transition-colors" 
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="space-y-1.5">
-                                <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">Expiration Date (Optional)</label>
-                                <input 
-                                    type="date" 
-                                    value={formData.expirationDate} 
-                                    onChange={e => setFormData({...formData, expirationDate: e.target.value})} 
-                                    className="w-full px-3 h-9 bg-secondary/50 border border-border rounded text-[11px] outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/50 transition-colors" 
-                                />
-                            </div>
-
-                            <div className="h-10 pt-1 flex gap-2 border-t border-border mt-2">
-                                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 flex items-center justify-center bg-secondary text-muted-foreground hover:text-foreground text-[10px] font-bold uppercase tracking-widest hover:bg-secondary/80 transition-colors rounded-sm">Cancel</button>
-                                <button type="submit" className="flex-1 flex items-center justify-center bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-widest hover:bg-primary/90 transition-colors rounded-sm">Save</button>
-                            </div>
-                        </form>
-                    </div>
+                    {!hasMore && balances.length > 0 && !isLoading && (
+                        <div className="text-center py-4 text-[11px] text-muted-foreground/40 uppercase tracking-widest">
+                            — {balances.length.toLocaleString()} records loaded —
+                        </div>
+                    )}
                 </div>
+            </div>
+
+            {/* ─── Add/Edit Modal ──────────────────────────────────────────── */}
+            {isModalOpen && (
+                <OBModal
+                    editingId={editingId}
+                    formData={formData}
+                    setFormData={setFormData}
+                    allSkus={allSkus}
+                    onClose={() => setIsModalOpen(false)}
+                    onSaved={() => { pageRef.current = 0; fetchPageRef.current(1, false); }}
+                    onOpenLotSelector={() => {
+                        if (!formData.sku) { toast.error('Please select a SKU first'); return; }
+                        setLotSelector({ isOpen: true, mode: 'form', skuId: formData.sku, currentLot: formData.lotNumber });
+                    }}
+                />
             )}
 
-            <LotSelectionModal 
+            {/* ─── Lot Selection Modal ─────────────────────────────────────── */}
+            <LotSelectionModal
                 isOpen={lotSelector.isOpen}
-                onClose={() => setLotSelector(prev => ({ ...prev, isOpen: false }))}
+                onClose={() => setLotSelector(p => ({ ...p, isOpen: false }))}
                 onSelect={handleLotSelect}
                 skuId={lotSelector.skuId}
                 currentLotNumber={lotSelector.currentLot}
                 title={lotSelector.mode === 'row' ? 'Change Lot Number' : 'Select Reference Lot'}
             />
         </div>
+    );
+}
+
+export default function OpeningBalancesPage() {
+    return (
+        <Suspense fallback={<div className="flex items-center justify-center h-[calc(100vh-48px)]"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>}>
+            <OpeningBalancesContent />
+        </Suspense>
     );
 }

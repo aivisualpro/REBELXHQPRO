@@ -24,22 +24,22 @@ export async function GET(request: Request) {
         let query: any = {};
 
         if (search) {
-             const fuzzyRegex = buildFuzzyRegex(search);
-             const matchingSkus = await Sku.find({ name: { $regex: fuzzyRegex, $options: 'i' } }).select('_id legacyId').lean();
-             const skuIds = matchingSkus.map(s => s._id.toString());
-             const skuLegacyIds = matchingSkus.map((s: any) => s.legacyId).filter(Boolean);
+            const fuzzyRegex = buildFuzzyRegex(search);
+            const matchingSkus = await Sku.find({ name: { $regex: fuzzyRegex, $options: 'i' } }).select('_id legacyId').lean();
+            const skuIds = matchingSkus.map(s => s._id.toString());
+            const skuLegacyIds = matchingSkus.map((s: any) => s.legacyId).filter(Boolean);
 
-             const fuzzyQuery = buildFuzzySearchQuery(search, ['lotNumber', 'reason', 'createdBy']);
-             // Merge fuzzy field search with SKU ID match
-             if (fuzzyQuery) {
-                 // Each token must match in at least one place: direct fields OR sku match
-                 query.$and = fuzzyQuery.$and.map((cond: any) => ({
-                     $or: [
-                         ...cond.$or,
-                         ...(skuIds.length > 0 ? [{ sku: { $in: [...skuIds, ...skuLegacyIds] } }] : [])
-                     ]
-                 }));
-             }
+            const fuzzyQuery = buildFuzzySearchQuery(search, ['lotNumber', 'reason', 'createdBy']);
+            // Merge fuzzy field search with SKU ID match
+            if (fuzzyQuery) {
+                // Each token must match in at least one place: direct fields OR sku match
+                query.$and = fuzzyQuery.$and.map((cond: any) => ({
+                    $or: [
+                        ...cond.$or,
+                        ...(skuIds.length > 0 ? [{ sku: { $in: [...skuIds, ...skuLegacyIds] } }] : [])
+                    ]
+                }));
+            }
         }
 
         const sortObj: any = { [sortBy]: sortOrder };
@@ -56,7 +56,7 @@ export async function GET(request: Request) {
         // Manually hydrate SKU data using raw MongoDB driver (same pattern as opening balances)
         // Mongoose populate/find can't resolve string _id refs due to BSON type mismatch
         const skuRefIds = [...new Set(adjustments.map((a: any) => a.sku?.toString()).filter(Boolean))];
-        
+
         const skuMap = new Map<string, { _id: string; name: string; uom: string; image: string; tier?: number }>();
 
         if (skuRefIds.length > 0) {
@@ -114,6 +114,7 @@ export async function GET(request: Request) {
             adjustments: hydratedAdjustments,
             total,
             page,
+            hasMore: page * limit < total,
             totalPages: Math.ceil(total / limit)
         });
 

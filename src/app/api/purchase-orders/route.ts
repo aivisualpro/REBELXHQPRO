@@ -89,6 +89,7 @@ export async function GET(request: Request) {
             orders,
             total,
             page,
+            hasMore: page * limit < total,
             totalPages: Math.ceil(total / limit)
         });
     } catch (error: any) {

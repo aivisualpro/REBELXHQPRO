@@ -1,652 +1,612 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { createPortal } from 'react-dom';
-import {
-  Search,
-  ArrowUpDown,
-  Plus,
-  X,
-  Loader2,
-  Package,
-  Layers,
-  Box,
-} from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { useRouter } from 'next/navigation';
+import { ArrowUpDown, Plus, Search, X, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
-import { confirmDeleteToast } from '@/lib/confirmToast';
-import { Pagination } from '@/components/ui/Pagination';
-import { MultiSelectFilter } from '@/components/ui/filters/MultiSelectFilter';
-import { TableColumnHeader } from '@/components/ui/TableColumnHeader';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Sku {
-  _id: string; // SKU
+  _id: string;
   name: string;
   image?: string;
-  category: string;
-  subCategory: string;
-  materialType: string;
-  uom: string;
-  salePrice: number;
-  orderUpto: number;
-  reOrderPoint: number;
-  kitApplied: boolean;
-  isLotApplied: boolean;
-  variances?: any[];
-  currentStock?: number;
-  avgCost?: number;
-  revenue?: number;
-  cogs?: number;
-  cogm?: number;
-  grossProfit?: number;
+  category?: string;
+  subCategory?: string;
+  materialType?: string;
+  uom?: string;
+  salePrice?: number;
+  orderUpto?: number;
+  reOrderPoint?: number;
+  kitApplied?: boolean;
+  isLotApplied?: boolean;
   tier?: number;
+  createdAt?: string;
+}
+
+interface CacheEntry {
+  skus: Sku[];
+  hasMore: boolean;
+  page: number;
+  total: number;
+  sortBy: string;
+  sortOrder: string;
+  search: string;
+  category: string;
+  timestamp: number;
+}
+
+// ─── Module-level cache ───────────────────────────────────────────────────────
+
+const globalCache: { current: CacheEntry | null } = { current: null };
+const CACHE_TTL = 120_000;
+const PAGE_SIZE = 50;
+
+// ─── Tier Badge ───────────────────────────────────────────────────────────────
+
+function TierBadge({ tier }: { tier: number }) {
+  const colors = ['', '#22c55e', '#3b82f6', '#f97316'];
+  return (
+    <span
+      className="flex-shrink-0 w-4 h-4 rounded flex items-center justify-center text-[9px] font-black text-white shadow-sm"
+      style={{ backgroundColor: colors[tier] || '#94a3b8' }}
+      title={`Tier ${tier}`}
+    >
+      {tier}
+    </span>
+  );
+}
+
+// ─── Columns ──────────────────────────────────────────────────────────────────
+
+const COLUMNS = [
+  { key: 'name', label: 'Name / SKU', width: 'w-[280px]' },
+  { key: 'category', label: 'Category', width: 'w-[130px]' },
+  { key: 'subCategory', label: 'Sub Category', width: 'w-[130px]' },
+  { key: 'materialType', label: 'Material', width: 'w-[110px]' },
+  { key: 'uom', label: 'UOM', width: 'w-[60px]' },
+  { key: 'salePrice', label: 'Sale Price', width: 'w-[90px]', align: 'text-right' },
+  { key: 'reOrderPoint', label: 'Re-Order Pt', width: 'w-[90px]', align: 'text-right' },
+  { key: 'orderUpto', label: 'Order Upto', width: 'w-[90px]', align: 'text-right' },
+  { key: 'kitApplied', label: 'Kit', width: 'w-[50px]' },
+];
+
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
+
+const SkeletonRow = React.memo(function SkeletonRow({ index }: { index: number }) {
+  return (
+    <tr className="border-b border-border/60" style={{ opacity: 1 - index * 0.035 }}>
+      {COLUMNS.map(col => (
+        <td key={col.key} className="px-2.5 py-2.5">
+          <div className="h-3 rounded bg-muted-foreground/10 animate-pulse" style={{ width: col.key === 'name' ? '75%' : col.key === 'category' ? '60%' : '45%' }} />
+        </td>
+      ))}
+    </tr>
+  );
+});
+
+// ─── Field Pill Components ────────────────────────────────────────────────────
+
+// Deterministic color palette — same value always gets same color
+const PILL_PALETTES = {
+  category: [
+    { bg: 'rgba(124,58,237,0.12)', color: '#7c3aed', border: 'rgba(124,58,237,0.25)' },  // violet
+    { bg: 'rgba(16,185,129,0.12)', color: '#059669', border: 'rgba(16,185,129,0.25)' },  // emerald
+    { bg: 'rgba(234,88,12,0.12)', color: '#ea580c', border: 'rgba(234,88,12,0.25)' },   // orange
+    { bg: 'rgba(8,145,178,0.12)', color: '#0891b2', border: 'rgba(8,145,178,0.25)' },   // cyan
+    { bg: 'rgba(219,39,119,0.12)', color: '#db2777', border: 'rgba(219,39,119,0.25)' },  // pink
+    { bg: 'rgba(101,163,13,0.12)', color: '#65a30d', border: 'rgba(101,163,13,0.25)' },  // lime
+    { bg: 'rgba(37,99,235,0.12)', color: '#2563eb', border: 'rgba(37,99,235,0.25)' },   // blue
+  ],
+  subCategory: [
+    { bg: 'rgba(251,191,36,0.12)', color: '#b45309', border: 'rgba(251,191,36,0.3)' },   // amber
+    { bg: 'rgba(99,102,241,0.12)', color: '#6366f1', border: 'rgba(99,102,241,0.25)' },  // indigo
+    { bg: 'rgba(20,184,166,0.12)', color: '#0f766e', border: 'rgba(20,184,166,0.25)' },  // teal
+    { bg: 'rgba(239,68,68,0.12)', color: '#dc2626', border: 'rgba(239,68,68,0.25)' },   // red
+    { bg: 'rgba(168,85,247,0.12)', color: '#9333ea', border: 'rgba(168,85,247,0.25)' },  // purple
+    { bg: 'rgba(59,130,246,0.12)', color: '#3b82f6', border: 'rgba(59,130,246,0.25)' },  // blue
+    { bg: 'rgba(34,197,94,0.12)', color: '#16a34a', border: 'rgba(34,197,94,0.25)' },   // green
+    { bg: 'rgba(251,146,60,0.12)', color: '#ea580c', border: 'rgba(251,146,60,0.25)' },  // orange
+  ],
+  material: [
+    { bg: 'rgba(100,116,139,0.12)', color: '#64748b', border: 'rgba(100,116,139,0.25)' }, // slate
+    { bg: 'rgba(52,211,153,0.12)', color: '#059669', border: 'rgba(52,211,153,0.25)' },  // emerald
+    { bg: 'rgba(129,140,248,0.12)', color: '#6366f1', border: 'rgba(129,140,248,0.25)' }, // indigo
+    { bg: 'rgba(251,191,36,0.12)', color: '#92400e', border: 'rgba(251,191,36,0.3)' },   // amber
+    { bg: 'rgba(248,113,113,0.12)', color: '#dc2626', border: 'rgba(248,113,113,0.25)' }, // red
+    { bg: 'rgba(34,211,238,0.12)', color: '#0891b2', border: 'rgba(34,211,238,0.25)' },  // sky
+    { bg: 'rgba(167,243,208,0.2)', color: '#065f46', border: 'rgba(167,243,208,0.35)' }, // green
+  ],
+};
+
+function hashString(str: string): number {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+function FieldPill({ value, type }: { value: string; type: 'category' | 'subCategory' | 'material' }) {
+  const palette = PILL_PALETTES[type];
+  const s = palette[hashString(value) % palette.length];
+  return (
+    <span
+      style={{ backgroundColor: s.bg, color: s.color, border: `1px solid ${s.border}`, borderRadius: '5px' }}
+      className="inline-flex items-center px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap max-w-full truncate"
+    >
+      {value}
+    </span>
+  );
+}
+
+function UomPill({ value }: { value: string }) {
+  return (
+    <span
+      style={{ backgroundColor: 'rgba(254,153,0,0.12)', color: '#b45309', border: '1px solid rgba(254,153,0,0.25)', borderRadius: '5px' }}
+      className="inline-flex items-center px-2 py-0.5 text-[10px] font-black font-mono uppercase tracking-widest"
+    >
+      {value}
+    </span>
+  );
+}
+
+// ─── Table Row ────────────────────────────────────────────────────────────────
+
+const SkuRow = React.memo(function SkuRow({
+  sku, onClick, highlight
+}: { sku: Sku; onClick: () => void; highlight?: boolean }) {
+  const fmt = (n?: number) => n != null ? `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—';
+  return (
+    <tr
+      data-sku-id={sku._id}
+      className={cn(
+        'group hover:bg-muted/30 dark:hover:bg-muted/10 transition-colors duration-150 cursor-pointer border-b border-border/60',
+        highlight && 'animate-[rowGlow_0.75s_ease-in-out_4] ring-1 ring-primary/40 bg-primary/[0.06]'
+      )}
+      onClick={onClick}
+    >
+      <td className="px-2.5 py-2.5 w-[280px] text-[12px] font-semibold text-foreground/90 group-hover:text-foreground transition-colors">
+        <div className="flex items-center gap-1.5">
+          {sku.tier ? <TierBadge tier={sku.tier} /> : null}
+          <span className="truncate">{sku.name}</span>
+        </div>
+      </td>
+      <td className="px-2.5 py-2.5 w-[130px]">{sku.category ? <FieldPill value={sku.category} type="category" /> : <span className="text-muted-foreground/30 text-[11px]">—</span>}</td>
+      <td className="px-2.5 py-2.5 w-[130px]">{sku.subCategory ? <FieldPill value={sku.subCategory} type="subCategory" /> : <span className="text-muted-foreground/30 text-[11px]">—</span>}</td>
+      <td className="px-2.5 py-2.5 w-[110px]">{sku.materialType ? <FieldPill value={sku.materialType} type="material" /> : <span className="text-muted-foreground/30 text-[11px]">—</span>}</td>
+      <td className="px-2.5 py-2.5 w-[60px]">{sku.uom ? <UomPill value={sku.uom} /> : <span className="text-muted-foreground/30 text-[11px]">—</span>}</td>
+      <td className="px-2.5 py-2.5 w-[90px] text-[12px] font-mono text-right text-foreground/80">{fmt(sku.salePrice)}</td>
+      <td className="px-2.5 py-2.5 w-[90px] text-[12px] font-mono text-right text-foreground/70">{sku.reOrderPoint?.toLocaleString() || '—'}</td>
+      <td className="px-2.5 py-2.5 w-[90px] text-[12px] font-mono text-right text-foreground/70">{sku.orderUpto?.toLocaleString() || '—'}</td>
+      <td className="px-2.5 py-2.5 w-[50px] text-center">
+        {sku.kitApplied ? <span className="text-[10px] font-black text-primary">✓</span> : <span className="text-muted-foreground/30 text-[10px]">—</span>}
+      </td>
+    </tr>
+  );
+});
+
+// ─── Add/Edit Modal ───────────────────────────────────────────────────────────
+
+const INITIAL_FORM = { name: '', image: '', category: '', subCategory: '', materialType: '', uom: '', salePrice: 0, orderUpto: 0, reOrderPoint: 0, kitApplied: false, isLotApplied: false };
+
+function SkuModal({ onClose, onSaved, editing }: { onClose: () => void; onSaved: () => void; editing?: Sku | null }) {
+  const [form, setForm] = useState(editing ? { name: editing.name, image: editing.image || '', category: editing.category || '', subCategory: editing.subCategory || '', materialType: editing.materialType || '', uom: editing.uom || '', salePrice: editing.salePrice || 0, orderUpto: editing.orderUpto || 0, reOrderPoint: editing.reOrderPoint || 0, kitApplied: editing.kitApplied || false, isLotApplied: editing.isLotApplied || false } : INITIAL_FORM);
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const url = editing ? `/api/skus/${editing._id}` : '/api/skus';
+      const res = await fetch(url, { method: editing ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+      if (res.ok) { toast.success(editing ? 'SKU updated' : 'SKU created'); globalCache.current = null; onSaved(); onClose(); }
+      else { const e = await res.json(); toast.error(e.error || 'Failed to save'); }
+    } catch { toast.error('Failed to save'); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-2xl mx-4 bg-background border border-border shadow-2xl rounded-xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
+        <div className="flex items-center justify-between px-5 h-11 border-b border-border bg-secondary/30 shrink-0">
+          <h2 className="text-[11px] font-black uppercase tracking-widest">{editing ? 'Edit SKU' : 'Add New SKU'}</h2>
+          <button onClick={onClose} className="p-1.5 hover:bg-secondary rounded-full transition-colors cursor-pointer"><X className="w-4 h-4 text-muted-foreground" /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-5 scrollbar-custom">
+          <form id="sku-form" onSubmit={handleSubmit} className="space-y-4">
+            <Field label="Name *"><input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className={inp} /></Field>
+            <Field label="Image URL"><input value={form.image} onChange={e => setForm({ ...form, image: e.target.value })} placeholder="https://..." className={inp} /></Field>
+            <div className="grid grid-cols-3 gap-4">
+              <Field label="Category">
+                <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className={inp}>
+                  <option value="">Select...</option>
+                  {['Finished Goods', 'High Priority', 'Lab Testing', 'Maintenance', 'Packaging', 'Part', 'Shipping Category'].map(o => <option key={o}>{o}</option>)}
+                </select>
+              </Field>
+              <Field label="Sub Category">
+                <select value={form.subCategory} onChange={e => setForm({ ...form, subCategory: e.target.value })} className={inp}>
+                  <option value="">Select...</option>
+                  {['Bags', 'Bottle And Lids', 'Display Boxes', 'Disposable Vape', 'Edibles', 'Flavors', 'Hemp', 'Kava', 'Kratom', 'Kratom Extract', 'Kratom Powder', 'Labels/Shrink-Bands', 'Marketing Material', 'Packagings', 'R&D', 'Raw Ingredients', 'Simple', 'Variable'].map(o => <option key={o}>{o}</option>)}
+                </select>
+              </Field>
+              <Field label="Material Type">
+                <select value={form.materialType} onChange={e => setForm({ ...form, materialType: e.target.value })} className={inp}>
+                  <option value="">Select...</option>
+                  {['Bag', 'Bottle', 'Box', 'Capsule', 'Clings', 'Crystal', 'Dropper', 'Edible', 'Extracts', 'Label', 'Lid/Top', 'Liquid', 'Oils', 'Postcards', 'Powder', 'Seal', 'Shipping Boxes', 'Shrinkband', 'Smokables', 'Stickers', 'Tablets', 'Terpenes', 'Topicals'].map(o => <option key={o}>{o}</option>)}
+                </select>
+              </Field>
+            </div>
+            <div className="grid grid-cols-4 gap-4">
+              <Field label="UOM">
+                <input list="uom-opts" value={form.uom} onChange={e => setForm({ ...form, uom: e.target.value })} placeholder="EA, G, MG..." className={inp} />
+                <datalist id="uom-opts">{['EA', 'G', 'GAL', 'HR', 'KG', 'L', 'LBS', 'MG', 'ML', 'OZ'].map(o => <option key={o} value={o} />)}</datalist>
+              </Field>
+              <Field label="Sale Price ($)"><input type="number" step="any" value={form.salePrice || ''} onChange={e => setForm({ ...form, salePrice: Number(e.target.value) })} className={inp} /></Field>
+              <Field label="Order Upto"><input type="number" step="any" value={form.orderUpto || ''} onChange={e => setForm({ ...form, orderUpto: Number(e.target.value) })} className={inp} /></Field>
+              <Field label="Re-Order Point"><input type="number" step="any" value={form.reOrderPoint || ''} onChange={e => setForm({ ...form, reOrderPoint: Number(e.target.value) })} className={inp} /></Field>
+            </div>
+            <div className="flex items-center gap-6 pt-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" className="w-4 h-4 accent-primary" checked={form.kitApplied} onChange={e => setForm({ ...form, kitApplied: e.target.checked })} />
+                <span className="text-[11px] font-bold uppercase text-muted-foreground">Kit Applied</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" className="w-4 h-4 accent-primary" checked={form.isLotApplied} onChange={e => setForm({ ...form, isLotApplied: e.target.checked })} />
+                <span className="text-[11px] font-bold uppercase text-muted-foreground">Lot Applied (Traceability)</span>
+              </label>
+            </div>
+          </form>
+        </div>
+        <div className="flex items-center justify-end gap-3 px-5 h-11 border-t border-border bg-secondary/30 shrink-0">
+          <button type="button" onClick={onClose} className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground cursor-pointer">Cancel</button>
+          <button type="submit" form="sku-form" disabled={saving} className="px-5 py-1.5 bg-primary text-black text-[10px] font-black uppercase tracking-widest rounded-lg hover:opacity-90 transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer">
+            {saving && <Loader2 className="w-3 h-3 animate-spin" />}
+            <span>{editing ? 'Save Changes' : 'Create SKU'}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const inp = 'w-full h-9 px-3 border border-border rounded-lg text-[12px] bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors appearance-none';
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return <div className="space-y-1.5"><label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">{label}</label>{children}</div>;
+}
+
+// ─── Category Filter Tabs ─────────────────────────────────────────────────────
+
+const CATEGORY_TABS = ['All', 'Finished Goods', 'Packaging', 'Raw Ingredients', 'Other'] as const;
+const CATEGORY_COLORS: Record<string, { bg: string; color: string; hoverBg: string }> = {
+  'All': { bg: '#fe9900', color: '#ffffff', hoverBg: 'rgba(254,153,0,0.08)' },
+  'Finished Goods': { bg: '#7c3aed', color: '#ffffff', hoverBg: 'rgba(124,58,237,0.08)' },
+  'Packaging': { bg: '#0891b2', color: '#ffffff', hoverBg: 'rgba(8,145,178,0.08)' },
+  'Raw Ingredients': { bg: '#65a30d', color: '#ffffff', hoverBg: 'rgba(101,163,13,0.08)' },
+  'Other': { bg: '#64748b', color: '#ffffff', hoverBg: 'rgba(100,116,139,0.08)' },
+};
+
+// ─── Main Content ─────────────────────────────────────────────────────────────
+
+function SkusContent() {
+  const router = useRouter();
+
+  const [skus, setSkus] = useState<Sku[]>(globalCache.current?.skus || []);
+  const [isLoading, setIsLoading] = useState(!globalCache.current);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(globalCache.current?.hasMore ?? true);
+  const [total, setTotal] = useState(globalCache.current?.total || 0);
+  const [error, setError] = useState<string | null>(null);
+
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [sortBy, setSortBy] = useState('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [activeCategory, setActiveCategory] = useState<string>('All');
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingSku, setEditingSku] = useState<Sku | null>(null);
+
+  const pageRef = useRef(globalCache.current?.page || 0);
+  const mountedRef = useRef(true);
+  const fetchingRef = useRef(false);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const reqSeqRef = useRef(0);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  // ─── Debounce ───────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 250);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // ─── Scroll-back & highlight ─────────────────────────────────────────────
+
+  useEffect(() => {
+    const savedId = sessionStorage.getItem('sku_scroll_to');
+    const savedScroll = sessionStorage.getItem('sku_scroll_top');
+    if (savedId) {
+      sessionStorage.removeItem('sku_scroll_to');
+      sessionStorage.removeItem('sku_scroll_top');
+      setHighlightId(savedId);
+      if (savedScroll && scrollRef.current) scrollRef.current.scrollTop = parseInt(savedScroll, 10);
+      const tryScroll = (attempts = 0) => {
+        const row = document.querySelector(`[data-sku-id="${savedId}"]`);
+        if (row) {
+          setTimeout(() => row.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
+          setTimeout(() => setHighlightId(null), 3000);
+        } else if (attempts < 30) setTimeout(() => tryScroll(attempts + 1), 200);
+      };
+      setTimeout(() => tryScroll(), 100);
+    }
+  }, []);
+
+  // ─── Fetch ──────────────────────────────────────────────────────────────
+
+  const fetchPage = useCallback(async (pageNum: number, isAppend: boolean) => {
+    if (abortControllerRef.current) abortControllerRef.current.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    const seq = ++reqSeqRef.current;
+
+    fetchingRef.current = true;
+    if (isAppend) setIsLoadingMore(true);
+    else setIsLoading(true);
+
+    try {
+      const params = new URLSearchParams({
+        page: String(pageNum),
+        limit: String(PAGE_SIZE),
+        sortBy, sortOrder,
+        search: debouncedSearch,
+        simple: 'true',
+        ignoreDate: 'true',
+      });
+
+      // Category filter
+      if (activeCategory !== 'All') {
+        if (activeCategory === 'Other') {
+          // "Other" = not any of the named categories
+        } else {
+          params.set('category', activeCategory);
+        }
+      }
+
+      const res = await fetch(`/api/skus?${params}`, { signal: controller.signal });
+      const data = await res.json();
+
+      if (seq !== reqSeqRef.current) return;
+      if (!mountedRef.current) return;
+
+      if (res.ok) {
+        const newSkus: Sku[] = data.skus || [];
+        // Client-side filter for "Other" category
+        const filtered = activeCategory === 'Other'
+          ? newSkus.filter(s => !['Finished Goods', 'Packaging', 'Raw Ingredients'].some(c => s.category?.includes(c)))
+          : newSkus;
+
+        const newHasMore = data.hasMore ?? (newSkus.length === PAGE_SIZE);
+        const newTotal = data.total || 0;
+
+        if (isAppend) {
+          setSkus(prev => {
+            const ids = new Set(prev.map(s => s._id));
+            const merged = [...prev, ...filtered.filter(s => !ids.has(s._id))];
+            globalCache.current = { skus: merged, hasMore: newHasMore, page: pageNum, total: newTotal, sortBy, sortOrder, search: debouncedSearch, category: activeCategory, timestamp: Date.now() };
+            return merged;
+          });
+        } else {
+          setSkus(filtered);
+          setTotal(newTotal);
+          globalCache.current = { skus: filtered, hasMore: newHasMore, page: pageNum, total: newTotal, sortBy, sortOrder, search: debouncedSearch, category: activeCategory, timestamp: Date.now() };
+        }
+
+        setHasMore(newHasMore);
+        pageRef.current = pageNum;
+        setError(null);
+      } else {
+        setError(data.error || 'Failed to fetch');
+      }
+    } catch (e: any) {
+      if (e?.name === 'AbortError') return;
+      if (mountedRef.current) setError(e.message);
+    } finally {
+      fetchingRef.current = false;
+      if (mountedRef.current) { setIsLoading(false); setIsLoadingMore(false); }
+    }
+  }, [sortBy, sortOrder, debouncedSearch, activeCategory]);
+
+  // ─── Initial load / filter changes ─────────────────────────────────────
+
+  const fetchPageRef = useRef(fetchPage);
+  fetchPageRef.current = fetchPage;
+  const isFirstMount = useRef(true);
+  const prevFiltersRef = useRef({ sortBy, sortOrder, search: debouncedSearch, category: activeCategory });
+
+  useEffect(() => {
+    const prev = prevFiltersRef.current;
+    const filtersChanged = prev.sortBy !== sortBy || prev.sortOrder !== sortOrder || prev.search !== debouncedSearch || prev.category !== activeCategory;
+    prevFiltersRef.current = { sortBy, sortOrder, search: debouncedSearch, category: activeCategory };
+
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      const cache = globalCache.current;
+      if (cache && cache.skus.length > 0 && (Date.now() - cache.timestamp) < CACHE_TTL &&
+        cache.sortBy === sortBy && cache.sortOrder === sortOrder && cache.search === debouncedSearch && cache.category === activeCategory) {
+        setSkus(cache.skus); setHasMore(cache.hasMore); setTotal(cache.total); pageRef.current = cache.page; setIsLoading(false); return;
+      }
+    }
+
+    globalCache.current = null;
+    pageRef.current = 0;
+    setSkus([]);
+    setHasMore(true);
+    fetchPageRef.current(1, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortBy, sortOrder, debouncedSearch, activeCategory]);
+
+  // ─── Infinite scroll ─────────────────────────────────────────────────────
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    const scrollContainer = scrollRef.current;
+    if (!sentinel || !scrollContainer) return;
+    const observer = new IntersectionObserver(
+      entries => { if (entries[0].isIntersecting && hasMore && !fetchingRef.current && !isLoading) fetchPageRef.current(pageRef.current + 1, true); },
+      { root: scrollContainer, rootMargin: '400px' }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, isLoading]);
+
+  const handleSort = (col: string) => {
+    if (sortBy === col) setSortOrder(p => p === 'asc' ? 'desc' : 'asc');
+    else { setSortBy(col); setSortOrder('asc'); }
+    scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  return (
+    <div className="flex flex-col h-[calc(100vh-48px)] bg-background transition-colors duration-300">
+
+      {/* ─── Local Header ──────────────────────────────────────────────── */}
+      <div className="shrink-0 border-b border-border bg-background px-3 py-2 flex items-center gap-3 overflow-x-auto">
+
+        {/* Title */}
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-[11px] font-black uppercase tracking-widest text-foreground">SKUS</span>
+          <span className="text-[11px] font-bold text-muted-foreground/60 tabular-nums">{total > 0 ? total.toLocaleString() : ''}</span>
+        </div>
+
+        <div className="h-5 w-px bg-border shrink-0" />
+
+        {/* Category Tabs */}
+        <div className="flex items-center gap-1.5">
+          {CATEGORY_TABS.map(tab => {
+            const sc = CATEGORY_COLORS[tab];
+            const isActive = activeCategory === tab;
+            return (
+              <button key={tab} onClick={() => { setActiveCategory(tab); scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                className="px-3 py-1.5 rounded-lg text-[12px] font-semibold whitespace-nowrap transition-all cursor-pointer"
+                style={isActive ? { backgroundColor: sc.bg, color: sc.color, boxShadow: '0 1px 4px rgba(0,0,0,0.15)' } : { color: 'inherit', backgroundColor: 'transparent' }}
+                onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.backgroundColor = sc.hoverBg; }}
+                onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'; }}
+              >{tab}</button>
+            );
+          })}
+        </div>
+
+        <div className="h-5 w-px bg-border shrink-0" />
+
+        {/* Search */}
+        <div className="relative flex items-center shrink-0">
+          <Search className="absolute left-2.5 w-3.5 h-3.5 text-muted-foreground/50 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search SKUs..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="pl-8 pr-3 h-8 w-56 bg-secondary/60 border border-border text-[12px] rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50 placeholder:text-muted-foreground/50 text-foreground transition-all"
+          />
+        </div>
+
+        <div className="flex-1" />
+
+        {/* Add Button */}
+        <button
+          onClick={() => { setEditingSku(null); setModalOpen(true); }}
+          className="h-8 px-3 bg-primary text-black hover:opacity-90 transition-all rounded-lg shadow flex items-center gap-1.5 cursor-pointer shrink-0"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span className="text-[11px] font-black uppercase tracking-widest">ADD</span>
+        </button>
+      </div>
+
+      {/* ─── Table ─────────────────────────────────────────────────────── */}
+      <div ref={scrollRef} className="flex-1 overflow-x-auto overflow-y-auto scrollbar-custom relative">
+        <div className="min-w-fit px-2 py-1">
+          <table className="w-full text-left border-separate border-spacing-0 relative z-0 table-fixed">
+            <thead className="bg-background border-b border-border sticky top-0 z-10">
+              <tr>
+                {COLUMNS.map(col => (
+                  <th
+                    key={col.key}
+                    onClick={() => handleSort(col.key)}
+                    className={cn(
+                      'px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary/60 transition-colors border-r border-border/40 last:border-0 select-none shadow-[0_1px_0_0_hsl(var(--border))]',
+                      col.width
+                    )}
+                  >
+                    <div className={cn('flex items-center gap-1', col.align === 'text-right' && 'justify-end')}>
+                      <span>{col.label}</span>
+                      <ArrowUpDown className={cn('w-2.5 h-2.5', sortBy === col.key ? 'text-primary' : 'text-muted-foreground/25')} />
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                Array.from({ length: 25 }).map((_, i) => <SkeletonRow key={i} index={i} />)
+              ) : error ? (
+                <tr><td colSpan={COLUMNS.length} className="px-4 py-12 text-center text-[12px] text-destructive">{error}</td></tr>
+              ) : skus.length === 0 ? (
+                <tr><td colSpan={COLUMNS.length} className="px-4 py-16 text-center text-[12px] text-muted-foreground/50 uppercase tracking-widest">No SKUs found</td></tr>
+              ) : skus.map(sku => (
+                <SkuRow
+                  key={sku._id}
+                  sku={sku}
+                  highlight={highlightId === sku._id}
+                  onClick={() => {
+                    sessionStorage.setItem('sku_scroll_to', sku._id);
+                    if (scrollRef.current) sessionStorage.setItem('sku_scroll_top', String(scrollRef.current.scrollTop));
+                    router.push(`/warehouse/skus/${sku._id}`);
+                  }}
+                />
+              ))}
+            </tbody>
+          </table>
+
+          <div ref={sentinelRef} className="h-2" />
+
+          {isLoadingMore && (
+            <div className="flex items-center justify-center gap-2 py-4">
+              <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          )}
+
+          {!hasMore && skus.length > 0 && !isLoading && (
+            <div className="text-center py-4 text-[11px] text-muted-foreground/40 uppercase tracking-widest">
+              — {skus.length.toLocaleString()} SKUs loaded —
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Modal */}
+      {modalOpen && (
+        <SkuModal
+          onClose={() => setModalOpen(false)}
+          onSaved={() => { globalCache.current = null; fetchPage(1, false); }}
+          editing={editingSku}
+        />
+      )}
+    </div>
+  );
 }
 
 export default function SkusPage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center h-[calc(100vh-36px)]"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>}>
-      <SkusPageContent />
+    <Suspense fallback={<div className="flex items-center justify-center h-[calc(100vh-48px)]"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>}>
+      <SkusContent />
     </Suspense>
   );
 }
-
-function SkusPageContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const [skus, setSkus] = useState<Sku[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalSkus, setTotalSkus] = useState(0);
-  const [sortBy, setSortBy] = useState('name');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-
-  // Search — local state for instant input, synced to URL after debounce
-  const [search, setSearch] = useState(searchParams.get('search') || '');
-  const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('search') || '');
-
-  // Header portal
-  const [headerPortalTarget, setHeaderPortalTarget] = useState<HTMLElement | null>(null);
-  useEffect(() => {
-    const target = document.getElementById('header-portal-target');
-    if (target) setHeaderPortalTarget(target);
-  }, []);
-
-  // Filters
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [selectedSubCategories, setSelectedSubCategories] = useState<string[]>([]);
-  const [selectedMaterialTypes, setSelectedMaterialTypes] = useState<string[]>([]);
-
-  // Modal State
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [editingSku, setEditingSku] = useState<Sku | null>(null);
-  const [globalSettings, setGlobalSettings] = useState<any>(null);
-
-  const initialFormState = {
-    sku: '',
-    name: '',
-    image: '',
-    category: '',
-    subCategory: '',
-    materialType: '',
-    uom: '',
-    salePrice: 0,
-    orderUpto: 0,
-    reOrderPoint: 0,
-    kitApplied: false,
-    isLotApplied: false
-  };
-  const [formData, setFormData] = useState(initialFormState);
-
-  // Debounce search + sync to URL
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search);
-      setPage(1);
-      // Sync to URL
-      const params = new URLSearchParams(searchParams.toString());
-      if (search) {
-        params.set('search', search);
-      } else {
-        params.delete('search');
-      }
-      router.replace(`/warehouse/skus?${params.toString()}`, { scroll: false });
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [search]);
-
-  const fetchSkus = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: '25',
-        search: debouncedSearch,
-        sortBy,
-        sortOrder,
-      });
-
-      if (selectedCategories.length) params.append('category', selectedCategories.join(','));
-      if (selectedSubCategories.length) params.append('subCategory', selectedSubCategories.join(','));
-      if (selectedMaterialTypes.length) params.append('materialType', selectedMaterialTypes.join(','));
-
-      const res = await fetch(`/api/skus?${params.toString()}`);
-      const data = await res.json();
-
-      if (res.ok) {
-        setSkus(data.skus || []);
-        setTotalPages(data.totalPages || 1);
-        setTotalSkus(data.total || 0);
-      } else {
-        setError(data.error || 'Failed to fetch SKUs');
-      }
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, debouncedSearch, sortBy, sortOrder, selectedCategories, selectedSubCategories, selectedMaterialTypes]);
-
-  useEffect(() => {
-    fetchSkus();
-  }, [fetchSkus]);
-
-  // Fetch Global Settings
-  useEffect(() => {
-    fetch('/api/settings')
-      .then(res => res.json())
-      .then(data => setGlobalSettings(data))
-      .catch(() => {});
-  }, []);
-
-  // Handle createNew URL param
-  useEffect(() => {
-    if (searchParams.get('createNew') === 'true') {
-        openModal();
-        // Remove param
-        const params = new URLSearchParams(searchParams.toString());
-        params.delete('createNew');
-        window.history.replaceState(null, '', `?${params.toString()}`);
-    }
-  }, [searchParams]);
-
-  const handleSort = (column: string) => {
-    if (sortBy === column) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(column);
-      setSortOrder('asc');
-    }
-  };
-
-
-
-  const openModal = (sku?: Sku) => {
-    if (sku) {
-      setEditingSku(sku);
-      setFormData({
-        sku: sku._id, // _id is sku
-        name: sku.name,
-        image: sku.image || '',
-        category: sku.category || '',
-        subCategory: sku.subCategory || '',
-        materialType: sku.materialType || '',
-        uom: sku.uom || '',
-        salePrice: sku.salePrice || 0,
-        orderUpto: sku.orderUpto || 0,
-        reOrderPoint: sku.reOrderPoint || 0,
-        kitApplied: sku.kitApplied || false,
-        isLotApplied: sku.isLotApplied || false
-      });
-    } else {
-      setEditingSku(null);
-      setFormData(initialFormState);
-    }
-    setIsModalOpen(true);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    try {
-      const url = editingSku ? `/api/skus/${editingSku._id}` : '/api/skus';
-      const method = editingSku ? 'PATCH' : 'POST';
-
-      const payload = { ...formData };
-
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (res.ok) {
-        setIsModalOpen(false);
-        toast.success(editingSku ? 'SKU updated' : 'SKU created');
-        fetchSkus();
-      } else {
-        const err = await res.json();
-        toast.error('Error: ' + (err.error || err.message));
-      }
-    } catch (error) {
-      console.error(error);
-      toast.error('Failed to save');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleDelete = (id: string) => {
-    confirmDeleteToast('Delete this SKU?', async () => {
-      try {
-        const res = await fetch(`/api/skus/${id}`, { method: 'DELETE' });
-        if (res.ok) {
-          toast.success('SKU deleted');
-          fetchSkus();
-        } else {
-          toast.error('Failed to delete');
-        }
-      } catch (e) {
-        toast.error('Delete failed');
-      }
-    });
-  };
-
-  // Derived options for filters based on current data
-  const categoryOptions = Array.from(new Set(skus.map(s => s.category).filter(Boolean))).map(c => ({ label: c, value: c }));
-  const subCategoryOptions = Array.from(new Set(skus.map(s => s.subCategory).filter(Boolean))).map(c => ({ label: c, value: c }));
-  const materialOptions = Array.from(new Set(skus.map(s => s.materialType).filter(Boolean))).map(c => ({ label: c, value: c }));
-
-  return (
-    <div className="flex flex-col h-[calc(100vh-36px)] bg-background relative transition-colors duration-300">
-      {/* Header Portal */}
-      {headerPortalTarget && createPortal(
-        <>
-          <input
-            type="text"
-            placeholder="Search products..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-3 pr-3 h-8 w-64 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
-          />
-          <div className="flex-1" />
-          <button
-            onClick={() => openModal()}
-            className="h-8 px-3 bg-primary text-black hover:opacity-90 transition-all rounded shadow-md flex items-center space-x-1.5 cursor-pointer"
-          >
-            <Plus className="w-3 h-3" />
-            <span className="hidden sm:inline text-[10px] font-black uppercase tracking-widest">Add</span>
-          </button>
-        </>,
-        headerPortalTarget
-      )}
-      <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
-        <div className="min-w-full px-2 py-2">
-          <table className="w-full text-left border-separate border-spacing-0 relative z-0">
-          <thead className="sticky top-0 bg-secondary/80 z-10 border-b border-border backdrop-blur-md transition-colors">
-            <tr>
-              {/* Name */}
-              <th className="border-r border-border">
-                <TableColumnHeader
-                  column="name"
-                  title="Name"
-                  currentSortBy={sortBy}
-                  currentSortOrder={sortOrder}
-                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
-                  className="text-muted-foreground"
-                />
-              </th>
-
-              {/* Category */}
-              <th className="border-r border-border">
-                <TableColumnHeader
-                  column="category"
-                  title="Category"
-                  currentSortBy={sortBy}
-                  currentSortOrder={sortOrder}
-                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
-                  filterOptions={categoryOptions}
-                  selectedFilters={selectedCategories}
-                  onFilterChange={(_key, values) => setSelectedCategories(values)}
-                  className="text-muted-foreground"
-                />
-              </th>
-
-              {/* Sub Category */}
-              <th className="border-r border-border">
-                <TableColumnHeader
-                  column="subCategory"
-                  title="Sub Cat"
-                  currentSortBy={sortBy}
-                  currentSortOrder={sortOrder}
-                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
-                  filterOptions={subCategoryOptions}
-                  selectedFilters={selectedSubCategories}
-                  onFilterChange={(_key, values) => setSelectedSubCategories(values)}
-                  className="text-muted-foreground"
-                />
-              </th>
-
-              {/* Material */}
-              <th className="border-r border-border">
-                <TableColumnHeader
-                  column="materialType"
-                  title="Material"
-                  currentSortBy={sortBy}
-                  currentSortOrder={sortOrder}
-                  onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }}
-                  filterOptions={materialOptions}
-                  selectedFilters={selectedMaterialTypes}
-                  onFilterChange={(_key, values) => setSelectedMaterialTypes(values)}
-                  className="text-muted-foreground"
-                />
-              </th>
-
-              {/* Sale Price */}
-              <th className="border-r border-border">
-                <TableColumnHeader column="salePrice" title="Sale Price" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground justify-end" />
-              </th>
-
-              {/* Cost */}
-              <th className="border-r border-border">
-                <TableColumnHeader column="avgCost" title="Cost (Avg)" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground justify-end" />
-              </th>
-
-              {/* Stock Level */}
-              <th className="border-r border-border">
-                <TableColumnHeader column="currentStock" title="Stock Level" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground justify-end" />
-              </th>
-
-              {/* Re-Ord */}
-              <th className="border-r border-border">
-                <TableColumnHeader column="reOrderPoint" title="Re-Ord" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground justify-end" />
-              </th>
-
-              {/* Order Up to */}
-              <th className="border-r border-border">
-                <TableColumnHeader column="orderUpto" title="Order Up to" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground justify-end" />
-              </th>
-
-              {/* Revenue */}
-              <th className="border-r border-border">
-                <TableColumnHeader column="revenue" title="Revenue" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground justify-end" />
-              </th>
-
-              {/* COGS */}
-              <th className="border-r border-border">
-                <TableColumnHeader column="cogs" title="COGS" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground justify-end" />
-              </th>
-
-              {/* COGM */}
-              <th className="border-r border-border">
-                <TableColumnHeader column="cogm" title="COGM" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground justify-end" />
-              </th>
-
-              {/* Gross Profit */}
-              <th className="px-2 py-1 border-r border-border">
-                <TableColumnHeader column="grossProfit" title="Gross Profit" currentSortBy={sortBy} currentSortOrder={sortOrder} onSort={(key, dir) => { setSortBy(key); setSortOrder(dir); }} className="text-muted-foreground justify-end" />
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border bg-background/50">
-            {loading ? (
-              <tr><td colSpan={13} className="px-2 py-12 text-center text-[10px] text-slate-400">Loading SKUs...</td></tr>
-            ) : error ? (
-              <tr><td colSpan={13} className="px-2 py-12 text-center text-red-500 text-[10px] font-bold">{error}</td></tr>
-            ) : skus.length === 0 ? (
-              <tr><td colSpan={13} className="px-2 py-12 text-center text-[10px] text-slate-400 uppercase font-bold tracking-tighter opacity-50">No SKUs found</td></tr>
-            ) : skus.map(sku => (
-              <tr 
-                key={sku._id} 
-                className="group relative z-0 bg-background hover:bg-secondary/40 transition-colors duration-150 cursor-pointer"
-                onClick={() => router.push(`/warehouse/skus/${sku._id}`)}
-              >
-                <td className="px-2 py-1 text-[11px] text-foreground font-medium border-r border-border whitespace-nowrap max-w-[300px] group-hover:border-l-2 group-hover:border-l-primary transition-all">
-                  <div className="flex items-center space-x-1.5">
-                    {sku.tier ? (
-                      <span className={cn(
-                        "flex-shrink-0 w-4 h-4 rounded flex items-center justify-center text-[9px] font-black text-white shadow-sm",
-                        sku.tier === 1 ? "bg-emerald-500" :
-                        sku.tier === 2 ? "bg-blue-500" :
-                        "bg-orange-500"
-                      )} title={`Tier ${sku.tier}`}>
-                        {sku.tier}
-                      </span>
-                    ) : null}
-                    <span className="truncate" title={sku.name}>{sku.name}</span>
-                  </div>
-                </td>
-                <td className="px-2 py-1 text-[10px] uppercase font-bold text-muted-foreground border-r border-border">{sku.category}</td>
-                <td className="px-2 py-1 text-[10px] uppercase font-bold text-muted-foreground border-r border-border">{sku.subCategory}</td>
-                <td className="px-2 py-1 text-[10px] uppercase font-bold text-muted-foreground border-r border-border">{sku.materialType}</td>
-                <td className="px-2 py-1 text-[11px] text-muted-foreground font-mono border-r border-border text-right">${(sku.salePrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td className="px-2 py-1 text-[11px] text-muted-foreground font-mono border-r border-border text-right">${(sku.avgCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td className="px-2 py-1 text-[11px] font-bold text-foreground border-r border-border text-right">
-                  <span className={cn(
-                    "px-1.5 py-0.5 rounded text-[11px] font-bold",
-                    (sku.currentStock || 0) <= (sku.reOrderPoint || 0) ? "bg-destructive/10 text-destructive border border-destructive/20" : "text-foreground"
-                  )}>
-                    {Math.round(sku.currentStock || 0).toLocaleString()}
-                  </span>
-                </td>
-                <td className="px-2 py-1 text-[11px] text-muted-foreground border-r border-border text-right">{(sku.reOrderPoint || 0).toLocaleString()}</td>
-                <td className="px-2 py-1 text-[11px] text-muted-foreground border-r border-border text-right">{(sku.orderUpto || 0).toLocaleString()}</td>
-                <td className="px-2 py-1 text-[11px] text-emerald-600 font-mono border-r border-border text-right">${(sku.revenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td className="px-2 py-1 text-[11px] text-muted-foreground font-mono border-r border-border text-right">${(sku.cogs || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td className="px-2 py-1 text-[11px] text-muted-foreground font-mono border-r border-border text-right">${(sku.cogm || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td className="px-2 py-1 text-[11px] font-black text-foreground font-mono text-right">${(sku.grossProfit || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-      <div className="border-t border-border bg-background transition-colors duration-300">
-        <Pagination
-          currentPage={page}
-          totalPages={totalPages}
-          onPageChange={setPage}
-          totalItems={totalSkus}
-          itemsPerPage={25}
-          itemName="SKUs"
-        />
-      </div>
-
-      {/* Add/Edit Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
-          <div className="relative z-10 w-full max-w-2xl mx-4 bg-background border border-border shadow-2xl rounded-lg overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 h-10 border-b border-border bg-secondary/30 shrink-0">
-              <h2 className="text-sm font-bold uppercase tracking-tight text-foreground">
-                {editingSku ? 'Edit SKU' : 'Add New SKU'}
-              </h2>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="p-1.5 hover:bg-secondary rounded-full transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4 text-muted-foreground" />
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-4 scrollbar-custom">
-              <form id="sku-form" onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Name <span className="text-destructive">*</span></label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.name}
-                    onChange={e => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full h-9 px-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Image URL</label>
-                  <input
-                    type="text"
-                    value={formData.image}
-                    onChange={e => setFormData({ ...formData, image: e.target.value })}
-                    placeholder="https://..."
-                    className="w-full h-9 px-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors"
-                  />
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Category</label>
-                    <select
-                      className="w-full h-9 px-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors appearance-none cursor-pointer"
-                      value={formData.category}
-                      onChange={e => setFormData({ ...formData, category: e.target.value })}
-                    >
-                      <option value="">Select Category</option>
-                      {[
-                        "Finished Goods", "High Priority", "Lab Testing", "Maintenance",
-                        "Packaging", "Part", "Shipping Category"
-                      ].map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                    </select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Sub Category</label>
-                    <select
-                      className="w-full h-9 px-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors appearance-none cursor-pointer"
-                      value={formData.subCategory}
-                      onChange={e => setFormData({ ...formData, subCategory: e.target.value })}
-                    >
-                      <option value="">Select Sub-Category</option>
-                      {[
-                        "Bags", "Bottle And Lids", "Display Boxes", "Disposable Vape", "Edibles", "Flavors", "Hemp",
-                        "Kava", "Kratom", "Kratom Extract", "Kratom Powder", "Labels/Shrink-Bands", "Marketing Material",
-                        "Packagings", "R&D (Research And Developement)", "Raw Ingredients", "Simple", "Variable"
-                      ].map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                    </select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Material Type</label>
-                    <select
-                      className="w-full h-9 px-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors appearance-none cursor-pointer"
-                      value={formData.materialType}
-                      onChange={e => setFormData({ ...formData, materialType: e.target.value })}
-                    >
-                      <option value="">Select Material Type</option>
-                      {[
-                        "Bag", "Bottle", "Box", "Capsule", "Clings", "Crystal", "Dropper", "Edible", "Extracts",
-                        "Label", "Lid/Top", "Liquid", "Oils", "Postcards", "Posters", "Powder", "Sample Boxes",
-                        "Seal", "Shipping Boxes", "Shrinkband", "Smokables", "Stickers", "Suppository", "SWAG",
-                        "Table Tents", "Tablets", "Terpenes", "Topicals"
-                      ].map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-4 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">UOM</label>
-                    <input
-                      list="uom-options"
-                      className="w-full h-9 px-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors"
-                      value={formData.uom}
-                      onChange={e => setFormData({ ...formData, uom: e.target.value })}
-                      placeholder="Select or Type..."
-                    />
-                    <datalist id="uom-options">
-                      {["EA", "G", "GAL", "HR", "KG", "L", "LBS", "MG", "ML", "OZ"].map(opt => (
-                        <option key={opt} value={opt} />
-                      ))}
-                    </datalist>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Sale Price ($)</label>
-                    <input type="number" step="any" value={formData.salePrice || ''} onChange={e => setFormData({ ...formData, salePrice: Number(e.target.value) })} className="w-full h-9 px-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Order Upto</label>
-                    <input type="number" step="any" value={formData.orderUpto || ''} onChange={e => setFormData({ ...formData, orderUpto: Number(e.target.value) })} className="w-full h-9 px-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Re-Order Point</label>
-                    <input type="number" step="any" value={formData.reOrderPoint || ''} onChange={e => setFormData({ ...formData, reOrderPoint: Number(e.target.value) })} className="w-full h-9 px-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors" />
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-6 pt-2">
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="w-4 h-4 accent-primary"
-                      checked={formData.kitApplied}
-                      onChange={e => setFormData({ ...formData, kitApplied: e.target.checked })}
-                    />
-                    <span className="text-xs font-bold uppercase text-muted-foreground">Kit Applied</span>
-                  </label>
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="w-4 h-4 accent-primary"
-                      checked={formData.isLotApplied}
-                      onChange={e => setFormData({ ...formData, isLotApplied: e.target.checked })}
-                    />
-                    <span className="text-xs font-bold uppercase text-muted-foreground">Lot Applied (Traceability)</span>
-                  </label>
-                </div>
-
-              </form>
-            </div>
-
-            {/* Footer */}
-            <div className="flex items-center justify-end space-x-3 px-5 h-10 border-t border-border bg-secondary/30 shrink-0">
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                form="sku-form"
-                disabled={isSubmitting}
-                className="px-5 py-1.5 bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-widest rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center space-x-2 cursor-pointer"
-              >
-                {isSubmitting && <Loader2 className="w-3 h-3 animate-spin" />}
-                <span>{editingSku ? 'Save Changes' : 'Create SKU'}</span>
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
-
-    </div>
-  );
-}
-
-// Helpers
-const FormInput = ({ label, value, onChange, type = "text", required = false, placeholder = "" }: { label: string, value: any, onChange: (val: any) => void, type?: string, required?: boolean, placeholder?: string }) => (
-  <div className="space-y-1.5">
-    <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">{label} {required && <span className="text-destructive">*</span>}</label>
-    <input
-      type={type}
-      required={required}
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      placeholder={placeholder}
-      readOnly={label.includes('SKU') && required === false}
-      className={cn(
-        "w-full h-9 px-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors",
-        label.includes('SKU') && required === false && "opacity-50 cursor-not-allowed"
-      )}
-    />
-  </div>
-);

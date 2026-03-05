@@ -70,9 +70,9 @@ export async function GET(request: Request) {
 
         // Build SKU lookup using raw MongoDB driver with cross-type matching
         const skuIds = [...new Set(rawBalances.map((b: any) => b.sku?.toString()).filter(Boolean))];
-        
+
         let skuMap = new Map<string, { name: string; image: string }>();
-        
+
         if (skuIds.length > 0) {
             const db = mongoose.connection.db;
             if (db) {
@@ -89,7 +89,7 @@ export async function GET(request: Request) {
                     { _id: { $in: lookupIds } },
                     { projection: { _id: 1, name: 1, image: 1 } }
                 ).toArray();
-                
+
                 skuDocs.forEach((s: any) => {
                     skuMap.set(s._id.toString(), { name: s.name || '', image: s.image || '' });
                 });
@@ -115,6 +115,7 @@ export async function GET(request: Request) {
             openingBalances,
             total,
             page,
+            hasMore: limit > 0 ? page * limit < total : false,
             totalPages: limit > 0 ? Math.ceil(total / limit) : 1
         });
     } catch (error: any) {

@@ -32,7 +32,7 @@ export async function GET(request: Request) {
         const isWebProduct = searchParams.get('isWebProduct');
 
         let query: any = {};
-        
+
         // Apply Global Date Filter (unless ignored for dropdowns)
         const ignoreDate = searchParams.get('ignoreDate') === 'true';
         if (!ignoreDate) {
@@ -76,6 +76,7 @@ export async function GET(request: Request) {
                 skus: skusRaw,
                 total,
                 page,
+                hasMore: page * (limit || 20) < total,
                 totalPages: Math.ceil(total / (limit || 20))
             });
         }
@@ -109,22 +110,26 @@ export async function GET(request: Request) {
             OpeningBalance.aggregate([
                 { $match: { sku: { $in: dualSkuIds } } },
                 { $addFields: { skuStr: { $toString: "$sku" } } },
-                { $group: { 
-                    _id: "$skuStr", 
-                    qty: { $sum: "$qty" }, 
-                    costVal: { $sum: { $multiply: ["$qty", "$cost"] } } 
-                }}
+                {
+                    $group: {
+                        _id: "$skuStr",
+                        qty: { $sum: "$qty" },
+                        costVal: { $sum: { $multiply: ["$qty", "$cost"] } }
+                    }
+                }
             ]),
             // 2. Purchase Orders (String type — use string IDs)
             PurchaseOrder.aggregate([
                 { $match: { "lineItems.sku": { $in: skuIds }, status: "Received" } },
                 { $unwind: "$lineItems" },
                 { $match: { "lineItems.sku": { $in: skuIds } } },
-                { $group: { 
-                    _id: "$lineItems.sku", 
-                    qty: { $sum: "$lineItems.qtyReceived" },
-                    costVal: { $sum: { $multiply: ["$lineItems.qtyReceived", "$lineItems.cost"] } }
-                }}
+                {
+                    $group: {
+                        _id: "$lineItems.sku",
+                        qty: { $sum: "$lineItems.qtyReceived" },
+                        costVal: { $sum: { $multiply: ["$lineItems.qtyReceived", "$lineItems.cost"] } }
+                    }
+                }
             ]),
             // 3. Sale Orders (ObjectId type — use dual IDs)
             SaleOrder.aggregate([
@@ -133,12 +138,14 @@ export async function GET(request: Request) {
                 { $match: { "lineItems.sku": { $in: dualSkuIds } } },
                 { $match: { orderStatus: { $in: ['Shipped', 'Completed'] } } },
                 { $addFields: { "lineItems.skuStr": { $toString: "$lineItems.sku" } } },
-                { $group: {
-                    _id: "$lineItems.skuStr",
-                    qty: { $sum: "$lineItems.qtyShipped" }, 
-                    revenue: { $sum: { $multiply: ["$lineItems.qtyShipped", "$lineItems.price"] } },
-                    cogs: { $sum: { $multiply: ["$lineItems.qtyShipped", "$lineItems.cost"] } }
-                }}
+                {
+                    $group: {
+                        _id: "$lineItems.skuStr",
+                        qty: { $sum: "$lineItems.qtyShipped" },
+                        revenue: { $sum: { $multiply: ["$lineItems.qtyShipped", "$lineItems.price"] } },
+                        cogs: { $sum: { $multiply: ["$lineItems.qtyShipped", "$lineItems.cost"] } }
+                    }
+                }
             ]),
             // 4. Manufacturing - Produced (all except Pending — matches ledger logic)
             Manufacturing.find({ sku: { $in: skuIds }, status: { $ne: 'Pending' } })
@@ -154,53 +161,67 @@ export async function GET(request: Request) {
             AuditAdjustment.aggregate([
                 { $match: { sku: { $in: dualSkuIds } } },
                 { $addFields: { skuStr: { $toString: "$sku" } } },
-                { $group: {
-                    _id: "$skuStr",
-                    netQty: { $sum: "$qty" },
-                    costVal: { $sum: { $multiply: ["$qty", "$cost"] } }
-                }}
-            ]), 
-            
+                {
+                    $group: {
+                        _id: "$skuStr",
+                        netQty: { $sum: "$qty" },
+                        costVal: { $sum: { $multiply: ["$qty", "$cost"] } }
+                    }
+                }
+            ]),
+
             // 7. Web Orders (By SKU — String type, including linkedSkuId)
             WebOrder.aggregate([
-                { $match: { 
-                    $or: [
-                        { "lineItems.sku": { $in: skuIds } },
-                        { "lineItems.linkedSkuId": { $in: strSkuIds } }
-                    ],
-                    status: { $in: ['completed', 'shipped', 'Completed', 'Shipped', 'processing', 'Processing', 'pending', 'Pending', 'on-hold', 'On Hold'] } 
-                }},
+                {
+                    $match: {
+                        $or: [
+                            { "lineItems.sku": { $in: skuIds } },
+                            { "lineItems.linkedSkuId": { $in: strSkuIds } }
+                        ],
+                        status: { $in: ['completed', 'shipped', 'Completed', 'Shipped', 'processing', 'Processing', 'pending', 'Pending', 'on-hold', 'On Hold'] }
+                    }
+                },
                 { $unwind: "$lineItems" },
-                { $match: { 
-                    $or: [
-                        { "lineItems.sku": { $in: skuIds } },
-                        { "lineItems.linkedSkuId": { $in: strSkuIds } }
-                    ]
-                }},
+                {
+                    $match: {
+                        $or: [
+                            { "lineItems.sku": { $in: skuIds } },
+                            { "lineItems.linkedSkuId": { $in: strSkuIds } }
+                        ]
+                    }
+                },
                 // Normalize to a single key for grouping
-                { $addFields: {
-                    resolvedSkuId: { $ifNull: ["$lineItems.linkedSkuId", { $ifNull: ["$lineItems.sku", null] }] }
-                }},
-                { $group: {
-                    _id: "$resolvedSkuId",
-                    qty: { $sum: "$lineItems.quantity" },
-                    revenue: { $sum: "$lineItems.total" } 
-                }}
+                {
+                    $addFields: {
+                        resolvedSkuId: { $ifNull: ["$lineItems.linkedSkuId", { $ifNull: ["$lineItems.sku", null] }] }
+                    }
+                },
+                {
+                    $group: {
+                        _id: "$resolvedSkuId",
+                        qty: { $sum: "$lineItems.quantity" },
+                        revenue: { $sum: "$lineItems.total" }
+                    }
+                }
             ]),
 
             // 8. Web Orders (By Variance)
-             WebOrder.aggregate([
-                { $match: { 
-                    "lineItems.varianceId": { $in: allVariances },
-                    status: { $in: ['completed', 'shipped', 'Completed', 'Shipped', 'processing', 'Processing', 'pending', 'Pending', 'on-hold', 'On Hold'] }
-                }},
+            WebOrder.aggregate([
+                {
+                    $match: {
+                        "lineItems.varianceId": { $in: allVariances },
+                        status: { $in: ['completed', 'shipped', 'Completed', 'Shipped', 'processing', 'Processing', 'pending', 'Pending', 'on-hold', 'On Hold'] }
+                    }
+                },
                 { $unwind: "$lineItems" },
                 { $match: { "lineItems.varianceId": { $in: allVariances } } },
-                { $group: {
-                    _id: "$lineItems.varianceId",
-                    qty: { $sum: "$lineItems.quantity" },
-                    revenue: { $sum: "$lineItems.total" }
-                }}
+                {
+                    $group: {
+                        _id: "$lineItems.varianceId",
+                        qty: { $sum: "$lineItems.quantity" },
+                        revenue: { $sum: "$lineItems.total" }
+                    }
+                }
             ])
         ]);
 
@@ -235,7 +256,7 @@ export async function GET(request: Request) {
         // Bulk fetch ingredient costs (only if needed)
         let ingObs: any[] = [];
         let ingPos: any[] = [];
-        
+
         if (ingredientKeys.size > 0) {
             [ingObs, ingPos] = await Promise.all([
                 OpeningBalance.find({
@@ -249,7 +270,7 @@ export async function GET(request: Request) {
                             lotNumber: { $in: Array.from(ingredientKeys).map(k => k.split(':')[1]) }
                         }
                     },
-                    status: 'Received' 
+                    status: 'Received'
                 }).select('lineItems status').lean()
             ]);
         }
@@ -281,14 +302,14 @@ export async function GET(request: Request) {
 
             // 1. OBs
             const obData = obsMap.get(id);
-            if(obData) {
+            if (obData) {
                 qtyIn += obData.qty || 0;
                 totalCostIn += obData.costVal || 0;
             }
 
             // 2. POs
             const poData = posMap.get(id);
-            if(poData) {
+            if (poData) {
                 qtyIn += poData.qty || 0;
                 totalCostIn += poData.costVal || 0;
             }
@@ -316,20 +337,20 @@ export async function GET(request: Request) {
                 });
                 mo.labor?.forEach((lab: any) => {
                     const parts = (lab.duration || '0:0:0').split(':');
-                    const hours = parseInt(parts[0] || '0') + parseInt(parts[1] || '0')/60 + parseInt(parts[2] || '0')/3600;
+                    const hours = parseInt(parts[0] || '0') + parseInt(parts[1] || '0') / 60 + parseInt(parts[2] || '0') / 3600;
                     moCost += hours * (lab.hourlyRate || 0);
                 });
-                
+
                 if (qty > 0) totalCostIn += moCost;
                 cogm += moCost;
             });
 
             // 4. MOs (Consumption - Out)
-             // Need to filter locally as we fetched by Ingredient
+            // Need to filter locally as we fetched by Ingredient
             const myConsMos = (mosConsAgg as any[]).filter((m: any) => {
                 return m.lineItems.some((li: any) => (li.sku?._id || li.sku)?.toString() === id);
             });
-            
+
             myConsMos.forEach((mo: any) => {
                 // Use filter (not find) — a job may have multiple line items for the same SKU (different lots)
                 const matchingLines = mo.lineItems.filter((l: any) => (l.sku?._id || l.sku)?.toString() === id);
@@ -348,19 +369,19 @@ export async function GET(request: Request) {
 
             // 5. Adjustments
             const adjData = adjsMap.get(id);
-            if(adjData) {
-                 const netAdj = adjData.netQty || 0;
-                 if (netAdj > 0) {
-                     qtyIn += netAdj;
-                     totalCostIn += adjData.costVal || 0; 
-                 } else {
-                     qtyOut += Math.abs(netAdj);
-                 }
+            if (adjData) {
+                const netAdj = adjData.netQty || 0;
+                if (netAdj > 0) {
+                    qtyIn += netAdj;
+                    totalCostIn += adjData.costVal || 0;
+                } else {
+                    qtyOut += Math.abs(netAdj);
+                }
             }
 
             // 6. Sales
             const soData = sosMap.get(id);
-            if(soData) {
+            if (soData) {
                 qtyOut += soData.qty || 0;
                 revenue += soData.revenue || 0;
                 cogs += soData.cogs || 0;
@@ -368,16 +389,16 @@ export async function GET(request: Request) {
 
             // 7. Web Orders
             const woSku = wosSkuMap.get(id);
-            if(woSku) {
+            if (woSku) {
                 qtyOut += woSku.qty || 0;
                 revenue += woSku.revenue || 0;
             }
-            
+
             varianceIds.forEach((vid: string) => {
                 const woVar = wosVarMap.get(vid);
-                if(woVar) {
-                     qtyOut += woVar.qty || 0;
-                     revenue += woVar.revenue || 0;
+                if (woVar) {
+                    qtyOut += woVar.qty || 0;
+                    revenue += woVar.revenue || 0;
                 }
             });
 
@@ -401,6 +422,7 @@ export async function GET(request: Request) {
             skus,
             total,
             page,
+            hasMore: page * limit < total,
             totalPages: Math.ceil(total / limit)
         });
     } catch (error: any) {
