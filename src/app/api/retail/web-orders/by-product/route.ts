@@ -13,12 +13,12 @@ const lotCache = new Map<string, { lotNumber: string; cost: number } | null>();
 // Get suggested lot for a SKU (uses robust helper that includes ALL transaction types)
 async function getSuggestedLot(skuId: string): Promise<{ lotNumber: string; cost: number } | null> {
     if (!skuId) return null;
-    
+
     // Check cache first
     if (lotCache.has(skuId)) {
         return lotCache.get(skuId) || null;
     }
-    
+
     // Use the robust lot helper that includes all sources AND consumptions
     const suggested = await getSuggestedLotForSku(skuId);
     const result = suggested ? { lotNumber: suggested.lotNumber, cost: suggested.cost } : null;
@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     try {
         // Clear cache at start of request
         lotCache.clear();
-        
+
         const { searchParams } = new URL(request.url);
         const productId = parseInt(searchParams.get('productId') || '0');
         const website = searchParams.get('website') || '';
@@ -44,8 +44,8 @@ export async function GET(request: Request) {
         const variationIdParam = searchParams.get('variationId');
         let variationId: any = 0;
         if (variationIdParam && variationIdParam !== 'null' && variationIdParam !== 'undefined') {
-             const parsed = parseInt(variationIdParam);
-             variationId = isNaN(parsed) ? variationIdParam : parsed;
+            const parsed = parseInt(variationIdParam);
+            variationId = isNaN(parsed) ? variationIdParam : parsed;
         }
 
         if (!productId) {
@@ -77,7 +77,7 @@ export async function GET(request: Request) {
         }
 
         // Fetch the WebProduct for dynamic fallbacks - increase robustness
-        const webProduct = await WebProduct.findOne({ 
+        const webProduct = await WebProduct.findOne({
             $or: [
                 { webId: productId, website },
                 { _id: `WC-${website}-${productId}` }
@@ -97,7 +97,7 @@ export async function GET(request: Request) {
 
         // Extract line items that match the product ID
         const lineItems: any[] = [];
-        
+
         for (const order of orders) {
             const matchingItems = (order.lineItems || []).filter(
                 (item: any) => {
@@ -107,24 +107,26 @@ export async function GET(request: Request) {
                     return pidMatch && vidMatch;
                 }
             );
-            
+
             for (const item of matchingItems) {
                 // Determine the linkedSkuId from item or fallback to webProduct
                 let effectiveLinkedSkuId = item.linkedSkuId;
                 let effectiveLotNumber = item.lotNumber;
                 let effectiveCost = item.cost;
+                let effectiveMultiplier = (webProduct as any)?.multiplier || 1;
 
-                if (!effectiveLinkedSkuId && webProduct) {
+                if (webProduct) {
                     if (item.variationId) {
-                        const variation = webProduct.variations?.find((v: any) => v.id == item.variationId || v._id == item.variationId);
+                        const variation = (webProduct as any).variations?.find((v: any) => v.id == item.variationId || v._id == item.variationId);
                         if (variation) {
-                            effectiveLinkedSkuId = variation.linkedSkuId;
+                            if (!effectiveLinkedSkuId) effectiveLinkedSkuId = variation.linkedSkuId;
+                            effectiveMultiplier = variation.multiplier || effectiveMultiplier;
                         }
-                    } else {
-                        effectiveLinkedSkuId = webProduct.linkedSkuId;
+                    } else if (!effectiveLinkedSkuId) {
+                        effectiveLinkedSkuId = (webProduct as any).linkedSkuId;
                     }
                 }
-                
+
                 // If we have a linkedSkuId but no lot number, dynamically suggest one
                 if (effectiveLinkedSkuId && !effectiveLotNumber) {
                     const suggestedLot = await getSuggestedLot(effectiveLinkedSkuId);
@@ -148,7 +150,7 @@ export async function GET(request: Request) {
                     website: order.website,
                     productName: item.name,
                     variationId: item.variationId,
-                    quantity: item.quantity,
+                    quantity: (item.quantity || 0) * effectiveMultiplier,
                     price: item.price,
                     total: item.total,
                     sku: item.sku,
@@ -162,7 +164,7 @@ export async function GET(request: Request) {
             }
         }
 
-        return NextResponse.json({ 
+        return NextResponse.json({
             lineItems,
             totalOrders: totalOrders,
             totalItems: lineItems.length

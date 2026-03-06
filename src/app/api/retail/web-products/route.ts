@@ -20,8 +20,15 @@ export async function GET(request: NextRequest) {
         const search = searchParams.get('search') || '';
         const website = searchParams.get('website');
         const hideZeroOrders = searchParams.get('hideZeroOrders') === 'true';
+        const showArchived = searchParams.get('showArchived') === 'true';
 
         let query: any = {};
+
+        if (showArchived) {
+            query.isArchived = true;
+        } else {
+            query.isArchived = { $ne: true };
+        }
 
         if (search) {
             const fuzzyQuery = buildFuzzySearchQuery(search, ['name', 'variations.name', '_id', 'sku_code']);
@@ -50,34 +57,34 @@ export async function GET(request: NextRequest) {
 
         // Check for Global Date Filter
         const dateFilterSetting = await Setting.findOne({ key: 'filterDataFrom' }).lean();
-        
+
         if (dateFilterSetting?.value) {
             const filterDate = new Date(dateFilterSetting.value);
-            
+
             // Calculate dynamic counts for the fetched products
-            const productIdentifiers = webProducts.map((p: any) => ({ 
-                webId: p.webId, 
-                website: p.website 
+            const productIdentifiers = webProducts.map((p: any) => ({
+                webId: p.webId,
+                website: p.website
             }));
 
             const counts = await WebOrder.aggregate([
-                { 
-                    $match: { 
+                {
+                    $match: {
                         dateCreated: { $gte: filterDate },
                         'lineItems.productId': { $in: productIdentifiers.map((p: any) => p.webId) }
-                    } 
+                    }
                 },
                 { $unwind: '$lineItems' },
-                { 
-                    $match: { 
-                         'lineItems.productId': { $in: productIdentifiers.map((p: any) => p.webId) }
-                    } 
+                {
+                    $match: {
+                        'lineItems.productId': { $in: productIdentifiers.map((p: any) => p.webId) }
+                    }
                 },
                 {
                     $group: {
-                        _id: { 
+                        _id: {
                             webId: '$lineItems.productId',
-                            website: '$website' 
+                            website: '$website'
                         },
                         orderIds: { $addToSet: "$_id" }
                     }
@@ -98,22 +105,22 @@ export async function GET(request: NextRequest) {
 
             // === Per-Variation Order Counts ===
             const variationCounts = await WebOrder.aggregate([
-                { 
-                    $match: { 
+                {
+                    $match: {
                         dateCreated: { $gte: filterDate },
                         'lineItems.productId': { $in: productIdentifiers.map((p: any) => p.webId) }
-                    } 
+                    }
                 },
                 { $unwind: '$lineItems' },
-                { 
-                    $match: { 
+                {
+                    $match: {
                         'lineItems.productId': { $in: productIdentifiers.map((p: any) => p.webId) },
                         'lineItems.variationId': { $exists: true, $nin: [null, 0] }
-                    } 
+                    }
                 },
                 {
                     $group: {
-                        _id: { 
+                        _id: {
                             webId: '$lineItems.productId',
                             website: '$website',
                             variationId: '$lineItems.variationId'
@@ -248,7 +255,7 @@ export async function POST(request: NextRequest) {
     try {
         await dbConnect();
         const body = await request.json();
-        
+
         // Ensure _id is set if not provided (usually WC-Website-ID)
         if (!body._id && body.webId && body.website) {
             body._id = `WC-${body.website}-${body.webId}`;

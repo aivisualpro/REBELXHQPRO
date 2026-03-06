@@ -371,7 +371,7 @@ export async function PATCH(
         const body = await request.json();
 
         // Fetch the old order BEFORE update to detect line item changes
-        const oldOrder: any = await Manufacturing.findById(id).lean();
+        const oldOrder: any = await Manufacturing.findById(id).select('lineItems._id').lean();
         const oldLineItemIds = new Set((oldOrder?.lineItems || []).map((li: any) => li._id?.toString()));
 
         const order = await Manufacturing.findByIdAndUpdate(id, body, { new: true })
@@ -434,11 +434,7 @@ export async function PATCH(
             }
         });
 
-        if (order.lineItems && Array.isArray(order.lineItems)) {
-            order.lineItems = await enrichLineItemsWithCost(order.lineItems) as any;
-        }
-
-        // Enrich with Tiers
+        // Enrich with Tiers (fast: single lookup)
         const allSkuIds = new Set<string>();
         if (order.sku && typeof order.sku === 'object' && order.sku !== null) {
             allSkuIds.add(((order.sku as any)._id || '').toString());
@@ -459,46 +455,83 @@ export async function PATCH(
             }
         });
 
-        // Background sync to AppSheet (Edit action, match by TimeStamp)
+        // ─── Background: Enrich costs + AppSheet sync ────────────────────────
         const orderIdStr = (order as any)._id?.toString();
         const hasLineItemsInBody = body.lineItems !== undefined;
-        if (orderIdStr) {
-            after(async () => {
-                try {
+
+        after(async () => {
+            try {
+                await dbConnect();
+
+                // Enrich line items with fresh costs + persist
+                const freshOrder: any = await Manufacturing.findById(orderIdStr).lean();
+                if (freshOrder && freshOrder.lineItems && Array.isArray(freshOrder.lineItems)) {
+                    const enrichedItems = await enrichLineItemsWithCost(freshOrder.lineItems);
+
+                    let materialCost = 0, packagingCost = 0, laborCost = 0;
+                    for (const li of enrichedItems as any[]) {
+                        const bomQty = (li.recipeQty || 0) * (freshOrder.qty || 0);
+                        const sa = li.sa ? li.sa / 100 : 0;
+                        const qtyExtra = sa > 0 ? (bomQty / sa) - bomQty : 0;
+                        const totalQty = bomQty + qtyExtra + (li.qtyScrapped || 0);
+                        const unitCost = li.cost || 0;
+                        const lineCost = totalQty * unitCost;
+                        const category = li.sku?.category || '';
+                        if (typeof category === 'string' && category.toLowerCase().includes('packaging')) {
+                            packagingCost += lineCost;
+                        } else {
+                            materialCost += lineCost;
+                        }
+                    }
+
+                    if (freshOrder.labor && Array.isArray(freshOrder.labor)) {
+                        for (const l of freshOrder.labor) {
+                            const dur = l.duration || '';
+                            const parts = dur.split(':').map((v: string) => parseFloat(v) || 0);
+                            const hours = parts.length === 3 ? parts[0] + parts[1] / 60 + parts[2] / 3600 : parts.length === 2 ? parts[0] + parts[1] / 60 : 0;
+                            laborCost += hours * (l.hourlyRate || 0);
+                        }
+                    }
+
+                    const totalCost = materialCost + packagingCost + laborCost;
+
+                    await Manufacturing.updateOne(
+                        { _id: orderIdStr },
+                        { $set: { materialCost, packagingCost, laborCost, totalCost, lineItems: enrichedItems } }
+                    );
+                }
+
+                // AppSheet sync
+                if (orderIdStr) {
                     await syncManufacturingOrderToAppSheet(orderIdStr, 'Edit');
 
-                    // If lineItems were part of this update, sync them too
                     if (hasLineItemsInBody) {
-                        await dbConnect();
-                        const freshOrder: any = await Manufacturing.findById(orderIdStr).lean();
-                        if (freshOrder) {
-                            const newLineItems = freshOrder.lineItems || [];
+                        const syncOrder: any = await Manufacturing.findById(orderIdStr).lean();
+                        if (syncOrder) {
+                            const newLineItems = syncOrder.lineItems || [];
                             const newLineItemIds = new Set(newLineItems.map((li: any) => li._id?.toString()));
 
-                            // Detect deleted line items
                             const deletedIds = [...oldLineItemIds].filter(id => !newLineItemIds.has(id)) as string[];
                             if (deletedIds.length > 0) {
                                 await deleteManufacturingLineItemsFromAppSheet(deletedIds);
                             }
 
-                            // Detect added line items (new _id not in old set)
                             const addedItems = newLineItems.filter((li: any) => !oldLineItemIds.has(li._id?.toString()));
                             if (addedItems.length > 0) {
-                                await syncManufacturingLineItemsToAppSheet(freshOrder, addedItems, 'Add');
+                                await syncManufacturingLineItemsToAppSheet(syncOrder, addedItems, 'Add');
                             }
 
-                            // Detect updated line items (existing _id in both old and new)
                             const updatedItems = newLineItems.filter((li: any) => oldLineItemIds.has(li._id?.toString()));
                             if (updatedItems.length > 0) {
-                                await syncManufacturingLineItemsToAppSheet(freshOrder, updatedItems, 'Edit');
+                                await syncManufacturingLineItemsToAppSheet(syncOrder, updatedItems, 'Edit');
                             }
                         }
                     }
-                } catch (syncError) {
-                    console.error('❌ Background AppSheet Manufacturing sync failed:', syncError);
                 }
-            });
-        }
+            } catch (bgError) {
+                console.error('❌ Background PATCH processing failed:', bgError);
+            }
+        });
 
         return NextResponse.json(order);
     } catch (error: any) {

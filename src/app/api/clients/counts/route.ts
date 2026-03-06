@@ -20,13 +20,27 @@ export async function GET() {
                 $lookup: {
                     from: 'saleorders',
                     localField: '_id',
-                    foreignField: 'client',
-                    as: 'orders'
+                    foreignField: 'clientId',
+                    pipeline: [
+                        { $match: { orderStatus: { $ne: 'Cancelled' } } },
+                        {
+                            $project: {
+                                amount: {
+                                    $subtract: [
+                                        { $add: [{ $sum: "$lineItems.total" }, { $ifNull: ["$shippingCost", 0] }, { $ifNull: ["$tax", 0] }] },
+                                        { $ifNull: ["$discount", 0] }
+                                    ]
+                                }
+                            }
+                        },
+                        { $group: { _id: null, total: { $sum: "$amount" } } }
+                    ],
+                    as: 'pricing'
                 }
             },
             {
                 $addFields: {
-                    totalRevenue: { $sum: '$orders.totalAmount' }
+                    totalRevenue: { $ifNull: [{ $arrayElemAt: ["$pricing.total", 0] }, 0] }
                 }
             },
             {
@@ -36,7 +50,7 @@ export async function GET() {
             },
             {
                 $group: {
-                    _id: { $ifNull: ['$companyType', 'Unknown'] },
+                    _id: { $toUpper: { $ifNull: ['$companyType', 'UNKNOWN'] } },
                     count: { $sum: 1 }
                 }
             }

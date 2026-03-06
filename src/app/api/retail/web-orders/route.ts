@@ -22,8 +22,20 @@ export async function GET(request: Request) {
         let query: any = {};
 
         if (search) {
-            const fuzzyQuery = buildFuzzySearchQuery(search, ['_id', 'number', 'billing.firstName', 'billing.lastName', 'billing.email', 'billing.phone']);
-            if (fuzzyQuery) Object.assign(query, fuzzyQuery);
+            const isNumeric = /^\d+$/.test(search.trim());
+            if (isNumeric) {
+                // For numeric searches, do exact substring match on number/_id fields
+                const exactPattern = search.trim();
+                query.$or = [
+                    { number: { $regex: exactPattern, $options: 'i' } },
+                    { _id: { $regex: exactPattern, $options: 'i' } },
+                    { 'billing.phone': { $regex: exactPattern, $options: 'i' } },
+                ];
+            } else {
+                // For text searches, use fuzzy matching on name/email fields
+                const fuzzyQuery = buildFuzzySearchQuery(search, ['_id', 'number', 'billing.firstName', 'billing.lastName', 'billing.email', 'billing.phone']);
+                if (fuzzyQuery) Object.assign(query, fuzzyQuery);
+            }
         }
 
         if (website) {

@@ -91,32 +91,32 @@ const SkeletonRow = React.memo(function SkeletonRow({ index }: { index: number }
 // Deterministic color palette — same value always gets same color
 const PILL_PALETTES = {
   category: [
-    { bg: 'rgba(124,58,237,0.12)', color: '#7c3aed', border: 'rgba(124,58,237,0.25)' },  // violet
-    { bg: 'rgba(16,185,129,0.12)', color: '#059669', border: 'rgba(16,185,129,0.25)' },  // emerald
-    { bg: 'rgba(234,88,12,0.12)', color: '#ea580c', border: 'rgba(234,88,12,0.25)' },   // orange
-    { bg: 'rgba(8,145,178,0.12)', color: '#0891b2', border: 'rgba(8,145,178,0.25)' },   // cyan
-    { bg: 'rgba(219,39,119,0.12)', color: '#db2777', border: 'rgba(219,39,119,0.25)' },  // pink
-    { bg: 'rgba(101,163,13,0.12)', color: '#65a30d', border: 'rgba(101,163,13,0.25)' },  // lime
-    { bg: 'rgba(37,99,235,0.12)', color: '#2563eb', border: 'rgba(37,99,235,0.25)' },   // blue
+    { bg: '#7c3aed', color: '#ffffff', border: '#7c3aed' },  // violet
+    { bg: '#059669', color: '#ffffff', border: '#059669' },  // emerald
+    { bg: '#ea580c', color: '#ffffff', border: '#ea580c' },   // orange
+    { bg: '#0891b2', color: '#ffffff', border: '#0891b2' },   // cyan
+    { bg: '#db2777', color: '#ffffff', border: '#db2777' },  // pink
+    { bg: '#65a30d', color: '#ffffff', border: '#65a30d' },  // lime
+    { bg: '#2563eb', color: '#ffffff', border: '#2563eb' },   // blue
   ],
   subCategory: [
-    { bg: 'rgba(251,191,36,0.12)', color: '#b45309', border: 'rgba(251,191,36,0.3)' },   // amber
-    { bg: 'rgba(99,102,241,0.12)', color: '#6366f1', border: 'rgba(99,102,241,0.25)' },  // indigo
-    { bg: 'rgba(20,184,166,0.12)', color: '#0f766e', border: 'rgba(20,184,166,0.25)' },  // teal
-    { bg: 'rgba(239,68,68,0.12)', color: '#dc2626', border: 'rgba(239,68,68,0.25)' },   // red
-    { bg: 'rgba(168,85,247,0.12)', color: '#9333ea', border: 'rgba(168,85,247,0.25)' },  // purple
-    { bg: 'rgba(59,130,246,0.12)', color: '#3b82f6', border: 'rgba(59,130,246,0.25)' },  // blue
-    { bg: 'rgba(34,197,94,0.12)', color: '#16a34a', border: 'rgba(34,197,94,0.25)' },   // green
-    { bg: 'rgba(251,146,60,0.12)', color: '#ea580c', border: 'rgba(251,146,60,0.25)' },  // orange
+    { bg: '#b45309', color: '#ffffff', border: '#b45309' },   // amber
+    { bg: '#6366f1', color: '#ffffff', border: '#6366f1' },  // indigo
+    { bg: '#0f766e', color: '#ffffff', border: '#0f766e' },  // teal
+    { bg: '#dc2626', color: '#ffffff', border: '#dc2626' },   // red
+    { bg: '#9333ea', color: '#ffffff', border: '#9333ea' },  // purple
+    { bg: '#3b82f6', color: '#ffffff', border: '#3b82f6' },  // blue
+    { bg: '#16a34a', color: '#ffffff', border: '#16a34a' },   // green
+    { bg: '#ea580c', color: '#ffffff', border: '#ea580c' },  // orange
   ],
   material: [
-    { bg: 'rgba(100,116,139,0.12)', color: '#64748b', border: 'rgba(100,116,139,0.25)' }, // slate
-    { bg: 'rgba(52,211,153,0.12)', color: '#059669', border: 'rgba(52,211,153,0.25)' },  // emerald
-    { bg: 'rgba(129,140,248,0.12)', color: '#6366f1', border: 'rgba(129,140,248,0.25)' }, // indigo
-    { bg: 'rgba(251,191,36,0.12)', color: '#92400e', border: 'rgba(251,191,36,0.3)' },   // amber
-    { bg: 'rgba(248,113,113,0.12)', color: '#dc2626', border: 'rgba(248,113,113,0.25)' }, // red
-    { bg: 'rgba(34,211,238,0.12)', color: '#0891b2', border: 'rgba(34,211,238,0.25)' },  // sky
-    { bg: 'rgba(167,243,208,0.2)', color: '#065f46', border: 'rgba(167,243,208,0.35)' }, // green
+    { bg: '#64748b', color: '#ffffff', border: '#64748b' }, // slate
+    { bg: '#059669', color: '#ffffff', border: '#059669' },  // emerald
+    { bg: '#6366f1', color: '#ffffff', border: '#6366f1' }, // indigo
+    { bg: '#92400e', color: '#ffffff', border: '#92400e' },   // amber
+    { bg: '#dc2626', color: '#ffffff', border: '#dc2626' }, // red
+    { bg: '#0891b2', color: '#ffffff', border: '#0891b2' },  // sky
+    { bg: '#065f46', color: '#ffffff', border: '#065f46' }, // green
   ],
 };
 
@@ -142,7 +142,7 @@ function FieldPill({ value, type }: { value: string; type: 'category' | 'subCate
 function UomPill({ value }: { value: string }) {
   return (
     <span
-      style={{ backgroundColor: 'rgba(254,153,0,0.12)', color: '#b45309', border: '1px solid rgba(254,153,0,0.25)', borderRadius: '5px' }}
+      style={{ backgroundColor: '#ea580c', color: '#ffffff', border: '1px solid #ea580c', borderRadius: '5px' }}
       className="inline-flex items-center px-2 py-0.5 text-[10px] font-black font-mono uppercase tracking-widest"
     >
       {value}

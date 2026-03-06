@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import {
@@ -111,6 +111,7 @@ export default function WebOrderDetailPage() {
     const [editingSkuId, setEditingSkuId] = useState<string | null>(null);
     const [editingCurrentLot, setEditingCurrentLot] = useState<string | undefined>(undefined);
 
+
     useEffect(() => {
         const originalBodyStyle = document.body.style.overflow;
         document.body.style.overflow = 'hidden';
@@ -156,6 +157,7 @@ export default function WebOrderDetailPage() {
         if (id) fetchOrder();
     }, [id, fetchOrder]);
 
+
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'completed': return 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30';
@@ -200,12 +202,12 @@ export default function WebOrderDetailPage() {
         if (!order || editingLineItemId === null) return;
 
         try {
+            // Optimistic UI: update lot number immediately
             const updatedLineItems = order.lineItems.map(item =>
                 item.id === editingLineItemId
-                    ? { ...item, lotNumber: lotNumber || undefined, cost: cost || 0 }
+                    ? { ...item, lotNumber: lotNumber || undefined }
                     : item
             );
-
             setOrder({ ...order, lineItems: updatedLineItems });
 
             const res = await fetch(`/api/retail/web-orders/${order._id}/line-item`, {
@@ -214,12 +216,13 @@ export default function WebOrderDetailPage() {
                 body: JSON.stringify({
                     lineItemId: editingLineItemId,
                     lotNumber: lotNumber || null,
-                    cost: cost || 0
                 })
             });
 
             if (res.ok) {
                 toast.success(lotNumber ? `Lot updated to ${lotNumber}` : 'Lot cleared');
+                // Re-fetch order to get virtual cost from API
+                fetchOrder();
             } else {
                 fetchOrder();
                 toast.error('Failed to update lot number');
@@ -234,6 +237,7 @@ export default function WebOrderDetailPage() {
             setEditingCurrentLot(undefined);
         }
     };
+
 
     if (loading) {
         return (
@@ -268,207 +272,193 @@ export default function WebOrderDetailPage() {
 
             <div className="flex flex-1 overflow-hidden">
                 {/* Left Sidebar: Details (30%) */}
-                <div className="w-[30%] border-r border-border bg-secondary/30 flex flex-col overflow-hidden">
-                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                        {/* Identity Boxes */}
-                        <div className="grid grid-cols-3 gap-2">
-                            <div className="border border-border rounded-md p-3 bg-background text-center flex items-center justify-center">
-                                <div className="text-base font-black text-amber-500 tracking-tight font-mono">#{order.number}</div>
-                            </div>
-                            <div className="border border-border rounded-md p-3 bg-background text-center">
-                                <div className="text-[11px] font-bold text-foreground break-words">
-                                    {order.billing?.firstName} {order.billing?.lastName}
+                <div className="w-[30%] border-r border-border bg-background flex flex-col overflow-hidden">
+                    <div className="flex-1 overflow-y-auto scrollbar-custom">
+                        {/* Hero Bar: Order# | Customer | Status */}
+                        <div className="px-4 pt-4 pb-4">
+                            <div className="flex items-stretch border border-border overflow-hidden">
+                                {/* Order # */}
+                                <div className="w-20 bg-amber-500 flex items-center justify-center shrink-0">
+                                    <span className="text-sm font-black text-white font-mono">#{order.number}</span>
+                                </div>
+                                {/* Customer Name */}
+                                <div className="flex-1 bg-emerald-500 flex items-center justify-center px-3 min-w-0">
+                                    <span className="text-sm font-black text-white leading-tight text-center line-clamp-2">
+                                        {order.billing?.firstName} {order.billing?.lastName}
+                                    </span>
                                 </div>
                             </div>
+                        </div>
+
+                        {/* Status Button */}
+                        <div className="mx-4 mb-3">
                             <div className={cn(
-                                "border rounded-md p-3 text-center flex items-center justify-center transition-colors",
-                                getStatusColor(order.status)
+                                "w-full px-3 py-2.5 text-[12px] font-black uppercase tracking-widest text-center border",
+                                order.status === 'completed' ? "bg-emerald-500 text-white border-emerald-600" :
+                                    order.status === 'processing' ? "bg-blue-500 text-white border-blue-600" :
+                                        order.status === 'on-hold' ? "bg-amber-500 text-white border-amber-600" :
+                                            order.status === 'pending' ? "bg-yellow-500 text-white border-yellow-600" :
+                                                (order.status === 'cancelled' || order.status === 'refunded' || order.status === 'failed') ? "bg-rose-500 text-white border-rose-600" :
+                                                    "bg-secondary text-muted-foreground border-border"
                             )}>
-                                <div className="text-[10px] font-black uppercase tracking-wider">{order.status}</div>
+                                {order.status}
                             </div>
                         </div>
 
                         {/* Website Badge */}
-                        <div className={cn(
-                            "border rounded-md p-2 text-center",
-                            getWebsiteColor(order.website)
-                        )}>
-                            <div className="text-[9px] font-black uppercase tracking-widest">{order.website}</div>
+                        <div className="mx-4 mb-4">
+                            <div className={cn(
+                                "w-full px-3 py-2 text-[10px] font-black uppercase tracking-widest text-center border",
+                                order.website?.includes('KING') ? "bg-amber-500/15 text-amber-500 border-amber-500/30" :
+                                    order.website?.includes('GRASS') ? "bg-emerald-500/15 text-emerald-500 border-emerald-500/30" :
+                                        order.website?.includes('GRHK') ? "bg-blue-500/15 text-blue-500 border-blue-500/30" :
+                                            order.website?.includes('REBEL') ? "bg-purple-500/15 text-purple-500 border-purple-500/30" :
+                                                "bg-secondary text-muted-foreground border-border"
+                            )}>
+                                {order.website}
+                            </div>
                         </div>
 
-                        {/* Details */}
-                        <div>
-                            <div className="space-y-6">
-                                {/* Order Info */}
-                                <div className="space-y-3">
-                                    <div className="flex justify-between items-center">
-                                        <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold italic">Date Created</div>
-                                        <div className="text-xs font-medium text-foreground">{formatDate(order.dateCreated)}</div>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold italic">Date Paid</div>
-                                        <div className="text-xs font-medium text-foreground">{formatDate(order.datePaid)}</div>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold italic">Date Completed</div>
-                                        <div className="text-xs font-medium text-foreground">{formatDate(order.dateCompleted)}</div>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold italic">Created Via</div>
-                                        <div className="text-xs font-medium text-foreground">{order.createdVia || '-'}</div>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold italic">Payment Method</div>
-                                        <div className="text-xs font-medium text-foreground">{order.paymentMethodTitle || order.paymentMethod || '-'}</div>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold italic">Currency</div>
-                                        <div className="text-xs font-medium text-foreground font-mono">{order.currency}</div>
-                                    </div>
-                                    {order.transactionId && (
-                                        <div className="flex justify-between items-center">
-                                            <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold italic">Transaction ID</div>
-                                            <div className="text-[9px] font-medium text-muted-foreground font-mono truncate max-w-[120px]">{order.transactionId}</div>
+                        {/* Order Info Grid */}
+                        <div className="mx-4 mb-4 border border-border">
+                            {[
+                                [
+                                    { label: 'Date Created', value: formatDate(order.dateCreated) },
+                                    { label: 'Date Paid', value: formatDate(order.datePaid) },
+                                ],
+                                [
+                                    { label: 'Date Completed', value: formatDate(order.dateCompleted) },
+                                    { label: 'Created Via', value: order.createdVia || '-' },
+                                ],
+                                [
+                                    { label: 'Payment Method', value: order.paymentMethodTitle || order.paymentMethod || '-' },
+                                    { label: 'Currency', value: order.currency },
+                                ],
+                            ].map((row, rowIdx) => (
+                                <div key={rowIdx} className={cn(
+                                    "grid grid-cols-2 divide-x divide-border",
+                                    rowIdx % 2 === 0 ? "bg-background" : "bg-secondary/50",
+                                    rowIdx > 0 && "border-t border-border"
+                                )}>
+                                    {row.map((item, colIdx) => (
+                                        <div key={colIdx} className="px-4 py-3 flex flex-col gap-0.5">
+                                            <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">{item.label}</span>
+                                            <span className="text-sm font-bold text-foreground truncate">{item.value}</span>
                                         </div>
-                                    )}
+                                    ))}
                                 </div>
-
-                                {/* Customer Note */}
-                                {order.customerNote && (
-                                    <div>
-                                        <div className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1 font-bold italic">Customer Note</div>
-                                        <div className="text-xs text-foreground italic border border-border rounded-md p-3 bg-background">{order.customerNote}</div>
-                                    </div>
-                                )}
-
-                                {/* Billing */}
-                                <div>
-                                    <h3 className="text-xs font-bold uppercase text-foreground tracking-widest mb-2 border-b border-border pb-2">Billing</h3>
-                                    <div className="space-y-0">
-                                        <div className="flex items-center py-2 border-b border-border/50">
-                                            <span className="text-[11px] text-muted-foreground w-28 shrink-0">Name</span>
-                                            <span className="text-[11px] font-bold text-foreground">{order.billing?.firstName} {order.billing?.lastName}</span>
-                                        </div>
-                                        {order.billing?.company && (
-                                            <div className="flex items-center py-2 border-b border-border/50">
-                                                <span className="text-[11px] text-muted-foreground w-28 shrink-0">Company</span>
-                                                <span className="text-[11px] text-foreground">{order.billing.company}</span>
-                                            </div>
-                                        )}
-                                        <div className="flex items-start py-2 border-b border-border/50">
-                                            <span className="text-[11px] text-muted-foreground w-28 shrink-0 pt-0.5">Address</span>
-                                            <span className="text-[11px] text-foreground leading-relaxed">
-                                                {order.billing?.address1 || <span className="text-muted-foreground italic">No address</span>}
-                                                {order.billing?.address2 && <><br />{order.billing.address2}</>}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center py-2 border-b border-border/50">
-                                            <span className="text-[11px] text-muted-foreground w-28 shrink-0">City</span>
-                                            <span className="text-[11px] text-foreground">{order.billing?.city || '-'}</span>
-                                        </div>
-                                        <div className="flex items-center py-2 border-b border-border/50">
-                                            <span className="text-[11px] text-muted-foreground w-28 shrink-0">State</span>
-                                            <span className="text-[11px] text-foreground">{order.billing?.state || '-'}</span>
-                                        </div>
-                                        <div className="flex items-center py-2 border-b border-border/50">
-                                            <span className="text-[11px] text-muted-foreground w-28 shrink-0">Postal Code</span>
-                                            <span className="text-[11px] text-foreground">{order.billing?.postcode || '-'}</span>
-                                        </div>
-                                        <div className="flex items-center py-2 border-b border-border/50">
-                                            <span className="text-[11px] text-muted-foreground w-28 shrink-0">Country</span>
-                                            <span className="text-[11px] text-foreground uppercase font-bold">{order.billing?.country || '-'}</span>
-                                        </div>
-                                        <div className="flex items-center py-2 border-b border-border/50">
-                                            <span className="text-[11px] text-muted-foreground w-28 shrink-0">Email</span>
-                                            <span className="text-[11px] font-bold text-foreground truncate">{order.billing?.email || <span className="text-muted-foreground italic font-normal">None</span>}</span>
-                                        </div>
-                                        <div className="flex items-center py-2">
-                                            <span className="text-[11px] text-muted-foreground w-28 shrink-0">Phone</span>
-                                            <span className="text-[11px] font-bold text-foreground">{order.billing?.phone || <span className="text-muted-foreground italic font-normal">None</span>}</span>
-                                        </div>
-                                    </div>
+                            ))}
+                            {order.transactionId && (
+                                <div className="px-4 py-3 flex flex-col gap-0.5 border-t border-border bg-background">
+                                    <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Transaction ID</span>
+                                    <span className="text-xs font-bold text-foreground font-mono truncate">{order.transactionId}</span>
                                 </div>
+                            )}
+                        </div>
 
-                                {/* Shipping */}
-                                <div>
-                                    <h3 className="text-xs font-bold uppercase text-foreground tracking-widest mb-2 border-b border-border pb-2">Shipping</h3>
-                                    <div className="space-y-0">
-                                        <div className="flex items-center py-2 border-b border-border/50">
-                                            <span className="text-[11px] text-muted-foreground w-28 shrink-0">Name</span>
-                                            <span className="text-[11px] font-bold text-foreground">{order.shipping?.firstName} {order.shipping?.lastName}</span>
-                                        </div>
-                                        {order.shipping?.company && (
-                                            <div className="flex items-center py-2 border-b border-border/50">
-                                                <span className="text-[11px] text-muted-foreground w-28 shrink-0">Company</span>
-                                                <span className="text-[11px] text-foreground">{order.shipping.company}</span>
-                                            </div>
-                                        )}
-                                        <div className="flex items-start py-2 border-b border-border/50">
-                                            <span className="text-[11px] text-muted-foreground w-28 shrink-0 pt-0.5">Address</span>
-                                            <span className="text-[11px] text-foreground leading-relaxed">
-                                                {order.shipping?.address1 || <span className="text-muted-foreground italic">No address</span>}
-                                                {order.shipping?.address2 && <><br />{order.shipping.address2}</>}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center py-2 border-b border-border/50">
-                                            <span className="text-[11px] text-muted-foreground w-28 shrink-0">City</span>
-                                            <span className="text-[11px] text-foreground">{order.shipping?.city || '-'}</span>
-                                        </div>
-                                        <div className="flex items-center py-2 border-b border-border/50">
-                                            <span className="text-[11px] text-muted-foreground w-28 shrink-0">State</span>
-                                            <span className="text-[11px] text-foreground">{order.shipping?.state || '-'}</span>
-                                        </div>
-                                        <div className="flex items-center py-2 border-b border-border/50">
-                                            <span className="text-[11px] text-muted-foreground w-28 shrink-0">Postal Code</span>
-                                            <span className="text-[11px] text-foreground">{order.shipping?.postcode || '-'}</span>
-                                        </div>
-                                        <div className="flex items-center py-2">
-                                            <span className="text-[11px] text-muted-foreground w-28 shrink-0">Country</span>
-                                            <span className="text-[11px] text-foreground uppercase font-bold">{order.shipping?.country || '-'}</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Shipping Lines */}
-                                    {order.shippingLines && order.shippingLines.length > 0 && (
-                                        <div className="mt-3 pt-2 border-t border-border/50">
-                                            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Shipping Methods</div>
-                                            {order.shippingLines.map((line: any, idx: number) => (
-                                                <div key={idx} className="flex justify-between items-center py-1">
-                                                    <span className="text-[11px] text-foreground">{line.method_title || line.methodTitle || 'Shipping'}</span>
-                                                    <span className="text-[11px] font-mono font-medium text-foreground">${parseFloat(line.total || 0).toFixed(2)}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
+                        {/* Customer Note */}
+                        {order.customerNote && (
+                            <div className="mx-4 mb-4 border border-border">
+                                <div className="px-4 py-3 bg-secondary/50 flex flex-col gap-0.5">
+                                    <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Customer Note</span>
+                                    <span className="text-sm font-medium text-foreground italic">{order.customerNote}</span>
                                 </div>
+                            </div>
+                        )}
 
-                                {/* Payment Summary */}
-                                <div>
-                                    <h3 className="text-xs font-bold uppercase text-foreground tracking-widest mb-4 border-b border-border pb-2">Payment Summary</h3>
-                                    <div className="space-y-3">
-                                        <div className="flex justify-between items-center group">
-                                            <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">Subtotal</span>
-                                            <span className="text-sm font-mono font-medium text-foreground">{formatCurrency(subtotal)}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center group">
-                                            <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">Shipping</span>
-                                            <span className="text-sm font-mono font-medium text-foreground">{formatCurrency(order.shippingTotal || 0)}</span>
-                                        </div>
-                                        {order.discountTotal > 0 && (
-                                            <div className="flex justify-between items-center group">
-                                                <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">Discount</span>
-                                                <span className="text-sm font-mono font-medium text-red-500">-{formatCurrency(order.discountTotal)}</span>
-                                            </div>
-                                        )}
-                                        <div className="flex justify-between items-center group">
-                                            <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">Tax</span>
-                                            <span className="text-sm font-mono font-medium text-foreground">{formatCurrency(order.totalTax || 0)}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center group pt-1 border-t border-border">
-                                            <span className="text-sm text-foreground font-bold">Order Total</span>
-                                            <span className="text-sm font-mono font-bold text-foreground">{formatCurrency(order.total)}</span>
-                                        </div>
+                        {/* Billing */}
+                        <div className="mx-4 mb-4">
+                            <div className="text-xs font-black uppercase tracking-widest text-foreground mb-3">Billing</div>
+                            <div className="border border-border">
+                                {[
+                                    { label: 'Name', value: `${order.billing?.firstName || ''} ${order.billing?.lastName || ''}`.trim() || '-' },
+                                    ...(order.billing?.company ? [{ label: 'Company', value: order.billing.company }] : []),
+                                    { label: 'Address', value: [order.billing?.address1, order.billing?.address2].filter(Boolean).join(', ') || '-' },
+                                    { label: 'City', value: order.billing?.city || '-' },
+                                    { label: 'State', value: order.billing?.state || '-' },
+                                    { label: 'Postal Code', value: order.billing?.postcode || '-' },
+                                    { label: 'Country', value: order.billing?.country || '-' },
+                                    { label: 'Email', value: order.billing?.email || '-' },
+                                    { label: 'Phone', value: order.billing?.phone || '-' },
+                                ].map((item, idx) => (
+                                    <div key={idx} className={cn(
+                                        "px-4 py-2.5 flex items-center justify-between",
+                                        idx % 2 === 0 ? "bg-background" : "bg-secondary/50",
+                                        idx > 0 && "border-t border-border"
+                                    )}>
+                                        <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">{item.label}</span>
+                                        <span className="text-sm font-bold text-foreground truncate max-w-[60%] text-right">{item.value}</span>
                                     </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Shipping */}
+                        <div className="mx-4 mb-4">
+                            <div className="text-xs font-black uppercase tracking-widest text-foreground mb-3">Shipping</div>
+                            <div className="border border-border">
+                                {[
+                                    { label: 'Name', value: `${order.shipping?.firstName || ''} ${order.shipping?.lastName || ''}`.trim() || '-' },
+                                    ...(order.shipping?.company ? [{ label: 'Company', value: order.shipping.company }] : []),
+                                    { label: 'Address', value: [order.shipping?.address1, order.shipping?.address2].filter(Boolean).join(', ') || '-' },
+                                    { label: 'City', value: order.shipping?.city || '-' },
+                                    { label: 'State', value: order.shipping?.state || '-' },
+                                    { label: 'Postal Code', value: order.shipping?.postcode || '-' },
+                                    { label: 'Country', value: order.shipping?.country || '-' },
+                                ].map((item, idx) => (
+                                    <div key={idx} className={cn(
+                                        "px-4 py-2.5 flex items-center justify-between",
+                                        idx % 2 === 0 ? "bg-background" : "bg-secondary/50",
+                                        idx > 0 && "border-t border-border"
+                                    )}>
+                                        <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">{item.label}</span>
+                                        <span className="text-sm font-bold text-foreground truncate max-w-[60%] text-right">{item.value}</span>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Shipping Lines */}
+                            {order.shippingLines && order.shippingLines.length > 0 && (
+                                <div className="mt-3 border border-border">
+                                    <div className="px-4 py-2 bg-secondary/50">
+                                        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Shipping Methods</span>
+                                    </div>
+                                    {order.shippingLines.map((line: any, idx: number) => (
+                                        <div key={idx} className={cn(
+                                            "px-4 py-2.5 flex justify-between items-center border-t border-border",
+                                            idx % 2 === 0 ? "bg-background" : "bg-secondary/50"
+                                        )}>
+                                            <span className="text-sm font-bold text-foreground">{line.method_title || line.methodTitle || 'Shipping'}</span>
+                                            <span className="text-sm font-mono font-bold text-foreground">${parseFloat(line.total || 0).toFixed(2)}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Payment Summary */}
+                        <div className="mx-4 mb-4">
+                            <div className="text-xs font-black uppercase tracking-widest text-foreground mb-4">Payment Summary</div>
+                            <div className="space-y-3">
+                                {[
+                                    { label: 'Subtotal', value: subtotal, color: null },
+                                    { label: 'Shipping', value: order.shippingTotal || 0, color: null },
+                                    ...(order.discountTotal > 0 ? [{ label: 'Discount', value: -(order.discountTotal), color: 'text-red-500' }] : []),
+                                    { label: 'Tax', value: order.totalTax || 0, color: null },
+                                ].map((item, idx) => (
+                                    <div key={idx} className="flex justify-between items-center group">
+                                        <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors font-medium">{item.label}</span>
+                                        <span className={cn("text-sm font-mono font-bold", item.color || "text-foreground")}>
+                                            {item.value < 0 ? '-' : ''}{formatCurrency(Math.abs(item.value))}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="mt-4 pt-4 border-t border-border">
+                                <div className="flex justify-between items-center px-4 py-3 bg-emerald-600 border border-emerald-700 shadow-sm">
+                                    <span className="text-xs font-black text-white uppercase tracking-widest">Order Total</span>
+                                    <span className="text-lg font-mono font-black text-white">{formatCurrency(order.total)}</span>
                                 </div>
                             </div>
                         </div>
@@ -511,14 +501,14 @@ export default function WebOrderDetailPage() {
                                 <table className="w-full border-collapse text-left">
                                     <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
                                         <tr>
-                                            <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">Product</th>
-                                            <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[140px]">Variation</th>
-                                            <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[150px]">Linked SKU</th>
-                                            <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[100px]">Lot #</th>
-                                            <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap text-center w-[50px]">Qty</th>
-                                            <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[70px]">Cost</th>
-                                            <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[70px]">Price</th>
-                                            <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[70px]">Total</th>
+                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap max-w-[280px]">Product</th>
+                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[120px]">Variation</th>
+                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[220px]">Linked SKU</th>
+                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[100px]">Lot #</th>
+                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap text-center w-[50px]">Qty</th>
+                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[70px]">Cost</th>
+                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[70px]">Price</th>
+                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[70px]">Total</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-border">
@@ -527,48 +517,48 @@ export default function WebOrderDetailPage() {
                                                 key={item.id}
                                                 className="hover:bg-secondary/50 transition-colors"
                                             >
-                                                <td className="px-3 py-1.5">
+                                                <td className="px-3 py-2">
                                                     {(item.webProductId || item.parentProductId) ? (
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 router.push(`/warehouse/web-products/${item.webProductId || item.parentProductId}`);
                                                             }}
-                                                            className="text-[10px] font-bold text-foreground cursor-pointer line-clamp-2 text-left transition-colors"
+                                                            className="text-xs font-bold text-foreground cursor-pointer line-clamp-2 text-left transition-colors hover:text-blue-500"
                                                         >
                                                             {item.name}
                                                         </button>
                                                     ) : (
-                                                        <span className="text-[10px] font-bold text-foreground line-clamp-2">{item.name}</span>
+                                                        <span className="text-xs font-bold text-foreground line-clamp-2">{item.name}</span>
                                                     )}
                                                 </td>
-                                                <td className="px-3 py-1.5">
+                                                <td className="px-3 py-2">
                                                     {item.variationId > 0 ? (
-                                                        <span className="text-[9px] text-muted-foreground truncate max-w-[130px] block" title={item.variationName || String(item.variationId)}>{item.variationName || item.variationId}</span>
+                                                        <span className="text-[10px] text-foreground font-bold truncate max-w-[130px] block" title={item.variationName || String(item.variationId)}>{item.variationName || item.variationId}</span>
                                                     ) : (
-                                                        <span className="text-[9px] text-muted-foreground/50">-</span>
+                                                        <span className="text-[10px] text-muted-foreground/50">-</span>
                                                     )}
                                                 </td>
-                                                <td className="px-3 py-1.5">
+                                                <td className="px-3 py-2">
                                                     {item.linkedSkuId ? (
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 router.push(`/warehouse/skus/${item.linkedSkuId}`);
                                                             }}
-                                                            className="flex items-center space-x-1 text-[9px] font-mono text-foreground cursor-pointer transition-colors group"
+                                                            className="flex items-center space-x-1 text-[10px] font-mono font-bold text-foreground cursor-pointer transition-colors group hover:text-blue-500"
                                                         >
-                                                            <span className="truncate max-w-[120px]">{item.linkedSkuName || item.linkedSkuId}</span>
+                                                            <span className="truncate max-w-[200px]">{item.linkedSkuName || item.linkedSkuId}</span>
                                                             <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                                                         </button>
                                                     ) : (
-                                                        <span className="text-[9px] text-muted-foreground/50">-</span>
+                                                        <span className="text-[10px] text-muted-foreground/50">-</span>
                                                     )}
                                                 </td>
-                                                <td className="px-3 py-1.5 text-[10px] text-muted-foreground group">
+                                                <td className="px-3 py-2 text-xs text-foreground group">
                                                     <div className="flex items-center gap-1">
                                                         {item.lotNumber ? (
-                                                            <span className="text-foreground font-mono">{item.lotNumber}</span>
+                                                            <span className="text-foreground font-mono font-bold">{item.lotNumber}</span>
                                                         ) : (
                                                             <span>-</span>
                                                         )}
@@ -585,15 +575,15 @@ export default function WebOrderDetailPage() {
                                                     </div>
                                                 </td>
 
-                                                <td className="px-3 py-1.5 text-center text-[10px] text-muted-foreground font-mono">{item.quantity}</td>
-                                                <td className="px-3 py-1.5 text-[10px] text-orange-600 font-mono whitespace-nowrap">{item.cost ? formatCurrency(item.cost) : '-'}</td>
-                                                <td className="px-3 py-1.5 text-[10px] text-muted-foreground font-mono">{formatCurrency(item.price)}</td>
-                                                <td className="px-3 py-1.5 text-[10px] text-foreground font-mono bg-secondary/20">{formatCurrency(item.total)}</td>
+                                                <td className="px-3 py-2 text-center text-xs text-foreground font-mono font-bold">{item.quantity}</td>
+                                                <td className="px-3 py-2 text-xs text-orange-500 font-mono font-bold whitespace-nowrap">{item.cost != null && item.cost > 0 ? formatCurrency(item.cost) : '-'}</td>
+                                                <td className="px-3 py-2 text-xs text-foreground font-mono font-bold">{formatCurrency(item.price)}</td>
+                                                <td className="px-3 py-2 text-xs text-foreground font-mono font-black bg-secondary/20">{formatCurrency(item.total)}</td>
                                             </tr>
                                         ))}
                                         {(!order.lineItems || order.lineItems.length === 0) && (
                                             <tr>
-                                                <td colSpan={8} className="px-3 py-6 text-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                                                <td colSpan={8} className="px-3 py-6 text-center text-xs font-bold text-muted-foreground uppercase tracking-wider">
                                                     No line items
                                                 </td>
                                             </tr>
@@ -602,13 +592,13 @@ export default function WebOrderDetailPage() {
                                     {order.lineItems && order.lineItems.length > 0 && (
                                         <tfoot className="bg-secondary border-t border-border">
                                             <tr>
-                                                <td colSpan={4} className="px-3 py-1.5 text-[10px] font-bold text-muted-foreground uppercase text-right">Subtotal</td>
-                                                <td className="px-3 py-1.5 text-[10px] font-bold text-foreground text-center">
+                                                <td colSpan={4} className="px-3 py-2 text-xs font-black text-muted-foreground uppercase text-right">Subtotal</td>
+                                                <td className="px-3 py-2 text-xs font-black text-foreground text-center">
                                                     {order.lineItems.reduce((sum, item) => sum + (item.quantity || 0), 0)}
                                                 </td>
-                                                <td className="px-3 py-1.5"></td>
-                                                <td className="px-3 py-1.5"></td>
-                                                <td className="px-3 py-1.5 text-[10px] font-black text-foreground">{formatCurrency(subtotal)}</td>
+                                                <td className="px-3 py-2"></td>
+                                                <td className="px-3 py-2"></td>
+                                                <td className="px-3 py-2 text-xs font-black text-foreground">{formatCurrency(subtotal)}</td>
                                             </tr>
                                         </tfoot>
                                     )}
@@ -622,24 +612,24 @@ export default function WebOrderDetailPage() {
                                 <table className="w-full border-collapse text-left">
                                     <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
                                         <tr>
-                                            <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest w-[60px]">#</th>
-                                            <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest w-[200px]">Key</th>
-                                            <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest">Value</th>
+                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest w-[60px]">#</th>
+                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest w-[200px]">Key</th>
+                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Value</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-border">
                                         {order.metaData?.map((meta: any, idx: number) => (
                                             <tr key={idx} className="hover:bg-secondary/50 transition-colors">
-                                                <td className="px-3 py-1.5 text-[10px] font-mono text-muted-foreground">{idx + 1}</td>
-                                                <td className="px-3 py-1.5 text-[10px] font-mono text-foreground">{meta.key}</td>
-                                                <td className="px-3 py-1.5 text-[10px] text-foreground max-w-[400px] truncate">
+                                                <td className="px-3 py-2 text-xs font-mono text-muted-foreground font-bold">{idx + 1}</td>
+                                                <td className="px-3 py-2 text-xs font-mono text-foreground font-bold">{meta.key}</td>
+                                                <td className="px-3 py-2 text-xs text-foreground max-w-[400px] truncate font-bold">
                                                     {typeof meta.value === 'object' ? JSON.stringify(meta.value) : String(meta.value)}
                                                 </td>
                                             </tr>
                                         ))}
                                         {(!order.metaData || order.metaData.length === 0) && (
                                             <tr>
-                                                <td colSpan={3} className="px-3 py-6 text-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                                                <td colSpan={3} className="px-3 py-6 text-center text-xs font-bold text-muted-foreground uppercase tracking-wider">
                                                     No meta data found
                                                 </td>
                                             </tr>
@@ -655,32 +645,32 @@ export default function WebOrderDetailPage() {
                                 <table className="w-full border-collapse text-left">
                                     <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
                                         <tr>
-                                            <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest w-[60px]">#</th>
-                                            <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest">Code</th>
-                                            <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest text-right w-[120px]">Discount</th>
-                                            <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest text-right w-[120px]">Discount Tax</th>
+                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest w-[60px]">#</th>
+                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Code</th>
+                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right w-[120px]">Discount</th>
+                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right w-[120px]">Discount Tax</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-border">
                                         {order.couponLines?.map((coupon: any, idx: number) => (
                                             <tr key={idx} className="hover:bg-secondary/50 transition-colors">
-                                                <td className="px-3 py-1.5 text-[10px] font-mono text-muted-foreground">{idx + 1}</td>
-                                                <td className="px-3 py-1.5">
-                                                    <span className="px-2 py-0.5 bg-purple-500/15 text-purple-400 border border-purple-500/30 text-[10px] font-bold uppercase">
+                                                <td className="px-3 py-2 text-xs font-mono text-muted-foreground font-bold">{idx + 1}</td>
+                                                <td className="px-3 py-2">
+                                                    <span className="px-2 py-0.5 bg-purple-500/15 text-purple-400 border border-purple-500/30 text-xs font-bold uppercase">
                                                         {coupon.code}
                                                     </span>
                                                 </td>
-                                                <td className="px-3 py-1.5 text-right text-[10px] font-mono font-bold text-emerald-500">
+                                                <td className="px-3 py-2 text-right text-xs font-mono font-black text-emerald-500">
                                                     -${parseFloat(coupon.discount || 0).toFixed(2)}
                                                 </td>
-                                                <td className="px-3 py-1.5 text-right text-[10px] font-mono text-muted-foreground">
+                                                <td className="px-3 py-2 text-right text-xs font-mono font-bold text-foreground">
                                                     ${parseFloat(coupon.discount_tax || coupon.discountTax || 0).toFixed(2)}
                                                 </td>
                                             </tr>
                                         ))}
                                         {(!order.couponLines || order.couponLines.length === 0) && (
                                             <tr>
-                                                <td colSpan={4} className="px-3 py-6 text-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                                                <td colSpan={4} className="px-3 py-6 text-center text-xs font-bold text-muted-foreground uppercase tracking-wider">
                                                     No coupons applied
                                                 </td>
                                             </tr>
@@ -696,28 +686,28 @@ export default function WebOrderDetailPage() {
                                 <table className="w-full border-collapse text-left">
                                     <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
                                         <tr>
-                                            <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest w-[80px]">ID</th>
-                                            <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest">Reason</th>
-                                            <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest w-[150px]">Date</th>
-                                            <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest text-right w-[120px]">Amount</th>
+                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest w-[80px]">ID</th>
+                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Reason</th>
+                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest w-[150px]">Date</th>
+                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right w-[120px]">Amount</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-border">
                                         {order.refunds?.map((refund: any, idx: number) => (
                                             <tr key={idx} className="hover:bg-rose-500/5 transition-colors">
-                                                <td className="px-3 py-1.5 text-[10px] font-mono text-muted-foreground">#{refund.id}</td>
-                                                <td className="px-3 py-1.5 text-[10px] text-foreground">{refund.reason || '-'}</td>
-                                                <td className="px-3 py-1.5 text-[10px] font-mono text-muted-foreground">
+                                                <td className="px-3 py-2 text-xs font-mono text-foreground font-bold">#{refund.id}</td>
+                                                <td className="px-3 py-2 text-xs text-foreground font-bold">{refund.reason || '-'}</td>
+                                                <td className="px-3 py-2 text-xs font-mono text-foreground font-bold">
                                                     {refund.date_created ? new Date(refund.date_created).toLocaleString() : '-'}
                                                 </td>
-                                                <td className="px-3 py-1.5 text-right text-[10px] font-mono font-bold text-rose-500">
+                                                <td className="px-3 py-2 text-right text-xs font-mono font-black text-rose-500">
                                                     -${Math.abs(parseFloat(refund.total || 0)).toFixed(2)}
                                                 </td>
                                             </tr>
                                         ))}
                                         {(!order.refunds || order.refunds.length === 0) && (
                                             <tr>
-                                                <td colSpan={4} className="px-3 py-6 text-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                                                <td colSpan={4} className="px-3 py-6 text-center text-xs font-bold text-muted-foreground uppercase tracking-wider">
                                                     No refunds found
                                                 </td>
                                             </tr>

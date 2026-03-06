@@ -185,26 +185,20 @@ export default function ManufacturingDetailPage() {
         };
     }, []);
 
-    // Deferred fetches - only load after main order is displayed for faster initial render
+    // Deferred fetches - load all sidebar data in a single API call after main order is displayed
     useEffect(() => {
         if (loading) return; // Wait until order is loaded
 
-        // Fetch SKU list for Add Line Item dropdown (deferred)
-        fetch('/api/skus?limit=0&ignoreDate=true')
+        fetch(`/api/manufacturing/${params.id}/sidebar-data`)
             .then(res => res.json())
             .then(data => {
+                // SKU list for Add Line Item dropdown
                 if (data.skus) {
                     setSkuList(data.skus.map((s: any) => ({ _id: s._id, name: s.name, category: s.category, image: s.image })));
                 }
-            })
-            .catch(() => { });
 
-        // Fetch users list for Labor dropdown (deferred)
-        fetch('/api/users?limit=1000')
-            .then(res => res.json())
-            .then(data => {
+                // Users list for Labor dropdown + name lookups
                 if (data.users && Array.isArray(data.users)) {
-                    // Store all users for name lookup
                     const allUsers = data.users.map((u: any) => ({
                         _id: u._id,
                         firstName: u.firstName || '',
@@ -213,7 +207,6 @@ export default function ManufacturingDetailPage() {
                     }));
                     setAllUsersList(allUsers);
 
-                    // Filter for labor dropdown (must have hourly rate)
                     const validUsers = data.users
                         .filter((u: any) => u.hourlyRate != null)
                         .map((u: any) => ({
@@ -225,15 +218,14 @@ export default function ManufacturingDetailPage() {
                         }));
                     setUsersList(validUsers);
                 }
+
+                // Global Settings
+                if (data.settings) {
+                    setGlobalSettings(data.settings);
+                }
             })
             .catch(() => { });
-
-        // Fetch Global Settings (deferred)
-        fetch('/api/settings')
-            .then(res => res.json())
-            .then(data => setGlobalSettings(data))
-            .catch(() => { });
-    }, [loading]);
+    }, [loading, params.id]);
 
     // Timer logic handled by global TimerContext (persists across route changes)
 
@@ -646,16 +638,7 @@ export default function ManufacturingDetailPage() {
                 {/* Left Sidebar: Details (30%) */}
                 <div className="w-[30%] border-r border-border bg-background overflow-y-auto scrollbar-custom flex flex-col">
                     {/* Back + Actions Bar */}
-                    <div className="flex items-center justify-between px-4 h-9 border-b border-border shrink-0">
-                        <div className="flex items-center gap-3">
-                            <button
-                                onClick={() => router.push('/warehouse/manufacturing')}
-                                className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80 px-2.5 py-1 border border-border transition-colors"
-                            >
-                                <ArrowLeft className="w-3.5 h-3.5" />
-                                <span>Back</span>
-                            </button>
-                        </div>
+                    <div className="flex items-center justify-end px-4 h-9 border-b border-border shrink-0">
                         <Link
                             href={`/warehouse/skus/${typeof order.sku === 'object' && order.sku !== null ? (order.sku as any)._id : order.sku}?lot=${encodeURIComponent(order.label || order._id)}`}
                             className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80 px-2.5 py-1 border border-border transition-colors"
@@ -797,21 +780,21 @@ export default function ManufacturingDetailPage() {
                             {/* Ordered + Adjust in a single row */}
                             <div className="flex items-stretch border border-border mb-3 overflow-hidden">
                                 {/* Ordered */}
-                                <div className="flex-1 bg-secondary px-4 py-3 flex items-center gap-3">
+                                <div className="flex-1 bg-secondary px-4 py-4 flex items-center gap-3">
                                     <div>
-                                        <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Ordered</div>
-                                        <div className="flex items-baseline gap-1.5 mt-0.5">
-                                            <span className="text-2xl font-black text-foreground leading-none">{order.qty?.toLocaleString()}</span>
-                                            <span className="text-[10px] text-muted-foreground font-bold uppercase">{order.uom}</span>
+                                        <div className="text-xs text-muted-foreground uppercase tracking-widest font-bold">Ordered</div>
+                                        <div className="flex items-baseline gap-1.5 mt-1">
+                                            <span className="text-3xl font-black text-foreground leading-none">{order.qty?.toLocaleString()}</span>
+                                            <span className="text-xs text-muted-foreground font-bold uppercase">{order.uom}</span>
                                         </div>
                                     </div>
                                 </div>
                                 {/* Adjust */}
-                                <div className="border-l border-border bg-background px-3 py-3 flex flex-col justify-center min-w-[130px]">
-                                    <div className="flex items-center justify-between mb-1.5">
-                                        <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Adjust</div>
+                                <div className="border-l border-border bg-background px-4 py-4 flex flex-col justify-center min-w-[140px]">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="text-xs text-muted-foreground uppercase tracking-widest font-bold">Adjust</div>
                                         {isSubmittingDiff && (
-                                            <div className="text-[9px] text-blue-500 font-bold uppercase animate-pulse">Saving</div>
+                                            <div className="text-[10px] text-blue-500 font-bold uppercase animate-pulse">Saving</div>
                                         )}
                                     </div>
                                     <div className="flex items-center bg-secondary border border-border h-8 focus-within:border-foreground transition-colors">
@@ -826,21 +809,21 @@ export default function ManufacturingDetailPage() {
                                             type="number"
                                             value={order.qtyDifference || 0}
                                             onChange={(e) => handleUpdateQtyDiff(parseInt(e.target.value) || 0)}
-                                            className="flex-1 text-center text-[13px] font-black bg-transparent text-foreground outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none min-w-0"
+                                            className="flex-1 text-center text-sm font-black bg-transparent text-foreground outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none min-w-0"
                                         />
                                         <button
                                             disabled={isSubmittingDiff}
                                             onClick={() => handleUpdateQtyDiff((order.qtyDifference || 0) + 1)}
                                             className="w-8 h-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-background transition-all border-l border-border"
                                         >
-                                            <Plus className="w-3 h-3" strokeWidth={3} />
+                                            <Plus className="w-3.5 h-3.5" strokeWidth={3} />
                                         </button>
                                     </div>
                                 </div>
                             </div>
-                            <div className="bg-emerald-500 border border-emerald-600 px-4 py-2.5 flex justify-between items-center">
-                                <div className="text-[10px] uppercase tracking-widest font-bold text-white">Qty Manufactured</div>
-                                <div className="text-lg font-black text-white">{costs.qtyManufactured} <span className="text-[10px] text-white/70 font-bold uppercase">{order.uom}</span></div>
+                            <div className="bg-emerald-600 border border-emerald-700 px-5 py-4 flex justify-between items-center rounded-b-md">
+                                <div className="text-sm uppercase tracking-widest font-black text-white">Qty Manufactured</div>
+                                <div className="text-3xl font-black text-white">{costs.qtyManufactured} <span className="text-xs text-white/80 font-bold uppercase">{order.uom}</span></div>
                             </div>
                         </div>
 
@@ -848,65 +831,88 @@ export default function ManufacturingDetailPage() {
                         <div className="mx-4 mb-4 border border-border">
                             {(() => {
                                 const lastQc = order.qualityCheck?.length ? order.qualityCheck[order.qualityCheck.length - 1] : null;
-                                return [
-                                    { label: 'Scheduled Start', value: order.scheduledStart ? new Date(order.scheduledStart).toLocaleDateString() : '-' },
-                                    { label: 'Scheduled Finish', value: order.scheduledFinish ? new Date(order.scheduledFinish).toLocaleDateString() : '-' },
-                                    { label: 'Created By', value: formatUser(order.createdBy) },
-                                    { label: 'Finished By', value: formatUser(order.finishedBy) },
-                                    { label: 'Checked By', value: lastQc ? formatUser(lastQc.checkedBy) : '-' },
-                                    { label: 'Packaged By', value: lastQc ? formatUser(lastQc.packagedBy) : '-' },
+                                const pairedRows = [
+                                    [
+                                        { label: 'Scheduled Start', value: order.scheduledStart ? new Date(order.scheduledStart).toLocaleDateString() : '-' },
+                                        { label: 'Scheduled Finish', value: order.scheduledFinish ? new Date(order.scheduledFinish).toLocaleDateString() : '-' },
+                                    ],
+                                    [
+                                        { label: 'Created By', value: formatUser(order.createdBy) },
+                                        { label: 'Finished By', value: formatUser(order.finishedBy) },
+                                    ],
+                                    [
+                                        { label: 'Checked By', value: lastQc ? formatUser(lastQc.checkedBy) : '-' },
+                                        { label: 'Packaged By', value: lastQc ? formatUser(lastQc.packagedBy) : '-' },
+                                    ],
+                                ];
+                                const fullWidthRows = [
                                     { label: 'Created At', value: new Date(order.createdAt).toLocaleDateString() },
                                     { label: 'Recipe', value: (typeof order.recipesId === 'object' && order.recipesId) ? order.recipesId.name : (order.recipesId || '-'), recipeId: (typeof order.recipesId === 'object' && order.recipesId) ? order.recipesId._id : (order.recipesId || null) },
                                 ] as { label: string; value: string; recipeId?: string | null }[];
-                            })().map((item, idx) => (
-                                <div key={idx} className={cn(
-                                    "flex items-center justify-between px-3 py-2.5",
-                                    idx % 2 === 0 ? "bg-background" : "bg-secondary/50"
-                                )}>
-                                    <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">{item.label}</span>
-                                    {item.recipeId ? (
-                                        <span
-                                            className="text-[12px] font-medium text-muted-foreground text-right max-w-[55%] truncate hover:text-blue-500 hover:underline cursor-pointer transition-colors"
-                                            onClick={() => router.push(`/warehouse/recipes/${item.recipeId}`)}
-                                        >
-                                            {item.value}
-                                        </span>
-                                    ) : (
-                                        <span className="text-[12px] font-medium text-muted-foreground text-right max-w-[55%] truncate">{item.value}</span>
-                                    )}
-                                </div>
-                            ))}
+                                return (
+                                    <>
+                                        {pairedRows.map((pair, rowIdx) => (
+                                            <div key={rowIdx} className={cn("grid grid-cols-2 divide-x divide-border", rowIdx % 2 === 0 ? "bg-background" : "bg-secondary/50")}>
+                                                {pair.map((item, colIdx) => (
+                                                    <div key={colIdx} className="px-4 py-3 flex flex-col gap-0.5">
+                                                        <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">{item.label}</span>
+                                                        <span className="text-sm font-bold text-foreground truncate">{item.value}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ))}
+                                        {fullWidthRows.map((item, idx) => (
+                                            <div key={`fw-${idx}`} className={cn(
+                                                "flex items-center justify-between px-4 py-3",
+                                                (pairedRows.length + idx) % 2 === 0 ? "bg-background" : "bg-secondary/50"
+                                            )}>
+                                                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">{item.label}</span>
+                                                {item.recipeId ? (
+                                                    <span
+                                                        className="text-sm font-bold text-foreground text-right max-w-[55%] truncate hover:text-blue-500 hover:underline cursor-pointer transition-colors"
+                                                        onClick={() => router.push(`/warehouse/recipes/${item.recipeId}`)}
+                                                    >
+                                                        {item.value}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-sm font-bold text-foreground text-right max-w-[55%] truncate">{item.value}</span>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </>
+                                );
+                            })()}
                         </div>
 
                         {/* Cost Analysis */}
                         <div className="mx-4 mb-4">
-                            <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-3">Cost Breakdown</div>
-                            <div className="space-y-2">
+                            <div className="text-xs font-black uppercase tracking-widest text-foreground mb-4">Cost Breakdown</div>
+                            <div className="space-y-3">
                                 {[
-                                    { label: 'Material', value: costs.material, color: 'bg-blue-500' },
-                                    { label: 'Packaging', value: costs.packaging, color: 'bg-violet-500' },
+                                    { label: 'Material', value: costs.material, color: 'bg-blue-600' },
+                                    { label: 'Packaging', value: costs.packaging, color: 'bg-violet-600' },
                                     { label: 'Labor', value: costs.labor, color: 'bg-amber-500' },
                                 ].map((item, idx) => (
                                     <div key={idx} className="group">
-                                        <div className="flex justify-between items-center mb-1">
-                                            <span className="text-[12px] text-muted-foreground group-hover:text-foreground transition-colors font-medium">{item.label}</span>
-                                            <span className="text-[12px] font-mono font-semibold text-muted-foreground">${item.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <div className="flex justify-between items-center mb-1.5">
+                                            <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors font-medium">{item.label}</span>
+                                            <span className="text-sm font-mono font-bold text-foreground">${item.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                         </div>
-                                        <div className="h-1 bg-secondary rounded-full overflow-hidden">
+                                        <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
                                             <div className={cn("h-full rounded-full transition-all duration-500", item.color)} style={{ width: `${costs.total > 0 ? (item.value / costs.total * 100) : 0}%` }} />
                                         </div>
                                     </div>
                                 ))}
                             </div>
 
-                            <div className="mt-3 pt-3 border-t border-border space-y-2">
+                            <div className="mt-4 pt-4 border-t border-border space-y-3">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-[12px] text-muted-foreground font-medium italic">Per Unit</span>
-                                    <span className="text-[12px] font-mono font-medium text-muted-foreground italic">${costs.perUnit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</span>
+                                    <span className="text-sm text-muted-foreground font-medium italic">Per Unit</span>
+                                    <span className="text-sm font-mono font-bold text-foreground italic">${costs.perUnit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 </div>
-                                <div className="flex justify-between items-center bg-emerald-500 border border-emerald-600 px-3 py-2">
-                                    <span className="text-[10px] font-black text-white uppercase tracking-widest">Total Cost</span>
-                                    <span className="text-base font-mono font-black text-white">${costs.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                <div className="flex justify-between items-center bg-emerald-600 border border-emerald-700 px-4 py-3 rounded-md shadow-sm">
+                                    <span className="text-xs font-black text-white uppercase tracking-widest">Total Cost</span>
+                                    <span className="text-lg font-mono font-black text-white">${costs.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 </div>
                             </div>
                         </div>
@@ -1025,25 +1031,25 @@ export default function ManufacturingDetailPage() {
                                     <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
                                         <tr>
                                             {[
-                                                { label: 'Date', width: 'w-[80px]' },
-                                                { label: 'SKU', width: 'w-[200px]' },
+                                                { label: 'Date', width: 'w-[90px]' },
+                                                { label: 'SKU', width: 'w-[320px]' },
                                                 { label: 'Cat', key: 'categoryDesc', width: 'w-[40px]', hideLabel: true, align: 'text-center' },
-                                                { label: 'Lot #', width: 'w-[100px]' },
-                                                { label: 'UOM', width: 'w-[50px]', align: 'text-center' },
-                                                { label: 'Recipe Qty', width: 'w-[70px]', align: 'text-right' },
-                                                { label: 'BOM Qty', width: 'w-[70px]', align: 'text-right' },
-                                                { label: 'Assay', width: 'w-[50px]', align: 'text-center' },
+                                                { label: 'Lot #', width: 'w-[140px]' },
+                                                { label: 'UOM', width: 'w-[60px]', align: 'text-center' },
+                                                { label: 'Recipe Qty', width: 'w-[80px]', align: 'text-right' },
+                                                { label: 'BOM Qty', width: 'w-[80px]', align: 'text-right' },
+                                                { label: 'Assay', width: 'w-[60px]', align: 'text-center' },
                                                 { label: 'Consm', width: 'w-[80px]', align: 'text-right' },
-                                                { label: 'Extra', width: 'w-[60px]', align: 'text-right' },
-                                                { label: 'Scrapped', width: 'w-[70px]', align: 'text-right' },
-                                                { label: 'Total', width: 'w-[80px]', align: 'text-right' },
-                                                { label: 'Total Cost', width: 'w-[90px]', align: 'text-right' },
+                                                { label: 'Extra', width: 'w-[70px]', align: 'text-right' },
+                                                { label: 'Scrapped', width: 'w-[80px]', align: 'text-right' },
+                                                { label: 'Total', width: 'w-[90px]', align: 'text-right' },
+                                                { label: 'Total Cost', width: 'w-[100px]', align: 'text-right' },
                                                 { label: 'Act', key: 'actionsDesc', width: 'w-[40px]', hideLabel: true, align: 'text-center' }
                                             ].map(col => (
                                                 <th
                                                     key={col.key || col.label}
                                                     className={cn(
-                                                        "px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap",
+                                                        "px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap",
                                                         col.width,
                                                         col.align || "text-left"
                                                     )}
@@ -1087,14 +1093,14 @@ export default function ManufacturingDetailPage() {
 
                                             return (
                                                 <tr key={item._id} className="hover:bg-secondary/30 transition-colors">
-                                                    <td className="px-3 py-1 text-[10px] text-muted-foreground font-mono">
+                                                    <td className="px-3 py-2 text-[11px] text-muted-foreground font-mono">
                                                         {new Date(item.createdAt).toLocaleDateString()}
                                                     </td>
-                                                    <td className="px-3 py-1 text-[10px] text-foreground/80 leading-tight min-w-[200px]">
-                                                        <div className="flex items-center space-x-1.5">
+                                                    <td className="px-3 py-2 text-[11px] text-foreground/90 font-medium leading-tight min-w-[320px] whitespace-nowrap">
+                                                        <div className="flex items-center space-x-2">
                                                             {!!displayTier && (
                                                                 <span className={cn(
-                                                                    "flex-shrink-0 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-black text-white",
+                                                                    "flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black text-white",
                                                                     displayTier === 1 ? "bg-emerald-500" :
                                                                         displayTier === 2 ? "bg-blue-500" :
                                                                             "bg-orange-500"
@@ -1113,23 +1119,23 @@ export default function ManufacturingDetailPage() {
                                                             </span>
                                                         </div>
                                                     </td>
-                                                    <td className="px-3 py-1 flex justify-center">
+                                                    <td className="px-3 py-2 flex justify-center">
                                                         {displayCategory?.toLowerCase().includes('part') ? (
                                                             <div title={displayCategory}>
-                                                                <Package className="w-3.5 h-3.5 text-blue-400" />
+                                                                <Package className="w-4 h-4 text-blue-400" />
                                                             </div>
                                                         ) : displayCategory?.toLowerCase().includes('finished') ? (
                                                             <div title={displayCategory}>
-                                                                <Tag className="w-3.5 h-3.5 text-green-500" />
+                                                                <Tag className="w-4 h-4 text-green-500" />
                                                             </div>
                                                         ) : (
                                                             <div title={displayCategory}>
-                                                                <Layers className="w-3.5 h-3.5 text-muted-foreground" />
+                                                                <Layers className="w-4 h-4 text-muted-foreground" />
                                                             </div>
                                                         )}
                                                     </td>
-                                                    <td className="px-3 py-1 text-[10px] text-muted-foreground group relative">
-                                                        <div className="flex items-center gap-1">
+                                                    <td className="px-3 py-2 text-[11px] text-muted-foreground group relative whitespace-nowrap">
+                                                        <div className="flex items-center gap-1.5">
                                                             {item.lotNumber ? (
                                                                 <Link
                                                                     href={`/warehouse/skus/${typeof item.sku === 'object' && item.sku !== null ? (item.sku as any)._id : item.sku}?lot=${encodeURIComponent(item.lotNumber)}`}
@@ -1146,22 +1152,22 @@ export default function ManufacturingDetailPage() {
                                                                 className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-blue-500 transition-all p-0.5"
                                                                 title="Edit Lot #"
                                                             >
-                                                                <Pencil className="w-2.5 h-2.5" />
+                                                                <Pencil className="w-3 h-3" />
                                                             </button>
                                                         </div>
                                                     </td>
-                                                    <td className="px-3 py-1 text-[9px] uppercase text-muted-foreground text-center">{item.uom || '-'}</td>
-                                                    <td className="px-3 py-1 text-[10px] text-muted-foreground font-mono text-right">{item.recipeQty ?? '-'}</td>
-                                                    <td className="px-3 py-1 text-[10px] text-muted-foreground font-mono text-right">{bomQty.toLocaleString()}</td>
-                                                    <td className="px-3 py-1 text-[10px] text-muted-foreground font-mono text-center">{saPercent > 0 ? `${saPercent}%` : '-'}</td>
-                                                    <td className="px-3 py-1 text-[10px] text-foreground/80 font-mono bg-blue-50/20 text-right">{bomQty.toLocaleString()}</td>
-                                                    <td className="px-3 py-1 text-[10px] text-muted-foreground font-mono text-right">{qtyExtra > 0 ? qtyExtra.toFixed(2) : '-'}</td>
-                                                    <td className="px-3 py-1 text-[10px] text-red-500/70 font-mono text-right">{qtyScrapped || '-'}</td>
-                                                    <td className="px-3 py-1 text-[10px] text-foreground/80 bg-secondary/30 text-right">
+                                                    <td className="px-3 py-2 text-[10px] uppercase text-muted-foreground text-center font-bold">{item.uom || '-'}</td>
+                                                    <td className="px-3 py-2 text-[11px] text-muted-foreground font-mono text-right">{item.recipeQty ?? '-'}</td>
+                                                    <td className="px-3 py-2 text-[11px] text-muted-foreground font-mono text-right">{bomQty.toLocaleString()}</td>
+                                                    <td className="px-3 py-2 text-[11px] text-muted-foreground font-mono text-center">{saPercent > 0 ? `${saPercent}%` : '-'}</td>
+                                                    <td className="px-3 py-2 text-[11px] text-foreground/80 font-mono bg-blue-50/20 text-right">{bomQty.toLocaleString()}</td>
+                                                    <td className="px-3 py-2 text-[11px] text-muted-foreground font-mono text-right">{qtyExtra > 0 ? qtyExtra.toFixed(2) : '-'}</td>
+                                                    <td className="px-3 py-2 text-[11px] text-red-500/80 font-mono text-right font-semibold">{qtyScrapped || '-'}</td>
+                                                    <td className="px-3 py-2 text-[11px] font-bold text-foreground/90 bg-secondary/30 text-right">
                                                         {totalQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                                                     </td>
-                                                    <td className="px-3 py-1 text-[10px] font-mono text-foreground/80 bg-secondary/10 whitespace-nowrap text-right">
-                                                        {item.cost !== undefined ? `$${(totalQty * item.cost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}` : '-'}
+                                                    <td className="px-3 py-2 text-[11px] font-mono font-semibold text-foreground/90 bg-secondary/10 whitespace-nowrap text-right">
+                                                        {item.cost !== undefined ? `$${(totalQty * item.cost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
                                                     </td>
                                                     <td className="px-3 py-1 text-center">
                                                         <button
@@ -1193,7 +1199,7 @@ export default function ManufacturingDetailPage() {
                                     <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
                                         <tr>
                                             {['Date', 'Type', 'User', 'Duration', 'Actions'].map(col => (
-                                                <th key={col} className={`px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap ${col === 'Actions' ? 'text-right' : ''}`}>
+                                                <th key={col} className={`px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap ${col === 'Actions' ? 'text-right' : ''}`}>
                                                     {col}
                                                 </th>
                                             ))}
@@ -1202,7 +1208,7 @@ export default function ManufacturingDetailPage() {
                                     <tbody className="divide-y divide-border">
                                         {(!order.labor || order.labor.length === 0) ? (
                                             <tr>
-                                                <td colSpan={5} className="px-3 py-6 text-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider">No labor entries found</td>
+                                                <td colSpan={5} className="px-3 py-6 text-center text-[12px] font-bold text-muted-foreground uppercase tracking-wider">No labor entries found</td>
                                             </tr>
                                         ) : order.labor.map(entry => {
                                             // Parse duration (HH:MM:SS) to hours for cost calculation
@@ -1216,11 +1222,11 @@ export default function ManufacturingDetailPage() {
 
                                             return (
                                                 <tr key={entry._id} className="hover:bg-secondary/30 transition-colors">
-                                                    <td className="px-3 py-1 text-[10px] text-muted-foreground font-mono">
+                                                    <td className="px-3 py-2 text-[11px] text-muted-foreground font-mono">
                                                         {new Date(entry.createdAt).toLocaleDateString()}
                                                     </td>
-                                                    <td className="px-3 py-1 text-[10px] text-foreground/80">{entry.type || '-'}</td>
-                                                    <td className="px-3 py-1 text-[10px] text-muted-foreground truncate max-w-[120px]">{userName}</td>
+                                                    <td className="px-3 py-2 text-[11px] text-foreground/90 font-medium">{entry.type || '-'}</td>
+                                                    <td className="px-3 py-2 text-[11px] text-foreground/90 font-medium truncate max-w-[120px]">{userName}</td>
                                                     <td className="px-3 py-1">
                                                         {isTimerRunning(entry._id)
                                                             ? (
@@ -1234,11 +1240,11 @@ export default function ManufacturingDetailPage() {
                                                                     </span>
                                                                 </span>
                                                             )
-                                                            : <span className="text-[10px] text-muted-foreground font-mono">{entry.duration || '-'}</span>
+                                                            : <span className="text-[11px] text-foreground/80 font-mono font-medium">{entry.duration || '-'}</span>
                                                         }
                                                     </td>
 
-                                                    <td className="px-3 py-1 text-right">
+                                                    <td className="px-3 py-2 text-right">
                                                         <div className="flex items-center justify-end space-x-1">
                                                             {isTimerRunning(entry._id) ? (
                                                                 <button
@@ -1396,19 +1402,19 @@ export default function ManufacturingDetailPage() {
                                     <table className="w-full border-collapse text-left">
                                         <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
                                             <tr>
-                                                <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap w-16">Step</th>
-                                                <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">Description</th>
+                                                <th className="px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap w-16 text-center">Step</th>
+                                                <th className="px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">Description</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {(order.recipesId.steps as any[]).sort((a: any, b: any) => (parseInt(a.step) || 0) - (parseInt(b.step) || 0)).map((step: any, i: number) => (
                                                 <tr key={i} className="border-b border-border hover:bg-secondary/30 transition-colors">
-                                                    <td className="px-3 py-2 text-xs font-bold text-foreground whitespace-nowrap align-top text-center">
+                                                    <td className="px-3 py-2.5 text-[12px] font-medium text-foreground whitespace-nowrap align-top text-center">
                                                         {step.step}
                                                     </td>
-                                                    <td className="px-3 py-2 align-top">
-                                                        <div className="font-bold text-foreground text-[11px]">{step.description}</div>
-                                                        {step.details && <div className="text-[10px] text-muted-foreground whitespace-pre-wrap leading-relaxed mt-0.5">{step.details}</div>}
+                                                    <td className="px-3 py-2.5 align-top">
+                                                        <div className="font-medium text-foreground/90 text-[12px]">{step.description}</div>
+                                                        {step.details && <div className="text-[11px] text-foreground/80 whitespace-pre-wrap leading-relaxed mt-1">{step.details}</div>}
                                                     </td>
                                                 </tr>
                                             ))}
@@ -1429,16 +1435,16 @@ export default function ManufacturingDetailPage() {
                                     <table className="w-full border-collapse text-left">
                                         <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
                                             <tr>
-                                                <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">Recipe</th>
-                                                <th className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">Notes</th>
+                                                <th className="px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">Recipe</th>
+                                                <th className="px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">Notes</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <tr className="border-b border-border hover:bg-secondary/30 transition-colors">
-                                                <td className="px-3 py-2 text-xs font-medium text-foreground whitespace-nowrap align-top">
+                                                <td className="px-3 py-2.5 text-[12px] font-medium text-foreground/90 whitespace-nowrap align-top">
                                                     {typeof order.recipesId === 'object' ? order.recipesId.name : '-'}
                                                 </td>
-                                                <td className="px-3 py-2 text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                                                <td className="px-3 py-2.5 text-[12px] font-medium text-foreground/90 whitespace-pre-wrap leading-relaxed">
                                                     {order.recipesId.notes}
                                                 </td>
                                             </tr>
@@ -1461,7 +1467,7 @@ export default function ManufacturingDetailPage() {
                                     <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
                                         <tr>
                                             {['Checked By', 'Packaged By', 'Label', 'Lot', 'Seal', 'Pkg Qty', 'Repackaged', 'Weight', 'Target', 'Actual Wt', 'QC By', 'Date'].map(col => (
-                                                <th key={col} className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">
+                                                <th key={col} className="px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">
                                                     {col}
                                                 </th>
                                             ))}
@@ -1470,32 +1476,32 @@ export default function ManufacturingDetailPage() {
                                     <tbody className="divide-y divide-border">
                                         {(!order.qualityCheck || order.qualityCheck.length === 0) ? (
                                             <tr>
-                                                <td colSpan={12} className="px-3 py-6 text-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider">No quality checks found</td>
+                                                <td colSpan={12} className="px-3 py-6 text-center text-[12px] font-bold text-muted-foreground uppercase tracking-wider">No quality checks found</td>
                                             </tr>
                                         ) : order.qualityCheck.map((qc, idx) => (
                                             <tr key={qc._id || idx} className="hover:bg-secondary/30 transition-colors">
-                                                <td className="px-3 py-1 text-[10px] text-foreground/80">{formatUser(qc.checkedBy)}</td>
-                                                <td className="px-3 py-1 text-[10px] text-foreground/80">{formatUser(qc.packagedBy)}</td>
-                                                <td className="px-3 py-1 text-[10px] text-center">
+                                                <td className="px-3 py-2 text-[11px] text-foreground/90 font-medium">{formatUser(qc.checkedBy)}</td>
+                                                <td className="px-3 py-2 text-[11px] text-foreground/90 font-medium">{formatUser(qc.packagedBy)}</td>
+                                                <td className="px-3 py-2 text-[11px] text-center">
                                                     {qc.label ? <span className="text-emerald-500 font-bold">✓</span> : <span className="text-muted-foreground/40">✗</span>}
                                                 </td>
-                                                <td className="px-3 py-1 text-[10px] text-center">
+                                                <td className="px-3 py-2 text-[11px] text-center">
                                                     {qc.lot ? <span className="text-emerald-500 font-bold">✓</span> : <span className="text-muted-foreground/40">✗</span>}
                                                 </td>
-                                                <td className="px-3 py-1 text-[10px] text-center">
+                                                <td className="px-3 py-2 text-[11px] text-center">
                                                     {qc.seal ? <span className="text-emerald-500 font-bold">✓</span> : <span className="text-muted-foreground/40">✗</span>}
                                                 </td>
-                                                <td className="px-3 py-1 text-[10px] text-center">
+                                                <td className="px-3 py-2 text-[11px] text-center">
                                                     {qc.packageQuality ? <span className="text-emerald-500 font-bold">✓</span> : <span className="text-muted-foreground/40">✗</span>}
                                                 </td>
-                                                <td className="px-3 py-1 text-[10px] text-center">
+                                                <td className="px-3 py-2 text-[11px] text-center">
                                                     {qc.repackaged ? <span className="text-amber-500 font-bold">✓</span> : <span className="text-muted-foreground/40">✗</span>}
                                                 </td>
-                                                <td className="px-3 py-1 text-[10px] text-foreground/80 font-mono">{qc.weight ?? 0}</td>
-                                                <td className="px-3 py-1 text-[10px] text-foreground/80 font-mono">{qc.target ?? 0}</td>
-                                                <td className="px-3 py-1 text-[10px] text-foreground/80 font-mono">{qc.actualWeight ?? 0}</td>
-                                                <td className="px-3 py-1 text-[10px] text-foreground/80">{formatUser(qc.qualityCheckedBy)}</td>
-                                                <td className="px-3 py-1 text-[10px] text-muted-foreground font-mono">
+                                                <td className="px-3 py-2 text-[11px] text-foreground/90 font-medium font-mono">{qc.weight ?? 0}</td>
+                                                <td className="px-3 py-2 text-[11px] text-foreground/90 font-medium font-mono">{qc.target ?? 0}</td>
+                                                <td className="px-3 py-2 text-[11px] text-foreground/90 font-medium font-mono">{qc.actualWeight ?? 0}</td>
+                                                <td className="px-3 py-2 text-[11px] text-foreground/90 font-medium">{formatUser(qc.qualityCheckedBy)}</td>
+                                                <td className="px-3 py-2 text-[11px] text-muted-foreground font-mono">
                                                     {qc.createdAt ? new Date(qc.createdAt).toLocaleDateString() : '—'}
                                                 </td>
                                             </tr>
@@ -1511,7 +1517,7 @@ export default function ManufacturingDetailPage() {
                                     <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
                                         <tr>
                                             {['Note', 'Created By', 'Created At', 'Actions'].map(col => (
-                                                <th key={col} className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">
+                                                <th key={col} className="px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">
                                                     {col}
                                                 </th>
                                             ))}
@@ -1520,20 +1526,20 @@ export default function ManufacturingDetailPage() {
                                     <tbody className="divide-y divide-border">
                                         {(!order.notes || order.notes.length === 0) ? (
                                             <tr>
-                                                <td colSpan={4} className="px-3 py-6 text-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider">No notes found</td>
+                                                <td colSpan={4} className="px-3 py-6 text-center text-[12px] font-bold text-muted-foreground uppercase tracking-wider">No notes found</td>
                                             </tr>
                                         ) : order.notes.map((note, idx) => (
                                             <tr key={note._id || idx} className="hover:bg-secondary/30 transition-colors">
-                                                <td className="px-3 py-1 text-[10px] text-foreground/80 max-w-md">
+                                                <td className="px-3 py-2 text-[11px] text-foreground/90 font-medium max-w-xl">
                                                     <p className="line-clamp-2">{note.note}</p>
                                                 </td>
-                                                <td className="px-3 py-1 text-[10px] text-muted-foreground">
+                                                <td className="px-3 py-2 text-[11px] text-muted-foreground font-medium">
                                                     {formatUser(note.createdBy)}
                                                 </td>
-                                                <td className="px-3 py-1 text-[10px] text-muted-foreground font-mono">
+                                                <td className="px-3 py-2 text-[11px] text-muted-foreground font-mono">
                                                     {new Date(note.createdAt).toLocaleDateString()}
                                                 </td>
-                                                <td className="px-3 py-1 text-right">
+                                                <td className="px-3 py-2 text-right">
                                                     <div className="flex items-center justify-end space-x-1">
                                                         <button
                                                             onClick={() => {

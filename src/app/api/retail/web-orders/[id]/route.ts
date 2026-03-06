@@ -3,8 +3,7 @@ import dbConnect from '@/lib/mongoose';
 import WebOrder from '@/models/WebOrder';
 import WebProduct from '@/models/WebProduct';
 import Sku from '@/models/Sku';
-import OpeningBalance from '@/models/OpeningBalance';
-import PurchaseOrder from '@/models/PurchaseOrder';
+import { getLotsWithCost } from '@/lib/lot-cost';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,37 +14,28 @@ export async function GET(
     try {
         await dbConnect();
         // Ensure models are registered
-        void Sku; 
+        void Sku;
 
-        // Await params for Next.js 15+
         const params = await props.params;
         const { id } = params;
 
-        // Populate SKU details in lineItems
         const order = await WebOrder.findById(id).lean() as any;
 
         if (!order) {
             return NextResponse.json({ error: 'Order not found' }, { status: 404 });
         }
 
-        // Manually populate SKUs if they are IDs, or leave as string if not found/raw
-        // Since SKU in schema is Mixed, population might be tricky if it's not a valid ObjectId.
-        // But let's try standard population or manual lookup if needed.
-        // Actually, Mongoose populate works if the ref and type are set correctly.
-        // In my schema: sku: { type: Schema.Types.Mixed, ref: 'Sku' }
-        // Let's try to populate manually for robust handling since IDs might be strings or ObjectIds.
-        
         // Collect all SKU IDs (both sku and linkedSkuId) for batch lookup
         const skuIds = order.lineItems
             .map((item: any) => item.sku)
             .filter((sku: any) => typeof sku === 'string' && sku.length > 0);
-        
+
         const linkedSkuIds = order.lineItems
             .map((item: any) => item.linkedSkuId)
             .filter((id: any) => typeof id === 'string' && id.length > 0);
-        
+
         const allSkuIds = [...new Set([...skuIds, ...linkedSkuIds])];
-        
+
         if (allSkuIds.length > 0) {
             const skus = await Sku.find({ _id: { $in: allSkuIds } }).select('name uom').lean();
             const skuMap = new Map(skus.map((s: any) => [s._id.toString(), s]));
@@ -62,73 +52,78 @@ export async function GET(
             });
         }
 
-        // Resolve variation names from WebProduct
+        // Resolve variation names and multipliers from WebProduct
         const webProductIds = [...new Set(
             order.lineItems
                 .map((item: any) => item.webProductId || item.parentProductId)
                 .filter(Boolean)
         )];
+
+        const multiplierMap = new Map<string, number>();
+
         if (webProductIds.length > 0) {
-            const webProducts = await WebProduct.find({ _id: { $in: webProductIds } }).select('variations').lean();
+            const webProducts = await WebProduct.find({ _id: { $in: webProductIds } })
+                .select('variations multiplier')
+                .lean();
             const wpMap = new Map(webProducts.map((wp: any) => [wp._id.toString(), wp]));
+
             order.lineItems = order.lineItems.map((item: any) => {
                 const wpId = item.webProductId || item.parentProductId;
-                if (wpId && item.variationId) {
+                if (wpId) {
                     const wp = wpMap.get(wpId.toString());
-                    if (wp?.variations) {
-                        const variation = wp.variations.find((v: any) => v.id == item.variationId || v._id == item.variationId);
-                        if (variation?.name) {
-                            return { ...item, variationName: variation.name };
+                    if (wp) {
+                        let multiplier = wp.multiplier ?? 1;
+                        if (item.variationId && wp.variations) {
+                            const variation = wp.variations.find(
+                                (v: any) => v.id == item.variationId || v._id == item.variationId
+                            );
+                            if (variation) {
+                                if (variation.name) item = { ...item, variationName: variation.name };
+                                if (variation.multiplier != null) multiplier = variation.multiplier;
+                            }
                         }
+                        multiplierMap.set(String(item.id), multiplier);
+                        return item;
                     }
                 }
                 return item;
             });
         }
 
-        // Enrich line items with cost based on Lot Number
-        if (order.lineItems && Array.isArray(order.lineItems)) {
-            const enrichedLineItems = await Promise.all(order.lineItems.map(async (item: any) => {
-                let cost = 0;
-                // item.sku is always a string (skuDetails has the populated object if any)
-                const skuId = item.sku;
-                const lotNumber = item.lotNumber;
+        // ─── VIRTUAL COST CALCULATION ─────────────────────────────────────
+        // Uses getLotsWithCost() which derives costs from the SKU ledger —
+        // the same source used by the Lot Selection Modal.
+        // This handles all cost sources including manufactured items where
+        // totalCost is calculated from ingredients + labor + packaging.
 
-                if (skuId && lotNumber) {
-                    // 1. Check Opening Balance
-                    const ob = await OpeningBalance.findOne({
-                        sku: skuId,
-                        lotNumber: lotNumber
-                    }).select('cost').lean();
+        // Collect unique linkedSkuIds that need cost lookup
+        const skuIdsForCost = [...new Set(
+            order.lineItems
+                .filter((item: any) => item.linkedSkuId && item.lotNumber)
+                .map((item: any) => item.linkedSkuId)
+        )] as string[];
 
-                    if (ob) {
-                        cost = ob.cost || 0;
-                    } else {
-                        // 2. Check Purchase Orders
-                        const po = await PurchaseOrder.findOne({
-                            'lineItems': {
-                                $elemMatch: {
-                                    sku: skuId,
-                                    lotNumber: lotNumber
-                                }
-                            }
-                        }).select('lineItems').lean();
-
-                        if (po && po.lineItems) {
-                            const line = po.lineItems.find((l: any) => {
-                                const lSku = l.sku?._id || l.sku;
-                                return lSku?.toString() === skuId?.toString() && l.lotNumber === lotNumber;
-                            });
-                            if (line) {
-                                cost = line.cost || 0;
-                            }
-                        }
-                    }
-                }
-                return { ...item, cost };
-            }));
-            order.lineItems = enrichedLineItems;
+        // Fetch lot costs for all unique SKUs in parallel
+        const lotCostBySkuId = new Map<string, Map<string, number>>();
+        if (skuIdsForCost.length > 0) {
+            const costResults = await Promise.all(
+                skuIdsForCost.map(sid => getLotsWithCost(sid))
+            );
+            skuIdsForCost.forEach((sid, idx) => {
+                lotCostBySkuId.set(sid, costResults[idx]);
+            });
         }
+
+        // Apply virtual costs to line items
+        order.lineItems = order.lineItems.map((item: any) => {
+            if (item.linkedSkuId && item.lotNumber) {
+                const skuLots = lotCostBySkuId.get(item.linkedSkuId);
+                const baseCost = skuLots?.get(item.lotNumber) || 0;
+                const multiplier = multiplierMap.get(String(item.id)) || 1;
+                return { ...item, cost: baseCost * multiplier };
+            }
+            return { ...item, cost: item.cost || 0 };
+        });
 
         return NextResponse.json(order);
 
@@ -147,7 +142,6 @@ export async function PATCH(
         const { id } = params;
         const body = await request.json();
 
-        // Separate status update from line item updates usually, but here we just handle body
         const updatedOrder = await WebOrder.findByIdAndUpdate(
             id,
             { $set: body },

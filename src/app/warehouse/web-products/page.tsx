@@ -50,7 +50,7 @@ interface SkuOption { value: string; label: string; }
 interface CacheEntry {
   products: WebProduct[]; hasMore: boolean; page: number; total: number;
   sortBy: string; sortOrder: string; search: string; website: string;
-  hideZeroOrders: boolean; timestamp: number;
+  hideZeroOrders: boolean; showArchived: boolean; timestamp: number;
 }
 
 // ─── Module-level cache ───────────────────────────────────────────────────────
@@ -63,17 +63,17 @@ const PAGE_SIZE = 50;
 
 function WebsiteBadge({ website }: { website?: string }) {
   const styleMap: Record<string, { bg: string; color: string }> = {
-    KING: { bg: 'linear-gradient(135deg,#d97706,#ea580c)', color: '#fff' },
-    GRASS: { bg: 'linear-gradient(135deg,#16a34a,#15803d)', color: '#fff' },
-    GRHK: { bg: 'linear-gradient(135deg,#0891b2,#2563eb)', color: '#fff' },
-    REBEL: { bg: 'linear-gradient(135deg,#7c3aed,#a855f7)', color: '#fff' },
-    GUD: { bg: 'linear-gradient(135deg,#e11d48,#db2777)', color: '#fff' },
+    KING: { bg: '#d97706', color: '#fff' },
+    GRASS: { bg: '#16a34a', color: '#fff' },
+    GRHK: { bg: '#0891b2', color: '#fff' },
+    REBEL: { bg: '#7c3aed', color: '#fff' },
+    GUD: { bg: '#e11d48', color: '#fff' },
   };
   const key = Object.keys(styleMap).find(k => website?.toUpperCase().includes(k));
   const s = key ? styleMap[key] : { bg: '#64748b', color: '#fff' };
   return (
     <span
-      className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider shadow-sm whitespace-nowrap"
+      className="px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider shadow-sm whitespace-nowrap"
       style={{ background: s.bg, color: s.color }}
     >
       {website || 'N/A'}
@@ -114,6 +114,7 @@ function WebProductsContent() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [activeWebsite, setActiveWebsite] = useState<string>('All');
   const [hideZeroOrders, setHideZeroOrders] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
 
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [skuList, setSkuList] = useState<any[]>([]);
@@ -139,6 +140,32 @@ function WebProductsContent() {
     const t = setTimeout(() => { setDebouncedSearch(search); }, 250);
     return () => clearTimeout(t);
   }, [search]);
+
+  // ─── Sync search to URL ────────────────────────────────────────────────
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (debouncedSearch) {
+      params.set('search', debouncedSearch);
+    } else {
+      params.delete('search');
+    }
+    const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname;
+    if (newUrl !== `?${searchParams.toString()}` && newUrl !== window.location.pathname + '?' + searchParams.toString()) {
+      router.push(`${window.location.pathname}${params.toString() ? '?' + params.toString() : ''}`, { scroll: false });
+    }
+  }, [debouncedSearch, router, searchParams]);
+
+  // ─── Sync URL back to state (browser back/forward) ─────────────────────
+
+  useEffect(() => {
+    const urlSearch = searchParams.get('search') || '';
+    if (urlSearch !== debouncedSearch) {
+      setSearch(urlSearch);
+      setDebouncedSearch(urlSearch);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // ─── Side data fetches ───────────────────────────────────────────────────
 
@@ -170,6 +197,7 @@ function WebProductsContent() {
       });
       if (activeWebsite !== 'All') params.set('website', activeWebsite);
       if (hideZeroOrders) params.set('hideZeroOrders', 'true');
+      if (showArchived) params.set('showArchived', 'true');
 
       const res = await fetch(`/api/retail/web-products?${params}`, { signal: controller.signal });
       const data = await res.json();
@@ -186,7 +214,7 @@ function WebProductsContent() {
         setProducts(prev => {
           const isAppend = pageRef.current > 0;
           const list = isAppend ? (() => { const ids = new Set(prev.map(p => p._id)); return [...prev, ...newProducts.filter(p => !ids.has(p._id))]; })() : newProducts;
-          globalCache.current = { products: list, hasMore: newHasMore, page: nextPage, total: newTotal, sortBy, sortOrder, search: debouncedSearch, website: activeWebsite, hideZeroOrders, timestamp: Date.now() };
+          globalCache.current = { products: list, hasMore: newHasMore, page: nextPage, total: newTotal, sortBy, sortOrder, search: debouncedSearch, website: activeWebsite, hideZeroOrders, showArchived, timestamp: Date.now() };
           return list;
         });
         setTotal(newTotal);
@@ -203,25 +231,25 @@ function WebProductsContent() {
       fetchingRef.current = false;
       if (mountedRef.current) { setIsLoading(false); setIsLoadingMore(false); }
     }
-  }, [sortBy, sortOrder, debouncedSearch, activeWebsite, hideZeroOrders]);
+  }, [sortBy, sortOrder, debouncedSearch, activeWebsite, hideZeroOrders, showArchived]);
 
   // ─── Initial load / filter changes ─────────────────────────────────────
 
   const fetchProductsRef = useRef(fetchProducts);
   fetchProductsRef.current = fetchProducts;
   const isFirstMount = useRef(true);
-  const prevFiltersRef = useRef({ sortBy, sortOrder, search: debouncedSearch, website: activeWebsite, hideZeroOrders });
+  const prevFiltersRef = useRef({ sortBy, sortOrder, search: debouncedSearch, website: activeWebsite, hideZeroOrders, showArchived });
 
   useEffect(() => {
     const prev = prevFiltersRef.current;
-    prevFiltersRef.current = { sortBy, sortOrder, search: debouncedSearch, website: activeWebsite, hideZeroOrders };
+    prevFiltersRef.current = { sortBy, sortOrder, search: debouncedSearch, website: activeWebsite, hideZeroOrders, showArchived };
 
     if (isFirstMount.current) {
       isFirstMount.current = false;
       const cache = globalCache.current;
       if (cache && cache.products.length > 0 && (Date.now() - cache.timestamp) < CACHE_TTL &&
         cache.sortBy === sortBy && cache.sortOrder === sortOrder && cache.search === debouncedSearch &&
-        cache.website === activeWebsite && cache.hideZeroOrders === hideZeroOrders) {
+        cache.website === activeWebsite && cache.hideZeroOrders === hideZeroOrders && cache.showArchived === showArchived) {
         setProducts(cache.products); setHasMore(cache.hasMore); setTotal(cache.total); pageRef.current = cache.page; setIsLoading(false);
         return;
       }
@@ -233,7 +261,7 @@ function WebProductsContent() {
     setHasMore(true);
     fetchProductsRef.current();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sortBy, sortOrder, debouncedSearch, activeWebsite, hideZeroOrders]);
+  }, [sortBy, sortOrder, debouncedSearch, activeWebsite, hideZeroOrders, showArchived]);
 
   // ─── Infinite scroll sentinel ────────────────────────────────────────────
 
@@ -320,6 +348,77 @@ function WebProductsContent() {
     return { totalLinkable, totalLinked, pct: totalLinkable > 0 ? Math.round((totalLinked / totalLinkable) * 100) : 0 };
   }, [globalLinkStats]);
 
+  const handleUpdateMultiplier = async (productId: string, val: number, variationId?: string | number) => {
+    const m = Math.max(1, val);
+    setProducts(prev => prev.map(p => {
+      if (p._id !== productId) return p;
+      const updated = { ...p };
+      if (variationId) {
+        updated.variations = updated.variations?.map(v => {
+          const vid = v.id || v._id;
+          if (vid == variationId) return { ...v, multiplier: m } as any;
+          return v;
+        });
+      } else {
+        (updated as any).multiplier = m;
+      }
+      return updated;
+    }));
+
+    try {
+      const p = products.find(x => x._id === productId);
+      if (!p) return;
+      if (variationId) {
+        const v = p.variations?.find(vx => (vx.id || vx._id) == variationId);
+        if (!v) return;
+        const newVars = p.variations?.map(vx => {
+          if ((vx.id || vx._id) == variationId) return { ...vx, multiplier: m };
+          return vx;
+        });
+        await fetch(`/api/retail/web-products/${productId}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ variations: newVars })
+        });
+      } else {
+        await fetch(`/api/retail/web-products/${productId}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ multiplier: m })
+        });
+      }
+      globalCache.current = null;
+    } catch { toast.error("Failed to update multiplier"); }
+  };
+
+  const handleToggleArchive = async (productId: string, currentArchived: boolean) => {
+    const toastId = toast.loading(currentArchived ? 'Unarchiving...' : 'Archiving...');
+    setProducts(prev => prev.filter(p => {
+      // Opt UI: if filtering is running, remove it from view if it no longer fits
+      if (p._id === productId && (!showArchived && !currentArchived)) return false;
+      // If we are showing archived, it stays in the list just changes state
+      return true;
+    }).map(p => {
+      if (p._id === productId) return { ...p, isArchived: !currentArchived } as any;
+      return p;
+    }));
+
+    try {
+      const res = await fetch(`/api/retail/web-products/${productId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isArchived: !currentArchived })
+      });
+      if (res.ok) {
+        toast.success(currentArchived ? 'Restored' : 'Archived', { id: toastId });
+        globalCache.current = null;
+      } else {
+        toast.error('Failed', { id: toastId });
+        fetchProductsRef.current();
+      }
+    } catch {
+      toast.error('Failed', { id: toastId });
+      fetchProductsRef.current();
+    }
+  };
+
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
   const getVariationLabel = (product: WebProduct, variation: Variation) => {
@@ -356,16 +455,16 @@ function WebProductsContent() {
     const isLinking = linkingProductId === cellKey;
 
     if (isLinking) return (
-      <div className="flex items-center gap-1.5">
-        <Loader2 className="w-3 h-3 animate-spin text-primary" />
-        <span className="text-[9px] text-primary font-bold uppercase tracking-wider">Linking...</span>
+      <div className="flex items-center gap-2">
+        <Loader2 className="w-4 h-4 animate-spin text-primary" />
+        <span className="text-xs text-primary font-bold uppercase tracking-wider">Linking...</span>
       </div>
     );
 
     if (currentLinkedSkuId) return (
-      <div className="flex items-center gap-1.5 min-w-[180px]" onClick={e => e.stopPropagation()}>
+      <div className="flex items-center gap-2 min-w-[200px]" onClick={e => e.stopPropagation()}>
         <span
-          className="flex-1 truncate text-[10px] font-bold text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md cursor-pointer hover:bg-emerald-500/20 transition-colors"
+          className="flex-1 truncate text-xs font-black text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1.5 rounded-md cursor-pointer hover:bg-emerald-500/20 transition-colors"
           onClick={() => router.push(`/warehouse/skus/${currentLinkedSkuId}`)}
           title={`Go to SKU: ${currentLinkedSkuId}`}
         >
@@ -373,23 +472,23 @@ function WebProductsContent() {
         </span>
         <button
           onClick={e => { e.stopPropagation(); handleLinkSku(product._id, '', variationId); }}
-          className="p-1 rounded hover:bg-rose-500/10 text-rose-400 hover:text-rose-500 transition-colors shrink-0"
+          className="p-1.5 rounded-md hover:bg-rose-500/10 text-rose-500 hover:text-rose-600 transition-colors shrink-0"
           title="Unlink SKU"
         >
-          <Unlink className="w-3 h-3" />
+          <Unlink className="w-4 h-4" />
         </button>
       </div>
     );
 
     return (
-      <div className="flex items-center gap-1.5 min-w-[180px]" onClick={e => e.stopPropagation()}>
+      <div className="flex items-center gap-2 min-w-[200px]" onClick={e => e.stopPropagation()}>
         <SearchableSelect
           options={skuOptions}
           value=""
           onChange={value => handleLinkSku(product._id, value, variationId)}
           placeholder="Link SKU..."
           className="w-full"
-          triggerClassName="h-6 text-[10px] rounded-md border border-dashed transition-all bg-rose-500/5 border-rose-500/20 text-rose-400 hover:bg-rose-500/10"
+          triggerClassName="h-8 text-xs font-bold rounded-md border border-dashed transition-all bg-rose-500/5 border-rose-500/20 text-rose-500 hover:bg-rose-500/10"
           onOpenChange={open => setActiveDropdownRow(open ? cellKey : null)}
         />
       </div>
@@ -501,10 +600,20 @@ function WebProductsContent() {
         {/* Hide zero orders toggle */}
         <button
           onClick={() => { setHideZeroOrders(p => !p); }}
-          className={cn('p-2 rounded-lg transition-colors cursor-pointer', hideZeroOrders ? 'bg-primary/10 text-primary border border-primary/20' : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60')}
+          className={cn('p-2 rounded-lg transition-colors cursor-pointer shrink-0', hideZeroOrders ? 'bg-primary/10 text-primary border border-primary/20' : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60')}
           title={hideZeroOrders ? 'Showing products with orders only' : 'Show all products'}
         >
           {hideZeroOrders ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+        </button>
+
+        {/* Show Archived filter */}
+        <button
+          onClick={() => { setShowArchived(p => !p); }}
+          className={cn('h-8 px-3 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 text-[11px] font-bold uppercase tracking-widest', showArchived ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20 shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60')}
+          title={showArchived ? 'Viewing Archived Products' : 'Show Archived Products'}
+        >
+          <Layers className="w-3.5 h-3.5" />
+          <span>Archived</span>
         </button>
 
         {/* Expand / Collapse All */}
@@ -537,12 +646,18 @@ function WebProductsContent() {
                   onClick={() => handleSort('salePrice', sortBy === 'salePrice' && sortOrder === 'asc' ? 'desc' : 'asc')}>
                   <span>Price</span>
                 </th>
+                <th className="px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest border-r border-border/40 select-none shadow-[0_1px_0_0_hsl(var(--border))] w-[80px]">
+                  <span>Multiplier</span>
+                </th>
                 <th className="px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest border-r border-border/40 select-none shadow-[0_1px_0_0_hsl(var(--border))] w-[220px]">
                   <span>Linked SKU</span>
                 </th>
                 <th className="px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary/60 transition-colors border-r border-border/40 select-none shadow-[0_1px_0_0_hsl(var(--border))] w-[80px]"
                   onClick={() => handleSort('totalWebOrders', sortBy === 'totalWebOrders' && sortOrder === 'asc' ? 'desc' : 'asc')}>
                   <span>Orders</span>
+                </th>
+                <th className="px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest border-r border-border/40 select-none shadow-[0_1px_0_0_hsl(var(--border))] w-[80px] text-center">
+                  <span>Archive</span>
                 </th>
                 <th className="px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary/60 transition-colors select-none shadow-[0_1px_0_0_hsl(var(--border))] w-[80px]"
                   onClick={() => handleSort('webId', sortBy === 'webId' && sortOrder === 'asc' ? 'desc' : 'asc')}>
@@ -581,45 +696,59 @@ function WebProductsContent() {
                       onClick={() => { isVariable ? toggleExpand(product._id) : router.push(`/warehouse/web-products/${product._id}`); }}
                     >
                       {/* Name */}
-                      <td className="px-2.5 py-2.5 text-[12px] font-medium text-foreground/90 group-hover:text-foreground border-r border-border/40">
-                        <div className="flex items-center gap-1.5">
+                      <td className="px-2.5 py-2.5 text-sm font-semibold text-foreground/90 group-hover:text-foreground border-r border-border/40">
+                        <div className="flex items-center gap-2">
                           {isVariable ? (
-                            <ChevronRight className={cn('w-3.5 h-3.5 text-muted-foreground shrink-0 transition-transform duration-200', isExpanded && 'rotate-90 text-primary')} />
-                          ) : <div className="w-3.5 shrink-0" />}
-                          <div className="w-6 h-6 rounded-md bg-secondary overflow-hidden border border-border flex-shrink-0">
+                            <ChevronRight className={cn('w-4 h-4 text-muted-foreground shrink-0 transition-transform duration-200', isExpanded && 'rotate-90 text-primary')} />
+                          ) : <div className="w-4 shrink-0" />}
+                          <div className="w-7 h-7 rounded-md bg-secondary overflow-hidden border border-border flex-shrink-0">
                             <img src={product.image || globalSettings?.missingSkuImage || '/sku-placeholder.png'} alt="" className="w-full h-full object-cover" />
                           </div>
                           <span className="truncate" title={product.name}>{highlightText(product.name)}</span>
                           {isVariable && (
                             <button onClick={e => { e.stopPropagation(); router.push(`/warehouse/web-products/${product._id}`); }}
-                              className="p-1 rounded hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors shrink-0 opacity-0 group-hover:opacity-100 cursor-pointer" title="Open detail">
-                              <ExternalLink className="w-3 h-3" />
+                              className="p-1.5 rounded hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors shrink-0 opacity-0 group-hover:opacity-100 cursor-pointer" title="Open detail">
+                              <ExternalLink className="w-4 h-4" />
                             </button>
                           )}
                         </div>
                       </td>
 
                       {/* Website */}
-                      <td className="px-2.5 py-2.5 border-r border-border/40">
+                      <td className="px-2.5 py-3 border-r border-border/40">
                         <WebsiteBadge website={product.website} />
                       </td>
 
                       {/* Price */}
-                      <td className="px-2.5 py-2.5 text-[12px] font-mono text-foreground/70 border-r border-border/40">
+                      <td className="px-2.5 py-3 text-sm font-black font-mono text-foreground/80 border-r border-border/40">
                         ${(product.salePrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
 
+                      {/* Multiplier */}
+                      <td className="px-2.5 py-3 border-r border-border/40" onClick={e => e.stopPropagation()}>
+                        {!isVariable && (
+                          <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            value={(product as any).multiplier || 1}
+                            onChange={e => handleUpdateMultiplier(product._id, parseInt(e.target.value) || 1)}
+                            className="w-full h-8 px-2 border-2 border-border/60 bg-background text-sm font-bold font-mono rounded text-center focus:border-primary/50 focus:outline-none transition-colors"
+                          />
+                        )}
+                      </td>
+
                       {/* Linked SKU */}
-                      <td className="px-2.5 py-2.5 border-r border-border/40">
+                      <td className="px-2.5 py-3 border-r border-border/40">
                         {isVariable ? (
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-2">
                             {allLinked ? (
-                              <span className="flex items-center gap-1 text-[9px] font-bold text-emerald-500 uppercase tracking-wider">
-                                <CheckCircle2 className="w-3 h-3" />All Linked
+                              <span className="flex items-center gap-1.5 text-[11px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-500/10 px-2 py-1 tracking-wider rounded">
+                                <CheckCircle2 className="w-3.5 h-3.5" />All Linked
                               </span>
                             ) : (
-                              <span className="flex items-center gap-1 text-[9px] font-bold text-amber-500 uppercase tracking-wider">
-                                <AlertCircle className="w-3 h-3" />{linkedCount}/{totalCount}
+                              <span className="flex items-center gap-1.5 text-[11px] font-black text-amber-600 uppercase tracking-widest bg-amber-500/10 px-2 py-1 tracking-wider rounded">
+                                <AlertCircle className="w-3.5 h-3.5" />{linkedCount}/{totalCount}
                               </span>
                             )}
                           </div>
@@ -627,12 +756,20 @@ function WebProductsContent() {
                       </td>
 
                       {/* Orders */}
-                      <td className="px-2.5 py-2.5 text-[12px] font-black text-emerald-600 font-mono border-r border-border/40">
+                      <td className="px-2.5 py-3 text-sm font-black text-emerald-600 font-mono border-r border-border/40">
                         {product.totalWebOrders || 0}
                       </td>
 
+                      {/* Archive */}
+                      <td className="px-2.5 py-3 border-r border-border/40 text-center" onClick={e => e.stopPropagation()}>
+                        <label className="relative inline-flex items-center cursor-pointer disabled:opacity-50">
+                          <input type="checkbox" className="sr-only peer" checked={(product as any).isArchived || false} onChange={() => handleToggleArchive(product._id, (product as any).isArchived || false)} />
+                          <div className="w-9 h-5 bg-gray-300 dark:bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-400 after:border after:rounded-full after:h-4 after:w-4 after:transition-all after:shadow-md peer-checked:bg-rose-500 shadow-inner border border-gray-400 dark:border-gray-500"></div>
+                        </label>
+                      </td>
+
                       {/* Web ID */}
-                      <td className="px-2.5 py-2.5 text-[11px] text-muted-foreground/60 font-mono">
+                      <td className="px-2.5 py-3 text-xs text-foreground/70 font-mono font-semibold">
                         {product.webId || '—'}
                       </td>
                     </tr>
@@ -653,25 +790,36 @@ function WebProductsContent() {
                           style={{ animationDelay: `${vIdx * 25}ms` }}
                         >
                           {/* Variation Name */}
-                          <td className="px-2.5 py-2 text-[11px] text-foreground/70 border-r border-border/40">
-                            <div className="flex items-center gap-1.5 pl-5">
-                              <div className="flex items-center shrink-0 mr-0.5">
-                                <div className="w-3 border-b border-border/50 border-l border-l-border/50 h-2.5 rounded-bl-sm" />
+                          <td className="px-2.5 py-2.5 text-xs font-medium text-foreground/80 border-r border-border/40">
+                            <div className="flex items-center gap-2 pl-6">
+                              <div className="flex items-center shrink-0 mr-1">
+                                <div className="w-4 border-b border-border/50 border-l border-l-border/50 h-3 rounded-bl-sm" />
                               </div>
-                              <Layers className="w-3 h-3 text-blue-400 shrink-0" />
-                              <div className="w-5 h-5 rounded bg-secondary overflow-hidden border border-border flex-shrink-0">
+                              <Layers className="w-4 h-4 text-blue-500 shrink-0" />
+                              <div className="w-6 h-6 rounded bg-secondary overflow-hidden border border-border flex-shrink-0">
                                 <img src={variation.image || product.image || globalSettings?.missingSkuImage || '/sku-placeholder.png'} alt="" className="w-full h-full object-cover" />
                               </div>
-                              <span className="font-medium text-foreground/80 truncate">{highlightText(getVariationLabel(product, variation))}</span>
+                              <span className="font-semibold text-foreground/90 truncate">{highlightText(getVariationLabel(product, variation))}</span>
                             </div>
                           </td>
-                          <td className="px-2.5 py-2 border-r border-border/40" />
-                          <td className="px-2.5 py-2 text-[11px] text-foreground/60 font-mono border-r border-border/40">
+                          <td className="px-2.5 py-2.5 border-r border-border/40" />
+                          <td className="px-2.5 py-2.5 text-xs text-foreground/80 font-mono font-bold border-r border-border/40">
                             ${((variation.salePrice || variation.price || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
-                          <td className="px-2.5 py-2 border-r border-border/40">{renderSkuCell(product, variation)}</td>
-                          <td className="px-2.5 py-2 text-[12px] font-black text-emerald-600 font-mono border-r border-border/40">{(variation as any).totalWebOrders || 0}</td>
-                          <td className="px-2.5 py-2 text-[10px] text-muted-foreground/50 font-mono">{vid || '—'}</td>
+                          <td className="px-2.5 py-2.5 border-r border-border/40" onClick={e => e.stopPropagation()}>
+                            <input
+                              type="number"
+                              min="1"
+                              step="1"
+                              value={(variation as any).multiplier || 1}
+                              onChange={e => handleUpdateMultiplier(product._id, parseInt(e.target.value) || 1, vid)}
+                              className="w-full h-7 px-1.5 border-2 border-border/60 bg-background text-[11px] font-bold font-mono rounded text-center focus:border-primary/50 focus:outline-none transition-colors"
+                            />
+                          </td>
+                          <td className="px-2.5 py-2.5 border-r border-border/40">{renderSkuCell(product, variation)}</td>
+                          <td className="px-2.5 py-2.5 text-sm font-black text-emerald-600 font-mono border-r border-border/40">{(variation as any).totalWebOrders || 0}</td>
+                          <td className="px-2.5 py-2.5 border-r border-border/40" />
+                          <td className="px-2.5 py-2.5 text-xs text-foreground/60 font-mono font-semibold">{vid || '—'}</td>
                         </tr>
                       );
                     })}

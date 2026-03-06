@@ -1,47 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import WebOrder from '@/models/WebOrder';
-import OpeningBalance from '@/models/OpeningBalance';
-import PurchaseOrder from '@/models/PurchaseOrder';
-import Manufacturing from '@/models/Manufacturing';
-import AuditAdjustment from '@/models/AuditAdjustment';
+import WebProduct from '@/models/WebProduct';
+import { getLotsWithCost } from '@/lib/lot-cost';
 
 export const dynamic = 'force-dynamic';
 
-// Get cost for a specific lot
-async function getLotCost(skuId: string, lotNumber: string): Promise<number> {
-    if (!lotNumber) return 0;
-    
-    // Check Opening Balance
-    const ob = await OpeningBalance.findOne({ sku: skuId, lotNumber }).lean();
-    if (ob?.cost) return ob.cost;
+// Get multiplier from the linked WebProduct (variation or simple product)
+async function getMultiplier(lineItem: any): Promise<number> {
+    const webProductId = lineItem.webProductId || lineItem.parentProductId;
+    if (!webProductId) return 1;
 
-    // Check Purchase Orders
-    const po = await PurchaseOrder.findOne({ 
-        'lineItems.sku': skuId, 
-        'lineItems.lotNumber': lotNumber 
-    }).lean();
-    if (po) {
-        const li = po.lineItems.find((l: any) => 
-            l.sku?.toString() === skuId && l.lotNumber === lotNumber
-        );
-        if (li?.cost) return li.cost;
+    try {
+        const product = await WebProduct.findById(webProductId).lean() as any;
+        if (!product) return 1;
+
+        // For variable products, check the matching variation
+        if (lineItem.variationId && product.variations?.length > 0) {
+            const variation = product.variations.find(
+                (v: any) => v.id === lineItem.variationId
+            );
+            if (variation?.multiplier != null) return variation.multiplier;
+        }
+
+        // For simple products or fallback, use the product-level multiplier
+        return product.multiplier ?? 1;
+    } catch {
+        return 1;
     }
-
-    // Check Manufacturing
-    const mo = await Manufacturing.findOne({ 
-        sku: skuId, 
-        $or: [{ lotNumber }, { label: lotNumber }]
-    }).lean();
-    if (mo) {
-        return 0; // Will be calculated by ledger
-    }
-
-    // Check Audit Adjustments
-    const adj = await AuditAdjustment.findOne({ sku: skuId, lotNumber }).lean();
-    if (adj?.cost) return adj.cost;
-
-    return 0;
 }
 
 export async function PATCH(
@@ -64,7 +50,7 @@ export async function PATCH(
         }
 
         // Find the line item by id (WooCommerce line item id)
-        const lineItem = order.lineItems.find((li: any) => 
+        const lineItem = order.lineItems.find((li: any) =>
             li.id === lineItemId || li._id?.toString() === String(lineItemId)
         );
 
@@ -72,10 +58,13 @@ export async function PATCH(
             return NextResponse.json({ error: 'Line item not found' }, { status: 404 });
         }
 
-        // Determine the cost - use provided cost or calculate it
+        // Calculate cost using the lot-cost helper (same as ledger)
         let finalCost = cost;
         if (lineItem.linkedSkuId && lotNumber && (cost === undefined || cost === null)) {
-            finalCost = await getLotCost(lineItem.linkedSkuId, lotNumber);
+            const lotCosts = await getLotsWithCost(lineItem.linkedSkuId);
+            const baseCost = lotCosts.get(lotNumber) || 0;
+            const multiplier = await getMultiplier(lineItem);
+            finalCost = baseCost * multiplier;
         }
 
         // Update the line item
@@ -89,7 +78,7 @@ export async function PATCH(
             lineItemId,
             lotNumber: lotNumber || null,
             cost: finalCost || 0,
-            message: lotNumber 
+            message: lotNumber
                 ? `Updated lot to ${lotNumber}${finalCost > 0 ? ` (cost: $${finalCost.toFixed(2)})` : ''}`
                 : 'Lot cleared'
         });

@@ -78,9 +78,9 @@ interface Financials {
     grossProfit: number;
     cogm?: number;
     cogp?: number;
-    chartData: { 
-        date: string; 
-        revenue: number; 
+    chartData: {
+        date: string;
+        revenue: number;
         qty: number;
         productionQty?: number;
         productionCost?: number;
@@ -124,7 +124,7 @@ function SkuDetailsPageContent() {
     const [lots, setLots] = useState<{ lotNumber: string; source: string; date: string | null; cost: number; balance: number }[]>([]);
     const [loading, setLoading] = useState(true);
     const [fallbackImage, setFallbackImage] = useState('/sku-placeholder.png');
-    
+
     // Pagination state for infinite scroll
     const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -202,7 +202,7 @@ function SkuDetailsPageContent() {
         if (!id) return;
         const savedFilters = localStorage.getItem(`sku_filters_${id}`);
         const savedLot = localStorage.getItem(`sku_lot_${id}`);
-        
+
         if (savedFilters) {
             try {
                 setFilters(JSON.parse(savedFilters));
@@ -238,38 +238,59 @@ function SkuDetailsPageContent() {
                 setTransactions(data.transactions || []);
                 setFinancials(data.financials || null);
                 if (data.settings?.missingSkuImage) setFallbackImage(data.settings.missingSkuImage);
-                
+
                 // Derive lots from ledger transactions (single source of truth)
                 const txList = data.transactions || [];
                 const lotMap = new Map<string, { balance: number; source: string; date: string | null; cost: number }>();
                 const isPendingProd = (t: any) => t.type === 'Produced' && ['pending', 'processing'].includes((t.status || '').toLowerCase());
                 const isUnfulfilledCons = (t: any) => t.type === 'Consumption' && (t.status || '').toLowerCase() !== 'fulfilled';
-                
+
                 // Sort oldest first for proper source/date attribution
-                const sorted = [...txList].sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
-                
+                // When dates are equal, source (positive) records come first
+                const lotTypePriority: Record<string, number> = {
+                    'Opening': 0, 'Audit': 1, 'Purchase Order': 2, 'Produced': 3,
+                    'Consumption': 4, 'Orders': 5, 'Web Order': 6,
+                };
+                const sorted = [...txList].sort((a: any, b: any) => {
+                    const dayA = new Date(new Date(a.date).toDateString()).getTime();
+                    const dayB = new Date(new Date(b.date).toDateString()).getTime();
+                    if (dayA !== dayB) return dayA - dayB;
+                    // Same day: positive records first
+                    const aPosFlag = a.quantity > 0 ? 0 : 1;
+                    const bPosFlag = b.quantity > 0 ? 0 : 1;
+                    if (aPosFlag !== bPosFlag) return aPosFlag - bPosFlag;
+                    return (lotTypePriority[a.type] ?? 9) - (lotTypePriority[b.type] ?? 9);
+                });
+
+                // Only these types can CREATE a lot (source types)
+                const SOURCE_TYPES = new Set(['Opening', 'Purchase Order', 'Produced', 'Audit']);
+
                 for (const tx of sorted) {
                     const lot = tx.lotNumber;
                     if (!lot || lot === '' || lot === 'N/A' || lot === '-') continue;
                     // Skip pending/processing and unfulfilled — same as ledger balance logic
                     if (isPendingProd(tx) || isUnfulfilledCons(tx)) continue;
-                    
+
                     const existing = lotMap.get(lot);
-                    const sourceType = 
+
+                    // Only derive source label from creation-type transactions
+                    const isSourceType = SOURCE_TYPES.has(tx.type);
+                    const sourceType = isSourceType ? (
                         tx.type === 'Opening' ? 'Opening Balance' :
-                        tx.type === 'Purchase Order' ? 'Purchase Order' :
-                        tx.type === 'Produced' ? 'Manufacturing' :
-                        tx.type === 'Audit' ? 'Audit Adjustment' :
-                        tx.type;
-                    
+                            tx.type === 'Purchase Order' ? 'Purchase Order' :
+                                tx.type === 'Produced' ? 'Manufacturing' :
+                                    tx.type === 'Audit' ? 'Audit Adjustment' :
+                                        tx.type
+                    ) : null;
+
                     lotMap.set(lot, {
                         balance: (existing?.balance || 0) + (tx.quantity || 0),
-                        source: existing?.source || sourceType,
-                        date: existing?.date || tx.date,
+                        source: existing?.source || sourceType || 'Unknown',
+                        date: existing?.date || (isSourceType ? tx.date : null) || existing?.date || tx.date,
                         cost: tx.cost > 0 && !existing?.cost ? tx.cost : (existing?.cost || 0),
                     });
                 }
-                
+
                 const derivedLots = Array.from(lotMap.entries())
                     .map(([lotNumber, data]) => ({ lotNumber, ...data }))
                     .sort((a, b) => {
@@ -284,7 +305,7 @@ function SkuDetailsPageContent() {
                 fetch(`/api/warehouse/skus/${id}/linked-web-products`)
                     .then(r => r.json())
                     .then(wpData => setLinkedWebProducts(wpData.linkedProducts || []))
-                    .catch(() => {})
+                    .catch(() => { })
                     .finally(() => setLoadingLinkedProducts(false));
             } else {
                 if (!background) toast.error("Failed to load SKU details");
@@ -299,22 +320,22 @@ function SkuDetailsPageContent() {
 
     const handleSaveLotUpdate = async (newLotNumber: string) => {
         if (!editingTx || !sku) return;
-        
+
         // 1. Optimistic Update (Immediate Feedback)
         setIsLotModalOpen(false);
         const originalTx = editingTx;
         const originalTransactions = [...transactions];
-        
+
         // Optimistically update the transaction in the list
-        setTransactions(prev => prev.map(t => 
+        setTransactions(prev => prev.map(t =>
             t._id === originalTx._id ? { ...t, lotNumber: newLotNumber } : t
         ));
-        
+
         setEditingTx(null);
 
         try {
             setIsSaving(true);
-            
+
             // 2. Background Update
             const res = await fetch(`/api/warehouse/skus/${sku._id}/transaction-update`, {
                 method: 'POST',
@@ -322,7 +343,7 @@ function SkuDetailsPageContent() {
                 body: JSON.stringify({
                     type: originalTx.type,
                     docId: originalTx.docId,
-                    lineItemId: originalTx._id, 
+                    lineItemId: originalTx._id,
                     newLotNumber: newLotNumber,
                     skuId: sku._id
                 })
@@ -377,9 +398,18 @@ function SkuDetailsPageContent() {
         if (filters.showOnlyNoCost && tx.cost && tx.cost > 0) return false;
         return true;
     }).sort((a, b) => {
-        const dateA = new Date(a.date).getTime();
-        const dateB = new Date(b.date).getTime();
-        return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+        const dayA = new Date(new Date(a.date).toDateString()).getTime();
+        const dayB = new Date(new Date(b.date).toDateString()).getTime();
+        const dir = sortOrder === 'asc' ? 1 : -1;
+        if (dayA !== dayB) return (dayA - dayB) * dir;
+        // Same day: positive (source) first, then by type
+        const aPf = a.quantity > 0 ? 0 : 1;
+        const bPf = b.quantity > 0 ? 0 : 1;
+        if (aPf !== bPf) return (aPf - bPf) * dir;
+        const tp: Record<string, number> = { 'Opening': 0, 'Audit': 1, 'Purchase Order': 2, 'Produced': 3, 'Consumption': 4, 'Orders': 5, 'Web Order': 6 };
+        const tDiff = (tp[a.type] ?? 9) - (tp[b.type] ?? 9);
+        if (tDiff !== 0) return tDiff * dir;
+        return (new Date(a.date).getTime() - new Date(b.date).getTime()) * dir;
     });
 
     const uniqueLots = Array.from(new Set(transactions.map(t => t.lotNumber).filter(l => l && l !== '')));
@@ -399,11 +429,21 @@ function SkuDetailsPageContent() {
         return true;
     });
 
-    const displayTransactions = selectedLot === 'All' 
-        ? finalTransactions 
+    const displayTransactions = selectedLot === 'All'
+        ? finalTransactions
         : (() => {
+            const tpLot: Record<string, number> = { 'Opening': 0, 'Audit': 1, 'Purchase Order': 2, 'Produced': 3, 'Consumption': 4, 'Orders': 5, 'Web Order': 6 };
             let runningBal = 0;
-            const ascTx = [...finalTransactions].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+            const ascTx = [...finalTransactions].sort((a, b) => {
+                const dayA = new Date(new Date(a.date).toDateString()).getTime();
+                const dayB = new Date(new Date(b.date).toDateString()).getTime();
+                if (dayA !== dayB) return dayA - dayB;
+                // Same day: positive first
+                const aPf = a.quantity > 0 ? 0 : 1;
+                const bPf = b.quantity > 0 ? 0 : 1;
+                if (aPf !== bPf) return aPf - bPf;
+                return (tpLot[a.type] ?? 9) - (tpLot[b.type] ?? 9);
+            });
             const balanced = ascTx.map(tx => {
                 if (!isPendingProduction(tx) && !isUnfulfilledConsumption(tx)) {
                     runningBal += tx.quantity;
@@ -414,8 +454,8 @@ function SkuDetailsPageContent() {
         })();
 
     // Paginated transactions for infinite scroll (only show visibleCount rows)
-    const paginatedTransactions = useMemo(() => 
-        displayTransactions.slice(0, visibleCount), 
+    const paginatedTransactions = useMemo(() =>
+        displayTransactions.slice(0, visibleCount),
         [displayTransactions, visibleCount]
     );
 
@@ -552,439 +592,439 @@ function SkuDetailsPageContent() {
                 {/* Left Column (30%) - Independent Scroll */}
                 <aside className="w-[30%] h-full border-r border-border bg-background shrink-0 flex flex-col overflow-hidden">
                     <div className="flex-1 overflow-y-auto scrollbar-custom">
-                    {/* SKU Hero Section - 3 Column: Image | Tier | Name */}
-                    <div className="px-4 pt-4 pb-4">
-                        <div className="flex items-stretch border border-border overflow-hidden">
-                            {/* Column 1: Image */}
-                            <div className="w-16 h-16 bg-secondary flex items-center justify-center shrink-0 border-r border-border overflow-hidden">
-                                {sku.image ? (
-                                    <img 
-                                        src={sku.image} 
-                                        alt={sku.name} 
-                                        className="w-full h-full object-cover" 
-                                        onError={(e) => { (e.target as HTMLImageElement).src = fallbackImage; }}
-                                    />
-                                ) : (
-                                    <img src={fallbackImage} alt="Fallback" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                                )}
-                            </div>
-                            {/* Column 2: Tier */}
-                            {!!sku.tier && (
-                                <div className={cn(
-                                    "w-10 flex items-center justify-center shrink-0 border-r border-border",
-                                    sku.tier === 1 ? "bg-emerald-500" :
-                                    sku.tier === 2 ? "bg-blue-500" :
-                                    "bg-orange-500"
-                                )}>
-                                    <span className="text-sm font-black text-white">{sku.tier}</span>
+                        {/* SKU Hero Section - 3 Column: Image | Tier | Name */}
+                        <div className="px-4 pt-4 pb-4">
+                            <div className="flex items-stretch border border-border overflow-hidden">
+                                {/* Column 1: Image */}
+                                <div className="w-16 h-16 bg-secondary flex items-center justify-center shrink-0 border-r border-border overflow-hidden">
+                                    {sku.image ? (
+                                        <img
+                                            src={sku.image}
+                                            alt={sku.name}
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => { (e.target as HTMLImageElement).src = fallbackImage; }}
+                                        />
+                                    ) : (
+                                        <img src={fallbackImage} alt="Fallback" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                                    )}
                                 </div>
-                            )}
-                            {/* Column 3: Name */}
-                            <div className="flex-1 bg-emerald-950/50 flex items-center justify-center px-3 min-w-0">
-                                <h1 className="text-sm font-black text-foreground leading-tight text-center line-clamp-2">{sku.name}</h1>
+                                {/* Column 2: Tier */}
+                                {!!sku.tier && (
+                                    <div className={cn(
+                                        "w-10 flex items-center justify-center shrink-0 border-r border-border",
+                                        sku.tier === 1 ? "bg-emerald-500" :
+                                            sku.tier === 2 ? "bg-blue-500" :
+                                                "bg-orange-500"
+                                    )}>
+                                        <span className="text-sm font-black text-white">{sku.tier}</span>
+                                    </div>
+                                )}
+                                {/* Column 3: Name */}
+                                <div className="flex-1 bg-foreground flex items-center justify-center px-4 min-w-0">
+                                    <h1 className="text-base font-black text-background leading-tight text-center line-clamp-2">{sku.name}</h1>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    {/* Stock Level - Premium */}
-                    <div className="px-4 pb-4 border-b border-border">
-                        <div className={cn(
-                            "relative rounded-lg px-4 py-5 flex flex-col items-center overflow-hidden",
-                            currentStock > (sku.reOrderPoint || 0)
-                                ? "bg-gradient-to-b from-emerald-950/40 to-emerald-950/10 border border-emerald-500/20"
-                                : "bg-gradient-to-b from-orange-950/40 to-orange-950/10 border border-orange-500/20"
-                        )}>
-                            {/* Subtle glow behind number */}
+                        {/* Stock Level - Premium */}
+                        <div className="px-4 pb-4 border-b border-border">
                             <div className={cn(
-                                "absolute inset-0 opacity-20 blur-2xl",
+                                "relative rounded-lg px-4 py-5 flex flex-col items-center overflow-hidden border",
                                 currentStock > (sku.reOrderPoint || 0)
-                                    ? "bg-emerald-500/30"
-                                    : "bg-orange-500/30"
-                            )} />
-                            <div className="relative flex items-center gap-2 mb-2">
+                                    ? "bg-secondary/30 border-emerald-900/40"
+                                    : "bg-secondary/30 border-orange-900/40"
+                            )}>
+                                {/* Subtle glow behind number */}
                                 <div className={cn(
-                                    "w-2 h-2 rounded-full animate-pulse",
-                                    currentStock > (sku.reOrderPoint || 0) ? "bg-emerald-400" : "bg-orange-400"
+                                    "absolute inset-0 opacity-[0.03]",
+                                    currentStock > (sku.reOrderPoint || 0)
+                                        ? "bg-emerald-500"
+                                        : "bg-orange-500"
                                 )} />
-                                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-[0.25em]">Stock Level</label>
-                            </div>
-                            <div className="relative flex items-baseline space-x-2">
-                                <span className={cn(
-                                    "text-4xl font-black tracking-tighter",
-                                    currentStock > (sku.reOrderPoint || 0) ? "text-emerald-400" : "text-orange-400"
-                                )}>
-                                    {currentStock.toLocaleString(undefined, { maximumFractionDigits: 3 })}
-                                </span>
-                                <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{sku.uom || 'Unit'}</span>
-                            </div>
-                            {sku.reOrderPoint != null && sku.reOrderPoint > 0 && (
-                                <p className={cn(
-                                    "relative text-[9px] font-medium mt-2 uppercase tracking-wider",
-                                    currentStock > sku.reOrderPoint ? "text-emerald-500/60" : "text-orange-500/60"
-                                )}>
-                                    {currentStock > sku.reOrderPoint ? '✓ Above' : '⚠ Below'} reorder point ({sku.reOrderPoint.toLocaleString()})
-                                </p>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Warnings Section - stacked flush */}
-                    {(() => {
-                        const pendingTxs = transactions.filter(tx => isPendingProduction(tx));
-                        const unfulfilledTxs = transactions.filter(tx => isUnfulfilledConsumption(tx));
-                        if (pendingTxs.length === 0 && unfulfilledTxs.length === 0) return null;
-                        const pendingQty = pendingTxs.reduce((acc, tx) => acc + tx.quantity, 0);
-                        const unfulfilledQty = unfulfilledTxs.reduce((acc, tx) => acc + Math.abs(tx.quantity), 0);
-                        return (
-                            <div className="px-4 py-2">
-                                {pendingTxs.length > 0 && (
-                                    <div
-                                        className={cn(
-                                            "w-full border-b border-red-500/20 px-4 py-2.5 cursor-pointer transition-colors",
-                                            warningFilter === 'pending' ? "bg-red-500/25 ring-1 ring-red-500/40" : "bg-red-500/10 hover:bg-red-500/20"
-                                        )}
-                                        onClick={() => setWarningFilter(warningFilter === 'pending' ? null : 'pending')}
-                                    >
-                                        <div className="flex items-start space-x-2">
-                                            <AlertTriangle className="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" />
-                                            <div className="flex-1">
-                                                <p className="text-[10px] font-bold text-red-400 uppercase tracking-wide">
-                                                    {pendingTxs.length} Pending/Processing Production{pendingTxs.length > 1 ? 's' : ''}
-                                                </p>
-                                                <p className="text-[9px] text-red-400/70 mt-0.5">
-                                                    <span className="font-mono font-bold">+{pendingQty.toLocaleString()}</span> units not counted until fulfilled
-                                                </p>
-                                            </div>
-                                            {warningFilter === 'pending' && (
-                                                <span className="text-[8px] text-red-400/60 uppercase tracking-wider font-bold self-center">Filtered</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-                                {unfulfilledTxs.length > 0 && (
-                                    <div
-                                        className={cn(
-                                            "w-full border-b border-red-500/20 px-4 py-2.5 cursor-pointer transition-colors",
-                                            warningFilter === 'unfulfilled' ? "bg-red-500/25 ring-1 ring-red-500/40" : "bg-red-500/10 hover:bg-red-500/20"
-                                        )}
-                                        onClick={() => setWarningFilter(warningFilter === 'unfulfilled' ? null : 'unfulfilled')}
-                                    >
-                                        <div className="flex items-start space-x-2">
-                                            <AlertTriangle className="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" />
-                                            <div className="flex-1">
-                                                <p className="text-[10px] font-bold text-red-400 uppercase tracking-wide">
-                                                    {unfulfilledTxs.length} Unfulfilled Consumption{unfulfilledTxs.length > 1 ? 's' : ''}
-                                                </p>
-                                                <p className="text-[9px] text-red-400/70 mt-0.5">
-                                                    <span className="font-mono font-bold">{unfulfilledQty.toLocaleString()}</span> units not counted until fulfilled
-                                                </p>
-                                            </div>
-                                            {warningFilter === 'unfulfilled' && (
-                                                <span className="text-[8px] text-red-400/60 uppercase tracking-wider font-bold self-center">Filtered</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })()}
-
-                    {/* Lots Summary Section */}
-                    {lots.length > 0 && (
-                        <div className="p-4 bg-background border-b border-border">
-                            <h3 className="text-xs font-bold text-foreground uppercase tracking-wider mb-3 border-b border-border pb-2">Lot Inventory</h3>
-                            <div className="overflow-hidden">
-                                <table className="w-full text-left">
-                                    <thead>
-                                        <tr className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
-                                            <th className="pb-2">Lot #</th>
-                                            <th className="pb-2">Type</th>
-                                            <th className="pb-2">Date</th>
-                                            <th className="pb-2 text-right">Cost</th>
-                                            <th className="pb-2 text-right">Balance</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-border">
-                                        {lots.filter(l => Math.abs(l.balance) >= 1).map((lot, idx) => (
-                                            <tr 
-                                                key={lot.lotNumber} 
-                                                className={cn(
-                                                    "text-[11px] hover:bg-secondary/50 cursor-pointer transition-colors",
-                                                    selectedLot === lot.lotNumber && "bg-primary/10 hover:bg-primary/15"
-                                                )}
-                                                onClick={() => setSelectedLot(selectedLot === lot.lotNumber ? 'All' : lot.lotNumber)}
-                                            >
-                                                <td className="py-1.5 font-mono font-medium text-foreground truncate max-w-[80px]" title={lot.lotNumber}>
-                                                    {lot.lotNumber.length > 15 ? lot.lotNumber.substring(0, 15) + '...' : lot.lotNumber}
-                                                </td>
-                                                <td className="py-1.5 text-muted-foreground truncate max-w-[60px]" title={lot.source}>
-                                                    {lot.source === 'Opening Balance' ? 'OB' : 
-                                                     lot.source === 'Manufacturing' ? 'MFG' : 
-                                                     lot.source === 'Audit Adjustment' ? 'ADJ' : 
-                                                     lot.source.startsWith('PO') ? 'PO' : lot.source.substring(0, 8)}
-                                                </td>
-                                                <td className="py-1.5 text-muted-foreground font-mono">
-                                                    {lot.date ? new Date(lot.date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) : '-'}
-                                                </td>
-                                                <td className="py-1.5 text-right font-mono text-muted-foreground">
-                                                    {lot.cost > 0 ? `$${lot.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}` : '-'}
-                                                </td>
-                                                <td className={cn(
-                                                    "py-1.5 text-right font-mono font-bold",
-                                                    lot.balance > 0 ? "text-emerald-500" : lot.balance < 0 ? "text-rose-500" : "text-muted-foreground"
-                                                )}>
-                                                    {lot.balance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Linked Web Products Section */}
-                    {(linkedWebProducts.length > 0 || loadingLinkedProducts) && (
-                        <div className="p-4 bg-background border-b border-border">
-                            <div className="flex items-center justify-between mb-3 border-b border-border pb-2">
-                                <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
-                                    <Link className="w-3.5 h-3.5 text-indigo-400" />
-                                    Web Products
-                                    <span className="text-[9px] font-medium text-muted-foreground/60 normal-case tracking-normal">
-                                        ({linkedWebProducts.length})
-                                    </span>
-                                </h3>
-                            </div>
-                            {loadingLinkedProducts ? (
-                                <div className="flex items-center justify-center py-4">
-                                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                                    <span className="text-[10px] text-muted-foreground ml-2">Loading…</span>
+                                <div className="relative flex items-center gap-2 mb-2">
+                                    <div className={cn(
+                                        "w-2 h-2 rounded-full animate-pulse",
+                                        currentStock > (sku.reOrderPoint || 0) ? "bg-emerald-400" : "bg-orange-400"
+                                    )} />
+                                    <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-[0.25em]">Stock Level</label>
                                 </div>
-                            ) : (
-                                <div className="space-y-1">
-                                    {linkedWebProducts.map((wp) => (
-                                        <div
-                                            key={wp._id}
-                                            className="group flex items-center gap-2 px-2 py-1.5 rounded hover:bg-secondary/50 transition-all cursor-pointer relative"
-                                            onClick={() => router.push(`/warehouse/web-products?search=${encodeURIComponent(wp.name)}`)}
-                                        >
-                                            {/* Image */}
-                                            {wp.image ? (
-                                                <img
-                                                    src={wp.image}
-                                                    alt=""
-                                                    className="w-7 h-7 rounded object-cover border border-border shrink-0"
-                                                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                                                />
-                                            ) : (
-                                                <div className="w-7 h-7 rounded bg-secondary flex items-center justify-center shrink-0 border border-border">
-                                                    <Globe className="w-3 h-3 text-muted-foreground/50" />
-                                                </div>
-                                            )}
+                                <div className="relative flex items-baseline space-x-2">
+                                    <span className={cn(
+                                        "text-5xl font-black tracking-tighter",
+                                        currentStock > (sku.reOrderPoint || 0) ? "text-emerald-400" : "text-orange-400"
+                                    )}>
+                                        {currentStock.toLocaleString(undefined, { maximumFractionDigits: 3 })}
+                                    </span>
+                                    <span className="text-[13px] font-bold text-muted-foreground uppercase tracking-widest">{sku.uom || 'Unit'}</span>
+                                </div>
+                                {sku.reOrderPoint != null && sku.reOrderPoint > 0 && (
+                                    <p className={cn(
+                                        "relative text-[9px] font-medium mt-2 uppercase tracking-wider",
+                                        currentStock > sku.reOrderPoint ? "text-emerald-500/60" : "text-orange-500/60"
+                                    )}>
+                                        {currentStock > sku.reOrderPoint ? '✓ Above' : '⚠ Below'} reorder point ({sku.reOrderPoint.toLocaleString()})
+                                    </p>
+                                )}
+                            </div>
+                        </div>
 
-                                            {/* Content */}
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-1.5">
-                                                    {/* Website badge */}
-                                                    {wp.website && (
-                                                        <span className="text-[7px] font-black uppercase tracking-wider px-1 py-px rounded bg-indigo-500/10 text-indigo-400/80 border border-indigo-500/15 shrink-0">
-                                                            {wp.website.length > 12 ? wp.website.substring(0, 12) : wp.website}
-                                                        </span>
-                                                    )}
-                                                    <p className="text-[9px] font-bold text-foreground truncate leading-none" title={wp.name}>
-                                                        {wp.name}
+                        {/* Warnings Section - stacked flush */}
+                        {(() => {
+                            const pendingTxs = transactions.filter(tx => isPendingProduction(tx));
+                            const unfulfilledTxs = transactions.filter(tx => isUnfulfilledConsumption(tx));
+                            if (pendingTxs.length === 0 && unfulfilledTxs.length === 0) return null;
+                            const pendingQty = pendingTxs.reduce((acc, tx) => acc + tx.quantity, 0);
+                            const unfulfilledQty = unfulfilledTxs.reduce((acc, tx) => acc + Math.abs(tx.quantity), 0);
+                            return (
+                                <div className="px-4 py-2">
+                                    {pendingTxs.length > 0 && (
+                                        <div
+                                            className={cn(
+                                                "w-full border px-5 py-4 cursor-pointer transition-all rounded-md mb-3 shadow-md",
+                                                warningFilter === 'pending' ? "bg-rose-600 border-rose-500 ring-2 ring-rose-500 ring-offset-1 ring-offset-background" : "bg-rose-500 border-rose-600 hover:bg-rose-600"
+                                            )}
+                                            onClick={() => setWarningFilter(warningFilter === 'pending' ? null : 'pending')}
+                                        >
+                                            <div className="flex items-start space-x-3">
+                                                <AlertTriangle className="w-5 h-5 text-white shrink-0" />
+                                                <div className="flex-1">
+                                                    <p className="text-sm font-black text-white uppercase tracking-wide">
+                                                        {pendingTxs.length} Pending/Processing Production{pendingTxs.length > 1 ? 's' : ''}
+                                                    </p>
+                                                    <p className="text-xs text-rose-100 mt-1 font-medium">
+                                                        <span className="font-mono font-bold">+{pendingQty.toLocaleString()}</span> units not counted until fulfilled
                                                     </p>
                                                 </div>
-                                                <div className="flex items-center gap-1 mt-0.5">
-                                                    {/* Status */}
-                                                    <span className={cn(
-                                                        "text-[7px] font-bold uppercase tracking-wider px-1 py-px rounded shrink-0",
-                                                        wp.status === 'publish' ? 'bg-emerald-500/10 text-emerald-500/80' :
-                                                        wp.status === 'draft' ? 'bg-amber-500/10 text-amber-500/80' :
-                                                        'bg-secondary text-muted-foreground/60'
-                                                    )}>
-                                                        {wp.status || '?'}
-                                                    </span>
-                                                    {/* Type */}
-                                                    <span className={cn(
-                                                        "text-[7px] font-bold uppercase tracking-wider px-1 py-px rounded shrink-0",
-                                                        wp.type === 'variable' ? 'bg-purple-500/10 text-purple-400/80' : 'bg-blue-500/10 text-blue-400/80'
-                                                    )}>
-                                                        {wp.type || 'simple'}
-                                                    </span>
-                                                    {/* Linked variations inline */}
-                                                    {wp.linkedVariations.length > 0 && (
-                                                        <>
-                                                            <span className="text-[7px] text-muted-foreground/30">→</span>
-                                                            {wp.linkedVariations.slice(0, 2).map((v) => (
-                                                                <span key={v._id} className="text-[8px] text-muted-foreground/60 truncate max-w-[60px]" title={v.name || v.sku}>
-                                                                    {v.name || v.sku || `#${v.id}`}
-                                                                </span>
-                                                            ))}
-                                                            {wp.linkedVariations.length > 2 && (
-                                                                <span className="text-[8px] text-muted-foreground/40">+{wp.linkedVariations.length - 2}</span>
-                                                            )}
-                                                        </>
-                                                    )}
-                                                </div>
+                                                {warningFilter === 'pending' && (
+                                                    <span className="text-[10px] text-white uppercase tracking-wider font-extrabold self-center bg-black/20 px-2 py-0.5 rounded">Filtered</span>
+                                                )}
                                             </div>
-
-                                            {/* Right: Price + Orders */}
-                                            <div className="shrink-0 text-right">
-                                                <p className="text-[10px] font-bold text-foreground font-mono leading-none">
-                                                    {wp.price != null ? `$${wp.price.toFixed(2)}` : '-'}
-                                                </p>
-                                                <p className="text-[8px] text-muted-foreground/50 font-mono mt-0.5">
-                                                    {wp.totalWebOrders || 0} ord
-                                                </p>
-                                            </div>
-
-                                            {/* External link */}
-                                            {wp.permalink && (
-                                                <a
-                                                    href={wp.permalink}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    className="p-0.5 hover:bg-secondary rounded transition-all opacity-0 group-hover:opacity-100 shrink-0"
-                                                    title="Open in store"
-                                                >
-                                                    <ExternalLink className="w-2.5 h-2.5 text-muted-foreground hover:text-indigo-400" />
-                                                </a>
+                                        </div>
+                                    )}
+                                    {unfulfilledTxs.length > 0 && (
+                                        <div
+                                            className={cn(
+                                                "w-full border px-5 py-4 cursor-pointer transition-all rounded-md mb-3 shadow-md",
+                                                warningFilter === 'unfulfilled' ? "bg-rose-600 border-rose-500 ring-2 ring-rose-500 ring-offset-1 ring-offset-background" : "bg-rose-500 border-rose-600 hover:bg-rose-600"
                                             )}
+                                            onClick={() => setWarningFilter(warningFilter === 'unfulfilled' ? null : 'unfulfilled')}
+                                        >
+                                            <div className="flex items-start space-x-3">
+                                                <AlertTriangle className="w-5 h-5 text-white shrink-0" />
+                                                <div className="flex-1">
+                                                    <p className="text-sm font-black text-white uppercase tracking-wide">
+                                                        {unfulfilledTxs.length} Unfulfilled Consumption{unfulfilledTxs.length > 1 ? 's' : ''}
+                                                    </p>
+                                                    <p className="text-xs text-rose-100 mt-1 font-medium">
+                                                        <span className="font-mono font-bold">{unfulfilledQty.toLocaleString()}</span> units not counted until fulfilled
+                                                    </p>
+                                                </div>
+                                                {warningFilter === 'unfulfilled' && (
+                                                    <span className="text-[10px] text-white uppercase tracking-wider font-extrabold self-center bg-black/20 px-2 py-0.5 rounded">Filtered</span>
+                                                )}
+                                            </div>
                                         </div>
-                                    ))}
+                                    )}
                                 </div>
-                            )}
-                        </div>
-                    )}
+                            );
+                        })()}
 
-                    {/* Financial Summary */}
-                    {financials && (
-                        <div className="p-4 bg-background space-y-8">
-                            <h3 className="text-xs font-bold text-foreground uppercase tracking-wider mb-4 border-b border-border pb-2">Financials</h3>
-                            
-                            {/* Tier 1 & 2: Show Revenue, Cost of Sales, Gross Profit */}
-                            {(sku?.tier === 1 || sku?.tier === 2) && (
-                                <div className="space-y-4">
-                                    <div className="flex justify-between items-baseline">
-                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Total Revenue</span>
-                                        <span className="text-sm font-bold text-foreground">${financials.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
-                                    </div>
-                                    <div className="flex justify-between items-baseline">
-                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Cost of Sales</span>
-                                        <span className="text-sm font-medium text-muted-foreground">${financials.costOfSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
-                                    </div>
-                                    <div className="flex justify-between items-baseline pt-2 border-t border-border">
-                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Gross Profit</span>
-                                        <span className={cn("text-sm font-bold", financials.grossProfit >= 0 ? "text-emerald-600" : "text-rose-600")}>
-                                            ${financials.grossProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
+                        {/* Lots Summary Section */}
+                        {lots.length > 0 && (
+                            <div className="p-4 bg-background border-b border-border">
+                                <h3 className="text-sm font-bold text-foreground uppercase tracking-wider mb-3 border-b border-border pb-2">Lot Inventory</h3>
+                                <div className="overflow-hidden">
+                                    <table className="w-full text-left">
+                                        <thead>
+                                            <tr className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                                                <th className="pb-2">Lot #</th>
+                                                <th className="pb-2">Type</th>
+                                                <th className="pb-2">Date</th>
+                                                <th className="pb-2 text-right">Cost</th>
+                                                <th className="pb-2 text-right">Balance</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-border">
+                                            {lots.filter(l => Math.abs(l.balance) >= 1).map((lot, idx) => (
+                                                <tr
+                                                    key={lot.lotNumber}
+                                                    className={cn(
+                                                        "text-sm hover:bg-secondary/50 cursor-pointer transition-colors",
+                                                        selectedLot === lot.lotNumber && "bg-primary/10 hover:bg-primary/15"
+                                                    )}
+                                                    onClick={() => setSelectedLot(selectedLot === lot.lotNumber ? 'All' : lot.lotNumber)}
+                                                >
+                                                    <td className="py-2 font-mono font-medium text-foreground truncate max-w-[160px]" title={lot.lotNumber}>
+                                                        {lot.lotNumber}
+                                                    </td>
+                                                    <td className="py-2 text-muted-foreground truncate max-w-[80px]" title={lot.source}>
+                                                        {lot.source === 'Opening Balance' ? 'OB' :
+                                                            lot.source === 'Manufacturing' ? 'MFG' :
+                                                                lot.source === 'Audit Adjustment' ? 'ADJ' :
+                                                                    lot.source.startsWith('PO') ? 'PO' : lot.source.substring(0, 8)}
+                                                    </td>
+                                                    <td className="py-2 text-muted-foreground font-mono">
+                                                        {lot.date ? new Date(lot.date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) : '-'}
+                                                    </td>
+                                                    <td className="py-2 text-right font-mono text-muted-foreground font-medium text-sm">
+                                                        {lot.cost > 0 ? `$${lot.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                                                    </td>
+                                                    <td className={cn(
+                                                        "py-2 text-right font-mono font-bold",
+                                                        lot.balance > 0 ? "text-emerald-500" : lot.balance < 0 ? "text-rose-500" : "text-muted-foreground"
+                                                    )}>
+                                                        {lot.balance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Linked Web Products Section */}
+                        {(linkedWebProducts.length > 0 || loadingLinkedProducts) && (
+                            <div className="p-4 bg-background border-b border-border">
+                                <div className="flex items-center justify-between mb-3 border-b border-border pb-2">
+                                    <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
+                                        <Link className="w-3.5 h-3.5 text-indigo-400" />
+                                        Web Products
+                                        <span className="text-[9px] font-medium text-muted-foreground/60 normal-case tracking-normal">
+                                            ({linkedWebProducts.length})
                                         </span>
+                                    </h3>
+                                </div>
+                                {loadingLinkedProducts ? (
+                                    <div className="flex items-center justify-center py-4">
+                                        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                                        <span className="text-[10px] text-muted-foreground ml-2">Loading…</span>
                                     </div>
+                                ) : (
+                                    <div className="space-y-1">
+                                        {linkedWebProducts.map((wp) => (
+                                            <div
+                                                key={wp._id}
+                                                className="group flex items-center gap-2 px-2 py-1.5 rounded hover:bg-secondary/50 transition-all cursor-pointer relative"
+                                                onClick={() => router.push(`/warehouse/web-products?search=${encodeURIComponent(wp.name)}`)}
+                                            >
+                                                {/* Image */}
+                                                {wp.image ? (
+                                                    <img
+                                                        src={wp.image}
+                                                        alt=""
+                                                        className="w-7 h-7 rounded object-cover border border-border shrink-0"
+                                                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                                    />
+                                                ) : (
+                                                    <div className="w-7 h-7 rounded bg-secondary flex items-center justify-center shrink-0 border border-border">
+                                                        <Globe className="w-3 h-3 text-muted-foreground/50" />
+                                                    </div>
+                                                )}
 
-                                    <div className="mt-8">
-                                        <h4 className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-4">Last 12 Months Turnover</h4>
-                                        <div className="flex items-end space-x-1 pt-6 h-32">
-                                            {financials.chartData.map((d, i) => {
-                                                const maxRev = Math.max(...financials.chartData.map(c => c.revenue), 100); 
-                                                const heightPct = (d.revenue / maxRev) * 100;
-                                                const monthLabel = d.date ? new Date(d.date + '-01').toLocaleString('en-US', { month: 'short' }) : '';
-                                                return (
-                                                    <div key={i} className="flex-1 h-full flex flex-col group relative">
-                                                        <div className="relative h-full flex flex-col justify-end w-full pb-px px-0.5">
-                                                            <div 
-                                                                className="bg-foreground/80 rounded-t hover:bg-foreground transition-all w-full relative group" 
-                                                                style={{ height: d.revenue > 0 ? `${Math.max(heightPct, 4)}%` : '2px' }}
-                                                            >
-                                                                {d.revenue > 0 ? (
-                                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 flex flex-col items-center pointer-events-none w-max z-10 opacity-100 group-hover:scale-110 transition-transform">
-                                                                        <span className="text-[9px] font-bold text-foreground tracking-tighter">${Math.round(d.revenue).toLocaleString()}</span>
-                                                                        <span className="text-[7px] text-muted-foreground font-medium uppercase">{d.qty || 0}</span>
+                                                {/* Content */}
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-1.5">
+                                                        {/* Website badge */}
+                                                        {wp.website && (
+                                                            <span className="text-[7px] font-black uppercase tracking-wider px-1 py-px rounded bg-indigo-500/10 text-indigo-400/80 border border-indigo-500/15 shrink-0">
+                                                                {wp.website.length > 12 ? wp.website.substring(0, 12) : wp.website}
+                                                            </span>
+                                                        )}
+                                                        <p className="text-[9px] font-bold text-foreground truncate leading-none" title={wp.name}>
+                                                            {wp.name}
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 mt-0.5">
+                                                        {/* Status */}
+                                                        <span className={cn(
+                                                            "text-[7px] font-bold uppercase tracking-wider px-1 py-px rounded shrink-0",
+                                                            wp.status === 'publish' ? 'bg-emerald-500/10 text-emerald-500/80' :
+                                                                wp.status === 'draft' ? 'bg-amber-500/10 text-amber-500/80' :
+                                                                    'bg-secondary text-muted-foreground/60'
+                                                        )}>
+                                                            {wp.status || '?'}
+                                                        </span>
+                                                        {/* Type */}
+                                                        <span className={cn(
+                                                            "text-[7px] font-bold uppercase tracking-wider px-1 py-px rounded shrink-0",
+                                                            wp.type === 'variable' ? 'bg-purple-500/10 text-purple-400/80' : 'bg-blue-500/10 text-blue-400/80'
+                                                        )}>
+                                                            {wp.type || 'simple'}
+                                                        </span>
+                                                        {/* Linked variations inline */}
+                                                        {wp.linkedVariations.length > 0 && (
+                                                            <>
+                                                                <span className="text-[7px] text-muted-foreground/30">→</span>
+                                                                {wp.linkedVariations.slice(0, 2).map((v) => (
+                                                                    <span key={v._id} className="text-[8px] text-muted-foreground/60 truncate max-w-[60px]" title={v.name || v.sku}>
+                                                                        {v.name || v.sku || `#${v.id}`}
+                                                                    </span>
+                                                                ))}
+                                                                {wp.linkedVariations.length > 2 && (
+                                                                    <span className="text-[8px] text-muted-foreground/40">+{wp.linkedVariations.length - 2}</span>
+                                                                )}
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Right: Price + Orders */}
+                                                <div className="shrink-0 text-right">
+                                                    <p className="text-[10px] font-bold text-foreground font-mono leading-none">
+                                                        {wp.price != null ? `$${wp.price.toFixed(2)}` : '-'}
+                                                    </p>
+                                                    <p className="text-[8px] text-muted-foreground/50 font-mono mt-0.5">
+                                                        {wp.totalWebOrders || 0} ord
+                                                    </p>
+                                                </div>
+
+                                                {/* External link */}
+                                                {wp.permalink && (
+                                                    <a
+                                                        href={wp.permalink}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="p-0.5 hover:bg-secondary rounded transition-all opacity-0 group-hover:opacity-100 shrink-0"
+                                                        title="Open in store"
+                                                    >
+                                                        <ExternalLink className="w-2.5 h-2.5 text-muted-foreground hover:text-indigo-400" />
+                                                    </a>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Financial Summary */}
+                        {financials && (
+                            <div className="p-4 bg-background space-y-8">
+                                <h3 className="text-xs font-bold text-foreground uppercase tracking-wider mb-4 border-b border-border pb-2">Financials</h3>
+
+                                {/* Tier 1 & 2: Show Revenue, Cost of Sales, Gross Profit */}
+                                {(sku?.tier === 1 || sku?.tier === 2) && (
+                                    <div className="space-y-4">
+                                        <div className="flex justify-between items-baseline">
+                                            <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">Total Revenue</span>
+                                            <span className="text-base font-black text-foreground">${financials.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        </div>
+                                        <div className="flex justify-between items-baseline">
+                                            <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">Cost of Sales</span>
+                                            <span className="text-base font-medium text-muted-foreground">${financials.costOfSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        </div>
+                                        <div className="flex justify-between items-baseline pt-2 border-t border-border">
+                                            <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">Gross Profit</span>
+                                            <span className={cn("text-base font-black", financials.grossProfit >= 0 ? "text-emerald-600" : "text-rose-600")}>
+                                                ${financials.grossProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </span>
+                                        </div>
+
+                                        <div className="mt-8">
+                                            <h4 className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-4">Last 12 Months Turnover</h4>
+                                            <div className="flex items-end space-x-1 pt-6 h-32">
+                                                {financials.chartData.map((d, i) => {
+                                                    const maxRev = Math.max(...financials.chartData.map(c => c.revenue), 100);
+                                                    const heightPct = (d.revenue / maxRev) * 100;
+                                                    const monthLabel = d.date ? new Date(d.date + '-01').toLocaleString('en-US', { month: 'short' }) : '';
+                                                    return (
+                                                        <div key={i} className="flex-1 h-full flex flex-col group relative">
+                                                            <div className="relative h-full flex flex-col justify-end w-full pb-px px-0.5">
+                                                                <div
+                                                                    className="bg-foreground/80 rounded-t hover:bg-foreground transition-all w-full relative group"
+                                                                    style={{ height: d.revenue > 0 ? `${Math.max(heightPct, 4)}%` : '2px' }}
+                                                                >
+                                                                    {d.revenue > 0 ? (
+                                                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 flex flex-col items-center pointer-events-none w-max z-10 opacity-100 group-hover:scale-110 transition-transform">
+                                                                            <span className="text-[9px] font-bold text-foreground tracking-tighter">${Math.round(d.revenue).toLocaleString()}</span>
+                                                                            <span className="text-[7px] text-muted-foreground font-medium uppercase">{d.qty || 0}</span>
+                                                                        </div>
+                                                                    ) : null}
+                                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-8 hidden group-hover:block z-30 bg-black text-white text-[9px] px-2 py-1 rounded whitespace-nowrap shadow-xl">
+                                                                        <p className="font-bold border-b border-white/20 mb-1">{d.date}</p>
+                                                                        <p>Rev: ${d.revenue.toLocaleString()}</p>
+                                                                        <p>Qty: {d.qty} units</p>
                                                                     </div>
-                                                                ) : null}
-                                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-8 hidden group-hover:block z-30 bg-black text-white text-[9px] px-2 py-1 rounded whitespace-nowrap shadow-xl">
-                                                                    <p className="font-bold border-b border-white/20 mb-1">{d.date}</p>
-                                                                    <p>Rev: ${d.revenue.toLocaleString()}</p>
-                                                                    <p>Qty: {d.qty} units</p>
                                                                 </div>
                                                             </div>
+                                                            <div className="text-[7px] text-muted-foreground font-medium text-center mt-1 uppercase tracking-tight">{monthLabel}</div>
                                                         </div>
-                                                        <div className="text-[7px] text-muted-foreground font-medium text-center mt-1 uppercase tracking-tight">{monthLabel}</div>
-                                                    </div>
-                                                );
-                                            })}
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            )}
+                                )}
 
-                            {/* Tier 2: Also show COGM, COGP and Manufacturing Chart */}
-                            {sku?.tier === 2 && (
-                                <div className="pt-8 border-t border-border space-y-4">
-                                    <div className="flex justify-between items-baseline">
-                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">COGM</span>
-                                        <span className="text-sm font-bold text-foreground">${(financials.cogm || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
-                                    </div>
-                                    <div className="flex justify-between items-baseline">
-                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">COGP</span>
-                                        <span className="text-sm font-medium text-muted-foreground">${(financials.cogp || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
-                                    </div>
+                                {/* Tier 2: Also show COGM, COGP and Manufacturing Chart */}
+                                {sku?.tier === 2 && (
+                                    <div className="pt-8 border-t border-border space-y-4">
+                                        <div className="flex justify-between items-baseline">
+                                            <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">COGM</span>
+                                            <span className="text-base font-black text-foreground">${(financials.cogm || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        </div>
+                                        <div className="flex justify-between items-baseline">
+                                            <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">COGP</span>
+                                            <span className="text-base font-medium text-muted-foreground">${(financials.cogp || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        </div>
 
-                                    <div className="mt-8">
-                                        <h4 className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-4">Last 12 Months Manufacturing</h4>
-                                        <div className="flex items-end space-x-1 pt-6 h-32">
-                                            {financials.chartData.map((d, i) => {
-                                                const maxQty = Math.max(...financials.chartData.map(c => c.productionQty || 0), 10); 
-                                                const heightPct = ((d.productionQty || 0) / maxQty) * 100;
-                                                const monthLabel = d.date ? new Date(d.date + '-01').toLocaleString('en-US', { month: 'short' }) : '';
-                                                return (
-                                                    <div key={i} className="flex-1 h-full flex flex-col group relative">
-                                                        <div className="relative h-full flex flex-col justify-end w-full pb-px px-0.5">
-                                                            <div 
-                                                                className="bg-orange-500 rounded-t hover:bg-orange-600 transition-all w-full relative group" 
-                                                                style={{ height: d.productionQty && d.productionQty > 0 ? `${Math.max(heightPct, 4)}%` : '2px' }}
-                                                            >
-                                                                {d.productionQty && d.productionQty > 0 ? (
-                                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 flex flex-col items-center pointer-events-none w-max z-10 opacity-100 group-hover:scale-110 transition-transform">
-                                                                        <span className="text-[9px] font-bold text-orange-700 tracking-tighter">{d.productionQty.toLocaleString()}</span>
+                                        <div className="mt-8">
+                                            <h4 className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-4">Last 12 Months Manufacturing</h4>
+                                            <div className="flex items-end space-x-1 pt-6 h-32">
+                                                {financials.chartData.map((d, i) => {
+                                                    const maxQty = Math.max(...financials.chartData.map(c => c.productionQty || 0), 10);
+                                                    const heightPct = ((d.productionQty || 0) / maxQty) * 100;
+                                                    const monthLabel = d.date ? new Date(d.date + '-01').toLocaleString('en-US', { month: 'short' }) : '';
+                                                    return (
+                                                        <div key={i} className="flex-1 h-full flex flex-col group relative">
+                                                            <div className="relative h-full flex flex-col justify-end w-full pb-px px-0.5">
+                                                                <div
+                                                                    className="bg-orange-500 rounded-t hover:bg-orange-600 transition-all w-full relative group"
+                                                                    style={{ height: d.productionQty && d.productionQty > 0 ? `${Math.max(heightPct, 4)}%` : '2px' }}
+                                                                >
+                                                                    {d.productionQty && d.productionQty > 0 ? (
+                                                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 flex flex-col items-center pointer-events-none w-max z-10 opacity-100 group-hover:scale-110 transition-transform">
+                                                                            <span className="text-[9px] font-bold text-orange-700 tracking-tighter">{d.productionQty.toLocaleString()}</span>
+                                                                        </div>
+                                                                    ) : null}
+                                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-8 hidden group-hover:block z-30 bg-black text-white text-[9px] px-2 py-1 rounded whitespace-nowrap shadow-xl">
+                                                                        <p className="font-bold border-b border-white/20 mb-1">{d.date}</p>
+                                                                        <p>Prod: {d.productionQty?.toLocaleString()} units</p>
+                                                                        <p>Cost: ${d.productionCost?.toLocaleString()}</p>
                                                                     </div>
-                                                                ) : null}
-                                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-8 hidden group-hover:block z-30 bg-black text-white text-[9px] px-2 py-1 rounded whitespace-nowrap shadow-xl">
-                                                                    <p className="font-bold border-b border-white/20 mb-1">{d.date}</p>
-                                                                    <p>Prod: {d.productionQty?.toLocaleString()} units</p>
-                                                                    <p>Cost: ${d.productionCost?.toLocaleString()}</p>
                                                                 </div>
                                                             </div>
+                                                            <div className="text-[7px] text-muted-foreground font-medium text-center mt-1 uppercase tracking-tight">{monthLabel}</div>
                                                         </div>
-                                                        <div className="text-[7px] text-muted-foreground font-medium text-center mt-1 uppercase tracking-tight">{monthLabel}</div>
-                                                    </div>
-                                                );
-                                            })}
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            )}
+                                )}
 
-                            {/* Tier 3: Show COGP (Raw Materials are purchased) */}
-                            {sku?.tier === 3 && (
-                                <div className="space-y-4">
-                                    <div className="flex justify-between items-baseline">
-                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">COGP</span>
-                                        <span className="text-sm font-bold text-foreground">${(financials.cogp || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
+                                {/* Tier 3: Show COGP (Raw Materials are purchased) */}
+                                {sku?.tier === 3 && (
+                                    <div className="space-y-4">
+                                        <div className="flex justify-between items-baseline">
+                                            <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">COGP</span>
+                                            <span className="text-base font-black text-foreground">${(financials.cogp || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        </div>
+                                        <p className="text-[10px] text-muted-foreground italic">Raw material - consumed in manufacturing only</p>
                                     </div>
-                                    <p className="text-[9px] text-muted-foreground italic">Raw material - consumed in manufacturing only</p>
-                                </div>
-                            )}
-                            <div className="h-4" />
-                        </div>
-                    )}
+                                )}
+                                <div className="h-4" />
+                            </div>
+                        )}
                     </div>
 
                     {/* Action Buttons at bottom */}
                     <div className="border-t border-border px-4 py-4 shrink-0 flex items-center gap-2">
                         <button
                             onClick={handleEditSku}
-                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-secondary text-foreground border border-border hover:bg-secondary/80 transition-colors cursor-pointer"
+                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-foreground transition-colors cursor-pointer rounded bg-secondary hover:bg-secondary/80 border border-border shadow-[0_1px_4px_rgba(0,0,0,0.15)]"
                         >
                             <Pencil className="w-3.5 h-3.5" />
                             <span>Edit</span>
@@ -992,7 +1032,7 @@ function SkuDetailsPageContent() {
                         <button
                             onClick={handleDeleteSku}
                             disabled={isDeleting}
-                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors cursor-pointer disabled:opacity-50"
+                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-bold uppercase tracking-widest bg-red-600 text-white rounded hover:bg-red-700 transition-colors cursor-pointer disabled:opacity-50 inline-flex shadow-[0_1px_4px_rgba(0,0,0,0.15)]"
                         >
                             <Trash2 className="w-3.5 h-3.5" />
                             <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
@@ -1028,18 +1068,18 @@ function SkuDetailsPageContent() {
                                     <div className="absolute left-0 top-full mt-2 w-64 bg-card border border-border rounded-lg shadow-2xl z-[100] p-4 animate-in fade-in zoom-in duration-200">
                                         <div className="space-y-4">
                                             <div>
-                                                <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-2">Date Range</label>
+                                                <label className="text-xs font-bold text-muted-foreground uppercase block mb-2">Date Range</label>
                                                 <div className="grid grid-cols-2 gap-2">
-                                                    <input type="date" value={filters.fromDate} onChange={(e) => setFilters(prev => ({...prev, fromDate: e.target.value}))} className="w-full text-[10px] border border-border rounded px-2 py-1 bg-background text-foreground" />
-                                                    <input type="date" value={filters.toDate} onChange={(e) => setFilters(prev => ({...prev, toDate: e.target.value}))} className="w-full text-[10px] border border-border rounded px-2 py-1 bg-background text-foreground" />
+                                                    <input type="date" value={filters.fromDate} onChange={(e) => setFilters(prev => ({ ...prev, fromDate: e.target.value }))} className="w-full text-xs font-medium border border-border rounded px-2 py-1.5 bg-background text-foreground" />
+                                                    <input type="date" value={filters.toDate} onChange={(e) => setFilters(prev => ({ ...prev, toDate: e.target.value }))} className="w-full text-xs font-medium border border-border rounded px-2 py-1.5 bg-background text-foreground" />
                                                 </div>
                                             </div>
                                             <div>
-                                                <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-2">Lot Selection</label>
-                                                <SearchableSelect options={[{ label: 'All Lots', value: 'All' }, ...uniqueLots.map(l => ({ label: l!, value: l! }))]} value={selectedLot} onChange={(val) => setSelectedLot(val)} placeholder="Select Lot..." triggerClassName="py-1 text-[10px] border-slate-200" />
+                                                <label className="text-xs font-bold text-muted-foreground uppercase block mb-2">Lot Selection</label>
+                                                <SearchableSelect options={[{ label: 'All Lots', value: 'All' }, ...uniqueLots.map(l => ({ label: l!, value: l! }))]} value={selectedLot} onChange={(val) => setSelectedLot(val)} placeholder="Select Lot..." triggerClassName="py-1.5 text-xs font-medium border-border" />
                                             </div>
                                             <div>
-                                                <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-3">Transaction Types</label>
+                                                <label className="text-xs font-bold text-muted-foreground uppercase block mb-3">Transaction Types</label>
                                                 <div className="space-y-2">
                                                     {[
                                                         { label: 'Opening Bal.', key: 'showOpeningBalance' as const, icon: <History className="w-3 h-3 text-purple-500" /> },
@@ -1053,52 +1093,52 @@ function SkuDetailsPageContent() {
                                                         <label key={t.key} className="flex items-center justify-between group cursor-pointer">
                                                             <div className="flex items-center space-x-2">
                                                                 {t.icon}
-                                                                <span className="text-[10px] font-medium text-muted-foreground group-hover:text-foreground transition-colors uppercase tracking-tight">{t.label}</span>
+                                                                <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors uppercase tracking-tight">{t.label}</span>
                                                             </div>
-                                                            <input 
-                                                                type="checkbox" 
-                                                                checked={filters[t.key]} 
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={filters[t.key]}
                                                                 onChange={() => setFilters(prev => ({ ...prev, [t.key]: !prev[t.key] }))}
-                                                                className="w-3 h-3 rounded border-border text-foreground focus:ring-primary"
+                                                                className="w-4 h-4 rounded border-border text-foreground focus:ring-primary"
                                                             />
                                                         </label>
                                                     ))}
                                                 </div>
                                             </div>
                                             <div>
-                                                <label className="text-[9px] font-bold text-muted-foreground uppercase block mb-3">Special Filters</label>
+                                                <label className="text-xs font-bold text-muted-foreground uppercase block mb-3">Special Filters</label>
                                                 <div className="space-y-2">
                                                     <label className="flex items-center justify-between group cursor-pointer">
                                                         <div className="flex items-center space-x-2">
-                                                            <AlertCircle className="w-3 h-3 text-amber-500" />
-                                                            <span className="text-[10px] font-medium text-muted-foreground group-hover:text-foreground transition-colors uppercase tracking-tight">No Lot #</span>
+                                                            <AlertCircle className="w-4 h-4 text-amber-500" />
+                                                            <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors uppercase tracking-tight">No Lot #</span>
                                                         </div>
-                                                        <input 
-                                                            type="checkbox" 
-                                                            checked={filters.showOnlyNoLot} 
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={filters.showOnlyNoLot}
                                                             onChange={() => setFilters(prev => ({ ...prev, showOnlyNoLot: !prev.showOnlyNoLot }))}
-                                                            className="w-3 h-3 rounded border-border text-amber-500 focus:ring-amber-500"
+                                                            className="w-4 h-4 rounded border-border text-amber-500 focus:ring-amber-500"
                                                         />
                                                     </label>
                                                     <label className="flex items-center justify-between group cursor-pointer">
                                                         <div className="flex items-center space-x-2">
-                                                            <DollarSign className="w-3 h-3 text-rose-500" />
-                                                            <span className="text-[10px] font-medium text-muted-foreground group-hover:text-foreground transition-colors uppercase tracking-tight">No Cost</span>
+                                                            <DollarSign className="w-4 h-4 text-rose-500" />
+                                                            <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors uppercase tracking-tight">No Cost</span>
                                                         </div>
-                                                        <input 
-                                                            type="checkbox" 
-                                                            checked={filters.showOnlyNoCost} 
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={filters.showOnlyNoCost}
                                                             onChange={() => setFilters(prev => ({ ...prev, showOnlyNoCost: !prev.showOnlyNoCost }))}
-                                                            className="w-3 h-3 rounded border-border text-rose-500 focus:ring-rose-500"
+                                                            className="w-4 h-4 rounded border-border text-rose-500 focus:ring-rose-500"
                                                         />
                                                     </label>
                                                 </div>
                                             </div>
                                             <div className="pt-2 border-t border-border flex justify-end">
-                                                <button 
+                                                <button
                                                     onClick={() => {
                                                         const defaultFilters = {
-                                                            fromDate: '', toDate: '', 
+                                                            fromDate: '', toDate: '',
                                                             showOpeningBalance: true, showProduction: true, showConsumption: true,
                                                             showPurchaseOrders: true, showSaleOrders: true, showWebOrders: true, showAuditAdjustments: true,
                                                             showOnlyNoLot: false, showOnlyNoCost: false
@@ -1108,7 +1148,7 @@ function SkuDetailsPageContent() {
                                                         localStorage.removeItem(`sku_filters_${id}`);
                                                         localStorage.removeItem(`sku_lot_${id}`);
                                                     }}
-                                                    className="text-[9px] font-bold text-muted-foreground hover:text-foreground uppercase"
+                                                    className="text-xs font-bold text-muted-foreground hover:text-foreground uppercase"
                                                 >
                                                     Reset All
                                                 </button>
@@ -1116,7 +1156,7 @@ function SkuDetailsPageContent() {
                                         </div>
                                     </div>
                                 )}
-                        </div>
+                            </div>
                         </div>
                         <div className="flex items-center space-x-2">
                             {(() => {
@@ -1124,14 +1164,14 @@ function SkuDetailsPageContent() {
                                 const totalQty = countable.reduce((acc, tx) => acc + tx.quantity, 0);
                                 return (
                                     <>
-                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                                            {paginatedTransactions.length === displayTransactions.length 
-                                                ? `${countable.length} Records` 
+                                        <span className="text-sm font-bold text-muted-foreground uppercase tracking-widest">
+                                            {paginatedTransactions.length === displayTransactions.length
+                                                ? `${countable.length} Records`
                                                 : `${Math.min(paginatedTransactions.length, countable.length)} of ${countable.length} Records`}
                                         </span>
-                                        <span className="text-[10px] text-muted-foreground/50">|</span>
+                                        <span className="text-sm text-muted-foreground/50">|</span>
                                         <span className={cn(
-                                            "text-[10px] font-bold font-mono",
+                                            "text-sm font-bold font-mono",
                                             totalQty > 0 ? "text-emerald-600" : "text-rose-600"
                                         )}>
                                             {totalQty > 0 ? '+' : ''}
@@ -1145,36 +1185,36 @@ function SkuDetailsPageContent() {
 
                     {/* Nested Sticky Layer 2: Table Header (Pinned exactly below toolbar) */}
                     <table className="w-full text-left border-collapse">
-                        <thead className="sticky top-10 z-[20] bg-secondary/90 backdrop-blur-sm border-b border-border">
+                        <thead className="sticky top-10 z-[20] bg-secondary border-b border-border">
                             <tr>
-                                <th className="px-3 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border">Date</th>
-                                <th className="px-3 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border">Type</th>
-                                <th className="px-3 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border">Reference</th>
-                                <th className="px-3 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border">Lot #</th>
-                                <th className="px-3 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-right border-r border-border">In/Out</th>
-                                <th className="px-3 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border">Status</th>
-                                <th className="px-3 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-right border-r border-border">Balance</th>
-                                <th className="px-3 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-right">Cost</th>
+                                <th className="px-3 py-3 text-xs font-bold text-muted-foreground uppercase tracking-widest border-r border-border">Date</th>
+                                <th className="px-3 py-3 text-xs font-bold text-muted-foreground uppercase tracking-widest border-r border-border">Type</th>
+                                <th className="px-3 py-3 text-xs font-bold text-muted-foreground uppercase tracking-widest border-r border-border">Reference</th>
+                                <th className="px-3 py-3 text-xs font-bold text-muted-foreground uppercase tracking-widest border-r border-border">Lot #</th>
+                                <th className="px-3 py-3 text-xs font-bold text-muted-foreground uppercase tracking-widest text-right border-r border-border">In/Out</th>
+                                <th className="px-3 py-3 text-xs font-bold text-muted-foreground uppercase tracking-widest border-r border-border">Status</th>
+                                <th className="px-3 py-3 text-xs font-bold text-muted-foreground uppercase tracking-widest text-right border-r border-border">Balance</th>
+                                <th className="px-3 py-3 text-xs font-bold text-muted-foreground uppercase tracking-widest text-right">Cost</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
                             {paginatedTransactions.map((tx) => (
-                                <tr key={tx._id} data-tx-id={tx._id} className={cn("hover:bg-secondary/50 transition-colors group cursor-pointer", (isPendingProduction(tx) || isUnfulfilledConsumption(tx)) && "!bg-rose-950/20 hover:!bg-rose-950/30 border-l-2 border-l-rose-400", highlightedTxIds.has(tx._id) && "ledger-row-flash")} onClick={() => router.push(tx.link)}>
-                                    <td className="px-3 py-2 text-[10px] text-muted-foreground font-mono">{new Date(tx.date).toLocaleDateString('en-US', { year: '2-digit', month: '2-digit', day: '2-digit' })}</td>
-                                    <td className="px-3 py-2">
+                                <tr key={tx._id} data-tx-id={tx._id} className={cn("hover:bg-secondary/50 transition-colors group cursor-pointer", (isPendingProduction(tx) || isUnfulfilledConsumption(tx)) && "!bg-red-500/10 hover:!bg-red-500/15 border-l-2 border-l-red-500", highlightedTxIds.has(tx._id) && "ledger-row-flash")} onClick={() => router.push(tx.link)}>
+                                    <td className="px-3 py-3 text-xs text-foreground/80 font-mono font-medium">{new Date(tx.date).toLocaleDateString('en-US', { year: '2-digit', month: '2-digit', day: '2-digit' })}</td>
+                                    <td className="px-3 py-3">
                                         <div className="flex items-center space-x-2">
                                             {getTypeIcon(tx.type)}
-                                            <span className="text-[9px] uppercase font-bold text-muted-foreground">{tx.type}</span>
+                                            <span className="text-[11px] uppercase font-black text-muted-foreground">{tx.type}</span>
                                         </div>
                                     </td>
-                                    <td className="px-3 py-2 text-[10px] text-muted-foreground truncate max-w-[120px]">{tx.reference}</td>
-                                    <td className="px-3 py-2 text-[10px] text-muted-foreground font-mono group/cell relative">
+                                    <td className="px-3 py-3 text-sm text-foreground/80 font-medium truncate max-w-[150px]">{tx.reference}</td>
+                                    <td className="px-3 py-3 text-sm text-foreground/80 font-mono group/cell relative">
                                         <div className="flex items-center justify-between">
                                             <span>{tx.lotNumber || '-'}</span>
-                                            <button 
-                                                onClick={(e) => { 
-                                                    e.stopPropagation(); 
-                                                    setEditingTx(tx); 
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setEditingTx(tx);
                                                     setIsLotModalOpen(true);
                                                 }}
                                                 className="opacity-0 group-hover/cell:opacity-100 p-1 hover:bg-secondary rounded transition-opacity"
@@ -1184,40 +1224,60 @@ function SkuDetailsPageContent() {
                                             </button>
                                         </div>
                                     </td>
-                                    <td className="px-3 py-2 text-right">
+                                    <td className="px-3 py-3 text-right">
                                         <span className={cn(
-                                            "text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-sm",
-                                            (isPendingProduction(tx) || isUnfulfilledConsumption(tx)) ? "text-amber-500/70 bg-amber-500/10 line-through" :
-                                            tx.quantity > 0 ? "text-emerald-500 bg-emerald-500/10" : "text-rose-500 bg-rose-500/10"
+                                            "text-xs font-mono font-black px-2 py-0.5 rounded",
+                                            (isPendingProduction(tx) || isUnfulfilledConsumption(tx)) ? "text-white bg-amber-600 dark:bg-amber-700 line-through" :
+                                                tx.quantity > 0 ? "text-white bg-emerald-600 dark:bg-emerald-700" : "text-white bg-rose-600 dark:bg-rose-700"
                                         )}>{tx.quantity > 0 ? '+' : ''}{tx.quantity}</span>
                                     </td>
-                                    <td className="px-3 py-2">
+                                    <td className="px-3 py-3">
                                         {tx.status ? (() => {
                                             const s = tx.status.toLowerCase();
-                                            const colorClass = 
-                                                ['completed', 'delivered', 'shipped', 'fulfilled', 'received'].includes(s) ? 'text-emerald-500 bg-emerald-500/10' :
-                                                ['in progress', 'processing', 'ready to qc'].includes(s) ? 'text-blue-500 bg-blue-500/10' :
-                                                ['cancelled', 'rejected', 'failed'].includes(s) ? 'text-rose-500 bg-rose-500/10' :
-                                                ['pending', 'draft', 'on-hold', 'on hold'].includes(s) ? 'text-amber-500 bg-amber-500/10' :
-                                                'text-muted-foreground bg-secondary';
+                                            const sNormalized =
+                                                s === 'fulfilled' ? 'Fulfilled' :
+                                                    ['completed', 'delivered', 'shipped', 'received'].includes(s) ? 'Completed' :
+                                                        ['in progress', 'processing', 'picking'].includes(s) ? 'Processing' :
+                                                            s === 'ready to qc' ? 'Ready to QC' :
+                                                                ['pending', 'draft', 'on-hold', 'on hold'].includes(s) ? 'Pending' :
+                                                                    s;
+
+                                            const styleMap: Record<string, { bg: string; color: string; border?: string; darkBg?: string; darkColor?: string }> = {
+                                                'Fulfilled': { bg: '#000000', color: '#ffffff', darkBg: 'rgba(16,185,129,0.2)', darkColor: '#34d399' },
+                                                'Completed': { bg: '#059669', color: '#ffffff', darkBg: 'rgba(5,150,105,0.2)', darkColor: '#34d399' },
+                                                'Processing': { bg: '#2563eb', color: '#ffffff', darkBg: 'rgba(59,130,246,0.2)', darkColor: '#60a5fa' },
+                                                'Ready to QC': { bg: '#d97706', color: '#ffffff', darkBg: 'rgba(245,158,11,0.2)', darkColor: '#fbbf24' },
+                                                'Pending': { bg: '#e2e8f0', color: '#000000', border: '1px solid #cbd5e1', darkBg: 'rgba(100,116,139,0.2)', darkColor: '#cbd5e1' },
+                                            };
+
+                                            // Fallbacks for unmapped
+                                            const defaultStyle = ['cancelled', 'rejected', 'failed'].includes(s) ?
+                                                { bg: '#e11d48', color: '#fff' } :
+                                                { bg: '#f1f5f9', color: '#64748b' };
+
+                                            const styleColor = styleMap[sNormalized] || defaultStyle;
+
                                             return (
-                                                <span className={cn("text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-sm", colorClass)}>
+                                                <span
+                                                    className="inline-flex items-center px-2 py-0.5 text-xs font-black uppercase tracking-wider status-badge"
+                                                    style={{ backgroundColor: styleColor.bg, color: styleColor.color, border: styleColor.border, borderRadius: '4px' }}
+                                                >
                                                     {tx.status}
                                                 </span>
                                             );
-                                        })() : <span className="text-[10px] text-muted-foreground/50">-</span>}
+                                        })() : <span className="text-xs text-muted-foreground/50">-</span>}
                                     </td>
-                                    <td className="px-3 py-2 text-right text-[10px] font-bold text-foreground font-mono">
+                                    <td className="px-3 py-3 text-right text-sm font-bold text-foreground font-mono">
                                         {(isPendingProduction(tx) || isUnfulfilledConsumption(tx)) ? <span className="text-muted-foreground/50">-</span> : tx.balance.toLocaleString()}
                                     </td>
-                                    <td className="px-3 py-2 text-right text-[10px] text-muted-foreground font-mono">
-                                        {(isPendingProduction(tx) || isUnfulfilledConsumption(tx)) ? <span className="text-muted-foreground/50">-</span> : (tx.cost ? `$${tx.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}` : '-')}
+                                    <td className="px-3 py-3 text-right text-sm text-muted-foreground font-medium font-mono">
+                                        {(isPendingProduction(tx) || isUnfulfilledConsumption(tx)) ? <span className="text-muted-foreground/50">-</span> : (tx.cost ? `$${tx.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-')}
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
-                    
+
                     {/* Load More Indicator */}
                     <div ref={loadMoreRef} className="h-16 flex items-center justify-center">
                         {hasMore && (

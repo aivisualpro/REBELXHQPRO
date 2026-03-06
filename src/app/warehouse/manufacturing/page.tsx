@@ -254,8 +254,8 @@ function ManufacturingContent() {
   const [hasMore, setHasMore] = useState(globalCache.current?.hasMore ?? true);
   const [error, setError] = useState<string | null>(null);
 
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [search, setSearch] = useState(searchParams.get('search') || '');
+  const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('search') || '');
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [activeStatus, setActiveStatus] = useState<string>('All');
@@ -278,6 +278,33 @@ function ManufacturingContent() {
     const timer = setTimeout(() => setDebouncedSearch(search), 250);
     return () => clearTimeout(timer);
   }, [search]);
+
+  // ─── Sync search to URL ────────────────────────────────────────────────
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (debouncedSearch) {
+      params.set('search', debouncedSearch);
+    } else {
+      params.delete('search');
+    }
+    const newQs = params.toString();
+    const currentQs = searchParams.toString();
+    if (newQs !== currentQs) {
+      router.push(`${window.location.pathname}${newQs ? '?' + newQs : ''}`, { scroll: false });
+    }
+  }, [debouncedSearch, router, searchParams]);
+
+  // ─── Sync URL back to state (browser back/forward) ─────────────────────
+
+  useEffect(() => {
+    const urlSearch = searchParams.get('search') || '';
+    if (urlSearch !== debouncedSearch) {
+      setSearch(urlSearch);
+      setDebouncedSearch(urlSearch);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // ─── Fetch a page ────────────────────────────────────────────────────────
 

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowUpDown, Search, Loader2, CreditCard, Truck, X, Download, Upload, ShoppingBag,
 } from 'lucide-react';
@@ -165,6 +165,7 @@ const WebTableRow = React.memo(function WebTableRow({
 
 function WebOrdersContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [orders, setOrders] = useState<WebOrder[]>(globalCache.current?.orders || []);
   const [isLoading, setIsLoading] = useState(!globalCache.current);
@@ -172,8 +173,8 @@ function WebOrdersContent() {
   const [hasMore, setHasMore] = useState(globalCache.current?.hasMore ?? true);
   const [error, setError] = useState<string | null>(null);
 
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [search, setSearch] = useState(searchParams.get('search') || '');
+  const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('search') || '');
   const [sortBy, setSortBy] = useState('dateCreated');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [activeStatus, setActiveStatus] = useState<string>('All');
@@ -186,6 +187,15 @@ function WebOrdersContent() {
 
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
   useEffect(() => { const t = setTimeout(() => setDebouncedSearch(search), 250); return () => clearTimeout(t); }, [search]);
+
+  // Sync search to URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (debouncedSearch) params.set('search', debouncedSearch);
+    else params.delete('search');
+    const newUrl = `${window.location.pathname}${params.toString() ? '?' + params.toString() : ''}`;
+    router.replace(newUrl, { scroll: false });
+  }, [debouncedSearch, router]);
 
   // Scroll-back & highlight
   const [highlightId, setHighlightId] = useState<string | null>(null);

@@ -19,6 +19,7 @@ const VariationSchema = new mongoose.Schema({
     permalink: String,
     // SKU Linking Fields
     linkedSkuId: String,           // Links to SKU._id
+    multiplier: { type: Number, default: 1 },
 });
 
 const WebProductSchema = new mongoose.Schema({
@@ -93,6 +94,9 @@ const WebProductSchema = new mongoose.Schema({
     variations: [VariationSchema],
     // SKU Linking Fields (for simple products)
     linkedSkuId: String,           // Links to SKU._id
+    multiplier: { type: Number, default: 1 },
+    // Options
+    isArchived: { type: Boolean, default: false },
     // Stats
     totalWebOrders: { type: Number, default: 0 },
     // Timestamps

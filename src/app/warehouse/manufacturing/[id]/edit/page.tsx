@@ -3,14 +3,14 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { 
-  ArrowLeft, 
-  Save, 
-  Factory, 
-  Calendar, 
-  Layers, 
-  AlertCircle,
-  X
+import {
+    ArrowLeft,
+    Save,
+    Factory,
+    Calendar,
+    Layers,
+    AlertCircle,
+    X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -22,7 +22,7 @@ export default function EditManufacturingOrderPage() {
     const params = useParams();
     const id = params.id as string;
     const { data: session } = useSession();
-    
+
     // Form State
     const [sku, setSku] = useState('');
     const [recipeId, setRecipeId] = useState('');
@@ -34,7 +34,7 @@ export default function EditManufacturingOrderPage() {
     const [scheduledFinish, setScheduledFinish] = useState('');
     const [priority, setPriority] = useState('Normal');
     const [status, setStatus] = useState('Pending');
-    
+
     // Data Options
     const [skus, setSkus] = useState<any[]>([]);
     const [recipes, setRecipes] = useState<any[]>([]);
@@ -50,37 +50,22 @@ export default function EditManufacturingOrderPage() {
         return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
     };
 
-    // Fetch existing order + dropdown data
+    // Fetch all edit form data in a single API call
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [orderRes, skusRes, recipesRes] = await Promise.all([
-                    fetch(`/api/manufacturing/${id}`),
-                    fetch('/api/skus?limit=0&ignoreDate=true&simple=true'),
-                    fetch('/api/recipes?limit=0')
-                ]);
-                
-                if (!orderRes.ok) throw new Error('Failed to fetch order');
-                if (!skusRes.ok || !recipesRes.ok) throw new Error('Failed to fetch data');
-                
-                const order = await orderRes.json();
-                const skusData = await skusRes.json();
-                const recipesData = await recipesRes.json();
-                
-                setSkus(skusData.skus || []);
-                setRecipes(recipesData.recipes || []);
+                const res = await fetch(`/api/manufacturing/${id}/edit-data`);
+                if (!res.ok) throw new Error('Failed to fetch order data');
+
+                const { order, skus: skuData, recipes: recipeData } = await res.json();
+
+                setSkus(skuData || []);
+                setRecipes(recipeData || []);
 
                 // Pre-fill form with existing order data
-                const skuId = typeof order.sku === 'object' && order.sku !== null 
-                    ? order.sku._id 
-                    : order.sku;
-                setSku(skuId || '');
-
-                const recId = typeof order.recipesId === 'object' && order.recipesId !== null
-                    ? order.recipesId._id
-                    : order.recipesId;
-                setRecipeId(recId || '');
-                setOriginalRecipeId(recId || '');
+                setSku(order.sku || '');
+                setRecipeId(order.recipesId || '');
+                setOriginalRecipeId(order.recipesId || '');
 
                 setLabel(order.label || '');
                 setQty(order.qty || 0);
@@ -106,7 +91,7 @@ export default function EditManufacturingOrderPage() {
         if (selectedSku) {
             setUom(selectedSku.uom || 'ea');
         }
-        
+
         // Reset recipe if SKU changes
         const matchingRecipes = recipes.filter(r => r.sku?._id === skuId || r.sku === skuId);
         if (matchingRecipes.length === 0) {
@@ -191,14 +176,14 @@ export default function EditManufacturingOrderPage() {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
             {/* Backdrop */}
-            <div 
+            <div
                 className="absolute inset-0 bg-black/60 backdrop-blur-sm"
                 onClick={handleClose}
             />
 
             {/* Modal */}
             <div className="relative z-10 w-full max-w-2xl mx-4 bg-background border border-border shadow-2xl rounded-lg overflow-hidden max-h-[90vh] flex flex-col">
-                
+
                 {/* Modal Header */}
                 <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-secondary/30 shrink-0">
                     <div className="flex items-center space-x-3">
@@ -222,7 +207,7 @@ export default function EditManufacturingOrderPage() {
                         {/* Scrollable Form Body */}
                         <div className="flex-1 overflow-y-auto p-5 space-y-5 scrollbar-custom">
                             <form id="edit-mfg-form" onSubmit={handleSubmit} className="space-y-5">
-                                
+
                                 {/* Section: SKU & Recipe */}
                                 <div className="bg-secondary/20 border border-border rounded-md p-4 space-y-4">
                                     <div className="flex items-center space-x-2 border-b border-border pb-2 mb-3">
@@ -230,7 +215,7 @@ export default function EditManufacturingOrderPage() {
                                         <h3 className="text-[10px] font-black uppercase text-foreground tracking-widest">Product Details</h3>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-4">
                                         <div className="space-y-1.5">
                                             <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Target SKU <span className="text-destructive">*</span></label>
                                             <SearchableSelect
@@ -315,14 +300,14 @@ export default function EditManufacturingOrderPage() {
                                     </div>
                                 </div>
 
-                                {/* Section: Scheduling & Priority */}
+                                {/* Section: Scheduling */}
                                 <div className="bg-secondary/20 border border-border rounded-md p-4">
                                     <div className="flex items-center space-x-2 border-b border-border pb-2 mb-3">
                                         <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
                                         <h3 className="text-[10px] font-black uppercase text-foreground tracking-widest">Scheduling</h3>
                                     </div>
 
-                                    <div className="grid grid-cols-3 gap-4">
+                                    <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-1.5">
                                             <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Scheduled Start</label>
                                             <input
@@ -342,42 +327,68 @@ export default function EditManufacturingOrderPage() {
                                                 className="w-full h-9 px-3 border border-border rounded-md text-xs bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors"
                                             />
                                         </div>
-
-                                        <div className="space-y-1.5">
-                                            <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Priority</label>
-                                            <select
-                                                value={priority}
-                                                onChange={e => setPriority(e.target.value)}
-                                                className="w-full h-9 px-3 border border-border rounded-md text-xs bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 appearance-none transition-colors cursor-pointer"
-                                            >
-                                                <option value="Normal">Normal</option>
-                                                <option value="High">High</option>
-                                                <option value="Extreme">Extreme</option>
-                                            </select>
-                                        </div>
                                     </div>
                                 </div>
 
-                                {/* Section: Status */}
+                                {/* Section: Priority & Status */}
                                 <div className="bg-secondary/20 border border-border rounded-md p-4">
                                     <div className="flex items-center space-x-2 border-b border-border pb-2 mb-3">
                                         <Factory className="w-3.5 h-3.5 text-muted-foreground" />
-                                        <h3 className="text-[10px] font-black uppercase text-foreground tracking-widest">Status</h3>
+                                        <h3 className="text-[10px] font-black uppercase text-foreground tracking-widest">Priority & Status</h3>
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-4">
+                                        {/* Priority Buttons */}
+                                        <div className="space-y-1.5">
+                                            <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Priority</label>
+                                            <div className="flex gap-2">
+                                                {[
+                                                    { value: 'Normal', bg: 'bg-emerald-500', border: 'border-emerald-600', hover: 'hover:bg-emerald-600' },
+                                                    { value: 'High', bg: 'bg-orange-500', border: 'border-orange-600', hover: 'hover:bg-orange-600' },
+                                                    { value: 'Extreme', bg: 'bg-red-500', border: 'border-red-600', hover: 'hover:bg-red-600' },
+                                                ].map(p => (
+                                                    <button
+                                                        key={p.value}
+                                                        type="button"
+                                                        onClick={() => setPriority(p.value)}
+                                                        className={cn(
+                                                            "flex-1 h-9 text-[10px] font-black uppercase tracking-widest border transition-all cursor-pointer rounded-md",
+                                                            priority === p.value || (priority || '').includes(p.value)
+                                                                ? `${p.bg} ${p.border} text-white shadow-sm`
+                                                                : "bg-secondary/60 border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
+                                                        )}
+                                                    >
+                                                        {p.value === 'Extreme' ? '⚡ ' : p.value === 'High' ? '↑ ' : ''}{p.value}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Status Buttons */}
                                         <div className="space-y-1.5">
                                             <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Order Status</label>
-                                            <select
-                                                value={status}
-                                                onChange={e => setStatus(e.target.value)}
-                                                className="w-full h-9 px-3 border border-border rounded-md text-xs bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 appearance-none transition-colors cursor-pointer"
-                                            >
-                                                <option value="Pending">Pending</option>
-                                                <option value="Processing">Processing</option>
-                                                <option value="Ready to QC">Ready to QC</option>
-                                                <option value="Fulfilled">Fulfilled</option>
-                                            </select>
+                                            <div className="flex gap-2">
+                                                {[
+                                                    { value: 'Pending', bg: 'bg-slate-500', border: 'border-slate-600', hover: 'hover:bg-slate-600' },
+                                                    { value: 'Processing', bg: 'bg-blue-500', border: 'border-blue-600', hover: 'hover:bg-blue-600' },
+                                                    { value: 'Ready to QC', bg: 'bg-amber-500', border: 'border-amber-600', hover: 'hover:bg-amber-600' },
+                                                    { value: 'Fulfilled', bg: 'bg-emerald-500', border: 'border-emerald-600', hover: 'hover:bg-emerald-600' },
+                                                ].map(s => (
+                                                    <button
+                                                        key={s.value}
+                                                        type="button"
+                                                        onClick={() => setStatus(s.value)}
+                                                        className={cn(
+                                                            "flex-1 h-9 text-[10px] font-black uppercase tracking-widest border transition-all cursor-pointer rounded-md",
+                                                            status === s.value
+                                                                ? `${s.bg} ${s.border} text-white shadow-sm`
+                                                                : "bg-secondary/60 border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
+                                                        )}
+                                                    >
+                                                        {s.value === 'Ready to QC' ? 'QC' : s.value}
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

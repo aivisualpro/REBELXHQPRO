@@ -9,6 +9,7 @@ import Manufacturing from '@/models/Manufacturing';
 import Client from '@/models/Client';
 import AuditAdjustment from '@/models/AuditAdjustment';
 import WebOrder from '@/models/WebOrder';
+import WebProduct from '@/models/WebProduct';
 import Vendor from '@/models/Vendor';
 import Setting from '@/models/Setting';
 import { getGlobalStartDate } from '@/lib/global-settings';
@@ -36,7 +37,7 @@ export async function GET(
 ) {
     try {
         await dbConnect();
-        
+
         // Ensure models are registered
         void Client;
         void AuditAdjustment;
@@ -72,7 +73,7 @@ export async function GET(
         const dateFilter = startDate ? { createdAt: { $gte: startDate } } : {};
 
         // 1. Parallelize ALL transaction queries with field selection for performance
-        const [openingBalances, purchaseOrders, rawManufacturingJobs, saleOrders, adjustments, webOrders] = await Promise.all([
+        const [openingBalances, purchaseOrders, rawManufacturingJobs, saleOrders, adjustments, webOrders, webProducts] = await Promise.all([
             OpeningBalance.find({ sku: id, ...dateFilter })
                 .select('_id createdAt lotNumber qty uom cost')
                 .lean(),
@@ -92,17 +93,37 @@ export async function GET(
                 .lean(),
             WebOrder.find({
                 $or: [
-                    { "lineItems.sku": id }, 
+                    { "lineItems.sku": id },
                     { "lineItems.varianceId": { $in: varianceIds } },
                     { "lineItems.linkedSkuId": id }
                 ],
                 ...dateFilter
             })
-                .select('_id createdAt dateCompleted status lineItems')
+                .select('_id createdAt dateCompleted status lineItems website')
+                .lean(),
+            WebProduct.find({
+                $or: [
+                    { linkedSkuId: id },
+                    { 'variations.linkedSkuId': id }
+                ]
+            })
+                .select('_id webId website multiplier variations.id variations._id variations.multiplier variations.linkedSkuId linkedSkuId')
                 .lean()
         ]);
 
         const manufacturingJobs = rawManufacturingJobs as any[];
+
+        // Build multiplier map
+        const multiplierMap = new Map<string, number>();
+        (webProducts as any[]).forEach((wp: any) => {
+            multiplierMap.set(`${wp.website}-${wp.webId}`, wp.multiplier || 1);
+            if (wp.variations && wp.variations.length > 0) {
+                wp.variations.forEach((v: any) => {
+                    const vid = v.id || v._id;
+                    multiplierMap.set(`${wp.website}-${wp.webId}-${vid}`, v.multiplier || wp.multiplier || 1);
+                });
+            }
+        });
 
         // Pass 0: Collect all SKUs involved as ingredients to fetch their definitive costs
         const ingredientSkuIds = new Set<string>();
@@ -162,8 +183,8 @@ export async function GET(
         const durationToHours = (duration: string) => {
             if (!duration) return 0;
             const parts = duration.split(':').map(p => parseFloat(p) || 0);
-            if (parts.length === 3) return parts[0] + parts[1]/60 + parts[2]/3600;
-            if (parts.length === 2) return parts[0] + parts[1]/60;
+            if (parts.length === 3) return parts[0] + parts[1] / 60 + parts[2] / 3600;
+            if (parts.length === 2) return parts[0] + parts[1] / 60;
             return parts[0] || 0;
         };
 
@@ -172,7 +193,7 @@ export async function GET(
             const jobSkuId = job.sku?._id || job.sku;
             if (jobSkuId?.toString() === id) {
                 let costPerUnit = 0;
-                
+
                 // Use stored totalCost if available (more accurate as it includes all cost components)
                 if (job.totalCost && job.totalCost > 0) {
                     const totalQtyProduced = (job.qty || 0) + (job.qtyDifference || 0);
@@ -189,12 +210,12 @@ export async function GET(
 
                     let totalLaborCost = 0;
                     job.labor?.forEach((l: any) => { totalLaborCost += durationToHours(l.duration) * (l.hourlyRate || 0); });
-                    
+
                     const packagingCost = job.packagingCost || 0;
                     const totalQtyProduced = (job.qty || 0) + (job.qtyDifference || 0);
                     costPerUnit = totalQtyProduced > 0 ? (totalMatCost + totalLaborCost + packagingCost) / totalQtyProduced : 0;
                 }
-                
+
                 const lot = job.lotNumber || job.label;
                 if (lot && !lotCosts.has(lot)) {
                     lotCosts.set(lot, costPerUnit);
@@ -285,7 +306,7 @@ export async function GET(
                     const qtyExtra = sa > 0 ? (bomQty / sa) - bomQty : 0;
                     const qtyScrapped = line.qtyScrapped || 0;
                     const totalQty = bomQty + qtyScrapped + qtyExtra;
-                    
+
                     if (totalQty > 0) {
                         transactions.push({
                             _id: line._id,
@@ -318,7 +339,7 @@ export async function GET(
                         type: 'Orders',
                         reference: so.label || so._id,
                         lotNumber: cleanLot(lot),
-                        quantity: round8(-Math.abs(line.qtyShipped || line.qty)), 
+                        quantity: round8(-Math.abs(line.qtyShipped || line.qty)),
                         uom: line.uom,
                         cost: round8(virtualCost !== undefined ? virtualCost : (line.cost || 0)),
                         salePrice: round8(line.price || 0),
@@ -349,42 +370,73 @@ export async function GET(
 
         // Web Orders
         webOrders.forEach((wo: any) => {
-             wo.lineItems?.forEach((line: any) => {
-                  const lineSkuId = (line.sku?._id || line.sku)?.toString();
-                  if (lineSkuId === id || (line.varianceId && varianceIds.includes(line.varianceId)) || line.linkedSkuId === id) {
-                        const lot = line.lotNumber || '';
-                        const virtualCost = lotCosts.get(lot);
-                        transactions.push({
-                           _id: line._id || `${wo._id}_${id}`,
-                           date: wo.dateCompleted ? new Date(wo.dateCompleted) : new Date(wo.createdAt),
-                           type: 'Web Order',
-                           reference: line.varianceId ? `${wo._id} (${line.varianceId})` : wo._id,
-                           lotNumber: cleanLot(lot) || 'N/A',
-                           quantity: round8(-Math.abs(line.quantity || 0)),
-                           uom: 'Unit',
-                           cost: round8(virtualCost !== undefined ? virtualCost : (line.cost || 0)),
-                           salePrice: round8((line.total && line.quantity) ? (line.total / line.quantity) : 0),
-                           docId: wo._id,
-                           link: `/sales/web-orders/${wo._id}`,
-                           varianceId: line.varianceId,
-                           website: line.website,
-                           status: wo.status || ''
-                        });
-                  }
-             });
+            wo.lineItems?.forEach((line: any) => {
+                const lineSkuId = (line.sku?._id || line.sku)?.toString();
+                if (lineSkuId === id || (line.varianceId && varianceIds.includes(line.varianceId)) || line.linkedSkuId === id) {
+                    const lot = line.lotNumber || '';
+                    const virtualCost = lotCosts.get(lot);
+
+                    const key = line.variationId ? `${wo.website}-${line.productId}-${line.variationId}` : `${wo.website}-${line.productId}`;
+                    const multiplier = multiplierMap.get(key) || 1;
+                    const qtyToDeduct = round8(-Math.abs((line.quantity || 0) * multiplier));
+
+                    transactions.push({
+                        _id: line._id || `${wo._id}_${id}`,
+                        date: wo.dateCompleted ? new Date(wo.dateCompleted) : new Date(wo.createdAt),
+                        type: 'Web Order',
+                        reference: line.varianceId ? `${wo._id} (${line.varianceId})` : wo._id,
+                        lotNumber: cleanLot(lot) || 'N/A',
+                        quantity: qtyToDeduct,
+                        uom: 'Unit',
+                        cost: round8(virtualCost !== undefined ? virtualCost : (line.cost || 0)),
+                        salePrice: round8((line.total && line.quantity) ? (line.total / line.quantity) : 0),
+                        docId: wo._id,
+                        link: `/sales/web-orders/${wo._id}`,
+                        varianceId: line.varianceId,
+                        website: wo.website,
+                        status: wo.status || ''
+                    });
+                }
+            });
         });
 
         // Final sorting and calculations (Optimized)
-        transactions.sort((a, b) => a.date.getTime() - b.date.getTime());
-        
+        // When dates are equal, source (positive) records come first.
+        // This prevents impossible negative-from-zero running balances.
+        const typePriority: Record<string, number> = {
+            'Opening': 0,
+            'Audit': 1,
+            'Purchase Order': 2,
+            'Produced': 3,
+            'Consumption': 4,
+            'Orders': 5,
+            'Web Order': 6,
+        };
+        transactions.sort((a, b) => {
+            // Compare by DATE only (truncate to midnight) — same calendar day = same priority band
+            const dayA = new Date(a.date.getFullYear(), a.date.getMonth(), a.date.getDate()).getTime();
+            const dayB = new Date(b.date.getFullYear(), b.date.getMonth(), b.date.getDate()).getTime();
+            if (dayA !== dayB) return dayA - dayB;
+            // Same day: positive (source) records come before negative (consumption) records
+            const aPositive = a.quantity > 0 ? 0 : 1;
+            const bPositive = b.quantity > 0 ? 0 : 1;
+            if (aPositive !== bPositive) return aPositive - bPositive;
+            // Then by type priority
+            const pa = typePriority[a.type] ?? 9;
+            const pb = typePriority[b.type] ?? 9;
+            if (pa !== pb) return pa - pb;
+            // Finally by exact timestamp for stable ordering
+            return a.date.getTime() - b.date.getTime();
+        });
+
         let balance = 0;
         let totalRevenue = 0;
         let costOfSales = 0;
         const monthlyStats = new Map<string, { revenue: number, qty: number, productionQty: number, productionCost: number }>();
         const curM = new Date(); curM.setDate(1);
-        for(let i=0; i<12; i++) {
-            const d = new Date(curM.getFullYear(), curM.getMonth()-i, 1);
-            monthlyStats.set(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`, { revenue:0, qty:0, productionQty: 0, productionCost: 0 });
+        for (let i = 0; i < 12; i++) {
+            const d = new Date(curM.getFullYear(), curM.getMonth() - i, 1);
+            monthlyStats.set(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, { revenue: 0, qty: 0, productionQty: 0, productionCost: 0 });
         }
 
         const isPendingProduction = (t: any) => t.type === 'Produced' && ['pending', 'processing'].includes((t.status || '').toLowerCase());
@@ -395,8 +447,8 @@ export async function GET(
             if (!isPendingProduction(t) && !isUnfulfilledConsumption(t)) {
                 balance = round8(balance + t.quantity);
             }
-            const key = `${t.date.getFullYear()}-${String(t.date.getMonth()+1).padStart(2,'0')}`;
-            
+            const key = `${t.date.getFullYear()}-${String(t.date.getMonth() + 1).padStart(2, '0')}`;
+
             if (t.type === 'Orders' || t.type === 'Web Order') {
                 const qty = Math.abs(t.quantity);
                 const rev = qty * (t.salePrice || 0);
@@ -431,22 +483,22 @@ export async function GET(
             cogm: cogmTotal,
             cogp: cogpTotal,
             chartData: Array.from(monthlyStats.entries())
-                .map(([date, stats]) => ({ 
-                    date, 
-                    revenue: stats.revenue, 
+                .map(([date, stats]) => ({
+                    date,
+                    revenue: stats.revenue,
                     qty: stats.qty,
                     productionQty: stats.productionQty,
                     productionCost: stats.productionCost
                 }))
-                .sort((a,b) => a.date.localeCompare(b.date))
+                .sort((a, b) => a.date.localeCompare(b.date))
         };
 
         // hasSales: Only count orders where items were actually shipped/sold
-        const hasSales = saleOrders.some(so => so.lineItems?.some((li: any) => {
+        const hasSales = (saleOrders as any[]).some(so => so.lineItems?.some((li: any) => {
             const liSkuId = (li.sku?._id || li.sku)?.toString();
             // Must be this exact SKU (not a variance) AND must have actually shipped
             return liSkuId === id && (li.qtyShipped > 0);
-        })) || webOrders.some(wo => wo.lineItems?.some((li: any) => {
+        })) || (webOrders as any[]).some(wo => wo.lineItems?.some((li: any) => {
             const liSkuId = (li.sku?._id || li.sku)?.toString();
             // For web orders, check if it's this exact SKU (not just a variance match for raw materials)
             // and the order was completed/shipped
@@ -466,7 +518,7 @@ export async function GET(
             const totalQty = bomQty + qtyScrapped + qtyExtra;
             return totalQty > 0;
         }));
-        
+
         let tier = 0;
         if (hasSales && !hasConsumption) tier = 1;
         else if (hasSales && hasConsumption) tier = 2;

@@ -4,7 +4,7 @@ import React, { Suspense } from 'react';
 import {
   Inbox, Trophy, Users,
   GitBranch, MessageSquare, ListTodo, BarChart3,
-  Plus, Search, ListFilter, HelpCircle, Plug, Settings,
+  Plus, Search, ListFilter, Settings,
   Phone, PhoneCall, Hourglass, AlertTriangle,
   Eye, Briefcase, Send,
   PanelLeftClose, PanelLeftOpen, StickyNote, ShieldAlert
@@ -385,21 +385,8 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
             </Link>
           </div>
 
-          {/* Workflows */}
-          <div title={isSidebarCollapsed ? "Workflows" : ""} className={cn(
-            "flex items-center rounded-md cursor-pointer transition-colors group",
-            isSidebarCollapsed ? "justify-center py-2.5 px-0" : "justify-between px-3 py-2 hover:bg-secondary"
-          )}>
-            <div className={cn("flex items-center", isSidebarCollapsed ? "justify-center" : "space-x-3")}>
-              <GitBranch className={cn("w-5 h-5 group-hover:text-foreground transition-colors", !isSidebarCollapsed && "mr-3")} />
-              {!isSidebarCollapsed && <span className="text-[14px] font-medium group-hover:text-foreground transition-colors">Workflows</span>}
-            </div>
-            {!isSidebarCollapsed && <Plus className="w-4 h-4 hover:text-foreground" />}
-          </div>
-
           {[
             { name: 'Tasks', icon: ListTodo, href: '/crm/tasks' },
-            { name: 'Reports', icon: BarChart3, href: '/crm/reports' },
           ].map((item) => (
             <Link key={item.name} href={item.href} className="block" title={isSidebarCollapsed ? item.name : ""}>
               <div className={cn(
@@ -435,8 +422,6 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
         {/* Footer */}
         <div className="p-3 border-t border-border space-y-0.5 bg-card">
           {[
-            { name: 'Support & FAQs', icon: HelpCircle, external: true, href: '#' },
-            { name: 'Integrations', icon: Plug, href: '#' },
             { name: 'Settings', icon: Settings, href: '/crm/settings' },
           ].map((item) => (
             <Link key={item.name} href={item.href} title={isSidebarCollapsed ? item.name : ""} className="block">
@@ -449,7 +434,6 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
                   <item.icon className={cn("w-5 h-5 transition-colors", !isSidebarCollapsed && "mr-3", isActive(item.href) ? "text-primary-foreground" : "group-hover:text-foreground")} />
                   {!isSidebarCollapsed && <span className={cn("text-[14px] font-medium transition-colors", isActive(item.href) ? "text-primary-foreground" : "group-hover:text-foreground")}>{item.name}</span>}
                 </div>
-                {!isSidebarCollapsed && item.external && <div className="text-xs">↗</div>}
               </div>
             </Link>
           ))}
