@@ -47,11 +47,10 @@ const UserSchema: Schema = new Schema({
 });
 
 // Auto-generate profileId on new documents
-UserSchema.pre('save', function (next: any) {
+UserSchema.pre('save', function () {
     if (!this.profileId) {
         this.profileId = generateProfileId();
     }
-    next();
 });
 
 export default mongoose.models.RXHQUsers || mongoose.model<IUser>('RXHQUsers', UserSchema);

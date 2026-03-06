@@ -112,17 +112,17 @@ interface LinkedWebProduct {
 
 const PAGE_SIZE = 20; // Load 20 rows at a time
 
-// Website color map — simple solid colors like status badges
-const WEBSITE_COLOR_MAP: Record<string, string> = {
-    'KING': 'bg-amber-600',
-    'GRASS': 'bg-emerald-600',
-    'GRHK': 'bg-sky-600',
-    'REBEL': 'bg-violet-600',
-    'GUD': 'bg-rose-600',
+// Website color map — matches web products page WebsiteBadge exactly
+const WEBSITE_STYLE_MAP: Record<string, { bg: string; color: string }> = {
+    'KING': { bg: '#d97706', color: '#fff' },
+    'GRASS': { bg: '#16a34a', color: '#fff' },
+    'GRHK': { bg: '#0891b2', color: '#fff' },
+    'REBEL': { bg: '#7c3aed', color: '#fff' },
+    'GUD': { bg: '#e11d48', color: '#fff' },
 };
-const getWebsiteColorClass = (name: string) => {
-    const key = Object.keys(WEBSITE_COLOR_MAP).find(k => name?.toUpperCase().includes(k));
-    return key ? WEBSITE_COLOR_MAP[key] : 'bg-zinc-500';
+const getWebsiteStyle = (name: string) => {
+    const key = Object.keys(WEBSITE_STYLE_MAP).find(k => name?.toUpperCase().includes(k));
+    return key ? WEBSITE_STYLE_MAP[key] : { bg: '#64748b', color: '#fff' };
 };
 
 function SkuDetailsPageContent() {
@@ -865,11 +865,17 @@ function SkuDetailsPageContent() {
                                                             )}
                                                         </td>
                                                         <td className="px-3 py-2">
-                                                            {wp.website ? (
-                                                                <span className={cn("text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 text-white rounded shadow-sm", getWebsiteColorClass(wp.website || ''))}>
-                                                                    {wp.website}
-                                                                </span>
-                                                            ) : (
+                                                            {wp.website ? (() => {
+                                                                const ws = getWebsiteStyle(wp.website);
+                                                                return (
+                                                                    <span
+                                                                        className="px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider shadow-sm whitespace-nowrap"
+                                                                        style={{ background: ws.bg, color: ws.color }}
+                                                                    >
+                                                                        {wp.website}
+                                                                    </span>
+                                                                );
+                                                            })() : (
                                                                 <span className="text-[10px] text-muted-foreground/50">-</span>
                                                             )}
                                                         </td>
@@ -1221,9 +1227,17 @@ function SkuDetailsPageContent() {
                                                 const orderNum = parts[parts.length - 1];
                                                 return (
                                                     <div className="flex items-center gap-2">
-                                                        <span className={cn("text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 text-white rounded shadow-sm whitespace-nowrap shrink-0", getWebsiteColorClass(website))}>
-                                                            {website}
-                                                        </span>
+                                                        {(() => {
+                                                            const ws = getWebsiteStyle(website);
+                                                            return (
+                                                                <span
+                                                                    className="px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider shadow-sm whitespace-nowrap shrink-0"
+                                                                    style={{ background: ws.bg, color: ws.color }}
+                                                                >
+                                                                    {website}
+                                                                </span>
+                                                            );
+                                                        })()}
                                                         <span className="text-xs font-bold font-mono text-foreground">{orderNum}</span>
                                                     </div>
                                                 );

@@ -90,16 +90,20 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function WebsiteBadge({ website }: { website: string }) {
-  const colorMap: Record<string, string> = {
-    'KING': 'bg-gradient-to-r from-amber-600 to-orange-500',
-    'GRASS': 'bg-gradient-to-r from-emerald-600 to-green-500',
-    'GRHK': 'bg-gradient-to-r from-sky-600 to-blue-500',
-    'REBEL': 'bg-gradient-to-r from-violet-600 to-purple-500',
-    'GUD': 'bg-gradient-to-r from-rose-600 to-pink-500',
+  const styleMap: Record<string, { bg: string; color: string }> = {
+    KING: { bg: '#d97706', color: '#fff' },
+    GRASS: { bg: '#16a34a', color: '#fff' },
+    GRHK: { bg: '#0891b2', color: '#fff' },
+    REBEL: { bg: '#7c3aed', color: '#fff' },
+    GUD: { bg: '#e11d48', color: '#fff' },
   };
-  const key = Object.keys(colorMap).find(k => website?.includes(k));
+  const key = Object.keys(styleMap).find(k => website?.toUpperCase().includes(k));
+  const s = key ? styleMap[key] : { bg: '#64748b', color: '#fff' };
   return (
-    <span className={cn("px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider text-white shadow-sm", key ? colorMap[key] : 'bg-zinc-500')}>
+    <span
+      className="px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider shadow-sm whitespace-nowrap"
+      style={{ background: s.bg, color: s.color }}
+    >
       {website || 'N/A'}
     </span>
   );
