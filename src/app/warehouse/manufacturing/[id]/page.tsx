@@ -655,12 +655,6 @@ export default function ManufacturingDetailPage() {
                                 <ArrowLeft className="w-3.5 h-3.5" />
                                 <span>Back</span>
                             </button>
-                            {order.label && (
-                                <div className="flex items-center gap-1.5">
-                                    <span className="text-[9px] text-muted-foreground uppercase tracking-widest font-bold">WO #</span>
-                                    <span className="text-xs font-mono font-black text-foreground">{order.label}</span>
-                                </div>
-                            )}
                         </div>
                         <Link
                             href={`/warehouse/skus/${typeof order.sku === 'object' && order.sku !== null ? (order.sku as any)._id : order.sku}?lot=${encodeURIComponent(order.label || order._id)}`}
@@ -711,10 +705,16 @@ export default function ManufacturingDetailPage() {
                                         const skuId = typeof order.sku === 'object' && order.sku !== null ? (order.sku as any)._id : order.sku;
                                         if (skuId) router.push(`/warehouse/skus/${skuId}`);
                                     }}
-                                    className="flex-1 bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors flex items-center justify-center px-3 min-w-0 cursor-pointer"
+                                    className="flex-1 bg-emerald-500 hover:bg-emerald-600 transition-colors flex items-center justify-center px-3 min-w-0 cursor-pointer"
                                 >
-                                    <h1 className="text-sm font-black text-foreground leading-tight text-center line-clamp-2">{skuName}</h1>
+                                    <h1 className="text-sm font-black text-white leading-tight text-center line-clamp-2">{skuName}</h1>
                                 </button>
+                                {/* Column 4: WO # */}
+                                {order.label && (
+                                    <div className="w-16 flex items-center justify-center shrink-0 border-l border-emerald-600 bg-emerald-600">
+                                        <span className="text-sm font-black text-white">{order.label}</span>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -724,32 +724,33 @@ export default function ManufacturingDetailPage() {
                                 <button
                                     onClick={() => { setStatusDropdownOpen(!statusDropdownOpen); setPriorityDropdownOpen(false); }}
                                     className={cn(
-                                        "w-full px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-center cursor-pointer transition-all",
-                                        order.status === 'Fulfilled' ? "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25" :
-                                            order.status === 'Processing' ? "bg-blue-500/15 text-blue-400 hover:bg-blue-500/25" :
-                                                order.status === 'Ready to QC' ? "bg-amber-500/15 text-amber-400 hover:bg-amber-500/25" :
-                                                    order.status === 'Pending' ? "bg-slate-500/15 text-slate-400 hover:bg-slate-500/25" :
-                                                        "bg-secondary text-muted-foreground hover:bg-secondary/80"
+                                        "w-full px-3 py-2.5 text-[12px] font-black uppercase tracking-widest text-center cursor-pointer transition-all border",
+                                        order.status === 'Fulfilled' ? "bg-emerald-500 text-white border-emerald-600 hover:bg-emerald-600" :
+                                            order.status === 'Processing' ? "bg-blue-500 text-white border-blue-600 hover:bg-blue-600" :
+                                                order.status === 'Ready to QC' ? "bg-amber-500 text-white border-amber-600 hover:bg-amber-600" :
+                                                    order.status === 'Pending' ? "bg-slate-500 text-white border-slate-600 hover:bg-slate-600" :
+                                                        "bg-secondary text-muted-foreground border-border hover:bg-secondary/80"
                                     )}
                                 >
                                     {order.status}
                                 </button>
                                 {statusDropdownOpen && (
-                                    <div className="absolute top-full left-0 right-0 mt-0.5 bg-[#1a1a1a] border border-border shadow-xl z-30">
+                                    <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-md shadow-xl z-30 overflow-hidden">
                                         {STATUSES.map(s => (
                                             <button
                                                 key={s}
                                                 onClick={() => { handleStatusChange(s); setStatusDropdownOpen(false); }}
                                                 className={cn(
-                                                    "w-full text-left px-3 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors",
-                                                    s === 'Fulfilled' ? "text-emerald-400 hover:bg-emerald-500/15" :
-                                                        s === 'Processing' ? "text-blue-400 hover:bg-blue-500/15" :
-                                                            s === 'Ready to QC' ? "text-amber-400 hover:bg-amber-500/15" :
+                                                    "w-full text-left px-3 py-2.5 text-[12px] font-bold uppercase tracking-wider transition-colors flex items-center justify-between",
+                                                    s === 'Fulfilled' ? "text-emerald-500 hover:bg-emerald-500/10" :
+                                                        s === 'Processing' ? "text-blue-500 hover:bg-blue-500/10" :
+                                                            s === 'Ready to QC' ? "text-amber-500 hover:bg-amber-500/10" :
                                                                 "text-muted-foreground hover:bg-secondary",
-                                                    order.status === s && "bg-secondary/80"
+                                                    order.status === s && "bg-secondary"
                                                 )}
                                             >
-                                                {s}
+                                                <span>{s}</span>
+                                                {order.status === s && <span className="text-[10px]">✓</span>}
                                             </button>
                                         ))}
                                     </div>
@@ -759,29 +760,30 @@ export default function ManufacturingDetailPage() {
                                 <button
                                     onClick={() => { setPriorityDropdownOpen(!priorityDropdownOpen); setStatusDropdownOpen(false); }}
                                     className={cn(
-                                        "w-full px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-center cursor-pointer transition-all",
-                                        (order.priority || '').includes('Extreme') ? "bg-red-500/15 text-red-400 hover:bg-red-500/25" :
-                                            (order.priority || '').includes('High') ? "bg-orange-500/15 text-orange-400 hover:bg-orange-500/25" :
-                                                "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25"
+                                        "w-full px-3 py-2.5 text-[12px] font-black uppercase tracking-widest text-center cursor-pointer transition-all border",
+                                        (order.priority || '').includes('Extreme') ? "bg-red-500 text-white border-red-600 hover:bg-red-600" :
+                                            (order.priority || '').includes('High') ? "bg-orange-500 text-white border-orange-600 hover:bg-orange-600" :
+                                                "bg-emerald-500 text-white border-emerald-600 hover:bg-emerald-600"
                                     )}
                                 >
                                     {(order.priority || '').includes('Extreme') ? 'Extreme' : (order.priority || '').includes('High') ? 'High' : 'Normal'}
                                 </button>
                                 {priorityDropdownOpen && (
-                                    <div className="absolute top-full left-0 right-0 mt-0.5 bg-[#1a1a1a] border border-border shadow-xl z-30">
+                                    <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-md shadow-xl z-30 overflow-hidden">
                                         {PRIORITIES.map(p => (
                                             <button
                                                 key={p}
                                                 onClick={() => { handlePriorityChange(p); setPriorityDropdownOpen(false); }}
                                                 className={cn(
-                                                    "w-full text-left px-3 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors",
-                                                    p === 'Extreme' ? "text-red-400 hover:bg-red-500/15" :
-                                                        p === 'High' ? "text-orange-400 hover:bg-orange-500/15" :
-                                                            "text-muted-foreground hover:bg-secondary",
-                                                    (order.priority || '').includes(p) && "bg-secondary/80"
+                                                    "w-full text-left px-3 py-2.5 text-[12px] font-bold uppercase tracking-wider transition-colors flex items-center justify-between",
+                                                    p === 'Extreme' ? "text-red-500 hover:bg-red-500/10" :
+                                                        p === 'High' ? "text-orange-500 hover:bg-orange-500/10" :
+                                                            "text-emerald-500 hover:bg-secondary",
+                                                    (order.priority || '').includes(p) && "bg-secondary"
                                                 )}
                                             >
-                                                {p}
+                                                <span>{p}</span>
+                                                {(order.priority || '').includes(p) && <span className="text-[10px]">✓</span>}
                                             </button>
                                         ))}
                                     </div>
@@ -792,24 +794,31 @@ export default function ManufacturingDetailPage() {
 
                         {/* Quantity Section */}
                         <div className="mx-4 mb-4">
-                            <div className="grid grid-cols-2 gap-3 mb-3">
-                                <div className="bg-secondary border border-border p-3">
-                                    <div className="text-[8px] text-muted-foreground uppercase tracking-widest font-bold mb-1">Ordered</div>
-                                    <div className="text-xl font-black text-foreground leading-none">{order.qty}</div>
-                                    <div className="text-[9px] text-muted-foreground font-bold uppercase mt-0.5">{order.uom}</div>
+                            {/* Ordered + Adjust in a single row */}
+                            <div className="flex items-stretch border border-border mb-3 overflow-hidden">
+                                {/* Ordered */}
+                                <div className="flex-1 bg-secondary px-4 py-3 flex items-center gap-3">
+                                    <div>
+                                        <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Ordered</div>
+                                        <div className="flex items-baseline gap-1.5 mt-0.5">
+                                            <span className="text-2xl font-black text-foreground leading-none">{order.qty?.toLocaleString()}</span>
+                                            <span className="text-[10px] text-muted-foreground font-bold uppercase">{order.uom}</span>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="bg-secondary border border-border p-3">
-                                    <div className="flex items-center justify-between mb-1">
-                                        <div className="text-[8px] text-muted-foreground uppercase tracking-widest font-bold">Adjust</div>
+                                {/* Adjust */}
+                                <div className="border-l border-border bg-background px-3 py-3 flex flex-col justify-center min-w-[130px]">
+                                    <div className="flex items-center justify-between mb-1.5">
+                                        <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Adjust</div>
                                         {isSubmittingDiff && (
-                                            <div className="text-[7px] text-blue-500 font-bold uppercase animate-pulse">Saving</div>
+                                            <div className="text-[9px] text-blue-500 font-bold uppercase animate-pulse">Saving</div>
                                         )}
                                     </div>
-                                    <div className="flex items-center bg-background border border-border h-7 focus-within:border-foreground transition-colors">
+                                    <div className="flex items-center bg-secondary border border-border h-8 focus-within:border-foreground transition-colors">
                                         <button
                                             disabled={isSubmittingDiff}
                                             onClick={() => handleUpdateQtyDiff((order.qtyDifference || 0) - 1)}
-                                            className="w-7 h-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-all border-r border-border"
+                                            className="w-8 h-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-background transition-all border-r border-border"
                                         >
                                             <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /></svg>
                                         </button>
@@ -817,21 +826,21 @@ export default function ManufacturingDetailPage() {
                                             type="number"
                                             value={order.qtyDifference || 0}
                                             onChange={(e) => handleUpdateQtyDiff(parseInt(e.target.value) || 0)}
-                                            className="flex-1 text-center text-xs font-bold bg-transparent text-foreground outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none min-w-0"
+                                            className="flex-1 text-center text-[13px] font-black bg-transparent text-foreground outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none min-w-0"
                                         />
                                         <button
                                             disabled={isSubmittingDiff}
                                             onClick={() => handleUpdateQtyDiff((order.qtyDifference || 0) + 1)}
-                                            className="w-7 h-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-all border-l border-border"
+                                            className="w-8 h-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-background transition-all border-l border-border"
                                         >
-                                            <Plus className="w-2.5 h-2.5" strokeWidth={3} />
+                                            <Plus className="w-3 h-3" strokeWidth={3} />
                                         </button>
                                     </div>
                                 </div>
                             </div>
-                            <div className="bg-emerald-500/10 border border-emerald-500/20 px-4 py-2.5 flex justify-between items-center">
-                                <div className="text-[9px] uppercase tracking-widest font-bold text-emerald-400">Qty Manufactured</div>
-                                <div className="text-lg font-black text-emerald-400">{costs.qtyManufactured} <span className="text-[9px] text-emerald-400/60 font-bold uppercase">{order.uom}</span></div>
+                            <div className="bg-emerald-500 border border-emerald-600 px-4 py-2.5 flex justify-between items-center">
+                                <div className="text-[10px] uppercase tracking-widest font-bold text-white">Qty Manufactured</div>
+                                <div className="text-lg font-black text-white">{costs.qtyManufactured} <span className="text-[10px] text-white/70 font-bold uppercase">{order.uom}</span></div>
                             </div>
                         </div>
 
@@ -851,19 +860,19 @@ export default function ManufacturingDetailPage() {
                                 ] as { label: string; value: string; recipeId?: string | null }[];
                             })().map((item, idx) => (
                                 <div key={idx} className={cn(
-                                    "flex items-center justify-between px-3 py-2",
+                                    "flex items-center justify-between px-3 py-2.5",
                                     idx % 2 === 0 ? "bg-background" : "bg-secondary/50"
                                 )}>
-                                    <span className="text-[9px] text-muted-foreground uppercase tracking-widest font-bold">{item.label}</span>
+                                    <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">{item.label}</span>
                                     {item.recipeId ? (
                                         <span
-                                            className="text-[11px] font-medium text-muted-foreground text-right max-w-[55%] truncate hover:text-blue-500 hover:underline cursor-pointer transition-colors"
+                                            className="text-[12px] font-medium text-muted-foreground text-right max-w-[55%] truncate hover:text-blue-500 hover:underline cursor-pointer transition-colors"
                                             onClick={() => router.push(`/warehouse/recipes/${item.recipeId}`)}
                                         >
                                             {item.value}
                                         </span>
                                     ) : (
-                                        <span className="text-[11px] font-medium text-muted-foreground text-right max-w-[55%] truncate">{item.value}</span>
+                                        <span className="text-[12px] font-medium text-muted-foreground text-right max-w-[55%] truncate">{item.value}</span>
                                     )}
                                 </div>
                             ))}
@@ -871,7 +880,7 @@ export default function ManufacturingDetailPage() {
 
                         {/* Cost Analysis */}
                         <div className="mx-4 mb-4">
-                            <div className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-3">Cost Breakdown</div>
+                            <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-3">Cost Breakdown</div>
                             <div className="space-y-2">
                                 {[
                                     { label: 'Material', value: costs.material, color: 'bg-blue-500' },
@@ -880,8 +889,8 @@ export default function ManufacturingDetailPage() {
                                 ].map((item, idx) => (
                                     <div key={idx} className="group">
                                         <div className="flex justify-between items-center mb-1">
-                                            <span className="text-[10px] text-muted-foreground group-hover:text-foreground transition-colors font-medium">{item.label}</span>
-                                            <span className="text-[11px] font-mono font-semibold text-muted-foreground">${item.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                            <span className="text-[12px] text-muted-foreground group-hover:text-foreground transition-colors font-medium">{item.label}</span>
+                                            <span className="text-[12px] font-mono font-semibold text-muted-foreground">${item.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                         </div>
                                         <div className="h-1 bg-secondary rounded-full overflow-hidden">
                                             <div className={cn("h-full rounded-full transition-all duration-500", item.color)} style={{ width: `${costs.total > 0 ? (item.value / costs.total * 100) : 0}%` }} />
@@ -892,12 +901,12 @@ export default function ManufacturingDetailPage() {
 
                             <div className="mt-3 pt-3 border-t border-border space-y-2">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-[10px] text-muted-foreground font-medium italic">Per Unit</span>
-                                    <span className="text-[11px] font-mono font-medium text-muted-foreground italic">${costs.perUnit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</span>
+                                    <span className="text-[12px] text-muted-foreground font-medium italic">Per Unit</span>
+                                    <span className="text-[12px] font-mono font-medium text-muted-foreground italic">${costs.perUnit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</span>
                                 </div>
-                                <div className="flex justify-between items-center bg-emerald-500/10 border border-emerald-500/20 px-3 py-2">
-                                    <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Total Cost</span>
-                                    <span className="text-base font-mono font-black text-emerald-400">${costs.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                <div className="flex justify-between items-center bg-emerald-500 border border-emerald-600 px-3 py-2">
+                                    <span className="text-[10px] font-black text-white uppercase tracking-widest">Total Cost</span>
+                                    <span className="text-base font-mono font-black text-white">${costs.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 </div>
                             </div>
                         </div>
@@ -914,7 +923,7 @@ export default function ManufacturingDetailPage() {
                         </button>
                         <button
                             onClick={handleDeleteOrder}
-                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors"
+                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-red-500 text-white border border-red-600 hover:bg-red-600 transition-colors"
                         >
                             <Trash2 className="w-3.5 h-3.5" />
                             <span>Delete</span>
@@ -974,7 +983,7 @@ export default function ManufacturingDetailPage() {
                                         });
                                         setIsEditModalOpen(true);
                                     }}
-                                    className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors flex items-center space-x-1"
+                                    className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-emerald-500 text-white border border-emerald-600 hover:bg-emerald-600 transition-colors flex items-center space-x-1"
                                 >
                                     <Plus className="w-3 h-3" />
                                     <span>Add Item</span>
@@ -987,7 +996,7 @@ export default function ManufacturingDetailPage() {
                                         setUserSearch('');
                                         setIsLaborModalOpen(true);
                                     }}
-                                    className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors flex items-center space-x-1"
+                                    className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-emerald-500 text-white border border-emerald-600 hover:bg-emerald-600 transition-colors flex items-center space-x-1"
                                 >
                                     <Plus className="w-3 h-3" />
                                     <span>Add Labor</span>
@@ -999,7 +1008,7 @@ export default function ManufacturingDetailPage() {
                                         setEditingNote({ note: '' });
                                         setIsNoteModalOpen(true);
                                     }}
-                                    className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors flex items-center space-x-1"
+                                    className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-emerald-500 text-white border border-emerald-600 hover:bg-emerald-600 transition-colors flex items-center space-x-1"
                                 >
                                     <Plus className="w-3 h-3" />
                                     <span>Add Note</span>

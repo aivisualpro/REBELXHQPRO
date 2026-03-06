@@ -171,24 +171,6 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
         };
     }
 
-    // Lab Results
-    if (pathname === '/warehouse/lab-results') {
-        return {
-            title: '',
-            actions: [],
-            isPortal: true
-        };
-    }
-
-    // Kits
-    if (pathname === '/warehouse/kits') {
-        return {
-            title: '',
-            actions: [],
-            isPortal: true
-        };
-    }
-
     // Recipes
     if (pathname === '/warehouse/recipes') {
         return {
@@ -267,13 +249,9 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
         };
     }
 
-    // Settings
+    // Settings — uses its own in-page header
     if (pathname === '/admin/settings') {
-        return {
-            title: '',
-            actions: [],
-            isPortal: true
-        };
+        return null;
     }
 
     // Default: No context
@@ -309,8 +287,8 @@ export const RouteContext = () => {
                             action.variant === 'primary'
                                 ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
                                 : action.variant === 'secondary'
-                                ? "bg-secondary text-foreground hover:bg-secondary/80"
-                                : "border border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
+                                    ? "bg-secondary text-foreground hover:bg-secondary/80"
+                                    : "border border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
                         );
 
                         if (action.href) {

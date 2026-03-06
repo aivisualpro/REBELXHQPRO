@@ -25,7 +25,7 @@ const DynamicActionsContent = () => {
     const searchParams = useSearchParams();
 
     // Routes that support search
-    const searchableRoutes = ['/crm/leads', '/crm/clients', '/crm/tasks', '/sales/wholesale-orders', '/warehouse/purchase-orders', '/warehouse/kits', '/warehouse/manufacturing', '/warehouse/audit-adjustments'];
+    const searchableRoutes = ['/crm/leads', '/crm/clients', '/crm/tasks', '/sales/wholesale-orders', '/warehouse/purchase-orders', '/warehouse/manufacturing', '/warehouse/audit-adjustments'];
     const isSearchable = searchableRoutes.includes(pathname);
 
     // Sync search value from URL
@@ -121,13 +121,12 @@ const DynamicActionsContent = () => {
             )}
 
             {/* Global Actions */}
-            <button 
+            <button
                 onClick={() => setIsPanelOpen(true)}
-                className={`relative p-1.5 rounded-full transition-all cursor-pointer ${
-                    activeTimerCount > 0 
-                        ? 'text-red-500 hover:text-red-400 hover:bg-red-500/10' 
+                className={`relative p-1.5 rounded-full transition-all cursor-pointer ${activeTimerCount > 0
+                        ? 'text-red-500 hover:text-red-400 hover:bg-red-500/10'
                         : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
-                }`}
+                    }`}
                 title={activeTimerCount > 0 ? `${activeTimerCount} active timer${activeTimerCount > 1 ? 's' : ''}` : 'No active timers'}
             >
                 <Bell className={`w-4 h-4 ${activeTimerCount > 0 ? 'animate-[wiggle_1s_ease-in-out_infinite]' : ''}`} />
@@ -137,7 +136,7 @@ const DynamicActionsContent = () => {
                     </span>
                 )}
             </button>
-            <button 
+            <button
                 onClick={toggleTheme}
                 className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-all group cursor-pointer"
                 title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
@@ -171,33 +170,33 @@ const DynamicActionsContent = () => {
 
                 <AnimatePresence>
                     {isUserMenuOpen && (
-                            <motion.div
-                                initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                transition={{ duration: 0.15 }}
-                                className="absolute right-0 mt-2 w-48 py-2 bg-card border border-border rounded-xl shadow-2xl z-50 overflow-hidden text-left"
+                        <motion.div
+                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                            transition={{ duration: 0.15 }}
+                            className="absolute right-0 mt-2 w-48 py-2 bg-card border border-border rounded-xl shadow-2xl z-50 overflow-hidden text-left"
+                        >
+                            <div className="px-4 py-2 border-b border-border/50 mb-1">
+                                <p className="text-xs text-foreground font-bold truncate">{session?.user?.name || session?.user?.email}</p>
+                            </div>
+                            <Link
+                                href="/profile"
+                                onClick={() => setIsUserMenuOpen(false)}
+                                className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-muted hover:text-foreground hover:bg-secondary transition-colors"
                             >
-                                <div className="px-4 py-2 border-b border-border/50 mb-1">
-                                    <p className="text-xs text-foreground font-bold truncate">{session?.user?.name || session?.user?.email}</p>
-                                </div>
-                                <Link 
-                                    href="/profile" 
-                                    onClick={() => setIsUserMenuOpen(false)}
-                                    className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-muted hover:text-foreground hover:bg-secondary transition-colors"
-                                >
-                                    <User className="w-4 h-4" />
-                                    <span>Profile</span>
-                                </Link>
-                                <div className="my-1 border-t border-border/50" />
-                                <button
-                                    onClick={() => signOut({ callbackUrl: '/login' })}
-                                    className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-red-500 hover:text-red-400 hover:bg-red-500/5 transition-colors"
-                                >
-                                    <LogOut className="w-4 h-4" />
-                                    <span>Logout</span>
-                                </button>
-                            </motion.div>
+                                <User className="w-4 h-4" />
+                                <span>Profile</span>
+                            </Link>
+                            <div className="my-1 border-t border-border/50" />
+                            <button
+                                onClick={() => signOut({ callbackUrl: '/login' })}
+                                className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-red-500 hover:text-red-400 hover:bg-red-500/5 transition-colors"
+                            >
+                                <LogOut className="w-4 h-4" />
+                                <span>Logout</span>
+                            </button>
+                        </motion.div>
                     )}
                 </AnimatePresence>
             </div>

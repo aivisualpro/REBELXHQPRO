@@ -30,6 +30,9 @@ export async function GET(request: Request) {
         }
         if (status) query.status = { $in: status.split(',') };
 
+        const role = searchParams.get('role') || '';
+        if (role) query.role = role;
+
         // Apply Global Date Filter
         query = await applyDateFilter(query, 'createdAt');
 

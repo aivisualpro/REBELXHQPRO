@@ -1,15 +1,14 @@
 'use client';
 
 import React, { useState, useRef, useCallback, Suspense, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { 
-    Save, 
-    Globe, 
-    Building, 
-    Bell, 
-    Shield, 
-    Mail, 
+import {
+    Save,
+    Globe,
+    Building,
+    Bell,
+    Shield,
+    Mail,
     Smartphone,
     MapPin,
     DollarSign,
@@ -157,11 +156,7 @@ function SettingsPageContent() {
         fetchSettings();
     }, []);
 
-    const [headerPortalTarget, setHeaderPortalTarget] = useState<HTMLElement | null>(null);
-    useEffect(() => {
-        const target = document.getElementById('header-portal-target');
-        if (target) setHeaderPortalTarget(target);
-    }, []);
+
 
     const fetchSettings = async () => {
         try {
@@ -232,7 +227,7 @@ function SettingsPageContent() {
                 try {
                     for (let i = 0; i < chunks.length; i++) {
                         const chunk = chunks[i];
-                        
+
                         const res = await fetch(endpoint, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -243,7 +238,7 @@ function SettingsPageContent() {
                             const data = await res.json();
                             successCount += (data.count || 0);
                             // Always log full response for debugging
-                            console.log(`Import ${label} chunk ${i+1} response:`, JSON.stringify(data, null, 2));
+                            console.log(`Import ${label} chunk ${i + 1} response:`, JSON.stringify(data, null, 2));
                             if (data.debug) {
                                 console.log('CSV Headers:', data.debug.csvHeaders);
                                 console.log('First row raw:', data.debug.firstRowRaw);
@@ -330,13 +325,13 @@ function SettingsPageContent() {
                     setWpSyncStatus(data);
                     pollWebProductSyncProgress();
                 }
-            }).catch(() => {});
+            }).catch(() => { });
             fetch('/api/retail/web-orders/sync').then(res => res.json()).then(data => {
                 if (data.isSyncing) {
                     setWoSyncStatus(data);
                     pollWebOrderSyncProgress();
                 }
-            }).catch(() => {});
+            }).catch(() => { });
         }
     }, [activeTab, moduleSubTab, pollWebProductSyncProgress]);
 
@@ -492,32 +487,40 @@ function SettingsPageContent() {
 
     return (
         <div className="flex flex-col h-[calc(100vh-48px)] bg-background">
-            {/* Portal search + save into main header */}
-            {headerPortalTarget && createPortal(
-                <>
-                    <h1 className="text-sm font-bold text-foreground uppercase tracking-tight whitespace-nowrap">Settings</h1>
-                    <div className="relative ml-4">
+            {/* Page Header */}
+            <div className="shrink-0 border-b border-border bg-background">
+                <div className="px-4 py-2.5 flex items-center gap-4">
+                    <div className="flex items-center gap-2 shrink-0">
+                        <Save className="w-4 h-4 text-primary" />
+                        <h1 className="text-[14px] font-black uppercase tracking-widest text-foreground">Settings</h1>
+                    </div>
+                    <div className="h-5 w-px bg-border shrink-0" />
+                    <div className="relative shrink-0">
                         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                         <input
                             type="text"
                             placeholder="Search settings..."
                             value={headerSearch}
                             onChange={e => setHeaderSearch(e.target.value)}
-                            className="pl-8 pr-3 h-8 w-64 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
+                            className="pl-8 pr-8 h-8 w-56 bg-background border border-border text-[12px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
                         />
+                        {headerSearch && (
+                            <button onClick={() => setHeaderSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors z-20 cursor-pointer">
+                                <X className="h-3 w-3" />
+                            </button>
+                        )}
                     </div>
                     <div className="flex-1" />
                     <button
                         onClick={handleSave}
                         disabled={saving}
-                        className="h-8 px-4 bg-foreground text-background hover:bg-foreground/90 transition-all rounded shadow-md flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                        className="h-8 px-4 bg-primary text-black hover:opacity-90 transition-all rounded-lg shadow flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
                     >
-                        <Save className="w-3 h-3" />
-                        <span className="text-[10px] font-black uppercase tracking-widest">{saving ? 'Saving...' : 'Save Changes'}</span>
+                        <Save className="w-3.5 h-3.5" />
+                        <span className="text-[11px] font-black uppercase tracking-widest">{saving ? 'Saving...' : 'Save Changes'}</span>
                     </button>
-                </>,
-                headerPortalTarget
-            )}
+                </div>
+            </div>
 
             <div className="flex flex-1 overflow-hidden">
                 {/* Sidebar */}
@@ -530,8 +533,8 @@ function SettingsPageContent() {
                                 onClick={() => setActiveTab(tab.id as Tab)}
                                 className={cn(
                                     "flex items-center space-x-3 px-6 py-3 text-sm font-medium transition-colors border-l-2",
-                                    activeTab === tab.id 
-                                        ? "border-foreground text-foreground bg-background" 
+                                    activeTab === tab.id
+                                        ? "border-foreground text-foreground bg-background"
                                         : "border-transparent text-muted-foreground hover:text-foreground hover:bg-background"
                                 )}
                             >
@@ -564,10 +567,10 @@ function SettingsPageContent() {
                                             <label className="text-xs font-bold text-muted-foreground">Company Name</label>
                                             <div className="relative">
                                                 <Building className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
-                                                <input 
-                                                    type="text" 
+                                                <input
+                                                    type="text"
                                                     value={settings.companyName}
-                                                    onChange={e => setSettings({...settings, companyName: e.target.value})}
+                                                    onChange={e => setSettings({ ...settings, companyName: e.target.value })}
                                                     className="w-full pl-9 pr-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring"
                                                 />
                                             </div>
@@ -578,10 +581,10 @@ function SettingsPageContent() {
                                                 <label className="text-xs font-bold text-muted-foreground">Support Email</label>
                                                 <div className="relative">
                                                     <Mail className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
-                                                    <input 
-                                                        type="email" 
+                                                    <input
+                                                        type="email"
                                                         value={settings.email}
-                                                        onChange={e => setSettings({...settings, email: e.target.value})}
+                                                        onChange={e => setSettings({ ...settings, email: e.target.value })}
                                                         className="w-full pl-9 pr-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring"
                                                     />
                                                 </div>
@@ -590,23 +593,23 @@ function SettingsPageContent() {
                                                 <label className="text-xs font-bold text-muted-foreground">Phone</label>
                                                 <div className="relative">
                                                     <Smartphone className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
-                                                    <input 
-                                                        type="text" 
+                                                    <input
+                                                        type="text"
                                                         value={settings.phone}
-                                                        onChange={e => setSettings({...settings, phone: e.target.value})}
+                                                        onChange={e => setSettings({ ...settings, phone: e.target.value })}
                                                         className="w-full pl-9 pr-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring"
                                                     />
                                                 </div>
                                             </div>
                                         </div>
-                                         <div className="space-y-1.5">
+                                        <div className="space-y-1.5">
                                             <label className="text-xs font-bold text-muted-foreground">Address</label>
                                             <div className="relative">
                                                 <MapPin className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
-                                                <input 
-                                                    type="text" 
+                                                <input
+                                                    type="text"
                                                     value={settings.address}
-                                                    onChange={e => setSettings({...settings, address: e.target.value})}
+                                                    onChange={e => setSettings({ ...settings, address: e.target.value })}
                                                     className="w-full pl-9 pr-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring"
                                                 />
                                             </div>
@@ -618,18 +621,18 @@ function SettingsPageContent() {
 
                         {/* LOCALIZATION TAB */}
                         {activeTab === 'localization' && (
-                             <div className="space-y-6">
+                            <div className="space-y-6">
                                 <div className="space-y-4">
                                     <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground border-b border-border pb-2">Regional Settings</h2>
-                                    
+
                                     <div className="grid grid-cols-2 gap-6">
                                         <div className="space-y-1.5">
                                             <label className="text-xs font-bold text-muted-foreground">Default Currency</label>
                                             <div className="relative">
                                                 <DollarSign className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
-                                                <select 
+                                                <select
                                                     value={settings.currency}
-                                                    onChange={e => setSettings({...settings, currency: e.target.value})}
+                                                    onChange={e => setSettings({ ...settings, currency: e.target.value })}
                                                     className="w-full pl-9 pr-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring appearance-none"
                                                 >
                                                     <option value="USD">USD ($)</option>
@@ -642,9 +645,9 @@ function SettingsPageContent() {
                                             <label className="text-xs font-bold text-muted-foreground">Timezone</label>
                                             <div className="relative">
                                                 <Clock className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
-                                                <select 
+                                                <select
                                                     value={settings.timezone}
-                                                    onChange={e => setSettings({...settings, timezone: e.target.value})}
+                                                    onChange={e => setSettings({ ...settings, timezone: e.target.value })}
                                                     className="w-full pl-9 pr-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring appearance-none"
                                                 >
                                                     <option value="America/New_York">Eastern Time (US & Canada)</option>
@@ -662,12 +665,12 @@ function SettingsPageContent() {
                                         <div className="space-y-2">
                                             {['MM/DD/YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'].map(fmt => (
                                                 <label key={fmt} className="flex items-center space-x-3 cursor-pointer p-3 border border-border rounded hover:bg-secondary/50 transition-colors">
-                                                    <input 
-                                                        type="radio" 
+                                                    <input
+                                                        type="radio"
                                                         name="dateFormat"
                                                         value={fmt}
                                                         checked={settings.dateFormat === fmt}
-                                                        onChange={e => setSettings({...settings, dateFormat: e.target.value})}
+                                                        onChange={e => setSettings({ ...settings, dateFormat: e.target.value })}
                                                         className="text-foreground focus:ring-black"
                                                     />
                                                     <span className="text-sm font-medium text-muted-foreground">{fmt} <span className="text-muted-foreground text-xs ml-2">(e.g. {new Date().toLocaleDateString()})</span></span>
@@ -691,7 +694,7 @@ function SettingsPageContent() {
                                         <div>
                                             <h4 className="text-sm font-bold text-blue-600 dark:text-blue-400">Start Date Filter</h4>
                                             <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                                                All data in the system (SKUs, Orders, Tickets, etc.) created BEFORE this date will be hidden from views. 
+                                                All data in the system (SKUs, Orders, Tickets, etc.) created BEFORE this date will be hidden from views.
                                                 Leave empty to show all history.
                                             </p>
                                         </div>
@@ -701,10 +704,10 @@ function SettingsPageContent() {
                                         <label className="text-xs font-bold text-muted-foreground">Filter Data From (Start Date)</label>
                                         <div className="relative max-w-sm">
                                             <Calendar className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
-                                            <input 
-                                                type="date" 
+                                            <input
+                                                type="date"
                                                 value={settings.filterDataFrom || ''}
-                                                onChange={e => setSettings({...settings, filterDataFrom: e.target.value})}
+                                                onChange={e => setSettings({ ...settings, filterDataFrom: e.target.value })}
                                                 className="w-full pl-9 pr-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring"
                                             />
                                         </div>
@@ -717,7 +720,7 @@ function SettingsPageContent() {
                         )}
                         {/* NOTIFICATIONS TAB */}
                         {activeTab === 'notifications' && (
-                             <div className="space-y-6">
+                            <div className="space-y-6">
                                 <div className="space-y-4">
                                     <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground border-b border-border pb-2">Alert Preferences</h2>
                                     <div className="space-y-4">
@@ -732,11 +735,11 @@ function SettingsPageContent() {
                                                 </div>
                                             </div>
                                             <label className="relative inline-flex items-center cursor-pointer">
-                                                <input 
-                                                    type="checkbox" 
+                                                <input
+                                                    type="checkbox"
                                                     checked={settings.emailAlerts}
-                                                    onChange={e => setSettings({...settings, emailAlerts: e.target.checked})}
-                                                    className="sr-only peer" 
+                                                    onChange={e => setSettings({ ...settings, emailAlerts: e.target.checked })}
+                                                    className="sr-only peer"
                                                 />
                                                 <div className="w-11 h-6 bg-secondary peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-background after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-foreground"></div>
                                             </label>
@@ -753,11 +756,11 @@ function SettingsPageContent() {
                                                 </div>
                                             </div>
                                             <label className="relative inline-flex items-center cursor-pointer">
-                                                <input 
-                                                    type="checkbox" 
+                                                <input
+                                                    type="checkbox"
                                                     checked={settings.pushNotifications}
-                                                    onChange={e => setSettings({...settings, pushNotifications: e.target.checked})}
-                                                    className="sr-only peer" 
+                                                    onChange={e => setSettings({ ...settings, pushNotifications: e.target.checked })}
+                                                    className="sr-only peer"
                                                 />
                                                 <div className="w-11 h-6 bg-secondary peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-background after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-foreground"></div>
                                             </label>
@@ -769,10 +772,10 @@ function SettingsPageContent() {
 
                         {/* SECURITY TAB */}
                         {activeTab === 'security' && (
-                             <div className="space-y-6">
+                            <div className="space-y-6">
                                 <div className="space-y-4">
                                     <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground border-b border-border pb-2">Access Control</h2>
-                                    
+
                                     <div className="p-4 border border-orange-500/20 bg-orange-500/10 rounded-lg flex items-start space-x-4">
                                         <Shield className="w-5 h-5 text-orange-600 shrink-0 mt-0.5" />
                                         <div>
@@ -781,11 +784,11 @@ function SettingsPageContent() {
                                         </div>
                                         <div className="ml-auto">
                                             <label className="relative inline-flex items-center cursor-pointer">
-                                                <input 
-                                                    type="checkbox" 
+                                                <input
+                                                    type="checkbox"
                                                     checked={settings.twoFactor}
-                                                    onChange={e => setSettings({...settings, twoFactor: e.target.checked})}
-                                                    className="sr-only peer" 
+                                                    onChange={e => setSettings({ ...settings, twoFactor: e.target.checked })}
+                                                    className="sr-only peer"
                                                 />
                                                 <div className="w-11 h-6 bg-secondary peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-background after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
                                             </label>
@@ -815,8 +818,8 @@ function SettingsPageContent() {
                                                 onClick={() => setModuleSubTab(tab.id as ModuleSubTab)}
                                                 className={cn(
                                                     "flex items-center space-x-2 px-4 py-2.5 text-xs font-bold uppercase tracking-wider transition-colors border-b-2 -mb-px",
-                                                    moduleSubTab === tab.id 
-                                                        ? "border-foreground text-foreground" 
+                                                    moduleSubTab === tab.id
+                                                        ? "border-foreground text-foreground"
                                                         : "border-transparent text-muted-foreground hover:text-muted-foreground"
                                                 )}
                                             >
@@ -864,15 +867,15 @@ function SettingsPageContent() {
 
                                         <div className="space-y-4">
                                             <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground border-b border-border pb-2">Wholesale Orders Import</h2>
-                                            
+
                                             {/* Status Display */}
                                             {importStatus && (
                                                 <div className={cn(
                                                     "p-3 rounded-lg text-sm font-medium",
                                                     importStatus.startsWith('✓') ? "bg-emerald-500/10 text-emerald-700 border border-emerald-500/20" :
-                                                    importStatus.startsWith('⚠️') ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20" :
-                                                    importStatus.startsWith('❌') ? "bg-red-500/10 text-red-700 border border-red-500/20" :
-                                                    "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+                                                        importStatus.startsWith('⚠️') ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20" :
+                                                            importStatus.startsWith('❌') ? "bg-red-500/10 text-red-700 border border-red-500/20" :
+                                                                "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
                                                 )}>
                                                     {isImporting && <RefreshCw className="w-4 h-4 inline mr-2 animate-spin" />}
                                                     {importStatus}
@@ -886,7 +889,7 @@ function SettingsPageContent() {
                                                 <div>
                                                     <h4 className="text-sm font-bold text-blue-600 dark:text-blue-400">Data Import</h4>
                                                     <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                                                        Import wholesale orders data from CSV files. Orders use <code className="bg-blue-500/20 px-1 rounded">legacyId</code> for matching - 
+                                                        Import wholesale orders data from CSV files. Orders use <code className="bg-blue-500/20 px-1 rounded">legacyId</code> for matching -
                                                         existing records will be updated, new records will be created.
                                                     </p>
                                                 </div>
@@ -980,7 +983,7 @@ function SettingsPageContent() {
                                         {/* Sync Costs Section */}
                                         <div className="space-y-4">
                                             <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground border-b border-border pb-2">Cost Synchronization</h2>
-                                            
+
                                             <div className="p-4 border border-amber-500/20 bg-amber-500/10 rounded-lg flex items-start space-x-4 mb-4">
                                                 <div className="shrink-0 mt-0.5">
                                                     <RefreshCw className="w-5 h-5 text-amber-600" />
@@ -999,8 +1002,8 @@ function SettingsPageContent() {
                                                 <div className={cn(
                                                     "p-3 rounded-lg text-sm font-medium font-mono",
                                                     syncStatus.startsWith('✓') ? "bg-emerald-500/10 text-emerald-700 border border-emerald-500/20" :
-                                                    syncStatus === 'Error' ? "bg-red-500/10 text-red-700 border border-red-500/20" :
-                                                    "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+                                                        syncStatus === 'Error' ? "bg-red-500/10 text-red-700 border border-red-500/20" :
+                                                            "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
                                                 )}>
                                                     {isSyncing && <RefreshCw className="w-4 h-4 inline mr-2 animate-spin" />}
                                                     {syncStatus}
@@ -1321,13 +1324,6 @@ function SettingsPageContent() {
                                             type="file"
                                             accept=".csv"
                                             className="hidden"
-                                            ref={importLabResultsRef}
-                                            onChange={(e) => handleImport(e, '/api/lab-results/import', 'Lab Results')}
-                                        />
-                                        <input
-                                            type="file"
-                                            accept=".csv"
-                                            className="hidden"
                                             ref={importRecipesRef}
                                             onChange={(e) => handleImport(e, '/api/recipes/import', 'Recipes')}
                                         />
@@ -1344,20 +1340,6 @@ function SettingsPageContent() {
                                             className="hidden"
                                             ref={importRecipeStepsRef}
                                             onChange={(e) => handleImport(e, '/api/recipes/import-steps', 'Recipe Steps')}
-                                        />
-                                        <input
-                                            type="file"
-                                            accept=".csv"
-                                            className="hidden"
-                                            ref={importKitsRef}
-                                            onChange={(e) => handleImport(e, '/api/kits/import', 'Product Kits')}
-                                        />
-                                        <input
-                                            type="file"
-                                            accept=".csv"
-                                            className="hidden"
-                                            ref={importKitLineItemsRef}
-                                            onChange={(e) => handleImport(e, '/api/kits/import-lineitems', 'Kit Line Items')}
                                         />
                                         <input
                                             type="file"
@@ -1397,7 +1379,7 @@ function SettingsPageContent() {
 
                                         <div className="space-y-4">
                                             <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground border-b border-border pb-2">System Defaults</h2>
-                                            
+
                                             <div className="space-y-3">
                                                 <div>
                                                     <label className="text-xs font-bold text-muted-foreground block mb-2">Missing SKU Image (Fallback)</label>
@@ -1421,7 +1403,7 @@ function SettingsPageContent() {
                                                                             const res = await fetch('/api/upload', { method: 'POST', body: formData });
                                                                             if (res.ok) {
                                                                                 const data = await res.json();
-                                                                                setSettings(prev => ({...prev, missingSkuImage: data.url }));
+                                                                                setSettings(prev => ({ ...prev, missingSkuImage: data.url }));
                                                                                 toast.success('Uploaded', { id: toastId });
                                                                             } else {
                                                                                 throw new Error('Upload failed');
@@ -1439,8 +1421,8 @@ function SettingsPageContent() {
                                                                 This image will be displayed whenever a SKU&apos;s primary image is missing or fails to load.
                                                             </p>
                                                             {settings.missingSkuImage && (
-                                                                <button 
-                                                                    onClick={() => setSettings(prev => ({...prev, missingSkuImage: ''}))}
+                                                                <button
+                                                                    onClick={() => setSettings(prev => ({ ...prev, missingSkuImage: '' }))}
                                                                     className="mt-2 text-[10px] text-red-600 hover:underline"
                                                                 >
                                                                     Remove Default Image
@@ -1455,15 +1437,15 @@ function SettingsPageContent() {
                                         {/* SKU Import Section */}
                                         <div className="space-y-4">
                                             <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground border-b border-border pb-2">SKU Data Import</h2>
-                                            
+
                                             {/* Status Display */}
                                             {importStatus && (
                                                 <div className={cn(
                                                     "p-3 rounded-lg text-sm font-medium",
                                                     importStatus.startsWith('✓') ? "bg-emerald-500/10 text-emerald-700 border border-emerald-500/20" :
-                                                    importStatus.startsWith('⚠️') ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20" :
-                                                    importStatus.startsWith('❌') ? "bg-red-500/10 text-red-700 border border-red-500/20" :
-                                                    "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+                                                        importStatus.startsWith('⚠️') ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20" :
+                                                            importStatus.startsWith('❌') ? "bg-red-500/10 text-red-700 border border-red-500/20" :
+                                                                "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
                                                 )}>
                                                     {isImporting && <RefreshCw className="w-4 h-4 inline mr-2 animate-spin" />}
                                                     {importStatus}
@@ -1477,7 +1459,7 @@ function SettingsPageContent() {
                                                 <div>
                                                     <h4 className="text-sm font-bold text-teal-600 dark:text-teal-400">SKU Data Import</h4>
                                                     <p className="text-xs text-teal-600 dark:text-teal-400 mt-1">
-                                                        Import SKUs and Variances from CSV files. SKUs use <code className="bg-teal-500/20 px-1 rounded">legacyId</code> for matching - 
+                                                        Import SKUs and Variances from CSV files. SKUs use <code className="bg-teal-500/20 px-1 rounded">legacyId</code> for matching -
                                                         existing records will be updated, new records will be created.
                                                     </p>
                                                 </div>
@@ -1632,7 +1614,7 @@ function SettingsPageContent() {
                                         {/* Opening Balances Import Section */}
                                         <div className="space-y-4">
                                             <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground border-b border-border pb-2">Opening Balances Import</h2>
-                                            
+
                                             <input
                                                 type="file"
                                                 accept=".csv"
@@ -2088,82 +2070,82 @@ function SettingsPageContent() {
                                                     <div className="grid grid-cols-2 gap-4">
                                                         <div className="space-y-1">
                                                             <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Name <span className="text-destructive">*</span></label>
-                                                            <input type="text" required value={wpFormData.name} onChange={e => setWpFormData({...wpFormData, name: e.target.value})} className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground font-medium" />
+                                                            <input type="text" required value={wpFormData.name} onChange={e => setWpFormData({ ...wpFormData, name: e.target.value })} className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground font-medium" />
                                                         </div>
                                                         <div className="space-y-1">
                                                             <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Website <span className="text-destructive">*</span></label>
-                                                            <input type="text" required placeholder="e.g. KINGKKRATOM" value={wpFormData.website} onChange={e => setWpFormData({...wpFormData, website: e.target.value})} className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground font-medium" />
+                                                            <input type="text" required placeholder="e.g. KINGKKRATOM" value={wpFormData.website} onChange={e => setWpFormData({ ...wpFormData, website: e.target.value })} className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground font-medium" />
                                                         </div>
                                                     </div>
                                                     <div className="grid grid-cols-2 gap-4">
                                                         <div className="space-y-1">
                                                             <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Web ID (WooCommerce) <span className="text-destructive">*</span></label>
-                                                            <input type="number" required value={wpFormData.webId} onChange={e => setWpFormData({...wpFormData, webId: Number(e.target.value)})} className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground font-medium" />
+                                                            <input type="number" required value={wpFormData.webId} onChange={e => setWpFormData({ ...wpFormData, webId: Number(e.target.value) })} className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground font-medium" />
                                                         </div>
                                                         <div className="space-y-1">
                                                             <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Linked SKU Code</label>
-                                                            <input type="text" placeholder="Matches internal SKU" value={wpFormData.sku_code} onChange={e => setWpFormData({...wpFormData, sku_code: e.target.value})} className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground font-medium" />
+                                                            <input type="text" placeholder="Matches internal SKU" value={wpFormData.sku_code} onChange={e => setWpFormData({ ...wpFormData, sku_code: e.target.value })} className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground font-medium" />
                                                         </div>
                                                     </div>
                                                     <div className="space-y-1">
                                                         <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Image URL</label>
-                                                        <input type="text" placeholder="https://..." value={wpFormData.image} onChange={e => setWpFormData({...wpFormData, image: e.target.value})} className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground font-medium" />
+                                                        <input type="text" placeholder="https://..." value={wpFormData.image} onChange={e => setWpFormData({ ...wpFormData, image: e.target.value })} className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground font-medium" />
                                                     </div>
                                                     <div className="grid grid-cols-3 gap-4">
                                                         <div className="space-y-1">
                                                             <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Category</label>
-                                                            <select className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground" value={wpFormData.category} onChange={e => setWpFormData({...wpFormData, category: e.target.value})}>
+                                                            <select className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground" value={wpFormData.category} onChange={e => setWpFormData({ ...wpFormData, category: e.target.value })}>
                                                                 <option value="">Select Category</option>
-                                                                {["Finished Goods","High Priority","Lab Testing","Maintenance","Packaging","Part","Shipping Category"].map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                                                {["Finished Goods", "High Priority", "Lab Testing", "Maintenance", "Packaging", "Part", "Shipping Category"].map(opt => <option key={opt} value={opt}>{opt}</option>)}
                                                             </select>
                                                         </div>
                                                         <div className="space-y-1">
                                                             <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Sub Category</label>
-                                                            <select className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground" value={wpFormData.subCategory} onChange={e => setWpFormData({...wpFormData, subCategory: e.target.value})}>
+                                                            <select className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground" value={wpFormData.subCategory} onChange={e => setWpFormData({ ...wpFormData, subCategory: e.target.value })}>
                                                                 <option value="">Select Sub-Category</option>
-                                                                {["Bags","Bottle and Lids","Display Boxes","Disposable Vape","Edibles","Flavors","Hemp","Kava","Kratom","Kratom Extract","Kratom Powder","Labels/Shrink-Bands","Marketing Material","Packagings","R&D (Research and Developement)","Raw Ingredients","simple","variable"].map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                                                {["Bags", "Bottle and Lids", "Display Boxes", "Disposable Vape", "Edibles", "Flavors", "Hemp", "Kava", "Kratom", "Kratom Extract", "Kratom Powder", "Labels/Shrink-Bands", "Marketing Material", "Packagings", "R&D (Research and Developement)", "Raw Ingredients", "simple", "variable"].map(opt => <option key={opt} value={opt}>{opt}</option>)}
                                                             </select>
                                                         </div>
                                                         <div className="space-y-1">
                                                             <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Material Type</label>
-                                                            <select className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground" value={wpFormData.materialType} onChange={e => setWpFormData({...wpFormData, materialType: e.target.value})}>
+                                                            <select className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground" value={wpFormData.materialType} onChange={e => setWpFormData({ ...wpFormData, materialType: e.target.value })}>
                                                                 <option value="">Select Material Type</option>
-                                                                {["Bag","Bottle","Box","Capsule","Clings","Crystal","Dropper","Edible","Extracts","Label","Lid/Top","Liquid","Oils","Postcards","Posters","Powder","Sample Boxes","Seal","Shipping Boxes","Shrinkband","Smokables","Stickers","Suppository","SWAG","Table Tents","Tablets","Terpenes","Topicals"].map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                                                {["Bag", "Bottle", "Box", "Capsule", "Clings", "Crystal", "Dropper", "Edible", "Extracts", "Label", "Lid/Top", "Liquid", "Oils", "Postcards", "Posters", "Powder", "Sample Boxes", "Seal", "Shipping Boxes", "Shrinkband", "Smokables", "Stickers", "Suppository", "SWAG", "Table Tents", "Tablets", "Terpenes", "Topicals"].map(opt => <option key={opt} value={opt}>{opt}</option>)}
                                                             </select>
                                                         </div>
                                                     </div>
                                                     <div className="grid grid-cols-4 gap-4">
                                                         <div className="space-y-1">
                                                             <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">UOM</label>
-                                                            <input list="wp-uom-options" className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground" value={wpFormData.uom} onChange={e => setWpFormData({...wpFormData, uom: e.target.value})} placeholder="Select or Type..." />
+                                                            <input list="wp-uom-options" className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground" value={wpFormData.uom} onChange={e => setWpFormData({ ...wpFormData, uom: e.target.value })} placeholder="Select or Type..." />
                                                             <datalist id="wp-uom-options">
-                                                                {["Bottle","Box","Case","EA","Grams","Hour","Kg","Kit","Liter","Meter","Pallet","Roll"].map(opt => <option key={opt} value={opt} />)}
+                                                                {["Bottle", "Box", "Case", "EA", "Grams", "Hour", "Kg", "Kit", "Liter", "Meter", "Pallet", "Roll"].map(opt => <option key={opt} value={opt} />)}
                                                             </datalist>
                                                         </div>
                                                         <div className="space-y-1">
                                                             <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Sale Price ($)</label>
-                                                            <input type="number" value={wpFormData.salePrice} onChange={e => setWpFormData({...wpFormData, salePrice: Number(e.target.value)})} className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground font-medium" />
+                                                            <input type="number" value={wpFormData.salePrice} onChange={e => setWpFormData({ ...wpFormData, salePrice: Number(e.target.value) })} className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground font-medium" />
                                                         </div>
                                                         <div className="space-y-1">
                                                             <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Order Upto</label>
-                                                            <input type="number" value={wpFormData.orderUpto} onChange={e => setWpFormData({...wpFormData, orderUpto: Number(e.target.value)})} className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground font-medium" />
+                                                            <input type="number" value={wpFormData.orderUpto} onChange={e => setWpFormData({ ...wpFormData, orderUpto: Number(e.target.value) })} className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground font-medium" />
                                                         </div>
                                                         <div className="space-y-1">
                                                             <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Re-Order Point</label>
-                                                            <input type="number" value={wpFormData.reOrderPoint} onChange={e => setWpFormData({...wpFormData, reOrderPoint: Number(e.target.value)})} className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground font-medium" />
+                                                            <input type="number" value={wpFormData.reOrderPoint} onChange={e => setWpFormData({ ...wpFormData, reOrderPoint: Number(e.target.value) })} className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 transition-colors text-foreground font-medium" />
                                                         </div>
                                                     </div>
                                                     <div className="flex items-center space-x-6 pt-2">
                                                         <label className="flex items-center space-x-2 cursor-pointer group">
                                                             <div className="relative flex items-center">
-                                                                <input type="checkbox" className="peer h-4 w-4 cursor-pointer appearance-none rounded border border-border bg-background transition-all checked:bg-primary" checked={wpFormData.kitApplied} onChange={e => setWpFormData({...wpFormData, kitApplied: e.target.checked})} />
+                                                                <input type="checkbox" className="peer h-4 w-4 cursor-pointer appearance-none rounded border border-border bg-background transition-all checked:bg-primary" checked={wpFormData.kitApplied} onChange={e => setWpFormData({ ...wpFormData, kitApplied: e.target.checked })} />
                                                                 <svg className="pointer-events-none absolute h-3 w-3 translate-x-[2px] text-black opacity-0 peer-checked:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                                                             </div>
                                                             <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors">Kit Applied</span>
                                                         </label>
                                                         <label className="flex items-center space-x-2 cursor-pointer group">
                                                             <div className="relative flex items-center">
-                                                                <input type="checkbox" className="peer h-4 w-4 cursor-pointer appearance-none rounded border border-border bg-background transition-all checked:bg-primary" checked={wpFormData.isLotApplied} onChange={e => setWpFormData({...wpFormData, isLotApplied: e.target.checked})} />
+                                                                <input type="checkbox" className="peer h-4 w-4 cursor-pointer appearance-none rounded border border-border bg-background transition-all checked:bg-primary" checked={wpFormData.isLotApplied} onChange={e => setWpFormData({ ...wpFormData, isLotApplied: e.target.checked })} />
                                                                 <svg className="pointer-events-none absolute h-3 w-3 translate-x-[2px] text-black opacity-0 peer-checked:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                                                             </div>
                                                             <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors">Lot Applied (Traceability)</span>

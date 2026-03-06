@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import {
-  ArrowUpDown, Plus, Search, X, Loader2, Mail, Phone, Upload, Edit2, Trash2, Users,
+  ArrowUpDown, Plus, Search, X, Loader2, Mail, Phone, Edit2, Trash2, Users, Filter, ChevronDown, Upload,
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { cn } from '@/lib/utils';
@@ -147,7 +147,9 @@ function UsersContent() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [sortBy, setSortBy] = useState('firstName');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [activeStatus, setActiveStatus] = useState<string>('All');
+  const [activeStatus, setActiveStatus] = useState<string>('Active');
+  const [roleFilter, setRoleFilter] = useState<string>('All');
+  const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
 
   const pageRef = useRef(globalCache.current?.page || 0);
   const mountedRef = useRef(true);
@@ -194,7 +196,7 @@ function UsersContent() {
   const [formData, setFormData] = useState({ firstName: '', lastName: '', email: '', password: '', role: ROLES[3], department: DEPARTMENTS[0], phone: '', hourlyRate: 0, profileImage: '', status: 'Active' as 'Active' | 'Inactive' });
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const csvInputRef = useRef<HTMLInputElement>(null);
+
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
@@ -237,18 +239,7 @@ function UsersContent() {
     });
   };
 
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]; if (!file) return;
-    Papa.parse(file, {
-      header: true, skipEmptyLines: true,
-      complete: async (results) => {
-        try {
-          const res = await fetch('/api/users/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ users: results.data }) });
-          if (res.ok) { toast.success('Import successful'); refreshUsers(); fetchStatusCounts(); } else { const err = await res.json(); toast.error('Import failed: ' + err.error); }
-        } catch { toast.error('Import error'); }
-      },
-    });
-  };
+
 
   // ─── Fetch ──────────────────────────────────────────────────────────────────
 
@@ -260,6 +251,7 @@ function UsersContent() {
     try {
       const params = new URLSearchParams({ page: String(pageNum), limit: String(PAGE_SIZE), sortBy, sortOrder, search: debouncedSearch });
       if (activeStatus !== 'All') params.set('status', activeStatus);
+      if (roleFilter !== 'All') params.set('role', roleFilter);
       const res = await fetch(`/api/users?${params}`, { signal: ctrl.signal });
       const data = await res.json();
       if (seq !== seqRef.current || !mountedRef.current) return;
@@ -280,7 +272,7 @@ function UsersContent() {
       } else { setError(data.error || 'Failed to fetch'); }
     } catch (e: any) { if (e?.name === 'AbortError') return; if (mountedRef.current) setError(e.message); }
     finally { fetchingRef.current = false; if (mountedRef.current) { setIsLoading(false); setIsLoadingMore(false); } }
-  }, [sortBy, sortOrder, debouncedSearch, activeStatus]);
+  }, [sortBy, sortOrder, debouncedSearch, activeStatus, roleFilter]);
 
   const fetchPageRef = useRef(fetchPage); fetchPageRef.current = fetchPage;
   const isFirstMount = useRef(true);
@@ -289,13 +281,13 @@ function UsersContent() {
     if (isFirstMount.current) {
       isFirstMount.current = false;
       const c = globalCache.current;
-      if (c && c.users.length > 0 && (Date.now() - c.timestamp) < CACHE_TTL && c.sortBy === sortBy && c.sortOrder === sortOrder && c.search === debouncedSearch && c.status === activeStatus) {
+      if (c && c.users.length > 0 && (Date.now() - c.timestamp) < CACHE_TTL && c.sortBy === sortBy && c.sortOrder === sortOrder && c.search === debouncedSearch && c.status === activeStatus && (c as any).role === roleFilter) {
         setUsers(c.users); setHasMore(c.hasMore); pageRef.current = c.page; setIsLoading(false); return;
       }
     }
     globalCache.current = null; pageRef.current = 0; setUsers([]); setHasMore(true);
     fetchPageRef.current(1, false);
-  }, [sortBy, sortOrder, debouncedSearch, activeStatus]);
+  }, [sortBy, sortOrder, debouncedSearch, activeStatus, roleFilter]);
 
   useEffect(() => {
     const sentinel = sentinelRef.current; const container = scrollRef.current;
@@ -355,12 +347,40 @@ function UsersContent() {
               className="pl-8 pr-8 h-8 w-56 bg-background border border-border text-[12px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded" />
             {search && (<button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors z-20 cursor-pointer"><X className="h-3 w-3" /></button>)}
           </div>
-          {/* Import CSV */}
-          <input ref={csvInputRef} type="file" accept=".csv" className="hidden" onChange={handleImport} />
-          <button onClick={() => csvInputRef.current?.click()}
-            className="flex items-center space-x-1.5 px-3 h-8 text-[10px] font-bold uppercase tracking-wider rounded border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer shrink-0">
-            <Upload className="w-3.5 h-3.5" /><span>Import</span>
-          </button>
+          {/* Role Filter */}
+          <div className="relative shrink-0">
+            <button
+              onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
+              className={cn(
+                "flex items-center gap-1.5 px-3 h-8 text-[10px] font-bold uppercase tracking-wider rounded border border-border hover:bg-secondary transition-colors cursor-pointer",
+                roleFilter !== 'All' ? 'text-primary border-primary/30 bg-primary/5' : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <Filter className="w-3.5 h-3.5" />
+              <span>{roleFilter === 'All' ? 'Role' : roleFilter}</span>
+              <ChevronDown className="w-3 h-3" />
+            </button>
+            {roleDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setRoleDropdownOpen(false)} />
+                <div className="absolute top-full right-0 mt-1 w-48 bg-card border border-border rounded-lg shadow-xl z-50 overflow-hidden py-1 max-h-72 overflow-y-auto scrollbar-custom">
+                  {['All', ...ROLES].map(r => (
+                    <button
+                      key={r}
+                      onClick={() => { setRoleFilter(r); setRoleDropdownOpen(false); scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                      className={cn(
+                        "w-full text-left px-3 py-2 text-[11px] font-semibold transition-colors flex items-center justify-between",
+                        roleFilter === r ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
+                      )}
+                    >
+                      <span>{r}</span>
+                      {roleFilter === r && <span className="text-primary text-[10px]">✓</span>}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
           {/* Add */}
           <button onClick={() => openModal()}
             className="h-8 px-3 bg-primary text-black hover:opacity-90 transition-all rounded-lg shadow flex items-center gap-1.5 cursor-pointer shrink-0">

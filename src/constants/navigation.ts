@@ -1,8 +1,8 @@
 import {
     Users, Settings, UsersRound, Activity, ShoppingCart, CreditCard,
     Globe, Package, Clock, Database, Factory, Truck, BookOpen,
-    Layers, FlaskConical, Store, BarChart3, PieChart, LineChart, Scale,
-    HelpCircle, Ticket, Book, ClipboardCheck, Target
+    Store, BarChart3, PieChart, LineChart, Scale,
+    HelpCircle, Ticket, ClipboardCheck, Target
 } from 'lucide-react';
 
 export const MENU_ITEMS = [
@@ -44,8 +44,6 @@ export const MENU_ITEMS = [
             { title: 'Audit Adjustments', href: '/warehouse/audit-adjustments', icon: ClipboardCheck },
             { title: 'Purchase Orders', href: '/warehouse/purchase-orders', icon: ShoppingCart },
             { title: 'Recipes', href: '/warehouse/recipes', icon: BookOpen },
-            { title: 'Product Kits', href: '/warehouse/kits', icon: Layers },
-            { title: 'Lab Results', href: '/warehouse/lab-results', icon: FlaskConical },
             { title: 'Vendors', href: '/warehouse/vendors', icon: Truck },
         ]
     },
@@ -55,7 +53,6 @@ export const MENU_ITEMS = [
         items: [
             { title: 'Financials', href: '/reports/financials', icon: LineChart },
             { title: 'Business', href: '/reports/business', icon: PieChart },
-            { title: 'Activity Reports', href: '/reports/activity', icon: BarChart3 },
         ]
     },
     {
@@ -63,7 +60,6 @@ export const MENU_ITEMS = [
         icon: HelpCircle,
         items: [
             { title: 'Tickets', href: '/help/tickets', icon: Ticket },
-            { title: 'Knowledge Base', href: '/help/knowledgebase', icon: Book },
         ]
     }
 ];
