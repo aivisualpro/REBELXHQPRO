@@ -125,6 +125,9 @@ function SkuDetailsPageContent() {
     const [loading, setLoading] = useState(true);
     const [fallbackImage, setFallbackImage] = useState('/sku-placeholder.png');
 
+    // Only treat http(s) URLs as valid images; relative paths (e.g. "SKUs_Images/...") cause 404s
+    const isValidImageUrl = (url?: string) => !!url && (url.startsWith('http://') || url.startsWith('https://'));
+
     // Pagination state for infinite scroll
     const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -597,7 +600,7 @@ function SkuDetailsPageContent() {
                             <div className="flex items-stretch border border-border overflow-hidden">
                                 {/* Column 1: Image */}
                                 <div className="w-16 h-16 bg-secondary flex items-center justify-center shrink-0 border-r border-border overflow-hidden">
-                                    {sku.image ? (
+                                    {isValidImageUrl(sku.image) ? (
                                         <img
                                             src={sku.image}
                                             alt={sku.name}

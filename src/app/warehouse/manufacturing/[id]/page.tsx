@@ -359,7 +359,11 @@ export default function ManufacturingDetailPage() {
         ],
     ];
 
-    const skuImage = (typeof order.sku === 'object' && order.sku !== null && order.sku.image) ? order.sku.image : skuList.find(s => s._id === (typeof order.sku === 'string' ? order.sku : (order.sku as any)?._id))?.image;
+    // Only treat http(s) URLs as valid images; relative paths (e.g. "SKUs_Images/...") cause 404s
+    const isValidImageUrl = (url?: string) => !!url && (url.startsWith('http://') || url.startsWith('https://'));
+
+    const rawSkuImage = (typeof order.sku === 'object' && order.sku !== null && order.sku.image) ? order.sku.image : skuList.find(s => s._id === (typeof order.sku === 'string' ? order.sku : (order.sku as any)?._id))?.image;
+    const skuImage = isValidImageUrl(rawSkuImage) ? rawSkuImage : undefined;
 
     const STATUSES = ['Pending', 'Processing', 'Ready to QC', 'Fulfilled'];
     const PRIORITIES = ['Normal', 'High', 'Extreme'];
