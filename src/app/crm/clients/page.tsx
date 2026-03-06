@@ -66,8 +66,10 @@ const COLUMNS = [
 function fmtCurrency(v: number) {
     if (!v && v !== 0) return <span className="text-muted-foreground/30">—</span>;
     if (v === 0) return <span className="text-muted-foreground/30">—</span>;
-    if (v >= 1000) return <span className="tabular-nums">${(v / 1000).toFixed(1)}k</span>;
-    return <span className="tabular-nums">${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>;
+    const abs = Math.abs(v);
+    const sign = v < 0 ? '- ' : '';
+    if (abs >= 1000) return <span className="tabular-nums">{sign}${(abs / 1000).toFixed(1)}k</span>;
+    return <span className="tabular-nums">{sign}${abs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>;
 }
 
 // ─── Status Badge ────────────────────────────────────────────────────────────

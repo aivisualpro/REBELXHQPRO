@@ -11,9 +11,12 @@ import mongoose from 'mongoose';
 
 let statusIndexEnsured = false;
 
-export async function GET() {
+export async function GET(request: Request) {
     try {
         await dbConnect();
+
+        const { searchParams } = new URL(request.url);
+        const clientFilter = searchParams.get('client');
 
         // Ensure index on orderStatus for fast grouping (once per cold start)
         if (!statusIndexEnsured) {
@@ -29,15 +32,23 @@ export async function GET() {
             } catch { /* index already exists */ }
         }
 
-        // Single aggregation pipeline — groups ALL documents by orderStatus
-        const pipeline = [
-            {
-                $group: {
-                    _id: '$orderStatus',
-                    count: { $sum: 1 }
-                }
+        // Build match stage (optional client filter)
+        const matchStage: any = {};
+        if (clientFilter) {
+            matchStage.clientId = new mongoose.Types.ObjectId(clientFilter);
+        }
+
+        // Single aggregation pipeline — groups documents by orderStatus
+        const pipeline: any[] = [];
+        if (Object.keys(matchStage).length > 0) {
+            pipeline.push({ $match: matchStage });
+        }
+        pipeline.push({
+            $group: {
+                _id: '$orderStatus',
+                count: { $sum: 1 }
             }
-        ];
+        });
 
         const results = await SaleOrder.aggregate(pipeline);
 
@@ -45,17 +56,17 @@ export async function GET() {
         const counts: Record<string, number> = {
             All: 0,
             Pending: 0,
-            Picking: 0,
-            Shipping: 0,
-            'Pending Payment': 0,
+            Processing: 0,
+            Shipped: 0,
             Issued: 0,
             Completed: 0,
+            Cancelled: 0,
         };
 
         for (const row of results) {
             const status = row._id as string;
-            if (status && counts.hasOwnProperty(status)) {
-                counts[status] = row.count;
+            if (status) {
+                counts[status] = (counts[status] || 0) + row.count;
             }
             counts.All += row.count;
         }
