@@ -32,7 +32,7 @@ import {
     ListTodo,
     Eye
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 interface Task {
@@ -313,7 +313,7 @@ function TasksContent() {
         }
 
         const success = await handleUpdateTask(draggedTask._id, updates);
-        
+
         if (!success) {
             // Revert on failure
             setColumnTasks(prev => ({
@@ -393,7 +393,7 @@ function TasksContent() {
         setIsModalOpen(true);
     };
 
-    const formatDate = (dateStr: string) => {
+    const formatDueDate = (dateStr: string) => {
         if (!dateStr) return 'No date';
         const date = new Date(dateStr);
         if (isNaN(date.getTime())) return 'Invalid Date';
@@ -407,7 +407,7 @@ function TasksContent() {
         if (diff < 0) return `${Math.abs(diff)}d overdue`;
         if (diff === 0) return 'Today';
         if (diff === 1) return 'Tomorrow';
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        return formatDate(dateStr);
     };
 
     const isOverdue = (task: Task) => {
@@ -508,9 +508,9 @@ function TasksContent() {
                                                                 <div className={cn(
                                                                     "w-6 h-6 flex items-center justify-center",
                                                                     task.priority === 'Critical' ? "bg-red-100 text-red-600" :
-                                                                    task.priority === 'High' ? "bg-orange-100 text-orange-600" :
-                                                                    task.priority === 'Medium' ? "bg-blue-100 text-blue-600" :
-                                                                    "bg-slate-100 text-slate-600"
+                                                                        task.priority === 'High' ? "bg-orange-100 text-orange-600" :
+                                                                            task.priority === 'Medium' ? "bg-blue-100 text-blue-600" :
+                                                                                "bg-slate-100 text-slate-600"
                                                                 )}>
                                                                     {typeIcons[task.type] || <Target className="w-3 h-3" />}
                                                                 </div>
@@ -545,7 +545,7 @@ function TasksContent() {
                                                                     "text-[10px] font-bold",
                                                                     isOverdue(task) ? "text-red-600" : "text-slate-500"
                                                                 )}>
-                                                                    {formatDate(task.dueDate)}
+                                                                    {formatDueDate(task.dueDate)}
                                                                 </span>
                                                             </div>
                                                             {task.assignedToInfo && (
@@ -592,9 +592,9 @@ function TasksContent() {
                                 <div className={cn(
                                     "w-10 h-10 flex items-center justify-center",
                                     selectedTask.priority === 'Critical' ? "bg-red-100 text-red-600" :
-                                    selectedTask.priority === 'High' ? "bg-orange-100 text-orange-600" :
-                                    selectedTask.priority === 'Medium' ? "bg-blue-100 text-blue-600" :
-                                    "bg-slate-100 text-slate-600"
+                                        selectedTask.priority === 'High' ? "bg-orange-100 text-orange-600" :
+                                            selectedTask.priority === 'Medium' ? "bg-blue-100 text-blue-600" :
+                                                "bg-slate-100 text-slate-600"
                                 )}>
                                     {typeIcons[selectedTask.type] || <Target className="w-5 h-5" />}
                                 </div>
@@ -603,9 +603,9 @@ function TasksContent() {
                                     <span className={cn(
                                         "text-[9px] font-bold uppercase px-2 py-0.5",
                                         selectedTask.priority === 'Critical' ? "bg-red-100 text-red-700" :
-                                        selectedTask.priority === 'High' ? "bg-orange-100 text-orange-700" :
-                                        selectedTask.priority === 'Medium' ? "bg-blue-100 text-blue-700" :
-                                        "bg-slate-100 text-slate-600"
+                                            selectedTask.priority === 'High' ? "bg-orange-100 text-orange-700" :
+                                                selectedTask.priority === 'Medium' ? "bg-blue-100 text-blue-700" :
+                                                    "bg-slate-100 text-slate-600"
                                     )}>
                                         {selectedTask.priority} Priority
                                     </span>
@@ -663,9 +663,9 @@ function TasksContent() {
                                     <span className={cn(
                                         "font-bold uppercase px-2 py-0.5",
                                         selectedTask.status === 'Completed' ? "bg-emerald-100 text-emerald-700" :
-                                        selectedTask.status === 'In Progress' ? "bg-blue-100 text-blue-700" :
-                                        selectedTask.status === 'In Review' ? "bg-purple-100 text-purple-700" :
-                                        "bg-amber-100 text-amber-700"
+                                            selectedTask.status === 'In Progress' ? "bg-blue-100 text-blue-700" :
+                                                selectedTask.status === 'In Review' ? "bg-purple-100 text-purple-700" :
+                                                    "bg-amber-100 text-amber-700"
                                     )}>
                                         {selectedTask.status}
                                     </span>
@@ -673,7 +673,7 @@ function TasksContent() {
                                 <div>
                                     <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Due Date</div>
                                     <span className={cn("font-bold", isOverdue(selectedTask) ? "text-red-600" : "text-slate-700")}>
-                                        {selectedTask.dueDate ? new Date(selectedTask.dueDate).toLocaleDateString() : 'No date'}
+                                        {selectedTask.dueDate ? formatDueDate(selectedTask.dueDate) : 'No date'}
                                     </span>
                                 </div>
                             </div>

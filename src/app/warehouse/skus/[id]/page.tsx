@@ -24,7 +24,7 @@ import {
     ExternalLink,
     Link
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -196,10 +196,8 @@ function SkuDetailsPageContent() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [isFilterOpen]);
 
-    useEffect(() => {
-        const lotParam = searchParams.get('lot');
-        if (lotParam) setSelectedLot(lotParam);
-    }, [searchParams]);
+    // Note: URL ?lot= param is now handled in the localStorage persistence effect below,
+    // which gives URL params priority over saved localStorage values.
 
     // Shell Viewport Lock: Prevents window-level scrolling for the industrial shell
     useEffect(() => {
@@ -213,7 +211,7 @@ function SkuDetailsPageContent() {
         };
     }, []);
 
-    // Filter Persistence: Load from localStorage on mount
+    // Filter Persistence: Load from localStorage on mount (URL param takes priority for lot)
     useEffect(() => {
         if (!id) return;
         const savedFilters = localStorage.getItem(`sku_filters_${id}`);
@@ -224,7 +222,11 @@ function SkuDetailsPageContent() {
                 setFilters(JSON.parse(savedFilters));
             } catch (e) { console.error("Error parsing saved filters", e); }
         }
-        if (savedLot) {
+        // URL ?lot= param takes priority over localStorage
+        const lotParam = searchParams.get('lot');
+        if (lotParam) {
+            setSelectedLot(lotParam);
+        } else if (savedLot) {
             setSelectedLot(savedLot);
         }
     }, [id]);
@@ -796,7 +798,7 @@ function SkuDetailsPageContent() {
                                                         </span>
                                                     </td>
                                                     <td className="px-3 py-2.5 text-xs text-muted-foreground font-mono font-bold">
-                                                        {lot.date ? new Date(lot.date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) : '-'}
+                                                        {lot.date ? formatDate(lot.date) : '-'}
                                                     </td>
                                                     <td className="px-3 py-2.5 text-right text-xs font-mono font-bold text-muted-foreground">
                                                         {lot.cost > 0 ? `$${lot.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
@@ -1211,7 +1213,7 @@ function SkuDetailsPageContent() {
                         <tbody className="divide-y divide-border">
                             {paginatedTransactions.map((tx) => (
                                 <tr key={tx._id} data-tx-id={tx._id} className={cn("hover:bg-secondary/50 transition-colors group cursor-pointer", (isPendingProduction(tx) || isUnfulfilledConsumption(tx)) && "!bg-red-500/10 hover:!bg-red-500/15 border-l-2 border-l-red-500", highlightedTxIds.has(tx._id) && "ledger-row-flash")} onClick={() => router.push(tx.link)}>
-                                    <td className="px-3 py-3 text-xs text-foreground/80 font-mono font-medium">{new Date(tx.date).toLocaleDateString('en-US', { year: '2-digit', month: '2-digit', day: '2-digit' })}</td>
+                                    <td className="px-3 py-3 text-xs text-foreground/80 font-mono font-medium">{formatDate(tx.date)}</td>
                                     <td className="px-3 py-3">
                                         <div className="flex items-center space-x-2">
                                             {getTypeIcon(tx.type)}

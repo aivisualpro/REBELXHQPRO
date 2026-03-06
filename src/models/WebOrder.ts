@@ -5,6 +5,7 @@ const LineItemSchema = new mongoose.Schema({
     name: String,
     productId: Number, // WooCommerce product_id - links to webId on WebProduct
     variationId: Number,
+    variationName: String,         // Display name for selected variation
     quantity: Number,
     taxClass: String,
     subtotal: Number,
@@ -19,9 +20,16 @@ const LineItemSchema = new mongoose.Schema({
     parentProductId: String, // Legacy: Reference to Sku._id
     // NEW: Enrichment fields for SKU/Lot/Cost tracking
     webProductId: String,          // Reference to WebProduct._id
-    linkedSkuId: String,           // Confirmed SKU link (from WebProduct)
-    lotNumber: String,             // Allocated lot number (editable)
-    cost: Number,                  // Cost from lot (auto-calculated)
+    linkedSkuId: String,           // Legacy: single confirmed SKU link
+    lotNumber: String,             // Legacy: single allocated lot number
+    cost: Number,                  // Legacy: single cost from lot
+    // Multi-SKU support: each entry has its own skuId, multiplier, lotNumber, cost
+    linkedSkus: [{
+        skuId: String,
+        multiplier: { type: Number, default: 1 },
+        lotNumber: String,
+        cost: { type: Number, default: 0 },
+    }],
 });
 
 const WebOrderSchema = new mongoose.Schema({

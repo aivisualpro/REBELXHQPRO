@@ -16,6 +16,8 @@ export async function GET(request: Request) {
         const toDate = searchParams.get('toDate') || '';
         const search = searchParams.get('search') || '';
         const status = searchParams.get('status') || '';
+        const productId = searchParams.get('productId') || '';
+        const variationId = searchParams.get('variationId') || '';
         const sortBy = searchParams.get('sortBy') || 'dateCreated';
         const sortOrder = searchParams.get('sortOrder') === 'asc' ? 1 : -1;
 
@@ -55,6 +57,16 @@ export async function GET(request: Request) {
                 const end = new Date(toDate);
                 end.setHours(23, 59, 59, 999);
                 query.dateCreated.$lte = end;
+            }
+        }
+
+        // Filter by product/variation in line items
+        if (productId) {
+            const pid = parseInt(productId);
+            query['lineItems.productId'] = isNaN(pid) ? productId : pid;
+            if (variationId) {
+                const vid = parseInt(variationId);
+                query['lineItems.variationId'] = isNaN(vid) ? variationId : vid;
             }
         }
 

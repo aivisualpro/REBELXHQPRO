@@ -49,7 +49,7 @@ import CallsView from '@/components/crm/CallsView';
 import SMSView from '@/components/crm/SMSView';
 import NotesView from '@/components/crm/NotesView';
 import OrdersView from '@/components/crm/OrdersView';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import ClientModal from '@/components/crm/ClientModal';
@@ -240,11 +240,11 @@ export default function ClientDashboardPage() {
     const [orders, setOrders] = useState<OrderItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'Emails' | 'Calls' | 'SMS' | 'Notes' | 'Orders'>('Emails');
-    
+
     // Notes state
     const [clientNotes, setClientNotes] = useState<{ _id: string; note: string; createdAt: string; createdBy: string }[]>([]);
     const [loadingNotes, setLoadingNotes] = useState(false);
-    
+
     // Pagination
     const [activitiesPage, setActivitiesPage] = useState(1);
     const [ordersPage, setOrdersPage] = useState(1);
@@ -259,7 +259,7 @@ export default function ClientDashboardPage() {
     const [isComposeOpen, setIsComposeOpen] = useState(false);
     const [composeData, setComposeData] = useState({ to: '', subject: '', body: '' });
     const [sendingEmail, setSendingEmail] = useState(false);
-    
+
     // Billing visibility state
     const [showBillingDetails, setShowBillingDetails] = useState(false);
     const [billingPasswordModal, setBillingPasswordModal] = useState(false);
@@ -369,9 +369,9 @@ export default function ClientDashboardPage() {
     const filteredEmails = useMemo(() => {
         if (!searchQuery) return gmailEmails;
         const q = searchQuery.toLowerCase();
-        return gmailEmails.filter(e => 
-            e.subject?.toLowerCase().includes(q) || 
-            e.sender?.toLowerCase().includes(q) || 
+        return gmailEmails.filter(e =>
+            e.subject?.toLowerCase().includes(q) ||
+            e.sender?.toLowerCase().includes(q) ||
             e.snippet?.toLowerCase().includes(q) ||
             e.body?.toLowerCase().includes(q)
         );
@@ -441,14 +441,14 @@ export default function ClientDashboardPage() {
             setBillingPasswordError('Please enter your password');
             return;
         }
-        
+
         try {
             const res = await fetch('/api/auth/verify-password', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ password: billingPassword })
             });
-            
+
             if (res.ok) {
                 // Password verified successfully
                 setBillingPasswordModal(false);
@@ -456,7 +456,7 @@ export default function ClientDashboardPage() {
                 setBillingPasswordError('');
                 setShowBillingDetails(true);
                 toast.success('Verification successful');
-                
+
                 // Auto-hide after 60 seconds
                 if (billingTimeoutRef.current) {
                     clearTimeout(billingTimeoutRef.current);
@@ -507,7 +507,7 @@ export default function ClientDashboardPage() {
         const height = 650;
         const left = (window.screen.width / 2) - (width / 2);
         const top = (window.screen.height / 2) - (height / 2);
-        
+
         const digitsOnly = phoneNumber.replace(/\D/g, '');
         let e164;
         if (phoneNumber.includes('+')) {
@@ -519,21 +519,21 @@ export default function ClientDashboardPage() {
         } else {
             e164 = digitsOnly;
         }
-        
-        const url = type === 'calls' 
+
+        const url = type === 'calls'
             ? `https://voice.google.com/u/0/calls?a=nc,%2B${e164}`
             : `https://voice.google.com/u/0/messages?number=%2B${e164}`;
-        
+
         window.open(
-            url, 
-            'GoogleVoiceWindow', 
+            url,
+            'GoogleVoiceWindow',
             `width=${width},height=${height},left=${left},top=${top},menubar=no,status=no,toolbar=no`
         );
-        
+
         setTimeout(async () => {
             const activityType = type === 'calls' ? 'Call' : 'Text';
             const shouldLog = confirm(`Log this ${activityType} to CRM?\n\nClick OK to log, or Cancel to skip.`);
-            
+
             if (shouldLog) {
                 const notes = prompt(`Any notes for this ${activityType}? (optional):`) || '';
                 try {
@@ -547,7 +547,7 @@ export default function ClientDashboardPage() {
                             notes
                         })
                     });
-                    
+
                     if (res.ok) {
                         toast.success(`${activityType} logged to CRM!`);
                         // Refresh data
@@ -576,7 +576,7 @@ export default function ClientDashboardPage() {
                 const data = await res.json();
                 setClient(data.client);
                 setSummary(data.summary);
-                
+
                 if (append) {
                     if (activeTab !== 'Orders' && activeTab !== 'Emails') {
                         setActivities(prev => [...prev, ...data.activities]);
@@ -586,15 +586,15 @@ export default function ClientDashboardPage() {
                 } else {
                     setActivities(data.activities);
                     setOrders(data.orders);
-                    
+
                     // Trigger Gmail fetch if client data is now available
                     fetchGmailEmails(data.client.emails);
-                    
+
                     if (summary?.totalEmails === undefined) {
                         setSummary(prev => ({ ...prev!, totalEmails: data.summary.totalEmails }));
                     }
                 }
-                
+
                 setHasMoreActivities(data.pagination.hasMoreActivities);
                 setHasMoreOrders(data.pagination.hasMoreOrders);
             } else {
@@ -617,7 +617,7 @@ export default function ClientDashboardPage() {
             setSummary(prev => prev ? { ...prev, totalEmails: 0 } : null);
             return;
         }
-        
+
         setLoadingGmail(true);
         try {
             const q = 'in:inbox (' + emailsToSearch.map((e: any) => {
@@ -718,14 +718,8 @@ export default function ClientDashboardPage() {
         return '$' + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
 
-    const formatDate = (dateStr: string) => {
-        if (!dateStr) return '-';
-        return new Date(dateStr).toLocaleDateString('en-US', { 
-            year: '2-digit', 
-            month: '2-digit', 
-            day: '2-digit' 
-        });
-    };
+
+
 
     const daysSince = (dateStr: string | null) => {
         if (!dateStr) return null;
@@ -752,398 +746,398 @@ export default function ClientDashboardPage() {
     return (
         <>
             <div className="flex flex-col h-[calc(100vh-40px)] overflow-hidden bg-background">
-            {/* Shell Layer 1: Route Header */}
-            <div className="sticky top-0 z-[50] bg-card border-b border-border px-4 flex items-center space-x-2 shrink-0 h-9">
-                <button 
-                    onClick={() => router.back()} 
-                    className="w-7 h-7 bg-primary flex items-center justify-center text-primary-foreground hover:bg-primary/90 transition-colors shrink-0 rounded"
-                >
-                    <ArrowLeft className="w-3.5 h-3.5" />
-                </button>
+                {/* Shell Layer 1: Route Header */}
+                <div className="sticky top-0 z-[50] bg-card border-b border-border px-4 flex items-center space-x-2 shrink-0 h-9">
+                    <button
+                        onClick={() => router.back()}
+                        className="w-7 h-7 bg-primary flex items-center justify-center text-primary-foreground hover:bg-primary/90 transition-colors shrink-0 rounded"
+                    >
+                        <ArrowLeft className="w-3.5 h-3.5" />
+                    </button>
 
-                <button 
-                    onClick={() => setIsEditModalOpen(true)}
-                    className="w-7 h-7 bg-primary flex items-center justify-center text-primary-foreground hover:bg-primary/90 transition-colors shrink-0 rounded"
-                >
-                    <Edit className="w-3.5 h-3.5" />
-                </button>
+                    <button
+                        onClick={() => setIsEditModalOpen(true)}
+                        className="w-7 h-7 bg-primary flex items-center justify-center text-primary-foreground hover:bg-primary/90 transition-colors shrink-0 rounded"
+                    >
+                        <Edit className="w-3.5 h-3.5" />
+                    </button>
 
-                <div className="flex-1 max-w-sm relative group h-7">
-                    <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 group-focus-within:text-[#fe9900] transition-colors" />
-                    <input 
-                        type="text" 
-                        placeholder={`Search ${activeTab.toLowerCase()}...`}
-                        className="w-full h-full pl-9 pr-4 bg-secondary/50 border border-transparent text-[11px] focus:outline-none focus:ring-1 focus:ring-[#fe9900] focus:bg-background focus:border-[#fe9900] transition-all rounded placeholder:text-muted-foreground font-medium text-foreground"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                    />
+                    <div className="flex-1 max-w-sm relative group h-7">
+                        <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 group-focus-within:text-[#fe9900] transition-colors" />
+                        <input
+                            type="text"
+                            placeholder={`Search ${activeTab.toLowerCase()}...`}
+                            className="w-full h-full pl-9 pr-4 bg-secondary/50 border border-transparent text-[11px] focus:outline-none focus:ring-1 focus:ring-[#fe9900] focus:bg-background focus:border-[#fe9900] transition-all rounded placeholder:text-muted-foreground font-medium text-foreground"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                    </div>
+
+                    <div className="flex items-center space-x-1 h-7 ml-4">
+                        {[
+                            { id: 'Emails', icon: Mail, count: summary?.totalEmails },
+                            { id: 'Calls', icon: Phone, count: summary?.totalCalls },
+                            { id: 'SMS', icon: MessageSquare, count: summary?.totalSMS },
+                            { id: 'Notes', icon: StickyNote, count: summary?.totalNotes },
+                            { id: 'Orders', icon: ShoppingCart, count: summary?.totalOrders }
+                        ].map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => {
+                                    setActiveTab(tab.id as any);
+                                    setSearchQuery(''); // Clear search when switching tabs
+                                }}
+                                className={cn(
+                                    "flex items-center space-x-2 px-4 h-full text-[10px] font-bold uppercase tracking-widest transition-all rounded-md",
+                                    activeTab === tab.id
+                                        ? "bg-[#fe9900] text-black shadow-sm"
+                                        : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                                )}
+                            >
+                                <tab.icon className="w-3.5 h-3.5" />
+                                <span>{tab.id}</span>
+                                {tab.count !== undefined && (
+                                    <span className={cn(
+                                        "px-1.5 py-0.5 text-[9px] rounded-sm font-mono",
+                                        activeTab === tab.id ? "bg-black text-white" : "bg-secondary text-muted-foreground"
+                                    )}>
+                                        {tab.count}
+                                    </span>
+                                )}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
-                <div className="flex items-center space-x-1 h-7 ml-4">
-                    {[
-                        { id: 'Emails', icon: Mail, count: summary?.totalEmails },
-                        { id: 'Calls', icon: Phone, count: summary?.totalCalls },
-                        { id: 'SMS', icon: MessageSquare, count: summary?.totalSMS },
-                        { id: 'Notes', icon: StickyNote, count: summary?.totalNotes },
-                        { id: 'Orders', icon: ShoppingCart, count: summary?.totalOrders }
-                    ].map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => {
-                                setActiveTab(tab.id as any);
-                                setSearchQuery(''); // Clear search when switching tabs
-                            }}
-                            className={cn(
-                                "flex items-center space-x-2 px-4 h-full text-[10px] font-bold uppercase tracking-widest transition-all rounded-md",
-                                activeTab === tab.id
-                                    ? "bg-[#fe9900] text-black shadow-sm"
-                                    : "text-muted-foreground hover:text-foreground hover:bg-secondary"
-                            )}
-                        >
-                            <tab.icon className="w-3.5 h-3.5" />
-                            <span>{tab.id}</span>
-                            {tab.count !== undefined && (
-                                <span className={cn(
-                                    "px-1.5 py-0.5 text-[9px] rounded-sm font-mono",
-                                    activeTab === tab.id ? "bg-black text-white" : "bg-secondary text-muted-foreground"
-                                )}>
-                                    {tab.count}
-                                </span>
-                            )}
-                        </button>
-                    ))}
-                </div>
-            </div>
+                {/* Shell Layer 2: Main Content Split */}
+                <div className="flex-1 flex overflow-hidden min-h-0 bg-background">
+                    {/* Left Column (30%) - Client Details */}
+                    <aside className="w-[30%] h-full overflow-y-auto border-r border-border bg-card shrink-0 scrollbar-custom">
+                        <div className="p-4 space-y-6">
 
-            {/* Shell Layer 2: Main Content Split */}
-            <div className="flex-1 flex overflow-hidden min-h-0 bg-background">
-                {/* Left Column (30%) - Client Details */}
-                <aside className="w-[30%] h-full overflow-y-auto border-r border-border bg-card shrink-0 scrollbar-custom">
-                    <div className="p-4 space-y-6">
-                        
-                        {/* Client Info Section */}
-                        <div className="space-y-0">
-                            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2 pb-1 border-b border-border">Client Info</div>
-                            
-                            {/* Row 1: Name */}
-                            <div className="flex items-center py-2 border-b border-border/50">
-                                <span className="text-[11px] text-muted-foreground w-28 shrink-0">Name</span>
-                                <span className="text-[11px] font-bold text-foreground">{client.name}</span>
-                            </div>
+                            {/* Client Info Section */}
+                            <div className="space-y-0">
+                                <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2 pb-1 border-b border-border">Client Info</div>
 
-                            {/* Row 2: Address */}
-                            <div className="flex items-start py-2 border-b border-border/50">
-                                <span className="text-[11px] text-muted-foreground w-28 shrink-0 pt-0.5">Address</span>
-                                <span className="text-[11px] text-foreground leading-relaxed">
-                                    {client.addresses?.[0]?.street || <span className="text-muted-foreground italic">No address</span>}
-                                </span>
-                            </div>
+                                {/* Row 1: Name */}
+                                <div className="flex items-center py-2 border-b border-border/50">
+                                    <span className="text-[11px] text-muted-foreground w-28 shrink-0">Name</span>
+                                    <span className="text-[11px] font-bold text-foreground">{client.name}</span>
+                                </div>
 
-                            {/* Row 2b: City */}
-                            <div className="flex items-center py-2 border-b border-border/50">
-                                <span className="text-[11px] text-muted-foreground w-28 shrink-0">City</span>
-                                <span className="text-[11px] text-foreground">{client.addresses?.[0]?.city || '-'}</span>
-                            </div>
+                                {/* Row 2: Address */}
+                                <div className="flex items-start py-2 border-b border-border/50">
+                                    <span className="text-[11px] text-muted-foreground w-28 shrink-0 pt-0.5">Address</span>
+                                    <span className="text-[11px] text-foreground leading-relaxed">
+                                        {client.addresses?.[0]?.street || <span className="text-muted-foreground italic">No address</span>}
+                                    </span>
+                                </div>
 
-                            {/* Row 2c: State */}
-                            <div className="flex items-center py-2 border-b border-border/50">
-                                <span className="text-[11px] text-muted-foreground w-28 shrink-0">State</span>
-                                <span className="text-[11px] text-foreground">{client.addresses?.[0]?.state || '-'}</span>
-                            </div>
+                                {/* Row 2b: City */}
+                                <div className="flex items-center py-2 border-b border-border/50">
+                                    <span className="text-[11px] text-muted-foreground w-28 shrink-0">City</span>
+                                    <span className="text-[11px] text-foreground">{client.addresses?.[0]?.city || '-'}</span>
+                                </div>
 
-                            {/* Row 2d: Postal Code */}
-                            <div className="flex items-center py-2 border-b border-border/50">
-                                <span className="text-[11px] text-muted-foreground w-28 shrink-0">Postal Code</span>
-                                <span className="text-[11px] text-foreground">{client.addresses?.[0]?.postalCode || '-'}</span>
-                            </div>
+                                {/* Row 2c: State */}
+                                <div className="flex items-center py-2 border-b border-border/50">
+                                    <span className="text-[11px] text-muted-foreground w-28 shrink-0">State</span>
+                                    <span className="text-[11px] text-foreground">{client.addresses?.[0]?.state || '-'}</span>
+                                </div>
 
-                            {/* Row 3: Sales Representative */}
-                            <div className="flex items-center py-2 border-b border-border/50">
-                                <span className="text-[11px] text-muted-foreground w-28 shrink-0">Sales Rep</span>
-                                <span className="text-[11px] font-bold text-foreground">
-                                    {client.salesRepInfo ? `${client.salesRepInfo.firstName} ${client.salesRepInfo.lastName}` : 'Unassigned'}
-                                </span>
-                            </div>
+                                {/* Row 2d: Postal Code */}
+                                <div className="flex items-center py-2 border-b border-border/50">
+                                    <span className="text-[11px] text-muted-foreground w-28 shrink-0">Postal Code</span>
+                                    <span className="text-[11px] text-foreground">{client.addresses?.[0]?.postalCode || '-'}</span>
+                                </div>
 
-                            {/* Row 4: Primary Phone */}
-                            <div className="flex items-center py-2 border-b border-border/50">
-                                <span className="text-[11px] text-muted-foreground w-28 shrink-0">Phone</span>
-                                <div className="flex items-center space-x-2">
+                                {/* Row 3: Sales Representative */}
+                                <div className="flex items-center py-2 border-b border-border/50">
+                                    <span className="text-[11px] text-muted-foreground w-28 shrink-0">Sales Rep</span>
                                     <span className="text-[11px] font-bold text-foreground">
-                                        {client.phones?.[0]?.value || <span className="text-muted-foreground italic font-normal">None</span>}
+                                        {client.salesRepInfo ? `${client.salesRepInfo.firstName} ${client.salesRepInfo.lastName}` : 'Unassigned'}
                                     </span>
-                                    {client.phones?.[0]?.value && (
-                                        <div className="flex items-center space-x-1">
-                                            <button 
-                                                onClick={() => initiateGoogleVoice(client._id, client.phones![0].value, 'calls')} 
-                                                className="p-1 rounded hover:bg-blue-100 text-blue-600 transition-colors" 
-                                                title="Call via Google Voice"
+                                </div>
+
+                                {/* Row 4: Primary Phone */}
+                                <div className="flex items-center py-2 border-b border-border/50">
+                                    <span className="text-[11px] text-muted-foreground w-28 shrink-0">Phone</span>
+                                    <div className="flex items-center space-x-2">
+                                        <span className="text-[11px] font-bold text-foreground">
+                                            {client.phones?.[0]?.value || <span className="text-muted-foreground italic font-normal">None</span>}
+                                        </span>
+                                        {client.phones?.[0]?.value && (
+                                            <div className="flex items-center space-x-1">
+                                                <button
+                                                    onClick={() => initiateGoogleVoice(client._id, client.phones![0].value, 'calls')}
+                                                    className="p-1 rounded hover:bg-blue-100 text-blue-600 transition-colors"
+                                                    title="Call via Google Voice"
+                                                >
+                                                    <Phone className="w-3 h-3" />
+                                                </button>
+                                                <button
+                                                    onClick={() => initiateGoogleVoice(client._id, client.phones![0].value, 'messages')}
+                                                    className="p-1 rounded hover:bg-emerald-100 text-emerald-600 transition-colors"
+                                                    title="SMS via Google Voice"
+                                                >
+                                                    <MessageSquare className="w-3 h-3" />
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Row 5: Primary Email */}
+                                <div className="flex items-center py-2">
+                                    <span className="text-[11px] text-muted-foreground w-28 shrink-0">Email</span>
+                                    <div className="flex items-center space-x-2">
+                                        <span className="text-[11px] font-bold text-foreground truncate">
+                                            {client.emails?.[0]?.value || <span className="text-muted-foreground italic font-normal">None</span>}
+                                        </span>
+                                        {client.emails?.[0]?.value && (
+                                            <button
+                                                onClick={() => {
+                                                    setComposeData(prev => ({ ...prev, to: client.emails![0].value }));
+                                                    setIsComposeOpen(true);
+                                                }}
+                                                className="p-1 rounded hover:bg-purple-100 text-purple-600 transition-colors"
+                                                title="Compose Email"
                                             >
-                                                <Phone className="w-3 h-3" />
+                                                <Mail className="w-3 h-3" />
                                             </button>
-                                            <button 
-                                                onClick={() => initiateGoogleVoice(client._id, client.phones![0].value, 'messages')} 
-                                                className="p-1 rounded hover:bg-emerald-100 text-emerald-600 transition-colors" 
-                                                title="SMS via Google Voice"
-                                            >
-                                                <MessageSquare className="w-3 h-3" />
-                                            </button>
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* Row 5: Primary Email */}
-                            <div className="flex items-center py-2">
-                                <span className="text-[11px] text-muted-foreground w-28 shrink-0">Email</span>
-                                <div className="flex items-center space-x-2">
-                                    <span className="text-[11px] font-bold text-foreground truncate">
-                                        {client.emails?.[0]?.value || <span className="text-muted-foreground italic font-normal">None</span>}
-                                    </span>
-                                    {client.emails?.[0]?.value && (
-                                        <button 
-                                            onClick={() => {
-                                                setComposeData(prev => ({ ...prev, to: client.emails![0].value }));
-                                                setIsComposeOpen(true);
-                                            }} 
-                                            className="p-1 rounded hover:bg-purple-100 text-purple-600 transition-colors" 
-                                            title="Compose Email"
-                                        >
-                                            <Mail className="w-3 h-3" />
+                            {/* Contacts Section */}
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between pb-1 border-b border-border">
+                                    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Contacts</div>
+                                    <div className="flex items-center space-x-1">
+                                        <button onClick={openAddContact} className="p-1 rounded bg-yellow-400 hover:bg-yellow-500 transition-colors" title="Add Contact">
+                                            <Plus className="w-3 h-3 text-black" />
                                         </button>
-                                    )}
+                                        <button onClick={() => setContactsExpanded(true)} className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" title="Expand Contacts">
+                                            <Maximize2 className="w-3 h-3" />
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
-
-                        {/* Contacts Section */}
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between pb-1 border-b border-border">
-                                <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Contacts</div>
-                                <div className="flex items-center space-x-1">
-                                    <button onClick={openAddContact} className="p-1 rounded bg-yellow-400 hover:bg-yellow-500 transition-colors" title="Add Contact">
-                                        <Plus className="w-3 h-3 text-black" />
-                                    </button>
-                                    <button onClick={() => setContactsExpanded(true)} className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" title="Expand Contacts">
-                                        <Maximize2 className="w-3 h-3" />
-                                    </button>
-                                </div>
-                            </div>
-                            {client.contacts && client.contacts.length > 0 ? (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-[10px]">
-                                        <thead>
-                                            <tr className="border-b border-border">
-                                                <th className="text-left py-1.5 px-1 font-bold text-muted-foreground uppercase tracking-wider">Name</th>
-                                                <th className="text-center py-1.5 px-1 font-bold text-muted-foreground uppercase tracking-wider">📞</th>
-                                                <th className="text-center py-1.5 px-1 font-bold text-muted-foreground uppercase tracking-wider">✉️</th>
-                                                <th className="text-left py-1.5 px-1 font-bold text-muted-foreground uppercase tracking-wider">Role</th>
-                                                <th className="text-right py-1.5 px-1 font-bold text-muted-foreground uppercase tracking-wider w-16"></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {client.contacts.map((c, idx) => (
-                                                <tr key={c._id || idx} className="group border-b border-border/50 hover:bg-muted/50 transition-colors">
-                                                    <td className="py-1.5 px-1 text-foreground font-medium whitespace-nowrap">{[c.firstName, c.lastName].filter(Boolean).join(' ') || '-'}</td>
-                                                    <td className="py-1.5 px-1 text-center">
-                                                        {c.phone ? (
-                                                            <div className="flex items-center justify-center space-x-1">
-                                                                <button onClick={() => initiateGoogleVoice(client._id, c.phone!, 'calls')} className="p-0.5 rounded hover:bg-blue-100 text-blue-600 transition-colors" title={`Call ${c.phone}`}>
-                                                                    <Phone className="w-3 h-3" />
+                                {client.contacts && client.contacts.length > 0 ? (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-[10px]">
+                                            <thead>
+                                                <tr className="border-b border-border">
+                                                    <th className="text-left py-1.5 px-1 font-bold text-muted-foreground uppercase tracking-wider">Name</th>
+                                                    <th className="text-center py-1.5 px-1 font-bold text-muted-foreground uppercase tracking-wider">📞</th>
+                                                    <th className="text-center py-1.5 px-1 font-bold text-muted-foreground uppercase tracking-wider">✉️</th>
+                                                    <th className="text-left py-1.5 px-1 font-bold text-muted-foreground uppercase tracking-wider">Role</th>
+                                                    <th className="text-right py-1.5 px-1 font-bold text-muted-foreground uppercase tracking-wider w-16"></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {client.contacts.map((c, idx) => (
+                                                    <tr key={c._id || idx} className="group border-b border-border/50 hover:bg-muted/50 transition-colors">
+                                                        <td className="py-1.5 px-1 text-foreground font-medium whitespace-nowrap">{[c.firstName, c.lastName].filter(Boolean).join(' ') || '-'}</td>
+                                                        <td className="py-1.5 px-1 text-center">
+                                                            {c.phone ? (
+                                                                <div className="flex items-center justify-center space-x-1">
+                                                                    <button onClick={() => initiateGoogleVoice(client._id, c.phone!, 'calls')} className="p-0.5 rounded hover:bg-blue-100 text-blue-600 transition-colors" title={`Call ${c.phone}`}>
+                                                                        <Phone className="w-3 h-3" />
+                                                                    </button>
+                                                                    <button onClick={() => initiateGoogleVoice(client._id, c.phone!, 'messages')} className="p-0.5 rounded hover:bg-emerald-100 text-emerald-600 transition-colors" title={`SMS ${c.phone}`}>
+                                                                        <MessageSquare className="w-3 h-3" />
+                                                                    </button>
+                                                                </div>
+                                                            ) : <span className="text-muted-foreground">-</span>}
+                                                        </td>
+                                                        <td className="py-1.5 px-1 text-center">
+                                                            {c.email ? (
+                                                                <button onClick={() => { setComposeData(prev => ({ ...prev, to: c.email! })); setIsComposeOpen(true); }} className="p-0.5 rounded hover:bg-purple-100 text-purple-600 transition-colors" title={`Email ${c.email}`}>
+                                                                    <Mail className="w-3 h-3" />
                                                                 </button>
-                                                                <button onClick={() => initiateGoogleVoice(client._id, c.phone!, 'messages')} className="p-0.5 rounded hover:bg-emerald-100 text-emerald-600 transition-colors" title={`SMS ${c.phone}`}>
-                                                                    <MessageSquare className="w-3 h-3" />
+                                                            ) : <span className="text-muted-foreground">-</span>}
+                                                        </td>
+                                                        <td className="py-1.5 px-1 text-foreground whitespace-nowrap">{c.role || '-'}</td>
+                                                        <td className="py-1.5 px-1 text-right">
+                                                            <div className="flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <button onClick={() => openEditContact(idx)} className="p-0.5 rounded hover:bg-blue-100 text-blue-600 transition-colors" title="Edit">
+                                                                    <Pencil className="w-3 h-3" />
+                                                                </button>
+                                                                <button onClick={() => handleDeleteContact(idx)} className="p-0.5 rounded hover:bg-red-100 text-red-600 transition-colors" title="Delete">
+                                                                    <Trash2 className="w-3 h-3" />
                                                                 </button>
                                                             </div>
-                                                        ) : <span className="text-muted-foreground">-</span>}
-                                                    </td>
-                                                    <td className="py-1.5 px-1 text-center">
-                                                        {c.email ? (
-                                                            <button onClick={() => { setComposeData(prev => ({ ...prev, to: c.email! })); setIsComposeOpen(true); }} className="p-0.5 rounded hover:bg-purple-100 text-purple-600 transition-colors" title={`Email ${c.email}`}>
-                                                                <Mail className="w-3 h-3" />
-                                                            </button>
-                                                        ) : <span className="text-muted-foreground">-</span>}
-                                                    </td>
-                                                    <td className="py-1.5 px-1 text-foreground whitespace-nowrap">{c.role || '-'}</td>
-                                                    <td className="py-1.5 px-1 text-right">
-                                                        <div className="flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <button onClick={() => openEditContact(idx)} className="p-0.5 rounded hover:bg-blue-100 text-blue-600 transition-colors" title="Edit">
-                                                                <Pencil className="w-3 h-3" />
-                                                            </button>
-                                                            <button onClick={() => handleDeleteContact(idx)} className="p-0.5 rounded hover:bg-red-100 text-red-600 transition-colors" title="Delete">
-                                                                <Trash2 className="w-3 h-3" />
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            ) : (
-                                <p className="text-[11px] text-muted-foreground italic py-2">No contacts found</p>
-                            )}
-                        </div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <p className="text-[11px] text-muted-foreground italic py-2">No contacts found</p>
+                                )}
+                            </div>
 
-                        {/* Business Description Section */}
-                        <div className="space-y-2">
-                            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest pb-1 border-b border-border">Business Description</div>
-                            <p className="text-[11px] text-foreground leading-relaxed italic">
-                                {client.description || 'No description provided'}
-                            </p>
-                            <div className="space-y-0 pt-1">
-                                {client.website && (
+                            {/* Business Description Section */}
+                            <div className="space-y-2">
+                                <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest pb-1 border-b border-border">Business Description</div>
+                                <p className="text-[11px] text-foreground leading-relaxed italic">
+                                    {client.description || 'No description provided'}
+                                </p>
+                                <div className="space-y-0 pt-1">
+                                    {client.website && (
+                                        <div className="flex justify-between text-[11px] py-1.5 border-b border-border/50">
+                                            <span className="text-muted-foreground">Website</span>
+                                            <a href={client.website.startsWith('http') ? client.website : `https://${client.website}`} target="_blank" className="text-blue-600 font-bold truncate max-w-[160px] hover:underline">{client.website}</a>
+                                        </div>
+                                    )}
+                                    {client.facebookPage && (
+                                        <div className="flex justify-between text-[11px] py-1.5 border-b border-border/50">
+                                            <span className="text-muted-foreground">Facebook</span>
+                                            <a href={client.facebookPage.startsWith('http') ? client.facebookPage : `https://${client.facebookPage}`} target="_blank" className="text-blue-600 font-bold truncate max-w-[160px] hover:underline">{client.facebookPage}</a>
+                                        </div>
+                                    )}
                                     <div className="flex justify-between text-[11px] py-1.5 border-b border-border/50">
-                                        <span className="text-muted-foreground">Website</span>
-                                        <a href={client.website.startsWith('http') ? client.website : `https://${client.website}`} target="_blank" className="text-blue-600 font-bold truncate max-w-[160px] hover:underline">{client.website}</a>
+                                        <span className="text-muted-foreground">Industry</span>
+                                        <span className="font-bold text-foreground">{client.industry || '-'}</span>
                                     </div>
-                                )}
-                                {client.facebookPage && (
                                     <div className="flex justify-between text-[11px] py-1.5 border-b border-border/50">
-                                        <span className="text-muted-foreground">Facebook</span>
-                                        <a href={client.facebookPage.startsWith('http') ? client.facebookPage : `https://${client.facebookPage}`} target="_blank" className="text-blue-600 font-bold truncate max-w-[160px] hover:underline">{client.facebookPage}</a>
+                                        <span className="text-muted-foreground">Forecasted</span>
+                                        <span className="font-bold text-foreground">{formatCurrency(client.forecastedAmount || 0)}</span>
                                     </div>
-                                )}
-                                <div className="flex justify-between text-[11px] py-1.5 border-b border-border/50">
-                                    <span className="text-muted-foreground">Industry</span>
-                                    <span className="font-bold text-foreground">{client.industry || '-'}</span>
-                                </div>
-                                <div className="flex justify-between text-[11px] py-1.5 border-b border-border/50">
-                                    <span className="text-muted-foreground">Forecasted</span>
-                                    <span className="font-bold text-foreground">{formatCurrency(client.forecastedAmount || 0)}</span>
-                                </div>
-                                {client.projectedCloseDate && (
+                                    {client.projectedCloseDate && (
+                                        <div className="flex justify-between text-[11px] py-1.5 border-b border-border/50">
+                                            <span className="text-muted-foreground">Projected Close</span>
+                                            <span className="font-bold text-emerald-600">{formatDate(client.projectedCloseDate)}</span>
+                                        </div>
+                                    )}
                                     <div className="flex justify-between text-[11px] py-1.5 border-b border-border/50">
-                                        <span className="text-muted-foreground">Projected Close</span>
-                                        <span className="font-bold text-emerald-600">{formatDate(client.projectedCloseDate)}</span>
+                                        <span className="text-muted-foreground">Payment Terms</span>
+                                        <span className="font-bold text-foreground">{client.defaultPaymentMethod || '-'}</span>
                                     </div>
-                                )}
-                                <div className="flex justify-between text-[11px] py-1.5 border-b border-border/50">
-                                    <span className="text-muted-foreground">Payment Terms</span>
-                                    <span className="font-bold text-foreground">{client.defaultPaymentMethod || '-'}</span>
-                                </div>
-                                <div className="flex justify-between text-[11px] py-1.5 border-b border-border/50">
-                                    <span className="text-muted-foreground">Shipping Terms</span>
-                                    <span className="font-bold text-foreground">{client.defaultShippingTerms || '-'}</span>
+                                    <div className="flex justify-between text-[11px] py-1.5 border-b border-border/50">
+                                        <span className="text-muted-foreground">Shipping Terms</span>
+                                        <span className="font-bold text-foreground">{client.defaultShippingTerms || '-'}</span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        {/* Credit Card Section */}
-                        <div className="space-y-2">
-                            <div className={cn("p-4 rounded-sm space-y-3 shadow-inner bg-gradient-to-br transition-all duration-500", cardTheme)}>
-                                <div className="flex items-center justify-between">
-                                    <div className="w-8 h-5.5 bg-gradient-to-br from-yellow-200 via-yellow-400 to-yellow-600 rounded-sm relative overflow-hidden shadow-inner flex shrink-0">
-                                        <div className="absolute inset-0 border-[0.5px] border-black/10"></div>
-                                        <div className="absolute top-1/2 left-0 w-full h-[0.5px] bg-black/20"></div>
-                                        <div className="absolute top-0 left-1/2 w-[0.5px] h-full bg-black/20"></div>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                        {cardType && (
-                                            <div className="text-[9px] text-white/50 uppercase font-black tracking-widest">{cardType}</div>
-                                        )}
-                                        <button
-                                            onClick={() => {
-                                                if (showBillingDetails) {
-                                                    setShowBillingDetails(false);
-                                                    if (billingTimeoutRef.current) {
-                                                        clearTimeout(billingTimeoutRef.current);
-                                                    }
-                                                } else {
-                                                    setBillingPasswordModal(true);
-                                                }
-                                            }}
-                                            className="p-1 hover:bg-white/10 rounded transition-colors"
-                                            title={showBillingDetails ? "Hide details" : "View details"}
-                                        >
-                                            {showBillingDetails ? (
-                                                <EyeOff className="w-3.5 h-3.5 text-white/60" />
-                                            ) : (
-                                                <Eye className="w-3.5 h-3.5 text-white/60" />
+                            {/* Credit Card Section */}
+                            <div className="space-y-2">
+                                <div className={cn("p-4 rounded-sm space-y-3 shadow-inner bg-gradient-to-br transition-all duration-500", cardTheme)}>
+                                    <div className="flex items-center justify-between">
+                                        <div className="w-8 h-5.5 bg-gradient-to-br from-yellow-200 via-yellow-400 to-yellow-600 rounded-sm relative overflow-hidden shadow-inner flex shrink-0">
+                                            <div className="absolute inset-0 border-[0.5px] border-black/10"></div>
+                                            <div className="absolute top-1/2 left-0 w-full h-[0.5px] bg-black/20"></div>
+                                            <div className="absolute top-0 left-1/2 w-[0.5px] h-full bg-black/20"></div>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            {cardType && (
+                                                <div className="text-[9px] text-white/50 uppercase font-black tracking-widest">{cardType}</div>
                                             )}
-                                        </button>
+                                            <button
+                                                onClick={() => {
+                                                    if (showBillingDetails) {
+                                                        setShowBillingDetails(false);
+                                                        if (billingTimeoutRef.current) {
+                                                            clearTimeout(billingTimeoutRef.current);
+                                                        }
+                                                    } else {
+                                                        setBillingPasswordModal(true);
+                                                    }
+                                                }}
+                                                className="p-1 hover:bg-white/10 rounded transition-colors"
+                                                title={showBillingDetails ? "Hide details" : "View details"}
+                                            >
+                                                {showBillingDetails ? (
+                                                    <EyeOff className="w-3.5 h-3.5 text-white/60" />
+                                                ) : (
+                                                    <Eye className="w-3.5 h-3.5 text-white/60" />
+                                                )}
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
-                                
-                                <div className="space-y-1">
-                                    <div className="text-[12px] font-mono text-white tracking-[0.2em] truncate">
-                                        {showBillingDetails 
-                                            ? (client.billing?.ccNumber || '•••• •••• •••• ••••')
-                                            : '•••• •••• •••• ••••'
-                                        }
-                                    </div>
-                                </div>
 
-                                <div className="flex justify-between items-end">
                                     <div className="space-y-1">
-                                        <div className="text-[7px] text-white/40 uppercase font-black tracking-tighter transition-colors">Card Holder</div>
-                                        <div className="text-[9px] text-white font-bold uppercase tracking-wider truncate max-w-[100px]">
-                                            {client.billing?.nameOnCard || '-'}
+                                        <div className="text-[12px] font-mono text-white tracking-[0.2em] truncate">
+                                            {showBillingDetails
+                                                ? (client.billing?.ccNumber || '•••• •••• •••• ••••')
+                                                : '•••• •••• •••• ••••'
+                                            }
                                         </div>
                                     </div>
-                                    <div className="flex space-x-3">
+
+                                    <div className="flex justify-between items-end">
                                         <div className="space-y-1">
-                                            <div className="text-[7px] text-white/40 uppercase font-black tracking-tighter">Expires</div>
-                                            <div className="text-[9px] text-white font-mono">{client.billing?.expirationDate || '••/••'}</div>
+                                            <div className="text-[7px] text-white/40 uppercase font-black tracking-tighter transition-colors">Card Holder</div>
+                                            <div className="text-[9px] text-white font-bold uppercase tracking-wider truncate max-w-[100px]">
+                                                {client.billing?.nameOnCard || '-'}
+                                            </div>
                                         </div>
-                                        <div className="space-y-1">
-                                            <div className="text-[7px] text-white/40 uppercase font-black tracking-tighter">CVV</div>
-                                            <div className="text-[9px] text-white font-mono">
-                                                {showBillingDetails 
-                                                    ? (client.billing?.securityCode || '•••')
-                                                    : '•••'
-                                                }
+                                        <div className="flex space-x-3">
+                                            <div className="space-y-1">
+                                                <div className="text-[7px] text-white/40 uppercase font-black tracking-tighter">Expires</div>
+                                                <div className="text-[9px] text-white font-mono">{client.billing?.expirationDate || '••/••'}</div>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <div className="text-[7px] text-white/40 uppercase font-black tracking-tighter">CVV</div>
+                                                <div className="text-[9px] text-white font-mono">
+                                                    {showBillingDetails
+                                                        ? (client.billing?.securityCode || '•••')
+                                                        : '•••'
+                                                    }
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
+
+                            <div className="h-10" />
                         </div>
+                    </aside>
 
-                        <div className="h-10" />
-                    </div>
-                </aside>
-
-                {/* Right Column: Activity/Orders Table */}
-                <main className="flex-1 h-full overflow-hidden bg-background relative flex flex-col">
-                    <div className="flex-1 h-full relative">
-                        {activeTab === 'Emails' && (
-                            <div className="h-full">
-                                <GmailEmailView 
-                                    initialLabel="INBOX" 
-                                    forcedClientEmails={client?.emails?.map(e => e.value) || []} 
+                    {/* Right Column: Activity/Orders Table */}
+                    <main className="flex-1 h-full overflow-hidden bg-background relative flex flex-col">
+                        <div className="flex-1 h-full relative">
+                            {activeTab === 'Emails' && (
+                                <div className="h-full">
+                                    <GmailEmailView
+                                        initialLabel="INBOX"
+                                        forcedClientEmails={client?.emails?.map(e => e.value) || []}
+                                    />
+                                </div>
+                            )}
+                            {activeTab === 'Calls' && id && (
+                                <CallsView
+                                    clientId={id as string}
+                                    clientPhone={client.phones?.[0]?.value}
+                                    onInitiateCall={() => initiateGoogleVoice(id as string, client.phones?.[0]?.value || '', 'calls')}
                                 />
-                            </div>
-                        )}
-                         {activeTab === 'Calls' && id && (
-                             <CallsView 
-                                clientId={id as string} 
-                                clientPhone={client.phones?.[0]?.value}
-                                onInitiateCall={() => initiateGoogleVoice(id as string, client.phones?.[0]?.value || '', 'calls')}
-                             />
-                         )}
-                        {activeTab === 'SMS' && id && (
-                             <SMSView 
-                                clientId={id as string} 
-                                clientPhone={client.phones?.[0]?.value}
-                                onInitiateSMS={() => initiateGoogleVoice(id as string, client.phones?.[0]?.value || '', 'messages')}
-                             />
-                         )}
-                        {activeTab === 'Notes' && id && (
-                            <NotesView 
-                                clientId={id as string} 
-                                onNotesUpdate={() => fetchClientData(1, false)} 
-                            />
-                        )}
-                        {activeTab === 'Orders' && id && (
-                            <OrdersView clientId={id as string} />
-                        )}
-                    </div>
-                </main>
+                            )}
+                            {activeTab === 'SMS' && id && (
+                                <SMSView
+                                    clientId={id as string}
+                                    clientPhone={client.phones?.[0]?.value}
+                                    onInitiateSMS={() => initiateGoogleVoice(id as string, client.phones?.[0]?.value || '', 'messages')}
+                                />
+                            )}
+                            {activeTab === 'Notes' && id && (
+                                <NotesView
+                                    clientId={id as string}
+                                    onNotesUpdate={() => fetchClientData(1, false)}
+                                />
+                            )}
+                            {activeTab === 'Orders' && id && (
+                                <OrdersView clientId={id as string} />
+                            )}
+                        </div>
+                    </main>
+                </div>
+
+
             </div>
-
-
-        </div>
 
             <ClientModal
                 isOpen={isEditModalOpen}
@@ -1284,33 +1278,33 @@ export default function ClientDashboardPage() {
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">First Name</label>
-                                    <input className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.firstName} onChange={e => setContactForm({...contactForm, firstName: e.target.value})} />
+                                    <input className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.firstName} onChange={e => setContactForm({ ...contactForm, firstName: e.target.value })} />
                                 </div>
                                 <div>
                                     <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Last Name</label>
-                                    <input className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.lastName} onChange={e => setContactForm({...contactForm, lastName: e.target.value})} />
+                                    <input className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.lastName} onChange={e => setContactForm({ ...contactForm, lastName: e.target.value })} />
                                 </div>
                             </div>
                             <div>
                                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Email</label>
-                                <input type="email" className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.email} onChange={e => setContactForm({...contactForm, email: e.target.value})} />
+                                <input type="email" className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.email} onChange={e => setContactForm({ ...contactForm, email: e.target.value })} />
                             </div>
                             <div className="grid grid-cols-3 gap-3">
                                 <div>
                                     <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Phone</label>
-                                    <input className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" placeholder="(000) 000-0000" value={contactForm.phone} onChange={e => setContactForm({...contactForm, phone: formatPhoneInput(e.target.value)})} />
+                                    <input className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" placeholder="(000) 000-0000" value={contactForm.phone} onChange={e => setContactForm({ ...contactForm, phone: formatPhoneInput(e.target.value) })} />
                                 </div>
-                                <SearchableDropdown label="Phone Type" value={contactForm.phoneType} onChange={v => setContactForm({...contactForm, phoneType: v})} options={PHONE_TYPE_OPTIONS} placeholder="Select type..." />
+                                <SearchableDropdown label="Phone Type" value={contactForm.phoneType} onChange={v => setContactForm({ ...contactForm, phoneType: v })} options={PHONE_TYPE_OPTIONS} placeholder="Select type..." />
                                 <div>
                                     <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Extension</label>
-                                    <input className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.extension} onChange={e => setContactForm({...contactForm, extension: e.target.value})} />
+                                    <input className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.extension} onChange={e => setContactForm({ ...contactForm, extension: e.target.value })} />
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-3">
-                                <SearchableDropdown label="Role" value={contactForm.role} onChange={v => setContactForm({...contactForm, role: v})} options={ROLE_OPTIONS} placeholder="Select role..." />
+                                <SearchableDropdown label="Role" value={contactForm.role} onChange={v => setContactForm({ ...contactForm, role: v })} options={ROLE_OPTIONS} placeholder="Select role..." />
                                 <div>
                                     <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Status</label>
-                                    <select className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.status} onChange={e => setContactForm({...contactForm, status: e.target.value})}>
+                                    <select className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.status} onChange={e => setContactForm({ ...contactForm, status: e.target.value })}>
                                         <option value="Active">Active</option>
                                         <option value="Inactive">Inactive</option>
                                     </select>
@@ -1318,33 +1312,33 @@ export default function ClientDashboardPage() {
                             </div>
                             <div>
                                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Address</label>
-                                <input className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.address} onChange={e => setContactForm({...contactForm, address: e.target.value})} />
+                                <input className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.address} onChange={e => setContactForm({ ...contactForm, address: e.target.value })} />
                             </div>
                             <div className="grid grid-cols-4 gap-3">
                                 <div>
                                     <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">City</label>
-                                    <input className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.city} onChange={e => setContactForm({...contactForm, city: e.target.value})} />
+                                    <input className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.city} onChange={e => setContactForm({ ...contactForm, city: e.target.value })} />
                                 </div>
                                 <div>
                                     <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">State</label>
-                                    <input className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.state} onChange={e => setContactForm({...contactForm, state: e.target.value})} />
+                                    <input className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.state} onChange={e => setContactForm({ ...contactForm, state: e.target.value })} />
                                 </div>
                                 <div>
                                     <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Zip Code</label>
-                                    <input className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.zipCode} onChange={e => setContactForm({...contactForm, zipCode: e.target.value})} />
+                                    <input className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.zipCode} onChange={e => setContactForm({ ...contactForm, zipCode: e.target.value })} />
                                 </div>
                                 <div>
                                     <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Country</label>
-                                    <input className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.country} onChange={e => setContactForm({...contactForm, country: e.target.value})} />
+                                    <input className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.country} onChange={e => setContactForm({ ...contactForm, country: e.target.value })} />
                                 </div>
                             </div>
                             <div>
                                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Website</label>
-                                <input className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.website} onChange={e => setContactForm({...contactForm, website: e.target.value})} />
+                                <input className="w-full mt-1 px-2 py-1.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" value={contactForm.website} onChange={e => setContactForm({ ...contactForm, website: e.target.value })} />
                             </div>
                             <div className="grid grid-cols-2 gap-3">
-                                <SearchableDropdown label="Communication Preference" value={contactForm.communicationPreference} onChange={v => setContactForm({...contactForm, communicationPreference: v})} options={COMM_PREF_OPTIONS} placeholder="Select preference..." />
-                                <SearchableDropdown label="Follow-Up Frequency" value={contactForm.followUpFrequency} onChange={v => setContactForm({...contactForm, followUpFrequency: v})} options={FOLLOW_UP_OPTIONS} placeholder="Select frequency..." />
+                                <SearchableDropdown label="Communication Preference" value={contactForm.communicationPreference} onChange={v => setContactForm({ ...contactForm, communicationPreference: v })} options={COMM_PREF_OPTIONS} placeholder="Select preference..." />
+                                <SearchableDropdown label="Follow-Up Frequency" value={contactForm.followUpFrequency} onChange={v => setContactForm({ ...contactForm, followUpFrequency: v })} options={FOLLOW_UP_OPTIONS} placeholder="Select frequency..." />
                             </div>
                         </div>
                         <div className="flex items-center justify-end space-x-2 px-4 py-3 border-t border-border">
@@ -1368,37 +1362,37 @@ export default function ClientDashboardPage() {
                     </div>
                     <div className="p-0">
                         <div className="px-4 border-b border-slate-100">
-                            <input 
-                                type="text" 
-                                placeholder="Recipients" 
-                                className="w-full text-sm py-3 focus:outline-none placeholder:text-slate-400 font-medium" 
-                                value={composeData.to} 
-                                onChange={(e) => setComposeData({...composeData, to: e.target.value})} 
+                            <input
+                                type="text"
+                                placeholder="Recipients"
+                                className="w-full text-sm py-3 focus:outline-none placeholder:text-slate-400 font-medium"
+                                value={composeData.to}
+                                onChange={(e) => setComposeData({ ...composeData, to: e.target.value })}
                             />
                         </div>
                         <div className="px-4 border-b border-slate-100">
-                            <input 
-                                type="text" 
-                                placeholder="Subject" 
-                                className="w-full text-sm py-3 focus:outline-none placeholder:text-slate-400 font-medium" 
-                                value={composeData.subject} 
-                                onChange={(e) => setComposeData({...composeData, subject: e.target.value})} 
+                            <input
+                                type="text"
+                                placeholder="Subject"
+                                className="w-full text-sm py-3 focus:outline-none placeholder:text-slate-400 font-medium"
+                                value={composeData.subject}
+                                onChange={(e) => setComposeData({ ...composeData, subject: e.target.value })}
                             />
                         </div>
                         <div className="px-4">
-                            <textarea 
-                                placeholder="Message" 
-                                rows={12} 
-                                className="w-full text-sm py-4 focus:outline-none resize-none placeholder:text-slate-400 font-medium leading-relaxed" 
-                                value={composeData.body} 
-                                onChange={(e) => setComposeData({...composeData, body: e.target.value})} 
+                            <textarea
+                                placeholder="Message"
+                                rows={12}
+                                className="w-full text-sm py-4 focus:outline-none resize-none placeholder:text-slate-400 font-medium leading-relaxed"
+                                value={composeData.body}
+                                onChange={(e) => setComposeData({ ...composeData, body: e.target.value })}
                             />
                         </div>
-                        
+
                         {/* Toolbar & Send */}
                         <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 bg-white">
                             <div className="flex items-center space-x-1">
-                                <button 
+                                <button
                                     onClick={handleSendEmail}
                                     disabled={sendingEmail}
                                     className="flex items-center space-x-3 px-8 py-2.5 bg-black text-white text-[11px] font-black uppercase tracking-[0.15em] hover:bg-slate-800 transition-all mr-4 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1415,20 +1409,20 @@ export default function ClientDashboardPage() {
                                         </>
                                     )}
                                 </button>
-                                
+
                                 <div className="flex items-center space-x-0.5 text-slate-500">
                                     <button className="p-2 hover:bg-slate-50 hover:text-black transition-all rounded-sm" title="Attach files">
                                         <Paperclip className="w-4 h-4" />
                                     </button>
                                 </div>
                             </div>
-                            
+
                             <div className="flex items-center space-x-2">
-                                <button 
-                                    onClick={() => { 
-                                        setIsComposeOpen(false); 
-                                        setComposeData({ to: '', subject: '', body: '' }); 
-                                    }} 
+                                <button
+                                    onClick={() => {
+                                        setIsComposeOpen(false);
+                                        setComposeData({ to: '', subject: '', body: '' });
+                                    }}
                                     className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all rounded-sm"
                                 >
                                     <Trash2 className="w-4 h-4" />
@@ -1445,7 +1439,7 @@ export default function ClientDashboardPage() {
                     <div className="bg-white rounded-lg shadow-2xl w-[380px] overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="bg-slate-900 text-white px-5 py-3 flex items-center justify-between">
                             <span className="text-[11px] font-black uppercase tracking-[0.15em]">Security Verification</span>
-                            <button 
+                            <button
                                 onClick={() => {
                                     setBillingPasswordModal(false);
                                     setBillingPassword('');

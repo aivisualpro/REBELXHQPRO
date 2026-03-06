@@ -27,9 +27,9 @@ let syncProgress = {
 };
 
 async function fetchProductsFromWC(
-    baseUrl: string, 
-    key: string, 
-    secret: string, 
+    baseUrl: string,
+    key: string,
+    secret: string,
     siteName: string,
     modifiedAfter?: Date
 ) {
@@ -48,7 +48,7 @@ async function fetchProductsFromWC(
     while (hasMore) {
         try {
             syncProgress.fetchingPage = page;
-            
+
             let url = `${apiBase}products?per_page=100&page=${page}`;
             if (modifiedAfter) {
                 url += `&modified_after=${modifiedAfter.toISOString()}`;
@@ -65,7 +65,7 @@ async function fetchProductsFromWC(
             }
 
             const data = await res.json();
-            
+
             if (!Array.isArray(data) || data.length === 0) {
                 hasMore = false;
             } else {
@@ -80,7 +80,7 @@ async function fetchProductsFromWC(
             throw error;
         }
     }
-    
+
     syncProgress.fetchingPhase = false;
     return allProducts;
 }
@@ -88,7 +88,7 @@ async function fetchProductsFromWC(
 async function fetchVariations(baseUrl: string, productId: number, key: string, secret: string) {
     const apiBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
     const auth = Buffer.from(`${key}:${secret}`).toString('base64');
-    
+
     const res = await fetch(`${apiBase}products/${productId}/variations?per_page=100`, {
         headers: { 'Authorization': `Basic ${auth}` },
         cache: 'no-store'
@@ -101,7 +101,7 @@ async function fetchVariations(baseUrl: string, productId: number, key: string, 
 export async function GET() {
     const startTime = syncProgress.startTime || 0;
     const elapsedMinutes = syncProgress.isSyncing ? ((Date.now() - startTime) / 1000 / 60).toFixed(1) : '0';
-    
+
     return NextResponse.json({
         ...syncProgress,
         elapsedMinutes,
@@ -118,12 +118,12 @@ export async function POST(request: Request) {
     if (syncProgress.isSyncing) {
         const startTime = syncProgress.startTime || 0;
         const elapsedMinutes = (Date.now() - startTime) / 1000 / 60;
-        
+
         if (elapsedMinutes > 10) {
             console.log(`Sync was stuck for ${elapsedMinutes.toFixed(1)}m. Resetting.`);
             syncProgress.isSyncing = false;
         } else {
-            return NextResponse.json({ 
+            return NextResponse.json({
                 error: 'Sync already in progress',
                 startedAt: new Date(startTime).toISOString(),
                 elapsedMinutes: elapsedMinutes.toFixed(1)
@@ -212,7 +212,7 @@ export async function POST(request: Request) {
                 const lastSyncAt = forceFullSync ? null : (syncMeta as any)?.lastSyncAt;
 
                 if (lastSyncAt) {
-                    syncProgress.currentStep = `Fetching changes from ${site.name} since ${new Date(lastSyncAt).toLocaleDateString()}...`;
+                    syncProgress.currentStep = `Fetching changes from ${site.name} since ${new Date(lastSyncAt).toISOString().slice(0, 10)}...`;
                     syncProgress.logs.push(`📅 ${site.name}: Incremental sync since ${new Date(lastSyncAt).toLocaleString()}`);
                 } else {
                     syncProgress.currentStep = `Fetching ALL products from ${site.name} (full sync)...`;
@@ -221,14 +221,14 @@ export async function POST(request: Request) {
 
                 try {
                     const products = await fetchProductsFromWC(
-                        site.baseUrl, 
-                        site.key, 
-                        site.secret, 
+                        site.baseUrl,
+                        site.key,
+                        site.secret,
                         site.name,
                         lastSyncAt ? new Date(lastSyncAt) : undefined
                     );
                     products.forEach(p => allWebProducts.push({ site, p }));
-                    
+
                     if (lastSyncAt) {
                         syncProgress.logs.push(`📦 ${site.name}: ${products.length} changed products`);
                     } else {
@@ -240,14 +240,14 @@ export async function POST(request: Request) {
             }
 
             syncProgress.total = allWebProducts.length;
-            
+
             if (allWebProducts.length === 0) {
                 syncProgress.currentStep = 'Complete - No changes detected';
                 syncProgress.isSyncing = false;
                 syncProgress.logs.push('✅ All products are up to date!');
                 return;
             }
-            
+
             syncProgress.currentStep = 'Syncing product details and variations...';
 
             for (let i = 0; i < allWebProducts.length; i++) {
@@ -255,16 +255,16 @@ export async function POST(request: Request) {
                 syncProgress.progress = i + 1;
                 syncProgress.currentSite = site.name;
                 syncProgress.currentProductName = p.name?.substring(0, 50) || `Product ${p.id}`;
-                
+
                 try {
                     // Generate WebProduct ID - Use Site Name + Web ID to avoid collisions across sites
                     // Previously this was using p.sku which caused products with same SKUs on different sites to overwrite each other
                     const webProductId = `WC-${site.name}-${p.id}`;
-                    
+
                     // Get existing WebProduct to preserve linkedSkuId
                     const existingWebProduct = await WebProduct.findById(webProductId).lean();
                     const isNew = !existingWebProduct;
-                    
+
                     // Fetch variations for variable products
                     let variations: any[] = [];
                     if (p.type === 'variable' && p.variations?.length > 0) {
@@ -272,9 +272,9 @@ export async function POST(request: Request) {
                         if (Array.isArray(vars)) {
                             // Get existing variations to preserve linkedSkuId
                             const existingVariations = (existingWebProduct as any)?.variations || [];
-                            
+
                             variations = vars.map((v: any) => {
-                                const existingVar = existingVariations.find((ev: any) => 
+                                const existingVar = existingVariations.find((ev: any) =>
                                     ev.id === v.id || ev._id === v.id.toString()
                                 );
                                 return {
@@ -308,8 +308,8 @@ export async function POST(request: Request) {
                         const idx = mergedVariations.findIndex(mv => mv._id === newV._id);
                         if (idx > -1) {
                             // Preserve linkedSkuId when updating
-                            mergedVariations[idx] = { 
-                                ...mergedVariations[idx], 
+                            mergedVariations[idx] = {
+                                ...mergedVariations[idx],
                                 ...newV,
                                 linkedSkuId: mergedVariations[idx].linkedSkuId || newV.linkedSkuId
                             };
@@ -399,7 +399,7 @@ export async function POST(request: Request) {
                         totalUpdated++;
                     }
                     syncProgress.stats = { added: totalAdded, updated: totalUpdated, skipped: totalSkipped };
-                    
+
                 } catch (pErr: any) {
                     syncProgress.logs.push(`❌ Error on ${p.id} (${site.name}): ${pErr.message}`);
                     totalSkipped++;
@@ -410,10 +410,10 @@ export async function POST(request: Request) {
             const syncTime = new Date();
             for (const site of websites) {
                 if (!site.baseUrl || !site.key || !site.secret) continue;
-                
+
                 const syncMetaId = `web-products-${site.name}`;
                 const siteProductCount = await WebProduct.countDocuments({ website: site.name });
-                
+
                 await SyncMeta.findOneAndUpdate(
                     { _id: syncMetaId },
                     {

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowUpDown, Plus, Search, Building2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -119,7 +119,7 @@ const VendorRow = React.memo(function VendorRow({
       <td className="px-2.5 py-2.5 w-[100px] text-[12px] text-foreground/60">{vendor.city || '—'}</td>
       <td className="px-2.5 py-2.5 w-[100px] text-[12px] text-foreground/70 uppercase font-medium">{vendor.paymentTerms || '—'}</td>
       <td className="px-2.5 py-2.5 w-[80px]"><VendorStatusBadge status={vendor.status} /></td>
-      <td className="px-2.5 py-2.5 w-[100px] text-[12px] font-mono text-foreground/60">{new Date(vendor.createdAt).toLocaleDateString()}</td>
+      <td className="px-2.5 py-2.5 w-[100px] text-[12px] font-mono text-foreground/60">{formatDate(vendor.createdAt)}</td>
     </tr>
   );
 });

@@ -35,22 +35,48 @@ export async function POST(request: Request) {
         const operations: any[] = [];
         let skippedCount = 0;
 
+        // Helper: resolve a field from a CSV row by checking multiple possible column names
+        const resolveField = (row: any, ...keys: string[]): string | undefined => {
+            for (const key of keys) {
+                if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== '') {
+                    return String(row[key]).trim();
+                }
+            }
+            return undefined;
+        };
+
+        // Helper: parse a numeric field, returns undefined if not present/empty
+        // Strips currency symbols ($), commas, and whitespace before parsing
+        const parseNum = (row: any, ...keys: string[]): number | undefined => {
+            const val = resolveField(row, ...keys);
+            if (val === undefined) return undefined;
+            const cleaned = val.replace(/[$,\s]/g, '');
+            const num = parseFloat(cleaned);
+            return isNaN(num) ? undefined : num;
+        };
+
         for (const row of data) {
             // Generate or use legacyId (same pattern as clients) - check many possible column names
-            const legacyId = row.legacyId || row.LegacyId || row.legacy_id || 
-                            row._id || row.Id || row.ID ||
-                            row.orderId || row.OrderId || row.order_id || row['Order ID'] || row['Order Id'] ||
-                            row.label || row.Label || row['Order Number'] || row.orderNumber;
-            
+            const legacyId = resolveField(row,
+                'legacyId', 'LegacyId', 'legacy_id', 'LegacyID',
+                '_id', 'Id', 'ID', 'id',
+                'orderId', 'OrderId', 'order_id', 'Order ID', 'Order Id',
+                'label', 'Label', 'Order Number', 'orderNumber', 'OrderNumber', 'order_number'
+            );
+
             if (!legacyId) {
                 skippedCount++;
                 continue;
             }
 
-            const label = row.label || row.orderId || row['Order ID'] || legacyId;
+            const label = resolveField(row, 'label', 'Label', 'orderId', 'Order ID', 'Order Number', 'orderNumber') || legacyId;
 
             // Match client by legacyId first, then by name
-            const clientRef = row.clientId || row.client || row['Client Name'] || row.clientLegacyId;
+            const clientRef = resolveField(row,
+                'clientId', 'ClientId', 'client_id', 'Client ID',
+                'client', 'Client', 'Client Name', 'clientName',
+                'clientLegacyId', 'ClientLegacyId'
+            );
             let clientId = null;
 
             if (clientRef) {
@@ -73,29 +99,63 @@ export async function POST(request: Request) {
                     }
                 }
             }
-            
+
+            // Build update data - only include fields that actually have values in the CSV
+            // This prevents overwriting existing DB values with 0/empty when CSV column is missing
             const updateData: any = {
-                legacyId, // Store the legacyId for future imports/updates
+                legacyId,
                 label,
-                salesRep: row.salesRep,
-                discount: parseFloat(row.discount) || 0,
-                paymentMethod: row.paymentMethod,
-                orderStatus: row.orderStatus || 'Pending',
-                shippedDate: row.shippedDate ? new Date(row.shippedDate) : undefined,
-                shippingMethod: row.shippingMethod,
-                trackingNumber: row.trackingNumber,
-                shippingCost: parseFloat(row.shippingCost) || 0,
-                tax: parseFloat(row.tax) || 0,
-                category: row.category,
-                shippingAddress: row.shippingAddress,
-                city: row.city,
-                state: row.state,
-                lockPrice: row.lockPrice === 'true' || row.lockPrice === true,
             };
-            
-            if (row.createdAt) {
-                updateData.createdAt = new Date(row.createdAt);
-            }
+
+            // String fields - only set if present in CSV
+            const salesRep = resolveField(row, 'salesRep', 'SalesRep', 'Sales Rep', 'sales_rep', 'SalesPerson', 'Sales Person');
+            if (salesRep !== undefined) updateData.salesRep = salesRep;
+
+            const paymentMethod = resolveField(row, 'paymentMethod', 'PaymentMethod', 'Payment Method', 'payment_method');
+            if (paymentMethod !== undefined) updateData.paymentMethod = paymentMethod;
+
+            const orderStatus = resolveField(row, 'orderStatus', 'OrderStatus', 'Order Status', 'order_status', 'Status', 'status');
+            if (orderStatus !== undefined) updateData.orderStatus = orderStatus;
+            else if (!clientId) updateData.orderStatus = 'Pending'; // Default only for new records
+
+            const shippingMethod = resolveField(row, 'shippingMethod', 'ShippingMethod', 'Shipping Method', 'shipping_method');
+            if (shippingMethod !== undefined) updateData.shippingMethod = shippingMethod;
+
+            const trackingNumber = resolveField(row, 'trackingNumber', 'TrackingNumber', 'Tracking Number', 'tracking_number', 'Tracking #', 'Tracking#');
+            if (trackingNumber !== undefined) updateData.trackingNumber = trackingNumber;
+
+            const category = resolveField(row, 'category', 'Category');
+            if (category !== undefined) updateData.category = category;
+
+            const shippingAddress = resolveField(row, 'shippingAddress', 'ShippingAddress', 'Shipping Address', 'shipping_address', 'Address');
+            if (shippingAddress !== undefined) updateData.shippingAddress = shippingAddress;
+
+            const city = resolveField(row, 'city', 'City');
+            if (city !== undefined) updateData.city = city;
+
+            const state = resolveField(row, 'state', 'State');
+            if (state !== undefined) updateData.state = state;
+
+            // Numeric fields - only set if present and valid in CSV
+            const shippingCost = parseNum(row, 'shippingCost', 'ShippingCost', 'Shipping Cost', 'shipping_cost', 'Shipping');
+            if (shippingCost !== undefined) updateData.shippingCost = shippingCost;
+
+            const discount = parseNum(row, 'discount', 'Discount');
+            if (discount !== undefined) updateData.discount = discount;
+
+            const tax = parseNum(row, 'tax', 'Tax');
+            if (tax !== undefined) updateData.tax = tax;
+
+            // Boolean field
+            const lockPriceVal = resolveField(row, 'lockPrice', 'LockPrice', 'Lock Price', 'lock_price');
+            if (lockPriceVal !== undefined) updateData.lockPrice = lockPriceVal === 'true' || lockPriceVal === 'TRUE' || lockPriceVal === '1';
+
+            // Date fields
+            const shippedDate = resolveField(row, 'shippedDate', 'ShippedDate', 'Shipped Date', 'shipped_date');
+            if (shippedDate) updateData.shippedDate = new Date(shippedDate);
+
+            const createdAt = resolveField(row, 'createdAt', 'CreatedAt', 'Created At', 'created_at', 'Date', 'Order Date', 'OrderDate');
+            if (createdAt) updateData.createdAt = new Date(createdAt);
 
             if (clientId) {
                 updateData.clientId = clientId;
@@ -114,7 +174,7 @@ export async function POST(request: Request) {
         // Bulk write for performance
         let count = 0;
         console.log(`[import-orders] Operations prepared: ${operations.length}, Skipped (no legacyId): ${skippedCount}`);
-        
+
         if (operations.length > 0) {
             const result = await SaleOrder.bulkWrite(operations, { ordered: false });
             count = (result.upsertedCount || 0) + (result.modifiedCount || 0);

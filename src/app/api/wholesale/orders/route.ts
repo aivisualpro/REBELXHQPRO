@@ -35,21 +35,32 @@ export async function GET(request: Request) {
         let query: any = {};
 
         if (search) {
-            const fuzzyRegex = buildFuzzyRegex(search);
-            const matchingClients = await Client.find(
-                { name: { $regex: fuzzyRegex, $options: 'i' } },
-                { _id: 1 }
-            ).lean();
-            const matchingClientIds = matchingClients.map((c: any) => c._id);
+            const trimmedSearch = search.trim();
+            const isNumericSearch = /^\d+$/.test(trimmedSearch);
 
-            const fuzzyQuery = buildFuzzySearchQuery(search, ['label', 'paymentMethod']);
-            if (fuzzyQuery) {
-                query.$and = fuzzyQuery.$and.map((cond: any) => ({
-                    $or: [
-                        ...cond.$or,
-                        ...(matchingClientIds.length > 0 ? [{ clientId: { $in: matchingClientIds } }] : [])
-                    ]
-                }));
+            if (isNumericSearch) {
+                // Exact match for order numbers — search for label that equals or starts with the number
+                query.$or = [
+                    { label: trimmedSearch },
+                    { label: { $regex: `^${trimmedSearch}`, $options: 'i' } }
+                ];
+            } else {
+                const fuzzyRegex = buildFuzzyRegex(search);
+                const matchingClients = await Client.find(
+                    { name: { $regex: fuzzyRegex, $options: 'i' } },
+                    { _id: 1 }
+                ).lean();
+                const matchingClientIds = matchingClients.map((c: any) => c._id);
+
+                const fuzzyQuery = buildFuzzySearchQuery(search, ['label', 'paymentMethod']);
+                if (fuzzyQuery) {
+                    query.$and = fuzzyQuery.$and.map((cond: any) => ({
+                        $or: [
+                            ...cond.$or,
+                            ...(matchingClientIds.length > 0 ? [{ clientId: { $in: matchingClientIds } }] : [])
+                        ]
+                    }));
+                }
             }
         }
 

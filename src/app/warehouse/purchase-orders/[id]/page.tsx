@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { ArrowLeft, Package, Calendar, Building2, CreditCard, Truck, Plus, X, Trash2, Pencil, ChevronDown, AlertCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatDate, toDateInputValue } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
@@ -137,7 +137,7 @@ export default function PurchaseOrderDetailPage() {
             fetch('/api/vendors?limit=500')
                 .then(res => res.json())
                 .then(data => setAllVendors(data.vendors || []))
-                .catch(() => {});
+                .catch(() => { });
         }
     }, [isHeaderModalOpen, allVendors.length]);
 
@@ -365,14 +365,8 @@ export default function PurchaseOrderDetailPage() {
         );
     }
 
-    const formatDate = (dateStr: string) => {
-        if (!dateStr) return '-';
-        return new Date(dateStr).toLocaleDateString('en-US', {
-            month: '2-digit',
-            day: '2-digit',
-            year: 'numeric'
-        });
-    };
+
+
 
     const formatCurrency = (val: number) => {
         if (val === undefined || val === null) return '-';
@@ -413,8 +407,8 @@ export default function PurchaseOrderDetailPage() {
             {headerPortal && order && createPortal(
                 <>
                     <div className="flex items-center space-x-2">
-                        <button 
-                            onClick={() => router.back()} 
+                        <button
+                            onClick={() => router.back()}
                             className="flex items-center space-x-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded transition-all cursor-pointer border border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
                         >
                             <ArrowLeft className="w-3.5 h-3.5" />
@@ -515,8 +509,8 @@ export default function PurchaseOrderDetailPage() {
                                     vendor: typeof order.vendor === 'object' && order.vendor ? order.vendor._id : order.vendor,
                                     paymentTerms: order.paymentTerms || '',
                                     status: order.status,
-                                    scheduledDelivery: order.scheduledDelivery ? new Date(order.scheduledDelivery).toISOString().split('T')[0] : '',
-                                    receivedDate: order.receivedDate ? new Date(order.receivedDate).toISOString().split('T')[0] : '',
+                                    scheduledDelivery: toDateInputValue(order.scheduledDelivery),
+                                    receivedDate: toDateInputValue(order.receivedDate),
                                 });
                                 setIsHeaderModalOpen(true);
                             }}
@@ -588,7 +582,7 @@ export default function PurchaseOrderDetailPage() {
                                         return (
                                             <tr key={item._id} className="hover:bg-secondary/50 transition-colors">
                                                 <td className="px-3 py-1.5 text-[10px] text-foreground">
-                                                    <span 
+                                                    <span
                                                         onClick={() => router.push(`/warehouse/skus/${skuId}`)}
                                                         className="hover:text-blue-600 hover:underline cursor-pointer transition-colors"
                                                     >
@@ -674,7 +668,7 @@ export default function PurchaseOrderDetailPage() {
                                     required
                                 />
                             </div>
-                            
+
                             <div className="space-y-1.5">
                                 <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Lot #</label>
                                 <div className="flex gap-2">
@@ -877,8 +871,8 @@ export default function PurchaseOrderDetailPage() {
                     </div>
                 </div>
             )}
-            
-            <LotSelectionModal 
+
+            <LotSelectionModal
                 isOpen={isLotSelectorOpen}
                 onClose={() => setIsLotSelectorOpen(false)}
                 onSelect={(lot) => {

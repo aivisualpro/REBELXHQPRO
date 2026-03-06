@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react
 import { useSession } from 'next-auth/react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Search, ArrowUpDown, Loader2, List, Plus, X } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatDate, toDateInputValue } from '@/lib/utils';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
 import toast from 'react-hot-toast';
@@ -88,7 +88,7 @@ function ExpiryBadge({ date }: { date?: string }) {
                 (isExpired || isSoon) && 'font-bold'
             )}
         >
-            {d.toLocaleDateString()}
+            {formatDate(d)}
         </span>
     );
 }
@@ -392,7 +392,7 @@ function OpeningBalancesContent() {
             qty: item.qty || 0,
             uom: item.uom || 'pcs',
             cost: item.cost || 0,
-            expirationDate: item.expirationDate ? new Date(item.expirationDate).toISOString().split('T')[0] : ''
+            expirationDate: toDateInputValue(item.expirationDate)
         });
         setIsModalOpen(true);
     };
@@ -593,7 +593,7 @@ function OpeningBalancesContent() {
 
                                     {/* Created At */}
                                     <td className="px-2.5 py-2.5 w-[100px] text-[11px] font-mono text-foreground/50">
-                                        {new Date(item.createdAt).toLocaleDateString()}
+                                        {formatDate(item.createdAt)}
                                     </td>
                                 </tr>
                             ))}

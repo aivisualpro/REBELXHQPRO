@@ -5,6 +5,7 @@ import { getGmailClient } from '@/lib/google-api';
 import dbConnect from '@/lib/mongoose';
 import User from '@/models/User';
 import Client from '@/models/Client';
+import { formatDate } from '@/lib/utils';
 
 // Cache client emails in memory with a TTL
 let clientEmailCache: { emails: Set<string>; ts: number } | null = null;
@@ -137,7 +138,7 @@ async function fetchMessageDetails(gmail: any, messages: any[]) {
                     body,
                     attachments,
                     time: isValidDate ? dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
-                    date: isValidDate ? dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' }) : '',
+                    date: isValidDate ? formatDate(dateObj!.toISOString()) : '',
                     timestamp: isValidDate ? dateObj.getTime() : 0,
                     isRead: !details.data.labelIds?.includes('UNREAD'),
                     isStarred: details.data.labelIds?.includes('STARRED'),

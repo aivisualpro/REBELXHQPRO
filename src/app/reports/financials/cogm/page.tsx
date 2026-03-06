@@ -1,6 +1,6 @@
 'use client';
 
-import { 
+import {
     Factory,
     Calendar,
     Package,
@@ -16,7 +16,7 @@ import {
     Loader2
 } from 'lucide-react';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import { MultiSelectFilter } from '@/components/ui/filters/MultiSelectFilter';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -98,7 +98,7 @@ export default function COGMPage() {
     // Data Fetching
     const fetchData = useCallback(async () => {
         if (!hasMore && page > 1) return;
-        
+
         setLoading(true);
         try {
             const params = new URLSearchParams({
@@ -131,7 +131,7 @@ export default function COGMPage() {
                         return [...filteredPrev, ...data.records];
                     });
                 }
-                
+
                 // Determine if there are more records
                 setHasMore((data.records || []).length === 20);
             }
@@ -170,14 +170,8 @@ export default function COGMPage() {
         };
     }, []);
 
-    const formatDate = (dateStr: string) => {
-        if (!dateStr) return '-';
-        return new Date(dateStr).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric'
-        });
-    };
+
+
 
     const getStatusColor = (status: string) => {
         switch (status) {
@@ -278,8 +272,8 @@ export default function COGMPage() {
                             {records.length === 0 && !loading ? (
                                 <tr><td colSpan={12} className="px-3 py-12 text-center text-[10px] text-slate-500">No records found</td></tr>
                             ) : records.map(record => (
-                                <tr 
-                                    key={record._id} 
+                                <tr
+                                    key={record._id}
                                     onClick={() => router.push(`/warehouse/manufacturing/${record._id}`)}
                                     className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
                                 >
@@ -317,7 +311,7 @@ export default function COGMPage() {
                             ))}
                         </tbody>
                     </table>
-                    
+
                     {/* Load More Sentinel */}
                     <div ref={loadMoreRef} className="h-10 flex items-center justify-center border-t border-slate-50 mt-auto shrink-0">
                         {loading && hasMore && (

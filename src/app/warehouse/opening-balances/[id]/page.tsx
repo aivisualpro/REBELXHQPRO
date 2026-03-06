@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
-import { cn } from '@/lib/utils';
+import { cn, formatDate, toDateInputValue } from '@/lib/utils';
 import { confirmDeleteToast } from '@/lib/confirmToast';
 
 interface Note {
@@ -66,7 +66,7 @@ export default function OpeningBalanceDetailPage() {
         expirationDate: ''
     });
 
-    
+
     // Client-side SKU fallback
     const [allSkus, setAllSkus] = useState<any[]>([]);
 
@@ -77,7 +77,7 @@ export default function OpeningBalanceDetailPage() {
             .then(data => {
                 if (data.skus) setAllSkus(data.skus);
             })
-            .catch(() => {});
+            .catch(() => { });
     }, []);
 
     useEffect(() => {
@@ -95,7 +95,7 @@ export default function OpeningBalanceDetailPage() {
         fetch('/api/settings')
             .then(res => res.json())
             .then(data => setGlobalSettings(data))
-            .catch(() => {});
+            .catch(() => { });
     }, []);
 
     // Shell Viewport Lock
@@ -120,7 +120,7 @@ export default function OpeningBalanceDetailPage() {
                     qty: data.qty || 0,
                     cost: data.cost || 0,
                     uom: data.uom || '',
-                    expirationDate: data.expirationDate ? new Date(data.expirationDate).toISOString().split('T')[0] : ''
+                    expirationDate: toDateInputValue(data.expirationDate)
                 });
             } else {
                 toast.error('Failed to load opening balance details');
@@ -275,24 +275,10 @@ export default function OpeningBalanceDetailPage() {
 
     const getSkuId = (val: any) => (typeof val === 'object' && val?._id ? val._id : val || '');
 
-    const formatDate = (dateStr?: string) => {
-        if (!dateStr) return '-';
-        return new Date(dateStr).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric'
-        });
-    };
-
     const formatDateTime = (dateStr?: string) => {
         if (!dateStr) return '-';
-        return new Date(dateStr).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+        const d = new Date(dateStr);
+        return `${formatDate(dateStr)} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
     };
 
     const getUserName = (emailOrId: string) => {
@@ -348,7 +334,7 @@ export default function OpeningBalanceDetailPage() {
             <div className="flex flex-1 overflow-hidden">
                 {/* Left Sidebar: Details (30%) */}
                 <div className="w-[30%] border-r border-border bg-secondary/30 flex flex-col overflow-hidden relative z-10">
-                    
+
                     {/* SKU Identity Header - Fixed */}
                     <div className="h-16 bg-card border-b border-border shrink-0 flex overflow-hidden">
                         {/* Image */}
@@ -366,7 +352,7 @@ export default function OpeningBalanceDetailPage() {
                                 }}
                             />
                         </div>
-                        
+
                         {/* Tier Strip */}
                         <div className="w-12 h-full bg-emerald-500 flex items-center justify-center shrink-0">
                             <span className="text-2xl font-black text-white">
@@ -516,7 +502,7 @@ export default function OpeningBalanceDetailPage() {
                                             qty: item.qty || 0,
                                             cost: item.cost || 0,
                                             uom: item.uom || '',
-                                            expirationDate: item.expirationDate ? new Date(item.expirationDate).toISOString().split('T')[0] : ''
+                                            expirationDate: toDateInputValue(item.expirationDate)
                                         });
                                     }}
                                     className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-secondary text-foreground border border-border hover:bg-secondary/80 transition-colors cursor-pointer"

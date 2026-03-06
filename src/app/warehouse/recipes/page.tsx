@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Search, ArrowUpDown, Plus, X, Loader2, Copy, Pencil, Trash2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { confirmDeleteToast } from '@/lib/confirmToast';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
@@ -494,7 +494,7 @@ function RecipesContent() {
 
                   {/* Created At */}
                   <td className="px-2.5 py-2.5 w-[100px] text-[11px] font-mono text-foreground/50 border-r border-border/40">
-                    {new Date(recipe.createdAt).toLocaleDateString()}
+                    {formatDate(recipe.createdAt)}
                   </td>
 
                   {/* Created By */}

@@ -7,6 +7,13 @@ import { getLotsWithCost } from '@/lib/lot-cost';
 
 export const dynamic = 'force-dynamic';
 
+// Helper: get linked SKUs array, normalizing legacy single-link format
+function getLinkedSkusFromDoc(doc: any): { skuId: string; multiplier: number }[] {
+    if (doc.linkedSkus && doc.linkedSkus.length > 0) return doc.linkedSkus;
+    if (doc.linkedSkuId) return [{ skuId: doc.linkedSkuId, multiplier: doc.multiplier || 1 }];
+    return [];
+}
+
 export async function GET(
     request: Request,
     props: { params: Promise<{ id: string }> }
@@ -25,85 +32,167 @@ export async function GET(
             return NextResponse.json({ error: 'Order not found' }, { status: 404 });
         }
 
-        // Collect all SKU IDs (both sku and linkedSkuId) for batch lookup
-        const skuIds = order.lineItems
-            .map((item: any) => item.sku)
-            .filter((sku: any) => typeof sku === 'string' && sku.length > 0);
-
-        const linkedSkuIds = order.lineItems
-            .map((item: any) => item.linkedSkuId)
-            .filter((id: any) => typeof id === 'string' && id.length > 0);
-
-        const allSkuIds = [...new Set([...skuIds, ...linkedSkuIds])];
-
-        if (allSkuIds.length > 0) {
-            const skus = await Sku.find({ _id: { $in: allSkuIds } }).select('name uom').lean();
-            const skuMap = new Map(skus.map((s: any) => [s._id.toString(), s]));
-
-            order.lineItems = order.lineItems.map((item: any) => {
-                const enriched = { ...item };
-                if (typeof item.sku === 'string' && skuMap.has(item.sku)) {
-                    enriched.skuDetails = skuMap.get(item.sku);
-                }
-                if (typeof item.linkedSkuId === 'string' && skuMap.has(item.linkedSkuId)) {
-                    enriched.linkedSkuName = skuMap.get(item.linkedSkuId)?.name || item.linkedSkuId;
-                }
-                return enriched;
-            });
-        }
-
-        // Resolve variation names and multipliers from WebProduct
+        // ─── 1. Resolve WebProduct linked SKUs for each line item ─────────
+        // Build a map of webProductId -> WebProduct so we can get linkedSkus
         const webProductIds = [...new Set(
             order.lineItems
                 .map((item: any) => item.webProductId || item.parentProductId)
                 .filter(Boolean)
         )];
 
-        const multiplierMap = new Map<string, number>();
-
+        const productWpMap = new Map<string, any>();
         if (webProductIds.length > 0) {
             const webProducts = await WebProduct.find({ _id: { $in: webProductIds } })
-                .select('variations multiplier')
+                .select('variations multiplier linkedSkuId linkedSkus webId')
                 .lean();
-            const wpMap = new Map(webProducts.map((wp: any) => [wp._id.toString(), wp]));
+            webProducts.forEach((wp: any) => productWpMap.set(wp._id.toString(), wp));
+        }
 
-            order.lineItems = order.lineItems.map((item: any) => {
-                const wpId = item.webProductId || item.parentProductId;
-                if (wpId) {
-                    const wp = wpMap.get(wpId.toString());
-                    if (wp) {
-                        let multiplier = wp.multiplier ?? 1;
-                        if (item.variationId && wp.variations) {
-                            const variation = wp.variations.find(
-                                (v: any) => v.id == item.variationId || v._id == item.variationId
-                            );
-                            if (variation) {
-                                if (variation.name) item = { ...item, variationName: variation.name };
-                                if (variation.multiplier != null) multiplier = variation.multiplier;
-                            }
-                        }
-                        multiplierMap.set(String(item.id), multiplier);
-                        return item;
-                    }
-                }
-                return item;
+        // Also collect webProduct by webId (productId on line items) for items without webProductId
+        const productIdToWpMap = new Map<number, any>();
+        const unmatchedProductIds = [...new Set(
+            order.lineItems
+                .filter((item: any) => !item.webProductId && !item.parentProductId && item.productId)
+                .map((item: any) => item.productId)
+        )];
+        if (unmatchedProductIds.length > 0) {
+            const moreProd = await WebProduct.find({ webId: { $in: unmatchedProductIds }, website: order.website })
+                .select('variations multiplier linkedSkuId linkedSkus webId')
+                .lean();
+            moreProd.forEach((wp: any) => {
+                productIdToWpMap.set(wp.webId, wp);
+                productWpMap.set(wp._id.toString(), wp);
             });
         }
 
-        // ─── VIRTUAL COST CALCULATION ─────────────────────────────────────
-        // Uses getLotsWithCost() which derives costs from the SKU ledger —
-        // the same source used by the Lot Selection Modal.
-        // This handles all cost sources including manufactured items where
-        // totalCost is calculated from ingredients + labor + packaging.
+        // ─── 2. Enrich each line item with linked SKUs from WebProduct ────
+        const multiplierMap = new Map<string, number>();
 
-        // Collect unique linkedSkuIds that need cost lookup
+        order.lineItems = order.lineItems.map((item: any) => {
+            const enriched = { ...item };
+            // Resolve the WebProduct
+            const wpId = item.webProductId || item.parentProductId;
+            const wp = wpId ? productWpMap.get(wpId.toString()) : productIdToWpMap.get(item.productId);
+
+            if (wp) {
+                enriched.webProductId = enriched.webProductId || wp._id.toString();
+
+                // Get the correct target (product or variation)
+                let target = wp;
+                let prodMultiplier = wp.multiplier ?? 1;
+                if (item.variationId && wp.variations) {
+                    const variation = wp.variations.find(
+                        (v: any) => v.id == item.variationId || v._id == item.variationId
+                    );
+                    if (variation) {
+                        target = variation;
+                        if (variation.name) enriched.variationName = variation.name;
+                        if (variation.multiplier != null) prodMultiplier = variation.multiplier;
+                    }
+                }
+
+                // If no variationId but product has variations, attach them for selection
+                if (!item.variationId && wp.variations && wp.variations.length > 0) {
+                    enriched.availableVariations = wp.variations.map((v: any) => ({
+                        id: v.id,
+                        _id: v._id,
+                        name: v.name || `Variation ${v.id}`,
+                        sku: v.sku || '',
+                        price: v.price,
+                        attributes: v.attributes || [],
+                    }));
+                }
+
+                multiplierMap.set(String(item.id), prodMultiplier);
+
+                // Get ALL linked SKUs from the WebProduct target
+                const wpLinkedSkus = getLinkedSkusFromDoc(target);
+
+                // If the line item doesn't already have linkedSkus populated, populate from WebProduct
+                if ((!enriched.linkedSkus || enriched.linkedSkus.length === 0) && wpLinkedSkus.length > 0) {
+                    // Migrate: use the existing linkedSkuId/lotNumber/cost for the first match
+                    enriched.linkedSkus = wpLinkedSkus.map((ls: any) => {
+                        if (ls.skuId === enriched.linkedSkuId) {
+                            return {
+                                skuId: ls.skuId,
+                                multiplier: ls.multiplier || 1,
+                                lotNumber: enriched.lotNumber || null,
+                                cost: enriched.cost || 0,
+                            };
+                        }
+                        return {
+                            skuId: ls.skuId,
+                            multiplier: ls.multiplier || 1,
+                            lotNumber: null,
+                            cost: 0,
+                        };
+                    });
+                }
+            }
+
+            return enriched;
+        });
+
+        // ─── 3. Batch SKU name lookup ─────────────────────────────────────
+        const allSkuIds = [...new Set(
+            order.lineItems.flatMap((item: any) => {
+                const ids: string[] = [];
+                if (item.linkedSkuId) ids.push(item.linkedSkuId);
+                if (item.linkedSkus) {
+                    item.linkedSkus.forEach((ls: any) => {
+                        if (ls.skuId) ids.push(ls.skuId);
+                    });
+                }
+                if (typeof item.sku === 'string' && item.sku.length > 0) ids.push(item.sku);
+                return ids;
+            })
+        )];
+
+        const skuNameMap = new Map<string, string>();
+        if (allSkuIds.length > 0) {
+            const skus = await Sku.find({ _id: { $in: allSkuIds } }).select('name uom').lean();
+            skus.forEach((s: any) => {
+                skuNameMap.set(s._id.toString(), s.name || s._id.toString());
+            });
+        }
+
+        // Apply SKU names
+        order.lineItems = order.lineItems.map((item: any) => {
+            const enriched = { ...item };
+            if (item.linkedSkuId && skuNameMap.has(item.linkedSkuId)) {
+                enriched.linkedSkuName = skuNameMap.get(item.linkedSkuId);
+            }
+            if (enriched.linkedSkus) {
+                enriched.linkedSkus = enriched.linkedSkus.map((ls: any) => ({
+                    ...ls,
+                    skuName: skuNameMap.get(ls.skuId) || ls.skuId,
+                }));
+            }
+            if (typeof item.sku === 'string' && skuNameMap.has(item.sku)) {
+                enriched.skuDetails = { name: skuNameMap.get(item.sku) };
+            }
+            return enriched;
+        });
+
+        // ─── 4. VIRTUAL COST CALCULATION ──────────────────────────────────
+        // Collect unique SKU IDs that need cost lookup (from linkedSkus array)
         const skuIdsForCost = [...new Set(
-            order.lineItems
-                .filter((item: any) => item.linkedSkuId && item.lotNumber)
-                .map((item: any) => item.linkedSkuId)
+            order.lineItems.flatMap((item: any) => {
+                const ids: string[] = [];
+                // From new linkedSkus array
+                if (item.linkedSkus) {
+                    item.linkedSkus
+                        .filter((ls: any) => ls.skuId && ls.lotNumber)
+                        .forEach((ls: any) => ids.push(ls.skuId));
+                }
+                // Legacy: single linkedSkuId with lotNumber
+                if (item.linkedSkuId && item.lotNumber && !item.linkedSkus?.length) {
+                    ids.push(item.linkedSkuId);
+                }
+                return ids;
+            })
         )] as string[];
 
-        // Fetch lot costs for all unique SKUs in parallel
         const lotCostBySkuId = new Map<string, Map<string, number>>();
         if (skuIdsForCost.length > 0) {
             const costResults = await Promise.all(
@@ -114,15 +203,26 @@ export async function GET(
             });
         }
 
-        // Apply virtual costs to line items
+        // Apply virtual costs
         order.lineItems = order.lineItems.map((item: any) => {
-            if (item.linkedSkuId && item.lotNumber) {
-                const skuLots = lotCostBySkuId.get(item.linkedSkuId);
-                const baseCost = skuLots?.get(item.lotNumber) || 0;
-                const multiplier = multiplierMap.get(String(item.id)) || 1;
-                return { ...item, cost: baseCost * multiplier };
+            const enriched = { ...item };
+            if (enriched.linkedSkus && enriched.linkedSkus.length > 0) {
+                enriched.linkedSkus = enriched.linkedSkus.map((ls: any) => {
+                    if (ls.skuId && ls.lotNumber) {
+                        const skuLots = lotCostBySkuId.get(ls.skuId);
+                        const baseCost = skuLots?.get(ls.lotNumber) || 0;
+                        return { ...ls, cost: baseCost * (ls.multiplier || 1) };
+                    }
+                    return ls;
+                });
+            } else if (enriched.linkedSkuId && enriched.lotNumber) {
+                // Legacy single-link cost
+                const skuLots = lotCostBySkuId.get(enriched.linkedSkuId);
+                const baseCost = skuLots?.get(enriched.lotNumber) || 0;
+                const multiplier = multiplierMap.get(String(enriched.id)) || 1;
+                enriched.cost = baseCost * multiplier;
             }
-            return { ...item, cost: item.cost || 0 };
+            return enriched;
         });
 
         return NextResponse.json(order);

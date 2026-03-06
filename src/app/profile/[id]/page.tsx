@@ -10,7 +10,7 @@ import {
     Calendar, TrendingUp, Target, Award, Coffee, MapPin
 } from 'lucide-react';
 import Image from 'next/image';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import { useTheme } from '@/components/ThemeProvider';
 import { usePermissions } from '@/hooks/usePermissions';
 
@@ -99,7 +99,7 @@ export default function UserProfilePage() {
     };
 
     const memberSince = user?.createdAt
-        ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+        ? formatDate(user.createdAt)
         : 'N/A';
 
     // Build quick links based on workspace permissions

@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { formatDate } from '@/lib/utils';
 
 export async function syncSkuToAppSheet(sku: any, action: 'Add' | 'Edit' | 'Delete' = 'Edit') {
     const appId = process.env.APPSHEET_APP_ID;
@@ -74,10 +75,10 @@ export async function syncClientToAppSheet(clients: any | any[]) {
         const phones = clientObj.phones || [];
         const emails = clientObj.emails || [];
         const addresses = clientObj.addresses || [];
-        const lastNote = clientObj.notes && clientObj.notes.length > 0 
-            ? clientObj.notes[clientObj.notes.length - 1].note 
+        const lastNote = clientObj.notes && clientObj.notes.length > 0
+            ? clientObj.notes[clientObj.notes.length - 1].note
             : '';
-        
+
         const whatsAppPhone = phones.find((p: any) => p.isWhatsApp || p.label?.toLowerCase().includes('whatsapp'))?.value || '';
 
         // Handle Sales Person Name if it was populated, else use ID
@@ -165,7 +166,7 @@ export async function syncOrderToAppSheet(order: any) {
 
     // Map Order to "Orders" table
     const orderObj = order.toObject ? order.toObject() : order;
-    
+
     // Use email for Sales Representative in AppSheet
     let salesRepEmail = '';
     if (typeof orderObj.salesRep === 'object' && orderObj.salesRep !== null) {
@@ -190,7 +191,7 @@ export async function syncOrderToAppSheet(order: any) {
         'Discount': orderObj.discount || 0,
         'Payment Method': orderObj.paymentMethod || '',
         'Order Status': orderObj.orderStatus || '',
-        '1000000': orderObj.label || '', 
+        '1000000': orderObj.label || '',
         'Shipped Date': orderObj.shippedDate ? new Date(orderObj.shippedDate).toISOString() : '',
         'Shipping Method': orderObj.shippingMethod || '',
         'Tracking #': orderObj.trackingNumber || '',
@@ -217,7 +218,7 @@ export async function syncOrderToAppSheet(order: any) {
         } else {
             productIdForAppSheet = item.sku || '';
         }
-        
+
         return {
             'RecordID': item._id,
             'Order #': orderObj.legacyId || orderObj._id,
@@ -226,7 +227,7 @@ export async function syncOrderToAppSheet(order: any) {
             'Qty Shipped': item.qtyShipped || 0,
             'UOM': item.uom || '',
             'Price': item.price || 0,
-            'Tracking ID': '', 
+            'Tracking ID': '',
             'TimeStamp': item.createdAt ? new Date(item.createdAt).toISOString() : new Date().toISOString()
         };
     });
@@ -252,7 +253,7 @@ export async function syncOrderToAppSheet(order: any) {
     try {
         // Run both API calls in PARALLEL for faster sync
         const promises: Promise<any>[] = [];
-        
+
         // Order sync promise
         promises.push(
             fetchWithTimeout(
@@ -397,7 +398,7 @@ export async function syncPaymentToAppSheet(order: any, payment: any, action: 'A
     const row: Record<string, any> = {
         'RecordID': payment.legacyId || payment._id?.toString() || '',
         'Order #': orderIdentifier,
-        'Payment Date': payment.createdAt ? new Date(payment.createdAt).toLocaleDateString('en-US') : '',
+        'Payment Date': payment.createdAt ? formatDate(payment.createdAt) : '',
         'Payment Amount': payment.paymentAmount || 0,
         'Create By': payment.createdBy || '',
     };
@@ -879,8 +880,8 @@ export async function syncPurchaseOrderToAppSheet(order: any, action: 'Add' | 'E
         'Payment Terms': orderObj.paymentTerms || '',
         'Created By': createdByEmail,
         'Status': orderObj.status || '',
-        'Date Scheduled': orderObj.scheduledDelivery ? new Date(orderObj.scheduledDelivery).toLocaleDateString('en-US') : '',
-        'Received Date': orderObj.receivedDate ? new Date(orderObj.receivedDate).toLocaleDateString('en-US') : '',
+        'Date Scheduled': orderObj.scheduledDelivery ? formatDate(orderObj.scheduledDelivery) : '',
+        'Received Date': orderObj.receivedDate ? formatDate(orderObj.receivedDate) : '',
         'TimeStamp': orderObj.createdAt ? new Date(orderObj.createdAt).toISOString() : '',
     };
 

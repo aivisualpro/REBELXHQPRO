@@ -14,7 +14,7 @@ import {
     AlertCircle,
     Clock
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { confirmDeleteToast } from '@/lib/confirmToast';
 import { Pagination } from '@/components/ui/Pagination';
@@ -308,7 +308,7 @@ export default function TicketsPage() {
                                     </span>
                                 </td>
                                 <td className="px-4 py-2 text-[11px] text-slate-500">
-                                    {item.date ? new Date(item.date).toLocaleDateString() : '-'}
+                                    {item.date ? formatDate(item.date) : '-'}
                                 </td>
                                 <td className="px-4 py-2 text-[11px] font-bold text-slate-900 max-w-[200px] truncate" title={item.issue}>
                                     {item.issue}
@@ -326,7 +326,7 @@ export default function TicketsPage() {
                                     </span>
                                 </td>
                                 <td className="px-4 py-2 text-[11px] text-slate-500">
-                                    {item.deadline ? new Date(item.deadline).toLocaleDateString() : '-'}
+                                    {item.deadline ? formatDate(item.deadline) : '-'}
                                 </td>
                                 <td className="px-4 py-2 text-[11px] text-slate-600">
                                     {renderUser(item.completedBy)}

@@ -15,9 +15,12 @@ import {
   Loader2,
   Package,
   Search,
-  ShoppingCart
+  ShoppingCart,
+  Save,
+  Check,
+  SquarePen
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatDate, toDateInputValue } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
@@ -171,6 +174,19 @@ function calcSubtotal(o: SaleOrder) {
 function calcCost(o: SaleOrder) {
   return o.lineItems?.reduce((s, i) => s + ((i.qtyShipped || 0) * (i.cost || 0)), 0) || 0;
 }
+function calcGrandTotal(o: SaleOrder) {
+  return calcSubtotal(o) + (o.shippingCost || 0) + (o.tax || 0) - (o.discount || 0);
+}
+function calcBalance(o: SaleOrder) {
+  const orderPaid = (o.payments || []).reduce((sum, p) => sum + (p.paymentAmount || 0), 0);
+  return calcGrandTotal(o) - orderPaid;
+}
+function calcMargin(o: SaleOrder) {
+  return calcGrandTotal(o) - calcCost(o);
+}
+
+// Columns that are computed on the frontend and must be sorted client-side
+const COMPUTED_SORT_COLUMNS = new Set(['subtotal', 'grandTotal', 'balance', 'cost', 'margin']);
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
@@ -218,35 +234,57 @@ function WholesaleSkeletonRow({ index }: { index: number }) {
 
 // ─── Table Row ───────────────────────────────────────────────────────────────
 
+interface QuickEditValues {
+  shippingCost: string;
+  discount: string;
+  tax: string;
+}
+
 const WholesaleTableRow = React.memo(function WholesaleTableRow({
-  order, onClick, highlight
+  order, onClick, highlight, isQuickEdit, quickEditValues, onQuickEditChange
 }: {
   order: SaleOrder; onClick: () => void; highlight?: boolean;
+  isQuickEdit?: boolean;
+  quickEditValues?: QuickEditValues;
+  onQuickEditChange?: (orderId: string, field: keyof QuickEditValues, value: string) => void;
 }) {
   const subtotal = calcSubtotal(order);
-  const shipping = order.shippingCost || 0;
-  const discount = order.discount || 0;
-  const tax = order.tax || 0;
+  const shipping = quickEditValues ? (parseFloat(quickEditValues.shippingCost) || 0) : (order.shippingCost ?? 0);
+  const discount = quickEditValues ? (parseFloat(quickEditValues.discount) || 0) : (order.discount ?? 0);
+  const tax = quickEditValues ? (parseFloat(quickEditValues.tax) || 0) : (order.tax ?? 0);
   const grandTotal = subtotal + shipping + tax - discount;
   const cost = calcCost(order);
   const margin = grandTotal - cost;
   const orderPaid = (order.payments || []).reduce((sum, p) => sum + (p.paymentAmount || 0), 0);
   const balance = grandTotal - orderPaid;
 
+  const isModified = quickEditValues && (
+    (parseFloat(quickEditValues.shippingCost) || 0) !== (order.shippingCost || 0) ||
+    (parseFloat(quickEditValues.discount) || 0) !== (order.discount || 0) ||
+    (parseFloat(quickEditValues.tax) || 0) !== (order.tax || 0)
+  );
+
+  const handleInputChange = (field: keyof QuickEditValues, rawValue: string) => {
+    if (!onQuickEditChange) return;
+    const cleaned = rawValue.replace(/[^0-9.]/g, '');
+    onQuickEditChange(order._id, field, cleaned);
+  };
+
   return (
     <tr
       data-order-id={order._id}
       className={cn(
         'group hover:bg-muted/30 dark:hover:bg-muted/10 transition-colors duration-150 cursor-pointer border-b border-border/60',
-        highlight && 'animate-[rowGlow_0.75s_ease-in-out_4] ring-1 ring-primary/40 bg-primary/[0.06]'
+        highlight && 'animate-[rowGlow_0.75s_ease-in-out_4] ring-1 ring-primary/40 bg-primary/[0.06]',
+        isModified && 'bg-amber-500/[0.06] dark:bg-amber-500/[0.04] border-l-2 border-l-amber-500'
       )}
-      onClick={onClick}
+      onClick={isQuickEdit ? undefined : onClick}
     >
       <td className="px-2.5 py-2.5 w-[70px] text-[12px] font-mono font-bold text-foreground/90 group-hover:text-foreground transition-colors">
         <span className="group-hover:border-l-2 group-hover:border-l-primary group-hover:pl-1.5 transition-all">{order.label || '-'}</span>
       </td>
       <td className="px-2.5 py-2.5 w-[85px] text-[12px] font-mono text-foreground/60">
-        {new Date(order.createdAt).toLocaleDateString()}
+        {formatDate(order.createdAt)}
       </td>
       <td className="px-2.5 py-2.5 w-[160px] text-[12px] text-foreground/90 group-hover:text-foreground transition-colors font-semibold truncate">
         {getClientName(order) || '-'}
@@ -255,9 +293,46 @@ const WholesaleTableRow = React.memo(function WholesaleTableRow({
       <td className="px-2.5 py-2.5 w-[100px] text-[12px] text-foreground/60">{order.paymentMethod || '-'}</td>
       <td className="px-2.5 py-2.5 w-[95px]"><OrderStatusBadge status={order.orderStatus} /></td>
       <td className="px-2.5 py-2.5 w-[90px] text-[12px] font-mono text-right text-foreground/70">{fmtCurrency(subtotal)}</td>
-      <td className="px-2.5 py-2.5 w-[75px] text-[12px] font-mono text-right text-foreground/70">{fmtCurrency(shipping)}</td>
-      <td className="px-2.5 py-2.5 w-[75px] text-[12px] font-mono text-right text-foreground/70">{fmtCurrency(discount)}</td>
-      <td className="px-2.5 py-2.5 w-[65px] text-[12px] font-mono text-right text-foreground/70">{fmtCurrency(tax)}</td>
+      {isQuickEdit ? (
+        <>
+          <td className="px-1 py-1 w-[75px]">
+            <input
+              type="text"
+              value={quickEditValues?.shippingCost || ''}
+              onChange={(e) => handleInputChange('shippingCost', e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              placeholder="0.00"
+              className="w-full h-7 px-1.5 text-[12px] font-mono text-right bg-background border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-foreground transition-all"
+            />
+          </td>
+          <td className="px-1 py-1 w-[75px]">
+            <input
+              type="text"
+              value={quickEditValues?.discount || ''}
+              onChange={(e) => handleInputChange('discount', e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              placeholder="0.00"
+              className="w-full h-7 px-1.5 text-[12px] font-mono text-right bg-background border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-foreground transition-all"
+            />
+          </td>
+          <td className="px-1 py-1 w-[65px]">
+            <input
+              type="text"
+              value={quickEditValues?.tax || ''}
+              onChange={(e) => handleInputChange('tax', e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              placeholder="0.00"
+              className="w-full h-7 px-1.5 text-[12px] font-mono text-right bg-background border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-foreground transition-all"
+            />
+          </td>
+        </>
+      ) : (
+        <>
+          <td className="px-2.5 py-2.5 w-[75px] text-[12px] font-mono text-right text-foreground/70">{fmtCurrency(shipping)}</td>
+          <td className="px-2.5 py-2.5 w-[75px] text-[12px] font-mono text-right text-foreground/70">{fmtCurrency(discount)}</td>
+          <td className="px-2.5 py-2.5 w-[65px] text-[12px] font-mono text-right text-foreground/70">{fmtCurrency(tax)}</td>
+        </>
+      )}
       <td className="px-2.5 py-2.5 w-[90px] text-[12px] font-mono text-right font-black text-foreground group-hover:text-foreground transition-colors">{fmtCurrency(grandTotal)}</td>
       <td className={cn('px-2.5 py-2.5 w-[85px] text-[12px] font-mono text-right font-bold', balance > 0.01 ? 'text-red-500' : 'text-emerald-500')}>{fmtCurrency(balance)}</td>
       <td className="px-2.5 py-2.5 w-[80px] text-[12px] font-mono text-right text-foreground/70">{fmtCurrency(cost)}</td>
@@ -276,8 +351,8 @@ function SaleOrdersContent() {
   const [hasMore, setHasMore] = useState(globalCache.current?.hasMore ?? true);
   const [error, setError] = useState<string | null>(null);
 
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [search, setSearch] = useState(searchParams.get('search') || '');
+  const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('search') || '');
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [activeStatus, setActiveStatus] = useState<string>('All');
@@ -298,6 +373,18 @@ function SaleOrdersContent() {
     const timer = setTimeout(() => setDebouncedSearch(search), 250);
     return () => clearTimeout(timer);
   }, [search]);
+
+  // Sync search to URL
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (debouncedSearch) {
+      params.set('search', debouncedSearch);
+    } else {
+      params.delete('search');
+    }
+    const newUrl = params.toString() ? `/sales/wholesale-orders?${params.toString()}` : '/sales/wholesale-orders';
+    router.replace(newUrl, { scroll: false });
+  }, [debouncedSearch]);
 
   // Scroll-back & highlight on return from detail
   const [highlightId, setHighlightId] = useState<string | null>(null);
@@ -401,6 +488,102 @@ function SaleOrdersContent() {
   const [newLineItems, setNewLineItems] = useState<ItemForm[]>([]);
   const [isRefreshingCosts, setIsRefreshingCosts] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState('');
+
+  // ─── Quick Edit Mode ──────────────────────────────────────────────────────
+  const [isQuickEditMode, setIsQuickEditMode] = useState(false);
+  const [quickEditData, setQuickEditData] = useState<Record<string, QuickEditValues>>({});
+  const [isBulkSaving, setIsBulkSaving] = useState(false);
+
+  const handleQuickEditChange = useCallback((orderId: string, field: keyof QuickEditValues, value: string) => {
+    setQuickEditData(prev => {
+      const existing = prev[orderId];
+      const order = orders.find(o => o._id === orderId);
+      if (!order) return prev;
+      const current = existing || {
+        shippingCost: String(order.shippingCost || 0),
+        discount: String(order.discount || 0),
+        tax: String(order.tax || 0),
+      };
+      return { ...prev, [orderId]: { ...current, [field]: value } };
+    });
+  }, [orders]);
+
+  const getModifiedOrders = useCallback(() => {
+    return Object.entries(quickEditData).filter(([orderId, values]) => {
+      const order = orders.find(o => o._id === orderId);
+      if (!order) return false;
+      return (
+        (parseFloat(values.shippingCost) || 0) !== (order.shippingCost || 0) ||
+        (parseFloat(values.discount) || 0) !== (order.discount || 0) ||
+        (parseFloat(values.tax) || 0) !== (order.tax || 0)
+      );
+    });
+  }, [quickEditData, orders]);
+
+  const modifiedCount = getModifiedOrders().length;
+
+  const handleBulkSave = async () => {
+    const modified = getModifiedOrders();
+    if (modified.length === 0) return;
+
+    setIsBulkSaving(true);
+    try {
+      const updates = modified.map(([orderId, values]) => ({
+        _id: orderId,
+        shippingCost: parseFloat(values.shippingCost) || 0,
+        discount: parseFloat(values.discount) || 0,
+        tax: parseFloat(values.tax) || 0,
+      }));
+
+      const res = await fetch('/api/wholesale/orders/bulk-update', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        toast.success(`Updated ${data.count} order${data.count !== 1 ? 's' : ''}`);
+        // Update local orders state optimistically
+        setOrders(prev => prev.map(o => {
+          const edit = quickEditData[o._id];
+          if (edit && modified.some(([id]) => id === o._id)) {
+            return { ...o, shippingCost: parseFloat(edit.shippingCost) || 0, discount: parseFloat(edit.discount) || 0, tax: parseFloat(edit.tax) || 0 };
+          }
+          return o;
+        }));
+        setQuickEditData({});
+        // Also invalidate cache
+        globalCache.current = null;
+      } else {
+        const err = await res.json();
+        toast.error(err.error || 'Failed to save changes');
+      }
+    } catch (e) {
+      toast.error('Error saving changes');
+    } finally {
+      setIsBulkSaving(false);
+    }
+  };
+
+  const toggleQuickEdit = () => {
+    if (isQuickEditMode) {
+      // Exiting: clear edits
+      setQuickEditData({});
+    } else {
+      // Entering: pre-fill current values for all visible orders
+      const initial: Record<string, QuickEditValues> = {};
+      orders.forEach(o => {
+        initial[o._id] = {
+          shippingCost: String(o.shippingCost || 0),
+          discount: String(o.discount || 0),
+          tax: String(o.tax || 0),
+        };
+      });
+      setQuickEditData(initial);
+    }
+    setIsQuickEditMode(!isQuickEditMode);
+  };
 
 
 
@@ -523,8 +706,9 @@ function SaleOrdersContent() {
     if (isAppend) setIsLoadingMore(true); else setIsLoading(true);
 
     try {
+      const apiSortBy = COMPUTED_SORT_COLUMNS.has(sortBy) ? 'createdAt' : sortBy;
       const params = new URLSearchParams({
-        page: String(pageNum), limit: String(PAGE_SIZE), sortBy, sortOrder, search: debouncedSearch,
+        page: String(pageNum), limit: String(PAGE_SIZE), sortBy: apiSortBy, sortOrder, search: debouncedSearch,
       });
       if (activeStatus !== 'All') params.set('status', activeStatus);
 
@@ -571,8 +755,19 @@ function SaleOrdersContent() {
 
   useEffect(() => {
     const prev = prevFiltersRef.current;
-    const filtersChanged = prev.sortBy !== sortBy || prev.sortOrder !== sortOrder || prev.search !== debouncedSearch || prev.status !== activeStatus;
+    const sortChanged = prev.sortBy !== sortBy || prev.sortOrder !== sortOrder;
+    const otherFiltersChanged = prev.search !== debouncedSearch || prev.status !== activeStatus;
     prevFiltersRef.current = { sortBy, sortOrder, search: debouncedSearch, status: activeStatus };
+
+    // If only sort changed and we're now sorting by a computed column, skip API re-fetch
+    // (client-side sort via useMemo handles it)
+    if (sortChanged && !otherFiltersChanged && COMPUTED_SORT_COLUMNS.has(sortBy)) {
+      return;
+    }
+    // If sort changed from one computed to another computed, also skip
+    if (sortChanged && !otherFiltersChanged && COMPUTED_SORT_COLUMNS.has(prev.sortBy) && COMPUTED_SORT_COLUMNS.has(sortBy)) {
+      return;
+    }
 
     if (isFirstMount.current) {
       isFirstMount.current = false;
@@ -607,6 +802,27 @@ function SaleOrdersContent() {
     else { setSortBy(column); setSortOrder('asc'); }
     scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // Client-side sort for computed columns
+  const sortedOrders = React.useMemo(() => {
+    if (!COMPUTED_SORT_COLUMNS.has(sortBy)) return orders;
+    const computeValue = (o: SaleOrder): number => {
+      switch (sortBy) {
+        case 'subtotal': return calcSubtotal(o);
+        case 'grandTotal': return calcGrandTotal(o);
+        case 'balance': return calcBalance(o);
+        case 'cost': return calcCost(o);
+        case 'margin': return calcMargin(o);
+        default: return 0;
+      }
+    };
+    const sorted = [...orders].sort((a, b) => {
+      const aVal = computeValue(a);
+      const bVal = computeValue(b);
+      return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+    });
+    return sorted;
+  }, [orders, sortBy, sortOrder]);
 
   const handleTabChange = (tab: string) => {
     setActiveStatus(tab);
@@ -997,6 +1213,18 @@ function SaleOrdersContent() {
               </button>
             )}
           </div>
+          <button onClick={toggleQuickEdit}
+            className={cn(
+              'h-8 px-3 transition-all rounded shadow-md flex items-center space-x-1.5 cursor-pointer shrink-0 border',
+              isQuickEditMode
+                ? 'bg-amber-500 text-black border-amber-600 hover:bg-amber-400'
+                : 'bg-secondary text-foreground border-border hover:bg-secondary/80'
+            )}>
+            <SquarePen className="w-3 h-3" />
+            <span className="hidden sm:inline text-[12px] font-black uppercase tracking-widest">
+              {isQuickEditMode ? 'Exit Edit' : 'Quick Edit'}
+            </span>
+          </button>
           <button onClick={() => { setEditingOrderId(null); openCreateModal(); }}
             className="h-8 px-3 bg-primary text-black hover:opacity-90 transition-all rounded shadow-md flex items-center space-x-1.5 cursor-pointer shrink-0">
             <Plus className="w-3 h-3" />
@@ -1038,8 +1266,11 @@ function SaleOrdersContent() {
                   </p>
                 </td></tr>
               ) : (
-                orders.map((order) => (
+                sortedOrders.map((order) => (
                   <WholesaleTableRow key={order._id} order={order} highlight={highlightId === order._id}
+                    isQuickEdit={isQuickEditMode}
+                    quickEditValues={quickEditData[order._id]}
+                    onQuickEditChange={handleQuickEditChange}
                     onClick={() => {
                       sessionStorage.setItem('ws_scroll_to', order._id);
                       if (scrollRef.current) sessionStorage.setItem('ws_scroll_top', String(scrollRef.current.scrollTop));
@@ -1059,6 +1290,49 @@ function SaleOrdersContent() {
             </div>
           )}
         </div>
+
+        {/* Quick Edit Floating Save Bar */}
+        {isQuickEditMode && (
+          <div className="sticky bottom-0 left-0 right-0 z-30 border-t border-border bg-background/95 backdrop-blur-md shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
+            <div className="px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <SquarePen className="w-4 h-4 text-amber-500" />
+                <span className="text-[12px] font-bold uppercase tracking-widest text-foreground">
+                  Quick Edit Mode
+                </span>
+                {modifiedCount > 0 && (
+                  <span className="px-2 py-0.5 text-[11px] font-black rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 tabular-nums">
+                    {modifiedCount} modified
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => { setQuickEditData({}); setIsQuickEditMode(false); }}
+                  className="h-8 px-4 text-[11px] font-bold uppercase tracking-widest border border-border rounded hover:bg-secondary transition-colors cursor-pointer text-muted-foreground"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleBulkSave}
+                  disabled={modifiedCount === 0 || isBulkSaving}
+                  className={cn(
+                    'h-8 px-5 text-[11px] font-black uppercase tracking-widest rounded shadow-md flex items-center gap-1.5 cursor-pointer transition-all',
+                    modifiedCount > 0
+                      ? 'bg-emerald-600 text-white hover:bg-emerald-500'
+                      : 'bg-secondary text-muted-foreground/50 cursor-not-allowed'
+                  )}
+                >
+                  {isBulkSaving ? (
+                    <><Loader2 className="w-3 h-3 animate-spin" /> Saving...</>
+                  ) : (
+                    <><Save className="w-3 h-3" /> Save All ({modifiedCount})</>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {isCreateModalOpen && (
@@ -1188,7 +1462,7 @@ function SaleOrdersContent() {
                       <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Shipped Date</label>
                       <input
                         type="date"
-                        value={newOrder.shippedDate ? new Date(newOrder.shippedDate).toISOString().split('T')[0] : ''}
+                        value={toDateInputValue(newOrder.shippedDate)}
                         onChange={e => setNewOrder({ ...newOrder, shippedDate: e.target.value })}
                         className="w-full h-9 px-3 bg-secondary/50 border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
                       />

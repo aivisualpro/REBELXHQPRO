@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 interface WebProduct {
@@ -459,8 +459,8 @@ export default function WebProductDetailsPage() {
                             <div className="text-xs font-black uppercase tracking-widest text-foreground mb-3">Sync Intelligence</div>
                             <div className="border border-border">
                                 {[
-                                    { label: 'Created', value: product.dateCreated ? new Date(product.dateCreated).toLocaleDateString() : '-' },
-                                    { label: 'Modified', value: product.dateModified ? new Date(product.dateModified).toLocaleDateString() : '-' },
+                                    { label: 'Created', value: product.dateCreated ? formatDate(product.dateCreated) : '-' },
+                                    { label: 'Modified', value: product.dateModified ? formatDate(product.dateModified) : '-' },
                                     { label: 'Instance ID', value: product._id },
                                 ].map((item, idx) => (
                                     <div key={idx} className={cn(
@@ -957,7 +957,7 @@ function RelatedWebOrders({ productWebId, website, baseProductName, variationId,
                                         className="hover:bg-secondary/50 transition-colors cursor-pointer group"
                                     >
                                         <td className="px-3 py-2 text-xs text-foreground font-mono font-bold whitespace-nowrap">
-                                            {item.orderDate ? new Date(item.orderDate).toLocaleDateString('en-US', { year: '2-digit', month: '2-digit', day: '2-digit' }) : '-'}
+                                            {item.orderDate ? formatDate(item.orderDate) : '-'}
                                         </td>
                                         <td className="px-3 py-2 text-xs text-foreground font-bold">
                                             #{item.orderNumber}

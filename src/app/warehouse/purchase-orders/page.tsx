@@ -6,7 +6,7 @@ import {
   Search, ArrowUpDown, Plus, Trash2, X, Loader2,
 } from 'lucide-react';
 import Papa from 'papaparse';
-import { cn } from '@/lib/utils';
+import { cn, formatDate, toDateInputValue } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 
@@ -521,7 +521,7 @@ function PurchaseOrdersContent() {
       vendor: typeof order.vendor === 'object' && order.vendor ? order.vendor._id : String(order.vendor || ''),
       paymentTerms: order.paymentTerms || '',
       status: order.status,
-      scheduledDelivery: order.scheduledDelivery ? new Date(order.scheduledDelivery).toISOString().split('T')[0] : ''
+      scheduledDelivery: toDateInputValue(order.scheduledDelivery)
     });
     setNewLineItems((order.lineItems || []).map(item => ({
       id: Math.random().toString(),
@@ -544,7 +544,7 @@ function PurchaseOrdersContent() {
 
   const renderVendor = (order: PurchaseOrder) => (typeof order.vendor === 'object' && order.vendor ? order.vendor.name : order.vendor || '-');
   const calcTotal = (order: PurchaseOrder) => order.lineItems?.reduce((s, i) => s + ((i.qtyOrdered || 0) * (i.cost || 0)), 0) || 0;
-  const fmtDate = (d: string) => d ? new Date(d).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) : '—';
+  const fmtDate = (d: string) => d ? formatDate(d) : '—';
   const fmtCurrency = (v: number) => '$' + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const COLS = [

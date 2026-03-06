@@ -8,7 +8,7 @@ import { ArrowLeft, Package, Calendar, User, Clock, Tag, Clipboard, Layers, Penc
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { confirmDeleteToast } from '@/lib/confirmToast';
 import { useTimers } from '@/components/TimerContext';
@@ -343,15 +343,15 @@ export default function ManufacturingDetailPage() {
 
     const infoRows = [
         [
-            { label: 'Scheduled Start', value: order.scheduledStart ? new Date(order.scheduledStart).toLocaleDateString() : '-' },
-            { label: 'Scheduled Finish', value: order.scheduledFinish ? new Date(order.scheduledFinish).toLocaleDateString() : '-' },
+            { label: 'Scheduled Start', value: order.scheduledStart ? formatDate(order.scheduledStart) : '-' },
+            { label: 'Scheduled Finish', value: order.scheduledFinish ? formatDate(order.scheduledFinish) : '-' },
         ],
         [
             { label: 'Created By', value: formatUser(order.createdBy) },
             { label: 'Finished By', value: formatUser(order.finishedBy) },
         ],
         [
-            { label: 'Created At', value: new Date(order.createdAt).toLocaleDateString() },
+            { label: 'Created At', value: formatDate(order.createdAt) },
             {
                 label: 'Recipe',
                 value: (typeof order.recipesId === 'object' && order.recipesId) ? order.recipesId.name : (order.recipesId || '-')
@@ -837,8 +837,8 @@ export default function ManufacturingDetailPage() {
                                 const lastQc = order.qualityCheck?.length ? order.qualityCheck[order.qualityCheck.length - 1] : null;
                                 const pairedRows = [
                                     [
-                                        { label: 'Scheduled Start', value: order.scheduledStart ? new Date(order.scheduledStart).toLocaleDateString() : '-' },
-                                        { label: 'Scheduled Finish', value: order.scheduledFinish ? new Date(order.scheduledFinish).toLocaleDateString() : '-' },
+                                        { label: 'Scheduled Start', value: order.scheduledStart ? formatDate(order.scheduledStart) : '-' },
+                                        { label: 'Scheduled Finish', value: order.scheduledFinish ? formatDate(order.scheduledFinish) : '-' },
                                     ],
                                     [
                                         { label: 'Created By', value: formatUser(order.createdBy) },
@@ -850,7 +850,7 @@ export default function ManufacturingDetailPage() {
                                     ],
                                 ];
                                 const fullWidthRows = [
-                                    { label: 'Created At', value: new Date(order.createdAt).toLocaleDateString() },
+                                    { label: 'Created At', value: formatDate(order.createdAt) },
                                     { label: 'Recipe', value: (typeof order.recipesId === 'object' && order.recipesId) ? order.recipesId.name : (order.recipesId || '-'), recipeId: (typeof order.recipesId === 'object' && order.recipesId) ? order.recipesId._id : (order.recipesId || null) },
                                 ] as { label: string; value: string; recipeId?: string | null }[];
                                 return (
@@ -1098,7 +1098,7 @@ export default function ManufacturingDetailPage() {
                                             return (
                                                 <tr key={item._id} className="hover:bg-secondary/30 transition-colors">
                                                     <td className="px-3 py-2 text-[11px] text-muted-foreground font-mono">
-                                                        {new Date(item.createdAt).toLocaleDateString()}
+                                                        {formatDate(item.createdAt)}
                                                     </td>
                                                     <td className="px-3 py-2 text-[11px] text-foreground/90 font-medium leading-tight min-w-[320px] whitespace-nowrap">
                                                         <div className="flex items-center space-x-2">
@@ -1227,7 +1227,7 @@ export default function ManufacturingDetailPage() {
                                             return (
                                                 <tr key={entry._id} className="hover:bg-secondary/30 transition-colors">
                                                     <td className="px-3 py-2 text-[11px] text-muted-foreground font-mono">
-                                                        {new Date(entry.createdAt).toLocaleDateString()}
+                                                        {formatDate(entry.createdAt)}
                                                     </td>
                                                     <td className="px-3 py-2 text-[11px] text-foreground/90 font-medium">{entry.type || '-'}</td>
                                                     <td className="px-3 py-2 text-[11px] text-foreground/90 font-medium truncate max-w-[120px]">{userName}</td>
@@ -1506,7 +1506,7 @@ export default function ManufacturingDetailPage() {
                                                 <td className="px-3 py-2 text-[11px] text-foreground/90 font-medium font-mono">{qc.actualWeight ?? 0}</td>
                                                 <td className="px-3 py-2 text-[11px] text-foreground/90 font-medium">{formatUser(qc.qualityCheckedBy)}</td>
                                                 <td className="px-3 py-2 text-[11px] text-muted-foreground font-mono">
-                                                    {qc.createdAt ? new Date(qc.createdAt).toLocaleDateString() : '—'}
+                                                    {qc.createdAt ? formatDate(qc.createdAt) : '—'}
                                                 </td>
                                             </tr>
                                         ))}
@@ -1541,7 +1541,7 @@ export default function ManufacturingDetailPage() {
                                                     {formatUser(note.createdBy)}
                                                 </td>
                                                 <td className="px-3 py-2 text-[11px] text-muted-foreground font-mono">
-                                                    {new Date(note.createdAt).toLocaleDateString()}
+                                                    {formatDate(note.createdAt)}
                                                 </td>
                                                 <td className="px-3 py-2 text-right">
                                                     <div className="flex items-center justify-end space-x-1">

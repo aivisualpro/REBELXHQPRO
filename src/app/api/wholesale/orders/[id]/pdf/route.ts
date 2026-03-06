@@ -3,6 +3,7 @@ import dbConnect from '@/lib/mongoose';
 import SaleOrder from '@/models/SaleOrder';
 import User from '@/models/User';
 import { generatePdfFromTemplate } from '@/lib/google-docs';
+import { formatDate } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,18 +38,13 @@ export async function GET(
             order.state
         ].filter(Boolean).join(', ');
 
-        // Format date
-        const formatDate = (d: any) => {
-            if (!d) return '-';
-            return new Date(d).toLocaleDateString('en-US', { 
-                month: '2-digit', day: '2-digit', year: 'numeric' 
-            });
-        };
+        // Format date — use global util
+
 
         // Format currency
         const formatCurrency = (val: number) => {
-            return '$' + (val || 0).toLocaleString(undefined, { 
-                minimumFractionDigits: 2, maximumFractionDigits: 2 
+            return '$' + (val || 0).toLocaleString(undefined, {
+                minimumFractionDigits: 2, maximumFractionDigits: 2
             });
         };
 
@@ -101,8 +97,8 @@ export async function GET(
 
         // Line item rows
         const tableRows = (order.lineItems || []).map((item: any) => {
-            const skuName = typeof item.sku === 'object' && item.sku 
-                ? item.sku.name || '' 
+            const skuName = typeof item.sku === 'object' && item.sku
+                ? item.sku.name || ''
                 : '';
             return {
                 '{{lineItems.sku.name}}': skuName,

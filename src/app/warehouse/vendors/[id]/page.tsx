@@ -29,7 +29,7 @@ const CITY_OPTIONS = ['Ann Arbor', 'Detroit', 'Grand Rapids', 'Lansing', 'Kalama
 const STATE_OPTIONS = ['AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'];
 const COUNTRY_OPTIONS = ['United States', 'Canada', 'Mexico', 'China', 'Germany', 'United Kingdom', 'Brazil', 'India', 'Other'];
 const PAYMENT_TERMS_OPTIONS = ['Net 10', 'Net 15', 'Net 30', 'Net 45', 'Net 60', 'Net 90', 'COD', 'Due on Receipt', 'Prepaid', '2/10 Net 30', 'Other'];
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 interface VendorNote {
@@ -289,12 +289,8 @@ export default function VendorDetailPage() {
         ), { duration: 10000, position: 'top-center', style: { maxWidth: '360px', background: '#1a1a1a', color: '#fff', marginTop: '40vh' } });
     };
 
-    const formatDate = (dateStr?: string) => {
-        if (!dateStr) return '-';
-        return new Date(dateStr).toLocaleDateString('en-US', {
-            month: '2-digit', day: '2-digit', year: 'numeric'
-        });
-    };
+
+
 
     const formatCurrency = (val: number) => {
         if (val === undefined || val === null) return '-';

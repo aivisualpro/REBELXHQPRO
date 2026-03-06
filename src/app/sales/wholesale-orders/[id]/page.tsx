@@ -7,7 +7,7 @@ import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { ArrowLeft, Calendar, CreditCard, Truck, Plus, X, Trash2, Pencil, User, MapPin, DollarSign, List, RefreshCw, MessageSquare, Phone, Mail, Eye, EyeOff, Download, FileText, Loader2 } from 'lucide-react';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
-import { cn } from '@/lib/utils';
+import { cn, formatDate, toDateInputValue } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 
@@ -264,10 +264,8 @@ export default function SaleOrderDetailPage() {
     const totalPayments = order?.payments?.reduce((sum, p) => sum + (p.paymentAmount || 0), 0) || 0;
     const balance = grandTotal - totalPayments;
 
-    const formatDate = (dateStr?: string) => {
-        if (!dateStr) return '-';
-        return new Date(dateStr).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
-    };
+
+
 
     const formatCurrency = (val?: number) => {
         if (val === undefined || val === null) return '-';
@@ -332,35 +330,50 @@ export default function SaleOrderDetailPage() {
 
     const handleStatusChange = async (newStatus: string) => {
         if (!order) return;
-        try {
-            const res = await fetch(`/api/wholesale/orders/${order._id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ orderStatus: newStatus })
-            });
+        // Optimistic: update UI instantly
+        const previousOrder = { ...order };
+        setOrder({ ...order, orderStatus: newStatus });
+        toast.success('Status updated');
+
+        // Background: persist to server
+        fetch(`/api/wholesale/orders/${order._id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderStatus: newStatus })
+        }).then(res => {
             if (res.ok) {
-                const data = await res.json();
-                setOrder(data);
-                toast.success('Status updated');
+                res.json().then(data => setOrder(data));
+            } else {
+                setOrder(previousOrder);
+                toast.error('Failed to update status — reverted');
             }
-        } catch (e) {
-            toast.error('Failed to update status');
-        }
+        }).catch(() => {
+            setOrder(previousOrder);
+            toast.error('Failed to update status — reverted');
+        });
     };
 
-    // Item Handlers
+    // Item Handlers — Optimistic UI
     const handleSaveItem = async () => {
         if (!order || !editingItem) return;
 
+        const isEdit = !!editingItem._id;
         let updatedItems;
-        if (editingItem._id) {
+        if (isEdit) {
             updatedItems = order.lineItems?.map(item =>
                 item._id === editingItem._id ? editingItem : item
             ) || [];
         } else {
-            updatedItems = [...(order.lineItems || []), { ...editingItem, _id: Date.now().toString() }];
+            updatedItems = [...(order.lineItems || []), { ...editingItem, _id: `temp-${Date.now()}` }];
         }
 
+        // Optimistic: update UI and close modal instantly
+        const previousOrder = { ...order, lineItems: order.lineItems ? [...order.lineItems] : [] };
+        setOrder({ ...order, lineItems: updatedItems });
+        setIsItemModalOpen(false);
+        toast.success(isEdit ? 'Item updated' : 'Item added');
+
+        // Background: persist to server
         const payload = {
             lineItems: updatedItems.map(i => ({
                 ...i,
@@ -368,26 +381,21 @@ export default function SaleOrderDetailPage() {
             }))
         };
 
-        try {
-            const res = await fetch(`/api/wholesale/orders/${order._id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+        fetch(`/api/wholesale/orders/${order._id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }).then(res => {
             if (res.ok) {
-                const data = await res.json();
-                setOrder(data);
-                toast.success(editingItem._id ? 'Item updated' : 'Item added');
-                setIsItemModalOpen(false);
+                res.json().then(data => setOrder(data));
             } else {
-                const err = await res.json().catch(() => null);
-                console.error('Save item failed:', res.status, err);
-                toast.error(err?.error || `Failed to save item (${res.status})`);
+                setOrder(previousOrder);
+                toast.error('Failed to save item — reverted');
             }
-        } catch (e: any) {
-            console.error('Save item error:', e);
-            toast.error(`Failed to save item: ${e.message || e}`);
-        }
+        }).catch(() => {
+            setOrder(previousOrder);
+            toast.error('Failed to save item — reverted');
+        });
     };
 
     const handleDeleteItem = async (itemId: string) => {
@@ -454,41 +462,54 @@ export default function SaleOrderDetailPage() {
 
     const handleLotSelect = async (lotNumber: string, cost?: number) => {
         if (!order || !editingLotItemId) return;
-        const updatedItems = order.lineItems?.map(item =>
+
+        // Optimistic: update in UI with sku objects preserved for display
+        const previousOrder = { ...order, lineItems: order.lineItems ? [...order.lineItems] : [] };
+        const optimisticItems = order.lineItems?.map(item =>
+            item._id === editingLotItemId
+                ? { ...item, lotNumber, cost: cost || 0 }
+                : item
+        ) || [];
+        setOrder({ ...order, lineItems: optimisticItems });
+        setIsLotModalOpen(false);
+        toast.success('Lot updated');
+
+        // Background: persist with flat sku IDs
+        const payloadItems = order.lineItems?.map(item =>
             item._id === editingLotItemId
                 ? { ...item, lotNumber, cost: cost || 0, sku: (item.sku && typeof item.sku === 'object') ? item.sku._id : item.sku }
                 : { ...item, sku: (item.sku && typeof item.sku === 'object') ? item.sku._id : item.sku }
         ) || [];
 
-        try {
-            const res = await fetch(`/api/wholesale/orders/${order._id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ lineItems: updatedItems })
-            });
+        fetch(`/api/wholesale/orders/${order._id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lineItems: payloadItems })
+        }).then(res => {
             if (res.ok) {
-                const data = await res.json();
-                setOrder(data);
-                toast.success('Lot updated');
-                setIsLotModalOpen(false);
+                res.json().then(data => setOrder(data));
+            } else {
+                setOrder(previousOrder);
+                toast.error('Failed to update lot — reverted');
             }
-        } catch (e) {
-            toast.error('Failed to update lot');
-        }
+        }).catch(() => {
+            setOrder(previousOrder);
+            toast.error('Failed to update lot — reverted');
+        });
     };
 
-    // Payment Handlers
+    // Payment Handlers — Optimistic UI
     const handleSavePayment = async () => {
         if (!order || !editingPayment) return;
 
+        const isEdit = !!editingPayment._id;
         let updatedPayments;
-        if (editingPayment._id) {
+        if (isEdit) {
             updatedPayments = order.payments?.map(p => p._id === editingPayment._id ? editingPayment : p) || [];
         } else {
-            // Auto-set createdBy from session and createdAt if not set
             const newPayment = {
                 ...editingPayment,
-                _id: Date.now().toString(),
+                _id: `temp-${Date.now()}`,
                 orderNumber: order.label,
                 createdBy: session?.user?.email || '',
                 createdAt: editingPayment.createdAt || new Date().toISOString().split('T')[0]
@@ -496,21 +517,28 @@ export default function SaleOrderDetailPage() {
             updatedPayments = [...(order.payments || []), newPayment];
         }
 
-        try {
-            const res = await fetch(`/api/wholesale/orders/${order._id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ payments: updatedPayments })
-            });
+        // Optimistic: update UI and close modal instantly
+        const previousOrder = { ...order, payments: order.payments ? [...order.payments] : [] };
+        setOrder({ ...order, payments: updatedPayments });
+        setIsPaymentModalOpen(false);
+        toast.success(isEdit ? 'Payment updated' : 'Payment added');
+
+        // Background: persist to server
+        fetch(`/api/wholesale/orders/${order._id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ payments: updatedPayments })
+        }).then(res => {
             if (res.ok) {
-                const data = await res.json();
-                setOrder(data);
-                toast.success(editingPayment._id ? 'Payment updated' : 'Payment added');
-                setIsPaymentModalOpen(false);
+                res.json().then(data => setOrder(data));
+            } else {
+                setOrder(previousOrder);
+                toast.error('Failed to save payment — reverted');
             }
-        } catch (e) {
-            toast.error('Failed to save payment');
-        }
+        }).catch(() => {
+            setOrder(previousOrder);
+            toast.error('Failed to save payment — reverted');
+        });
     };
 
     const handleDeletePayment = async (paymentId: string) => {
@@ -557,21 +585,28 @@ export default function SaleOrderDetailPage() {
     const handleSaveHeader = async () => {
         if (!order || !editingHeader) return;
 
-        try {
-            const res = await fetch(`/api/wholesale/orders/${order._id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(editingHeader)
-            });
+        // Optimistic: update UI and close modal instantly
+        const previousOrder = { ...order };
+        setOrder({ ...order, ...editingHeader });
+        setIsHeaderModalOpen(false);
+        toast.success('Order details updated');
+
+        // Background: persist to server
+        fetch(`/api/wholesale/orders/${order._id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(editingHeader)
+        }).then(res => {
             if (res.ok) {
-                const data = await res.json();
-                setOrder(data);
-                toast.success('Order details updated');
-                setIsHeaderModalOpen(false);
+                res.json().then(data => setOrder(data));
+            } else {
+                setOrder(previousOrder);
+                toast.error('Failed to update order — reverted');
             }
-        } catch (e) {
-            toast.error('Failed to update order');
-        }
+        }).catch(() => {
+            setOrder(previousOrder);
+            toast.error('Failed to update order — reverted');
+        });
     };
 
     const handleRefreshCosts = async () => {
@@ -1096,7 +1131,7 @@ export default function SaleOrderDetailPage() {
                                     shippingCost: order.shippingCost,
                                     discount: order.discount,
                                     tax: order.tax,
-                                    shippedDate: order.shippedDate ? new Date(order.shippedDate).toISOString().split('T')[0] : '',
+                                    shippedDate: toDateInputValue(order.shippedDate),
                                     shippingAddress: order.shippingAddress,
                                     city: order.city,
                                     state: order.state
@@ -1360,7 +1395,7 @@ export default function SaleOrderDetailPage() {
                                                             onClick={() => {
                                                                 setEditingPayment({
                                                                     ...payment,
-                                                                    createdAt: payment.createdAt ? new Date(payment.createdAt).toISOString().split('T')[0] : ''
+                                                                    createdAt: toDateInputValue(payment.createdAt)
                                                                 });
                                                                 setIsPaymentModalOpen(true);
                                                             }}
@@ -1450,7 +1485,7 @@ export default function SaleOrderDetailPage() {
                                                 </button>
                                             </div>
                                             <div className="flex items-center space-x-3 mt-2 pt-2 border-t border-border/50">
-                                                <span className="text-[10px] text-muted-foreground font-mono font-bold">{note.createdAt ? new Date(note.createdAt).toLocaleDateString() : '-'}</span>
+                                                <span className="text-[10px] text-muted-foreground font-mono font-bold">{note.createdAt ? formatDate(note.createdAt) : '-'}</span>
                                                 <span className="text-[10px] text-muted-foreground font-bold">{getUserName(note.createdBy)}</span>
                                             </div>
                                         </div>
@@ -1651,7 +1686,7 @@ export default function SaleOrderDetailPage() {
                                 <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Date</label>
                                 <input
                                     type="date"
-                                    value={editingPayment.createdAt || ''}
+                                    value={toDateInputValue(editingPayment.createdAt)}
                                     onChange={(e) => setEditingPayment({ ...editingPayment, createdAt: e.target.value })}
                                     className="w-full px-3 py-2 border border-border rounded text-sm focus:outline-none"
                                 />
@@ -1746,7 +1781,7 @@ export default function SaleOrderDetailPage() {
                                             <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Shipped Date</label>
                                             <input
                                                 type="date"
-                                                value={editingHeader.shippedDate}
+                                                value={toDateInputValue(editingHeader.shippedDate)}
                                                 onChange={(e) => setEditingHeader({ ...editingHeader, shippedDate: e.target.value })}
                                                 className="w-full h-[34px] px-3 border border-input rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary/20 bg-background text-foreground"
                                             />

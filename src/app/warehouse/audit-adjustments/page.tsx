@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
-import { ArrowUpDown, X, Search, Loader2, Plus, List } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { ArrowUpDown, X, Search, Loader2, Plus, ClipboardCheck, Pencil, Trash2 } from 'lucide-react';
+import { cn, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -16,6 +16,7 @@ interface AuditAdjustment {
     sku: { _id: string; name: string; uom: string; image?: string; tier?: number } | string;
     lotNumber: string;
     qty: number;
+    cost: number;
     reason: string;
     createdBy: { firstName: string; lastName: string } | string;
     createdAt: string;
@@ -35,46 +36,159 @@ interface CacheEntry {
 // ─── Module-level cache ───────────────────────────────────────────────────────
 
 const globalCache: { current: CacheEntry | null } = { current: null };
-const CACHE_TTL = 60_000;
+const CACHE_TTL = 120_000;
 const PAGE_SIZE = 50;
 
-// ─── Tier Badge ───────────────────────────────────────────────────────────────
+// ─── Table Columns ────────────────────────────────────────────────────────────
+
+const COLUMNS = [
+    { key: 'createdAt', label: 'Date', sortable: true, width: 'w-[100px]' },
+    { key: 'sku', label: 'SKU', sortable: true, width: 'w-[220px]' },
+    { key: 'lotNumber', label: 'Lot #', sortable: true, width: 'w-[120px]' },
+    { key: 'qty', label: 'Qty', sortable: true, width: 'w-[80px]', align: 'text-right' as const },
+    { key: 'cost', label: 'Cost', sortable: true, width: 'w-[90px]', align: 'text-right' as const },
+    { key: 'reason', label: 'Reason', sortable: true, width: 'flex-1' },
+    { key: 'createdBy', label: 'Created By', sortable: false, width: 'w-[140px]' },
+    { key: 'actions', label: 'Actions', sortable: false, width: 'w-[90px]', align: 'text-center' as const },
+];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function TierBadge({ tier }: { tier: number }) {
-    const colors: Record<number, string> = { 1: '#22c55e', 2: '#3b82f6', 3: '#f97316' };
     return (
-        <span className="flex-shrink-0 w-4 h-4 rounded flex items-center justify-center text-[9px] font-black text-white shadow-sm"
-            style={{ backgroundColor: colors[tier] || '#94a3b8' }} title={`Tier ${tier}`}>{tier}</span>
+        <span className={cn(
+            'flex-shrink-0 w-4 h-4 !rounded-full flex items-center justify-center text-[10px] font-black text-white',
+            tier === 1 ? 'bg-emerald-600' : tier === 2 ? 'bg-blue-600' : 'bg-orange-500'
+        )} title={`Tier ${tier}`}>{tier}</span>
     );
 }
-
-// ─── Qty Badge ────────────────────────────────────────────────────────────────
 
 function QtyBadge({ qty }: { qty: number }) {
     const isPositive = qty > 0;
     return (
         <span
-            className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-black font-mono"
+            className="inline-flex items-center px-2 py-0.5 rounded-md text-[12px] font-black font-mono"
             style={isPositive
-                ? { backgroundColor: 'rgba(34,197,94,0.12)', color: '#16a34a', border: '1px solid rgba(34,197,94,0.25)' }
-                : { backgroundColor: 'rgba(220,38,38,0.12)', color: '#dc2626', border: '1px solid rgba(220,38,38,0.25)' }}
+                ? { backgroundColor: '#166534', color: '#bbf7d0', border: '1px solid #15803d' }
+                : { backgroundColor: '#7f1d1d', color: '#fecaca', border: '1px solid #991b1b' }}
         >
             {isPositive ? '+' : ''}{qty.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 8 })}
         </span>
     );
 }
 
-// ─── Skeleton Row ─────────────────────────────────────────────────────────────
-
-const SkeletonRow = React.memo(function SkeletonRow({ index }: { index: number }) {
+function SkeletonRow({ index }: { index: number }) {
     return (
-        <tr className="border-b border-border/60" style={{ opacity: 1 - index * 0.04 }}>
-            <td className="px-2.5 py-2.5 w-10"><div className="w-6 h-6 rounded-md bg-muted-foreground/10 animate-pulse" /></td>
-            {[38, 18, 10, 25, 18, 15].map((w, i) => (
-                <td key={i} className="px-2.5 py-2.5">
-                    <div className="h-3 rounded bg-muted-foreground/10 animate-pulse" style={{ width: `${w}%` }} />
+        <tr className="border-b border-border/30">
+            {COLUMNS.map((col) => (
+                <td key={col.key} className={cn('px-2 py-2.5', col.width)}>
+                    <div
+                        className={cn(
+                            'h-3.5 rounded-sm bg-secondary/80 animate-pulse',
+                            col.key === 'sku' ? 'w-4/5' :
+                                col.key === 'reason' ? 'w-3/4' :
+                                    col.key === 'createdBy' ? 'w-16' : 'w-10'
+                        )}
+                        style={{ animationDelay: `${index * 30}ms` }}
+                    />
                 </td>
             ))}
+        </tr>
+    );
+}
+
+// ─── Table Row ────────────────────────────────────────────────────────────────
+
+const TableRow = React.memo(function TableRow({
+    item, highlight, onEdit, onDelete
+}: {
+    item: AuditAdjustment; highlight?: boolean;
+    onEdit: (e: React.MouseEvent) => void; onDelete: (e: React.MouseEvent) => void;
+}) {
+    const skuData = typeof item.sku === 'object' && item.sku?.name
+        ? item.sku
+        : { _id: '', name: typeof item.sku === 'string' ? item.sku : '-', uom: '', image: '', tier: undefined };
+    const skuTier = typeof item.sku === 'object' && item.sku !== null ? (item.sku as any).tier : undefined;
+    const skuId = typeof item.sku === 'object' && item.sku !== null ? (item.sku as any)._id : '';
+    const userName = typeof item.createdBy === 'object' && item.createdBy?.firstName
+        ? `${item.createdBy.firstName} ${item.createdBy.lastName}`
+        : typeof item.createdBy === 'string' ? item.createdBy : '-';
+
+    return (
+        <tr
+            data-aa-id={item._id}
+            className={cn(
+                'group hover:bg-muted/30 dark:hover:bg-muted/10 transition-colors duration-150 border-b border-border/60',
+                highlight && 'animate-[rowGlow_0.75s_ease-in-out_4] ring-1 ring-primary/40 bg-primary/[0.06]'
+            )}
+        >
+            {/* Date */}
+            <td className="px-2.5 py-2.5 text-[12px] font-mono text-foreground/70 cursor-pointer">
+                {formatDate(item.createdAt)}
+            </td>
+
+            {/* SKU Name + Tier (Clickable → SKU Detail Page) */}
+            <td className="px-2.5 py-2.5 text-[12px] font-semibold text-foreground cursor-pointer">
+                <div className="flex items-center gap-1.5">
+                    {skuTier ? <TierBadge tier={skuTier} /> : null}
+                    {skuId ? (
+                        <a
+                            href={`/warehouse/skus/${skuId}`}
+                            className="truncate whitespace-nowrap text-primary hover:text-primary/80 hover:underline transition-colors cursor-pointer"
+                            title={skuData.name}
+                        >{skuData.name}</a>
+                    ) : (
+                        <span className="truncate whitespace-nowrap" title={skuData.name}>{skuData.name}</span>
+                    )}
+                </div>
+            </td>
+
+            {/* Lot Number */}
+            <td className="px-2.5 py-2.5 text-[12px] font-mono text-foreground/80 tracking-tight cursor-pointer">
+                {item.lotNumber || <span className="text-muted-foreground/30">—</span>}
+            </td>
+
+            {/* Qty */}
+            <td className="px-2.5 py-2.5 text-right cursor-pointer">
+                <QtyBadge qty={item.qty} />
+            </td>
+
+            {/* Cost */}
+            <td className="px-2.5 py-2.5 text-right text-[12px] font-mono font-bold text-foreground/80 cursor-pointer">
+                {item.cost && item.cost > 0
+                    ? `$${item.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    : <span className="text-muted-foreground/30">—</span>}
+            </td>
+
+            {/* Reason */}
+            <td className="px-2.5 py-2.5 text-[12px] text-foreground/80 truncate cursor-pointer" title={item.reason}>
+                {item.reason || <span className="text-muted-foreground/30">—</span>}
+            </td>
+
+            {/* Created By */}
+            <td className="px-2.5 py-2.5 text-[12px] font-medium text-foreground/80 truncate cursor-pointer">
+                {userName}
+            </td>
+
+            {/* Actions */}
+            <td className="px-2.5 py-2.5 text-center cursor-pointer">
+                <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                        onClick={onEdit}
+                        className="p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors cursor-pointer"
+                        title="Edit"
+                    >
+                        <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                        onClick={onDelete}
+                        className="p-1.5 rounded-md hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-colors cursor-pointer"
+                        title="Delete"
+                    >
+                        <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                </div>
+            </td>
         </tr>
     );
 });
@@ -192,9 +306,46 @@ function AdjustmentModal({ onClose, initialData, skus, sessionUser, onSuccess }:
     );
 }
 
-// ─── Main Content ─────────────────────────────────────────────────────────────
+// ─── Main Export ──────────────────────────────────────────────────────────────
 
-function AuditAdjustmentsPage() {
+export default function AuditAdjustmentsPageWrapper() {
+    return (
+        <Suspense fallback={<ShellSkeleton />}>
+            <AuditAdjustmentsContent />
+        </Suspense>
+    );
+}
+
+function ShellSkeleton() {
+    return (
+        <div className="flex flex-col h-[calc(100vh-48px)] bg-background">
+            <div className="shrink-0 border-b border-border px-4 py-2.5 flex items-center gap-3">
+                <div className="h-4 w-40 bg-secondary/80 animate-pulse rounded" />
+                <div className="h-4 w-12 bg-secondary/80 animate-pulse rounded ml-4" />
+            </div>
+            <div className="flex-1 overflow-hidden px-2 py-1">
+                <table className="w-full text-left border-separate border-spacing-0">
+                    <thead className="bg-secondary/50 border-b border-border sticky top-0 z-10">
+                        <tr>
+                            {COLUMNS.map((col) => (
+                                <th key={col.key} className={cn('px-2 py-2 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border/50 last:border-0', col.width)}>
+                                    {col.label}
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {Array.from({ length: 25 }).map((_, i) => <SkeletonRow key={i} index={i} />)}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+}
+
+// ─── Content ──────────────────────────────────────────────────────────────────
+
+function AuditAdjustmentsContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { data: session } = useSession();
@@ -206,8 +357,9 @@ function AuditAdjustmentsPage() {
     const [total, setTotal] = useState(globalCache.current?.total || 0);
     const [error, setError] = useState<string | null>(null);
 
-    const [search, setSearch] = useState('');
-    const [debouncedSearch, setDebouncedSearch] = useState('');
+    // Initialize from URL params
+    const [search, setSearch] = useState(searchParams.get('search') || '');
+    const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('search') || '');
     const [sortBy, setSortBy] = useState('createdAt');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
@@ -216,6 +368,7 @@ function AuditAdjustmentsPage() {
     const [skus, setSkus] = useState<{ label: string; value: string }[]>([]);
     const [globalSettings, setGlobalSettings] = useState<any>(null);
     const [highlightId, setHighlightId] = useState<string | null>(null);
+    const [filterId, setFilterId] = useState<string | null>(searchParams.get('id') || null);
 
     const pageRef = useRef(globalCache.current?.page || 0);
     const mountedRef = useRef(true);
@@ -243,16 +396,43 @@ function AuditAdjustmentsPage() {
             params.delete('createNew');
             router.replace(`/warehouse/audit-adjustments${params.toString() ? '?' + params.toString() : ''}`, { scroll: false });
         }
-    }, [searchParams]);
+    }, [searchParams, router]);
 
     // ─── Debounce ────────────────────────────────────────────────────────────
 
     useEffect(() => {
-        const t = setTimeout(() => setDebouncedSearch(search), 300);
+        const t = setTimeout(() => setDebouncedSearch(search), 250);
         return () => clearTimeout(t);
     }, [search]);
 
-    // ─── Scroll-back highlight ───────────────────────────────────────────────
+    // ─── Sync search to URL ─────────────────────────────────────────────────
+
+    useEffect(() => {
+        const params = new URLSearchParams(searchParams.toString());
+        if (debouncedSearch) {
+            params.set('search', debouncedSearch);
+        } else {
+            params.delete('search');
+        }
+        const newQs = params.toString();
+        const currentQs = searchParams.toString();
+        if (newQs !== currentQs) {
+            router.push(`${window.location.pathname}${newQs ? '?' + newQs : ''}`, { scroll: false });
+        }
+    }, [debouncedSearch, router, searchParams]);
+
+    // ─── Sync URL back to state (browser back/forward) ──────────────────────
+
+    useEffect(() => {
+        const urlSearch = searchParams.get('search') || '';
+        if (urlSearch !== debouncedSearch) {
+            setSearch(urlSearch);
+            setDebouncedSearch(urlSearch);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
+
+    // ─── Scroll-back highlight ──────────────────────────────────────────────
 
     useEffect(() => {
         const savedId = sessionStorage.getItem('aa_scroll_to');
@@ -271,7 +451,7 @@ function AuditAdjustmentsPage() {
         }
     }, []);
 
-    // ─── Fetch ───────────────────────────────────────────────────────────────
+    // ─── Fetch ──────────────────────────────────────────────────────────────
 
     const fetchPage = useCallback(async (pageNum: number, isAppend: boolean) => {
         if (abortControllerRef.current) abortControllerRef.current.abort();
@@ -287,6 +467,7 @@ function AuditAdjustmentsPage() {
                 page: String(pageNum), limit: String(PAGE_SIZE),
                 search: debouncedSearch, sortBy, sortOrder,
             });
+            if (filterId) params.set('id', filterId);
 
             const res = await fetch(`/api/warehouse/audit-adjustments?${params}`, { signal: controller.signal });
             const data = await res.json();
@@ -322,7 +503,7 @@ function AuditAdjustmentsPage() {
             fetchingRef.current = false;
             if (mountedRef.current) { setIsLoading(false); setIsLoadingMore(false); }
         }
-    }, [sortBy, sortOrder, debouncedSearch]);
+    }, [sortBy, sortOrder, debouncedSearch, filterId]);
 
     // ─── Initial load / filter changes ──────────────────────────────────────
 
@@ -333,11 +514,14 @@ function AuditAdjustmentsPage() {
     useEffect(() => {
         if (isFirstMount.current) {
             isFirstMount.current = false;
-            const cache = globalCache.current;
-            if (cache && cache.adjustments.length > 0 && (Date.now() - cache.timestamp) < CACHE_TTL &&
-                cache.sortBy === sortBy && cache.sortOrder === sortOrder && cache.search === debouncedSearch) {
-                setAdjustments(cache.adjustments); setHasMore(cache.hasMore); setTotal(cache.total);
-                pageRef.current = cache.page; setIsLoading(false); return;
+            // Skip cache when filtering by specific ID
+            if (!filterId) {
+                const cache = globalCache.current;
+                if (cache && cache.adjustments.length > 0 && (Date.now() - cache.timestamp) < CACHE_TTL &&
+                    cache.sortBy === sortBy && cache.sortOrder === sortOrder && cache.search === debouncedSearch) {
+                    setAdjustments(cache.adjustments); setHasMore(cache.hasMore); setTotal(cache.total);
+                    pageRef.current = cache.page; setIsLoading(false); return;
+                }
             }
         }
         globalCache.current = null;
@@ -346,7 +530,7 @@ function AuditAdjustmentsPage() {
         setHasMore(true);
         fetchPageRef.current(1, false);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [sortBy, sortOrder, debouncedSearch]);
+    }, [sortBy, sortOrder, debouncedSearch, filterId]);
 
     // ─── Infinite scroll ────────────────────────────────────────────────────
 
@@ -356,11 +540,13 @@ function AuditAdjustmentsPage() {
         if (!sentinel || !container) return;
         const observer = new IntersectionObserver(
             entries => { if (entries[0].isIntersecting && hasMore && !fetchingRef.current && !isLoading) fetchPageRef.current(pageRef.current + 1, true); },
-            { root: container, rootMargin: '400px' }
+            { root: container, rootMargin: '600px' }
         );
         observer.observe(sentinel);
         return () => observer.disconnect();
     }, [hasMore, isLoading]);
+
+    // ─── Sort handler ───────────────────────────────────────────────────────
 
     const handleSort = (col: string) => {
         if (sortBy === col) setSortOrder(p => p === 'asc' ? 'desc' : 'asc');
@@ -368,90 +554,139 @@ function AuditAdjustmentsPage() {
         scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    const getSkuData = (val: any) => {
-        if (typeof val === 'object' && val?.name) return val;
-        return { _id: '', name: typeof val === 'string' ? val : '-', uom: '', image: '' };
-    };
-    const renderUser = (val: any) => {
-        if (typeof val === 'object' && val?.firstName) return `${val.firstName} ${val.lastName}`;
-        if (typeof val === 'string') return val;
-        return '-';
-    };
-
     const missingImg = globalSettings?.missingSkuImage || '';
 
-    const COLS = [
-        { key: 'img', label: 'Img', sortable: false, width: 'w-10' },
-        { key: 'sku', label: 'SKU', sortable: true, width: 'w-[220px]' },
-        { key: 'lotNumber', label: 'Lot #', sortable: true, width: 'w-[120px]' },
-        { key: 'qty', label: 'Qty', sortable: true, width: 'w-[100px]' },
-        { key: 'reason', label: 'Reason', sortable: true, width: 'w-[260px]' },
-        { key: 'createdBy', label: 'Created By', sortable: false, width: 'w-[140px]' },
-        { key: 'createdAt', label: 'Date', sortable: true, width: 'w-[100px]' },
-    ];
+    // ─── Delete handler ─────────────────────────────────────────────────────
+
+    const handleDeleteAdjustment = (adjustmentId: string) => {
+        toast((t) => (
+            <div className="flex flex-col gap-2">
+                <p className="text-sm font-bold text-white">Delete this adjustment?</p>
+                <p className="text-xs text-gray-400">This action cannot be undone.</p>
+                <div className="flex gap-2 mt-1">
+                    <button
+                        onClick={() => toast.dismiss(t.id)}
+                        className="flex-1 px-3 py-1.5 text-xs font-bold rounded border border-gray-600 bg-gray-800 text-white hover:bg-gray-700 transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={async () => {
+                            toast.dismiss(t.id);
+                            try {
+                                const res = await fetch(`/api/warehouse/audit-adjustments/${adjustmentId}`, {
+                                    method: 'DELETE'
+                                });
+                                if (res.ok) {
+                                    toast.success('Adjustment deleted');
+                                    globalCache.current = null;
+                                    pageRef.current = 0;
+                                    fetchPageRef.current(1, false);
+                                } else {
+                                    const data = await res.json();
+                                    toast.error(data.error || 'Failed to delete');
+                                }
+                            } catch (e) {
+                                toast.error('Error deleting adjustment');
+                            }
+                        }}
+                        className="flex-1 px-3 py-1.5 text-xs font-bold rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+                    >
+                        Delete
+                    </button>
+                </div>
+            </div>
+        ), { duration: 10000, position: 'top-center', style: { maxWidth: '360px', background: '#1a1a1a', color: '#fff', marginTop: '40vh' } });
+    };
+
+    // ─── Render ─────────────────────────────────────────────────────────────
 
     return (
         <div className="flex flex-col h-[calc(100vh-48px)] bg-background transition-colors duration-300">
 
-            {/* ─── Local Page Header ───────────────────────────────────────── */}
-            <div className="shrink-0 border-b border-border bg-background px-3 py-2 flex items-center gap-3 overflow-x-auto">
+            {/* ─── Page Header (manufacturing-style) ────────────────── */}
+            <div className="shrink-0 border-b border-border bg-background">
+                <div className="px-4 py-2.5 flex items-center gap-4">
 
-                {/* Title + count */}
-                <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[11px] font-black uppercase tracking-widest text-foreground">AUDIT ADJUSTMENTS</span>
-                    <span className="text-[11px] font-bold text-muted-foreground/60 tabular-nums">{total > 0 ? total.toLocaleString() : ''}</span>
-                </div>
+                    {/* Title */}
+                    <div className="flex items-center gap-2 shrink-0">
+                        <ClipboardCheck className="w-4 h-4 text-primary" />
+                        <h1 className="text-[14px] font-black uppercase tracking-widest text-foreground">Audit Adjustments</h1>
+                    </div>
 
-                <div className="h-5 w-px bg-border shrink-0" />
+                    {/* Separator */}
+                    <div className="h-5 w-px bg-border shrink-0" />
 
-                {/* Search */}
-                <div className="relative flex items-center shrink-0">
-                    <Search className="absolute left-2.5 w-3.5 h-3.5 text-muted-foreground/50 pointer-events-none" />
-                    <input
-                        type="text"
-                        placeholder="Search SKU, lot, reason..."
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        className="pl-8 pr-8 h-8 w-64 bg-secondary/60 border border-border text-[12px] rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50 placeholder:text-muted-foreground/50 text-foreground transition-all"
-                    />
-                    {search && (
-                        <button onClick={() => setSearch('')} className="absolute right-2.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
-                            <X className="h-3.5 w-3.5" />
+                    {/* Total count */}
+                    <span className="text-[11px] font-bold text-muted-foreground/60 tabular-nums shrink-0">
+                        {total > 0 ? total.toLocaleString() : ''}
+                    </span>
+
+                    {/* Filter badge when viewing single record */}
+                    {filterId && (
+                        <button
+                            onClick={() => { setFilterId(null); router.replace('/warehouse/audit-adjustments', { scroll: false }); globalCache.current = null; pageRef.current = 0; fetchPageRef.current(1, false); }}
+                            className="flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 border border-primary/30 rounded text-[10px] font-bold uppercase tracking-widest text-primary hover:bg-primary/20 transition-colors cursor-pointer shrink-0"
+                        >
+                            <span>Filtered</span>
+                            <X className="w-3 h-3" />
                         </button>
                     )}
+
+                    {/* Spacer */}
+                    <div className="flex-1" />
+
+                    {/* Search */}
+                    <div className="relative shrink-0">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                        <input
+                            type="text"
+                            placeholder="Search SKU, lot, reason..."
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            className="pl-8 pr-8 h-8 w-56 bg-background border border-border text-[12px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
+                        />
+                        {search && (
+                            <button
+                                onClick={() => setSearch('')}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors z-20 cursor-pointer"
+                            >
+                                <X className="h-3 w-3" />
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Add button */}
+                    <button
+                        onClick={e => { e.stopPropagation(); setEditingItem(null); setIsModalOpen(true); }}
+                        className="h-8 px-3 bg-primary text-black hover:opacity-90 transition-all rounded shadow-md flex items-center space-x-1.5 cursor-pointer shrink-0"
+                    >
+                        <Plus className="w-3 h-3" />
+                        <span className="hidden sm:inline text-[12px] font-black uppercase tracking-widest">Add</span>
+                    </button>
                 </div>
-
-                <div className="flex-1" />
-
-                {/* ADD button */}
-                <button
-                    onClick={e => { e.stopPropagation(); setEditingItem(null); setIsModalOpen(true); }}
-                    className="h-8 px-3 bg-primary text-black hover:opacity-90 transition-all rounded-lg shadow flex items-center gap-1.5 cursor-pointer shrink-0"
-                >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span className="text-[11px] font-black uppercase tracking-widest">ADD</span>
-                </button>
             </div>
 
-            {/* ─── Table ──────────────────────────────────────────────────── */}
+            {/* ─── Table ──────────────────────────────────────────── */}
             <div ref={scrollRef} className="flex-1 overflow-x-auto overflow-y-auto scrollbar-custom relative">
                 <div className="min-w-fit px-2 py-1">
-                    <table className="w-full text-left border-separate border-spacing-0 relative z-0 table-fixed">
-                        <thead className="bg-background border-b border-border sticky top-0 z-10">
+                    <table className="w-full text-left border-separate border-spacing-0 relative z-0">
+                        <thead className="bg-background border-b border-border sticky top-0 z-10 box-border">
                             <tr>
-                                {COLS.map(col => (
+                                {COLUMNS.map(col => (
                                     <th
                                         key={col.key}
                                         onClick={col.sortable ? () => handleSort(col.key) : undefined}
                                         className={cn(
-                                            'px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest border-r border-border/40 last:border-0 select-none shadow-[0_1px_0_0_hsl(var(--border))]',
+                                            'px-2.5 py-2 text-[12px] font-semibold text-muted-foreground uppercase tracking-widest border-r border-border/40 last:border-0 select-none shadow-[0_1px_0_0_hsl(var(--border))]',
                                             col.width,
-                                            col.sortable && 'cursor-pointer hover:bg-secondary/60 transition-colors',
+                                            col.align || 'text-left',
+                                            col.sortable && 'cursor-pointer hover:bg-secondary/60 dark:hover:bg-secondary/50 transition-colors',
                                         )}
                                     >
-                                        <div className="flex items-center gap-1">
+                                        <div className={cn('flex items-center gap-1', col.align === 'text-right' && 'justify-end')}>
                                             <span>{col.label}</span>
-                                            {col.sortable && <ArrowUpDown className={cn('w-2.5 h-2.5 flex-shrink-0', sortBy === col.key ? 'text-primary' : 'text-muted-foreground/25')} />}
+                                            {col.sortable && <ArrowUpDown className={cn('w-2.5 h-2.5 transition-colors', sortBy === col.key ? 'text-primary' : 'text-muted-foreground/25')} />}
                                         </div>
                                     </th>
                                 ))}
@@ -459,100 +694,69 @@ function AuditAdjustmentsPage() {
                         </thead>
                         <tbody>
                             {isLoading ? (
-                                Array.from({ length: 20 }).map((_, i) => <SkeletonRow key={i} index={i} />)
+                                Array.from({ length: 25 }).map((_, i) => <SkeletonRow key={i} index={i} />)
                             ) : error ? (
-                                <tr><td colSpan={7} className="px-4 py-12 text-center text-[12px] text-destructive">{error}</td></tr>
+                                <tr>
+                                    <td colSpan={8} className="px-2 py-8 text-center text-destructive text-[12px]">{error}</td>
+                                </tr>
                             ) : adjustments.length === 0 ? (
-                                <tr><td colSpan={7} className="px-4 py-16 text-center text-[12px] text-muted-foreground/50 uppercase tracking-widest">No records found</td></tr>
-                            ) : adjustments.map(item => {
-                                const skuData = getSkuData(item.sku);
-                                const imgSrc = skuData.image || missingImg || '';
-                                const skuTier = typeof item.sku === 'object' && item.sku !== null ? (item.sku as any).tier : undefined;
-
-                                return (
-                                    <tr
-                                        key={item._id}
-                                        data-aa-id={item._id}
-                                        className={cn(
-                                            'group hover:bg-muted/30 dark:hover:bg-muted/10 transition-colors duration-150 cursor-pointer border-b border-border/60',
-                                            highlightId === item._id && 'animate-[rowGlow_0.75s_ease-in-out_4] ring-1 ring-primary/40 bg-primary/[0.06]'
+                                <tr>
+                                    <td colSpan={8} className="px-2 py-16 text-center">
+                                        <ClipboardCheck className="w-8 h-8 mx-auto mb-3 text-muted-foreground/20" />
+                                        <p className="text-[12px] text-muted-foreground/50 uppercase tracking-widest font-bold">
+                                            {debouncedSearch ? 'No matching adjustments' : filterId ? 'Adjustment not found' : 'No adjustments found'}
+                                        </p>
+                                        {filterId && (
+                                            <button
+                                                onClick={() => { setFilterId(null); router.replace('/warehouse/audit-adjustments', { scroll: false }); globalCache.current = null; pageRef.current = 0; fetchPageRef.current(1, false); }}
+                                                className="mt-3 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-secondary text-foreground border border-border rounded hover:bg-secondary/80 transition-colors cursor-pointer"
+                                            >Show All Adjustments</button>
                                         )}
-                                        onClick={() => {
-                                            sessionStorage.setItem('aa_scroll_to', item._id);
-                                            if (scrollRef.current) sessionStorage.setItem('aa_scroll_top', String(scrollRef.current.scrollTop));
-                                            router.push(`/warehouse/audit-adjustments/${item._id}`);
+                                    </td>
+                                </tr>
+                            ) : (
+                                adjustments.map((item) => (
+                                    <TableRow
+                                        key={item._id}
+                                        item={item}
+                                        highlight={highlightId === item._id || filterId === item._id}
+                                        onEdit={(e) => {
+                                            e.stopPropagation();
+                                            setEditingItem(item);
+                                            setIsModalOpen(true);
                                         }}
-                                    >
-                                        {/* Image */}
-                                        <td className="px-2.5 py-2.5 w-10 border-r border-border/40">
-                                            <div className="w-6 h-6 rounded-md overflow-hidden bg-secondary flex items-center justify-center border border-border flex-shrink-0">
-                                                <img src={imgSrc || '/sku-placeholder.png'} alt="" className="w-full h-full object-cover"
-                                                    onError={e => {
-                                                        const t = e.target as HTMLImageElement;
-                                                        const fb = missingImg || '/sku-placeholder.png';
-                                                        if (!t.src.includes('sku-placeholder.png')) t.src = fb;
-                                                    }} />
-                                            </div>
-                                        </td>
+                                        onDelete={(e) => {
+                                            e.stopPropagation();
+                                            handleDeleteAdjustment(item._id);
+                                        }}
+                                    />
+                                ))
+                            )}
 
-                                        {/* SKU Name + Tier */}
-                                        <td className="px-2.5 py-2.5 w-[220px] text-[12px] font-semibold text-foreground/90 group-hover:text-foreground transition-colors border-r border-border/40">
-                                            <div className="flex items-center gap-1.5">
-                                                {skuTier ? <TierBadge tier={skuTier} /> : null}
-                                                <span className="truncate" title={skuData.name}>{skuData.name}</span>
-                                            </div>
-                                        </td>
-
-                                        {/* Lot Number */}
-                                        <td className="px-2.5 py-2.5 w-[120px] text-[11px] font-mono text-foreground/60 tracking-tight border-r border-border/40">
-                                            {item.lotNumber || <span className="text-muted-foreground/30">—</span>}
-                                        </td>
-
-                                        {/* Qty */}
-                                        <td className="px-2.5 py-2.5 w-[100px] border-r border-border/40">
-                                            <QtyBadge qty={item.qty} />
-                                        </td>
-
-                                        {/* Reason */}
-                                        <td className="px-2.5 py-2.5 w-[260px] text-[11px] text-foreground/60 truncate border-r border-border/40" title={item.reason}>
-                                            {item.reason || <span className="text-muted-foreground/30">—</span>}
-                                        </td>
-
-                                        {/* Created By */}
-                                        <td className="px-2.5 py-2.5 w-[140px] text-[11px] text-foreground/60 border-r border-border/40">
-                                            {renderUser(item.createdBy)}
-                                        </td>
-
-                                        {/* Date */}
-                                        <td className="px-2.5 py-2.5 w-[100px] text-[11px] font-mono text-foreground/50">
-                                            {new Date(item.createdAt).toLocaleDateString()}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
+                            {/* Loading more skeleton rows */}
+                            {isLoadingMore && (
+                                Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={`loading-${i}`} index={i} />)
+                            )}
                         </tbody>
                     </table>
 
-                    {/* Infinite scroll sentinel */}
-                    <div ref={sentinelRef} className="h-2" />
+                    {/* Sentinel for infinite scroll */}
+                    <div ref={sentinelRef} className="h-1" />
 
-                    {isLoadingMore && (
-                        <div className="flex items-center justify-center gap-2 py-4">
-                            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
-                            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
-                            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
-                        </div>
-                    )}
-
-                    {!hasMore && adjustments.length > 0 && !isLoading && (
-                        <div className="text-center py-4 text-[11px] text-muted-foreground/40 uppercase tracking-widest">
-                            — {adjustments.length.toLocaleString()} records loaded —
+                    {/* End marker */}
+                    {!isLoading && !hasMore && adjustments.length > 0 && (
+                        <div className="flex items-center justify-center py-4 gap-2">
+                            <div className="h-px w-12 bg-border" />
+                            <span className="text-[12px] text-muted-foreground/40 uppercase tracking-widest font-bold">
+                                {adjustments.length.toLocaleString()} records loaded
+                            </span>
+                            <div className="h-px w-12 bg-border" />
                         </div>
                     )}
                 </div>
             </div>
 
-            {/* ─── Modal ──────────────────────────────────────────────────── */}
+            {/* ─── Modal ──────────────────────────────────────────── */}
             {isModalOpen && (
                 <AdjustmentModal
                     onClose={() => setIsModalOpen(false)}
@@ -563,13 +767,5 @@ function AuditAdjustmentsPage() {
                 />
             )}
         </div>
-    );
-}
-
-export default function AuditAdjustmentsPageWrapper() {
-    return (
-        <Suspense fallback={<div className="flex items-center justify-center h-[calc(100vh-48px)]"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>}>
-            <AuditAdjustmentsPage />
-        </Suspense>
     );
 }

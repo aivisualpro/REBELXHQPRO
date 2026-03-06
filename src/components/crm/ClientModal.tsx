@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { X, Loader2, Plus, Trash2, Mail, Phone, MapPin, Globe, Facebook, Briefcase, DollarSign, Calendar, CreditCard, Ship, Wallet, FileText, Lock, ShieldCheck, Eye, EyeOff } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, toDateInputValue } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 interface ClientModalProps {
@@ -81,12 +81,12 @@ const formatPhoneNumber = (value: string) => {
 
 const formatExpiryDate = (value: string) => {
     let clearValue = value.replace(/[^\d]/g, '');
-    
+
     // Auto-prefix single digit > 1 (e.g. typing '3' becomes '03')
     if (clearValue.length === 1 && parseInt(clearValue) > 1 && parseInt(clearValue) <= 9) {
         clearValue = '0' + clearValue;
     }
-    
+
     if (clearValue.length >= 2) {
         return `${clearValue.slice(0, 2)}/${clearValue.slice(2, 4)}`;
     }
@@ -132,7 +132,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [salesReps, setSalesReps] = useState<{ _id: string, firstName: string, lastName: string }[]>([]);
     const [minRevenueSlab, setMinRevenueSlab] = useState(20);
-    
+
     const [formData, setFormData] = useState({
         name: initialData?.name || '',
         contactType: initialData?.contactType || 'Uncategorized',
@@ -144,22 +144,22 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
         facebookPage: initialData?.facebookPage || '',
         industry: initialData?.industry || '',
         forecastedAmount: initialData?.forecastedAmount || 0,
-        projectedCloseDate: initialData?.projectedCloseDate ? new Date(initialData.projectedCloseDate).toISOString().split('T')[0] : '',
-        emails: initialData?.emails && initialData.emails.length > 0 
-            ? initialData.emails.map((e: any) => ({ value: e.value, label: e.label || 'Main' })) 
+        projectedCloseDate: toDateInputValue(initialData?.projectedCloseDate),
+        emails: initialData?.emails && initialData.emails.length > 0
+            ? initialData.emails.map((e: any) => ({ value: e.value, label: e.label || 'Main' }))
             : [{ value: '', label: 'Main' }],
-        phones: initialData?.phones && initialData.phones.length > 0 
-            ? initialData.phones.map((p: any) => ({ value: p.value, label: p.label || 'Main' })) 
+        phones: initialData?.phones && initialData.phones.length > 0
+            ? initialData.phones.map((p: any) => ({ value: p.value, label: p.label || 'Main' }))
             : [{ value: '', label: 'Main' }],
-        addresses: initialData?.addresses && initialData.addresses.length > 0 
-            ? initialData.addresses.map((a: any) => ({ 
-                street: a.street || '', 
-                city: a.city || '', 
-                state: a.state || '', 
-                postalCode: a.postalCode || '', 
-                country: a.country || 'USA', 
-                label: a.label || 'Main' 
-            })) 
+        addresses: initialData?.addresses && initialData.addresses.length > 0
+            ? initialData.addresses.map((a: any) => ({
+                street: a.street || '',
+                city: a.city || '',
+                state: a.state || '',
+                postalCode: a.postalCode || '',
+                country: a.country || 'USA',
+                label: a.label || 'Main'
+            }))
             : [{ street: '', city: '', state: '', postalCode: '', country: 'USA', label: 'Main' }],
         billing: {
             nameOnCard: initialData?.billing?.nameOnCard || '',
@@ -187,22 +187,22 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                 facebookPage: initialData?.facebookPage || '',
                 industry: initialData?.industry || '',
                 forecastedAmount: initialData?.forecastedAmount || 0,
-                projectedCloseDate: initialData?.projectedCloseDate ? new Date(initialData.projectedCloseDate).toISOString().split('T')[0] : '',
-                emails: initialData?.emails && initialData.emails.length > 0 
-                    ? initialData.emails.map((e: any) => ({ value: e.value, label: e.label || 'Main' })) 
+                projectedCloseDate: toDateInputValue(initialData?.projectedCloseDate),
+                emails: initialData?.emails && initialData.emails.length > 0
+                    ? initialData.emails.map((e: any) => ({ value: e.value, label: e.label || 'Main' }))
                     : [{ value: '', label: 'Main' }],
-                phones: initialData?.phones && initialData.phones.length > 0 
-                    ? initialData.phones.map((p: any) => ({ value: p.value, label: p.label || 'Main' })) 
+                phones: initialData?.phones && initialData.phones.length > 0
+                    ? initialData.phones.map((p: any) => ({ value: p.value, label: p.label || 'Main' }))
                     : [{ value: '', label: 'Main' }],
-                addresses: initialData?.addresses && initialData.addresses.length > 0 
-                    ? initialData.addresses.map((a: any) => ({ 
-                        street: a.street || '', 
-                        city: a.city || '', 
-                        state: a.state || '', 
-                        postalCode: a.postalCode || '', 
-                        country: a.country || 'USA', 
-                        label: a.label || 'Main' 
-                    })) 
+                addresses: initialData?.addresses && initialData.addresses.length > 0
+                    ? initialData.addresses.map((a: any) => ({
+                        street: a.street || '',
+                        city: a.city || '',
+                        state: a.state || '',
+                        postalCode: a.postalCode || '',
+                        country: a.country || 'USA',
+                        label: a.label || 'Main'
+                    }))
                     : [{ street: '', city: '', state: '', postalCode: '', country: 'USA', label: 'Main' }],
                 billing: {
                     nameOnCard: initialData?.billing?.nameOnCard || '',
@@ -245,9 +245,9 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
     };
 
 
-     const [showCC, setShowCC] = useState(false);
+    const [showCC, setShowCC] = useState(false);
     const [showCVV, setShowCVV] = useState(false);
-    
+
     const cardType = getCardType(formData.billing.ccNumber);
     const cardTheme = getCardTheme(cardType);
 
@@ -434,7 +434,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                             </div>
                             <div className="col-span-3 space-y-1.5">
                                 <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">Business Description</label>
-                                    <textarea
+                                <textarea
                                     value={formData.description}
                                     onChange={e => setFormData({ ...formData, description: e.target.value })}
                                     className="w-full px-4 py-2 bg-background border border-border text-foreground text-sm resize-none focus:outline-none focus:ring-1 focus:ring-primary transition-all"
@@ -533,68 +533,68 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                             <h3 className="text-[10px] font-black uppercase tracking-[0.2em]">Contact Channels</h3>
                         </div>
                         <div className="grid grid-cols-2 gap-8">
-                        {/* Emails */}
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center">
-                                    <Mail className="w-3 h-3 mr-2 text-blue-500" /> Emails
-                                </h3>
-                                <button type="button" onClick={() => addField('emails')} className="text-blue-600 hover:text-blue-700 cursor-pointer">
-                                    <Plus className="w-3.5 h-3.5" />
-                                </button>
-                            </div>
-                            {formData.emails.map((email: any, idx: number) => (
-                                <div key={idx} className="flex space-x-2">
-                                    <input
-                                        type="email"
-                                        placeholder="email@example.com"
-                                        value={email.value}
-                                        onChange={e => {
-                                            const newEmails = [...formData.emails];
-                                            newEmails[idx].value = e.target.value;
-                                            setFormData({ ...formData, emails: newEmails });
-                                        }}
-                                        className="flex-1 px-3 py-1.5 bg-secondary border border-border text-foreground text-xs focus:outline-none focus:border-primary transition-colors"
-                                    />
-                                    <button type="button" onClick={() => removeField('emails', idx)} className="p-1.5 text-muted-foreground/30 hover:text-red-500 transition-colors cursor-pointer">
-                                        <Trash2 className="w-3.5 h-3.5" />
+                            {/* Emails */}
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center">
+                                        <Mail className="w-3 h-3 mr-2 text-blue-500" /> Emails
+                                    </h3>
+                                    <button type="button" onClick={() => addField('emails')} className="text-blue-600 hover:text-blue-700 cursor-pointer">
+                                        <Plus className="w-3.5 h-3.5" />
                                     </button>
                                 </div>
-                            ))}
-                        </div>
+                                {formData.emails.map((email: any, idx: number) => (
+                                    <div key={idx} className="flex space-x-2">
+                                        <input
+                                            type="email"
+                                            placeholder="email@example.com"
+                                            value={email.value}
+                                            onChange={e => {
+                                                const newEmails = [...formData.emails];
+                                                newEmails[idx].value = e.target.value;
+                                                setFormData({ ...formData, emails: newEmails });
+                                            }}
+                                            className="flex-1 px-3 py-1.5 bg-secondary border border-border text-foreground text-xs focus:outline-none focus:border-primary transition-colors"
+                                        />
+                                        <button type="button" onClick={() => removeField('emails', idx)} className="p-1.5 text-muted-foreground/30 hover:text-red-500 transition-colors cursor-pointer">
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
 
-                        {/* Phones */}
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center">
-                                    <Phone className="w-3 h-3 mr-2 text-emerald-500" /> Phones
-                                </h3>
-                                <button type="button" onClick={() => addField('phones')} className="text-blue-600 hover:text-blue-700 cursor-pointer">
-                                    <Plus className="w-3.5 h-3.5" />
-                                </button>
-                            </div>
-                            {formData.phones.map((phone: any, idx: number) => (
-                                <div key={idx} className="flex space-x-2">
-                                    <input
-                                        type="tel"
-                                        placeholder="(000) 000-0000"
-                                        value={phone.value}
-                                        onChange={e => {
-                                            const formatted = formatPhoneNumber(e.target.value);
-                                            const newPhones = [...formData.phones];
-                                            newPhones[idx].value = formatted;
-                                            setFormData({ ...formData, phones: newPhones });
-                                        }}
-                                        className="flex-1 px-3 py-1.5 bg-secondary border border-border text-foreground text-xs focus:outline-none focus:border-primary transition-colors"
-                                    />
-                                    <button type="button" onClick={() => removeField('phones', idx)} className="p-1.5 text-muted-foreground/30 hover:text-red-500 transition-colors cursor-pointer">
-                                        <Trash2 className="w-3.5 h-3.5" />
+                            {/* Phones */}
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center">
+                                        <Phone className="w-3 h-3 mr-2 text-emerald-500" /> Phones
+                                    </h3>
+                                    <button type="button" onClick={() => addField('phones')} className="text-blue-600 hover:text-blue-700 cursor-pointer">
+                                        <Plus className="w-3.5 h-3.5" />
                                     </button>
                                 </div>
-                            ))}
+                                {formData.phones.map((phone: any, idx: number) => (
+                                    <div key={idx} className="flex space-x-2">
+                                        <input
+                                            type="tel"
+                                            placeholder="(000) 000-0000"
+                                            value={phone.value}
+                                            onChange={e => {
+                                                const formatted = formatPhoneNumber(e.target.value);
+                                                const newPhones = [...formData.phones];
+                                                newPhones[idx].value = formatted;
+                                                setFormData({ ...formData, phones: newPhones });
+                                            }}
+                                            className="flex-1 px-3 py-1.5 bg-secondary border border-border text-foreground text-xs focus:outline-none focus:border-primary transition-colors"
+                                        />
+                                        <button type="button" onClick={() => removeField('phones', idx)} className="p-1.5 text-muted-foreground/30 hover:text-red-500 transition-colors cursor-pointer">
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
-                </div>
 
                     {/* Section 5: Locations */}
                     <div className="space-y-6">
@@ -611,9 +611,9 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                         <div className="grid grid-cols-2 gap-6">
                             {formData.addresses.map((address: any, idx: number) => (
                                 <div key={idx} className="p-4 bg-card border border-border rounded-sm space-y-3 relative group shadow-sm">
-                                    <button 
-                                        type="button" 
-                                        onClick={() => removeField('addresses', idx)} 
+                                    <button
+                                        type="button"
+                                        onClick={() => removeField('addresses', idx)}
                                         className="absolute top-2 right-2 p-1.5 text-muted-foreground/30 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
                                     >
                                         <Trash2 className="w-3.5 h-3.5" />
@@ -677,7 +677,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                                 <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Secure Handshake</span>
                             </div>
                         </div>
-                        
+
                         <div className={cn("p-6 rounded-sm shadow-2xl space-y-8 relative overflow-hidden group bg-gradient-to-br transition-all duration-500", cardTheme)}>
                             {/* Card Chip & Type Badge */}
                             <div className="flex items-start justify-between relative z-10">
@@ -721,7 +721,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                                             className="w-full pl-4 pr-10 py-2.5 bg-black/20 border border-white/10 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all font-mono tracking-widest"
                                             placeholder="XXXX XXXX XXXX XXXX"
                                         />
-                                        <button 
+                                        <button
                                             type="button"
                                             onClick={() => setShowCC(!showCC)}
                                             className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
@@ -757,7 +757,7 @@ export default function ClientModal({ isOpen, onClose, onSuccess, initialType = 
                                             className="w-full pl-4 pr-10 py-2.5 bg-black/20 border border-white/10 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all font-mono"
                                             placeholder="***"
                                         />
-                                        <button 
+                                        <button
                                             type="button"
                                             onClick={() => setShowCVV(!showCVV)}
                                             className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"

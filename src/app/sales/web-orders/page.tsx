@@ -6,7 +6,7 @@ import {
   ArrowUpDown, Search, Loader2, CreditCard, Truck, X, Download, Upload, ShoppingBag,
 } from 'lucide-react';
 import Papa from 'papaparse';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -138,7 +138,7 @@ const WebTableRow = React.memo(function WebTableRow({
       )}
       onClick={onClick}>
       <td className="px-2.5 py-2.5 w-[90px] text-[12px] font-mono text-foreground/60">
-        {order.dateCreated ? new Date(order.dateCreated).toLocaleDateString() : '-'}
+        {order.dateCreated ? formatDate(order.dateCreated) : '-'}
       </td>
       <td className="px-2.5 py-2.5 w-[80px] text-[12px] font-mono font-bold text-foreground/90 group-hover:text-foreground transition-colors">
         <span className="group-hover:border-l-2 group-hover:border-l-primary group-hover:pl-1.5 transition-all">#{order.number}</span>
@@ -182,6 +182,11 @@ function WebOrdersContent() {
   const [sortBy, setSortBy] = useState('dateCreated');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [activeStatus, setActiveStatus] = useState<string>('All');
+
+  // Product filter (from web-products page link)
+  const productIdFilter = searchParams.get('productId') || '';
+  const variationIdFilter = searchParams.get('variationId') || '';
+  const websiteFilter = searchParams.get('website') || '';
 
   const pageRef = useRef(globalCache.current?.page || 0);
   const mountedRef = useRef(true);
@@ -283,6 +288,9 @@ function WebOrdersContent() {
     try {
       const params = new URLSearchParams({ page: String(pageNum), limit: String(PAGE_SIZE), sortBy, sortOrder, search: debouncedSearch });
       if (activeStatus !== 'All') params.set('status', activeStatus);
+      if (productIdFilter) params.set('productId', productIdFilter);
+      if (variationIdFilter) params.set('variationId', variationIdFilter);
+      if (websiteFilter) params.set('website', websiteFilter);
       const res = await fetch(`/api/retail/web-orders?${params}`, { signal: ctrl.signal });
       const data = await res.json();
       if (seq !== seqRef.current || !mountedRef.current) return;
@@ -303,7 +311,7 @@ function WebOrdersContent() {
       } else { setError(data.error || 'Failed to fetch'); }
     } catch (e: any) { if (e?.name === 'AbortError') return; if (mountedRef.current) setError(e.message); }
     finally { fetchingRef.current = false; if (mountedRef.current) { setIsLoading(false); setIsLoadingMore(false); } }
-  }, [sortBy, sortOrder, debouncedSearch, activeStatus]);
+  }, [sortBy, sortOrder, debouncedSearch, activeStatus, productIdFilter, variationIdFilter, websiteFilter]);
 
   const fetchPageRef = useRef(fetchPage); fetchPageRef.current = fetchPage;
   const isFirstMount = useRef(true);
@@ -353,6 +361,23 @@ function WebOrdersContent() {
     <div className="flex flex-col h-[calc(100vh-48px)] bg-background transition-colors duration-300">
       {/* Header */}
       <div className="shrink-0 border-b border-border bg-background">
+        {/* Product filter banner */}
+        {productIdFilter && (
+          <div className="px-4 py-2 bg-primary/5 border-b border-primary/10 flex items-center gap-3">
+            <ShoppingBag className="w-3.5 h-3.5 text-primary" />
+            <span className="text-[11px] font-bold text-primary">
+              Filtered by Product ID: <span className="font-mono">{productIdFilter}</span>
+              {variationIdFilter && <> &middot; Variation: <span className="font-mono">{variationIdFilter}</span></>}
+              {websiteFilter && <> &middot; Website: <span className="font-mono">{websiteFilter}</span></>}
+            </span>
+            <button
+              onClick={() => router.push('/sales/web-orders')}
+              className="ml-auto text-[10px] font-bold text-primary/70 hover:text-primary px-2 py-1 rounded hover:bg-primary/10 transition-colors cursor-pointer"
+            >
+              Clear Filter
+            </button>
+          </div>
+        )}
         <div className="px-4 py-2.5 flex items-center gap-4">
           <div className="flex items-center gap-2 shrink-0">
             <ShoppingBag className="w-4 h-4 text-primary" />

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Plus, Trash2, Edit2, Save, X, Package, Layers, FileText, Beaker, Copy } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { confirmDeleteToast } from '@/lib/confirmToast';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
@@ -401,7 +401,7 @@ export default function RecipeDetailPage() {
                         <div className="border border-border rounded-md p-4 bg-background space-y-2">
                             <div className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Created</div>
                             <div className="text-xs text-muted-foreground">
-                                {new Date(recipe.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                                {formatDate(recipe.createdAt)}
                             </div>
                             {recipe.createdBy && typeof recipe.createdBy === 'object' && (
                                 <div className="text-xs text-muted-foreground">

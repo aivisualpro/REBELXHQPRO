@@ -11,7 +11,7 @@ import {
   Loader2,
   Flame,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -181,7 +181,7 @@ const TableRow = React.memo(function TableRow({
         <span className="group-hover:border-l-2 group-hover:border-l-primary group-hover:pl-1.5 transition-all">{order.label || '-'}</span>
       </td>
       <td className="px-2.5 py-2.5 w-[80px] text-[12px] font-mono text-foreground/60">
-        {new Date(order.createdAt).toLocaleDateString()}
+        {formatDate(order.createdAt)}
       </td>
       <td className="px-2.5 py-2.5 text-[12px] text-foreground/90 group-hover:text-foreground transition-colors font-semibold">
         <div className="flex items-center gap-1.5">

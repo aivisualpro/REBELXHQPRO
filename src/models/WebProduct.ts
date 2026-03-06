@@ -1,5 +1,10 @@
 import mongoose from 'mongoose';
 
+const LinkedSkuSchema = new mongoose.Schema({
+    skuId: { type: String, required: true },
+    multiplier: { type: Number, default: 1 },
+}, { _id: false });
+
 const VariationSchema = new mongoose.Schema({
     _id: { type: String, default: () => new mongoose.Types.ObjectId().toString() },
     id: Number,                    // WooCommerce variation ID
@@ -17,9 +22,11 @@ const VariationSchema = new mongoose.Schema({
     dateCreated: Date,
     dateModified: Date,
     permalink: String,
-    // SKU Linking Fields
-    linkedSkuId: String,           // Links to SKU._id
+    // SKU Linking Fields (legacy single-link)
+    linkedSkuId: String,           // Links to SKU._id (kept for backward compat)
     multiplier: { type: Number, default: 1 },
+    // Multi-SKU Linking
+    linkedSkus: [LinkedSkuSchema], // Multiple SKU links with individual multipliers
 });
 
 const WebProductSchema = new mongoose.Schema({
@@ -93,8 +100,10 @@ const WebProductSchema = new mongoose.Schema({
     // Variations (for variable products)
     variations: [VariationSchema],
     // SKU Linking Fields (for simple products)
-    linkedSkuId: String,           // Links to SKU._id
+    linkedSkuId: String,           // Links to SKU._id (kept for backward compat)
     multiplier: { type: Number, default: 1 },
+    // Multi-SKU Linking
+    linkedSkus: [LinkedSkuSchema], // Multiple SKU links with individual multipliers
     // Options
     isArchived: { type: Boolean, default: false },
     // Stats
@@ -109,6 +118,8 @@ WebProductSchema.index({ website: 1 });
 WebProductSchema.index({ webId: 1, website: 1 });
 WebProductSchema.index({ linkedSkuId: 1 });
 WebProductSchema.index({ 'variations.linkedSkuId': 1 });
+WebProductSchema.index({ 'linkedSkus.skuId': 1 });
+WebProductSchema.index({ 'variations.linkedSkus.skuId': 1 });
 WebProductSchema.index({ totalWebOrders: -1 });
 
 export default mongoose.models.WebProduct || mongoose.model('WebProduct', WebProductSchema);

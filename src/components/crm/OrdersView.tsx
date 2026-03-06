@@ -9,7 +9,7 @@ import {
   X,
   ShoppingCart,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import { SaleOrderModal } from '@/components/sales/SaleOrderModal';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -179,7 +179,7 @@ const OrderTableRow = React.memo(function OrderTableRow({
 
       {/* Date */}
       <td className="px-2.5 py-2.5 w-[90px] text-[12px] font-mono text-foreground/60">
-        {new Date(order.createdAt).toLocaleDateString()}
+        {formatDate(order.createdAt)}
       </td>
 
       {/* Client (conditional) */}

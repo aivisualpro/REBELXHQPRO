@@ -10,10 +10,28 @@ import {
     Loader2,
     Edit2,
     ExternalLink,
+    ChevronDown,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
+
+interface LinkedSkuEntry {
+    skuId: string;
+    skuName?: string;
+    multiplier: number;
+    lotNumber?: string;
+    cost?: number;
+}
+
+interface AvailableVariation {
+    id: number;
+    _id: string;
+    name: string;
+    sku: string;
+    price?: number;
+    attributes?: any[];
+}
 
 interface LineItem {
     id: number;
@@ -33,8 +51,10 @@ interface LineItem {
     variationName?: string;
     lotNumber?: string;
     cost?: number;
+    linkedSkus?: LinkedSkuEntry[];
     attributes?: any[];
     metaData?: any[];
+    availableVariations?: AvailableVariation[];
 }
 
 interface WebOrder {
@@ -109,6 +129,7 @@ export default function WebOrderDetailPage() {
     const [isLotModalOpen, setIsLotModalOpen] = useState(false);
     const [editingLineItemId, setEditingLineItemId] = useState<number | null>(null);
     const [editingSkuId, setEditingSkuId] = useState<string | null>(null);
+    const [editingSkuIndex, setEditingSkuIndex] = useState<number>(-1); // index within linkedSkus array
     const [editingCurrentLot, setEditingCurrentLot] = useState<string | undefined>(undefined);
 
 
@@ -177,23 +198,33 @@ export default function WebOrderDetailPage() {
         return 'bg-secondary text-muted-foreground border-border';
     };
 
-    const formatDate = (dateStr?: string) => {
-        if (!dateStr) return '-';
-        return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    };
+
+
 
     const formatCurrency = (val?: number) => {
         return `$${(val || 0).toFixed(2)}`;
     };
 
-    // Lot Selection Handlers
-    const handleOpenLotModal = (item: LineItem) => {
+    // Lot Selection Handlers (now supports targeting a specific linkedSkus entry)
+    const handleOpenLotModal = (item: LineItem, skuIdx?: number) => {
+        // Multi-SKU: open for a specific linked SKU entry
+        if (skuIdx != null && item.linkedSkus && item.linkedSkus[skuIdx]) {
+            const entry = item.linkedSkus[skuIdx];
+            setEditingLineItemId(item.id);
+            setEditingSkuId(entry.skuId);
+            setEditingSkuIndex(skuIdx);
+            setEditingCurrentLot(entry.lotNumber);
+            setIsLotModalOpen(true);
+            return;
+        }
+        // Legacy: single linkedSkuId
         if (!item.linkedSkuId) {
             toast.error('No linked SKU for this item');
             return;
         }
         setEditingLineItemId(item.id);
         setEditingSkuId(item.linkedSkuId);
+        setEditingSkuIndex(-1);
         setEditingCurrentLot(item.lotNumber);
         setIsLotModalOpen(true);
     };
@@ -203,11 +234,20 @@ export default function WebOrderDetailPage() {
 
         try {
             // Optimistic UI: update lot number immediately
-            const updatedLineItems = order.lineItems.map(item =>
-                item.id === editingLineItemId
-                    ? { ...item, lotNumber: lotNumber || undefined }
-                    : item
-            );
+            const updatedLineItems = order.lineItems.map(item => {
+                if (item.id !== editingLineItemId) return item;
+                if (editingSkuIndex >= 0 && item.linkedSkus) {
+                    // Multi-SKU: update specific entry
+                    return {
+                        ...item,
+                        linkedSkus: item.linkedSkus.map((ls, idx) =>
+                            idx === editingSkuIndex ? { ...ls, lotNumber: lotNumber || undefined } : ls
+                        )
+                    };
+                }
+                // Legacy: single linkedSkuId
+                return { ...item, lotNumber: lotNumber || undefined };
+            });
             setOrder({ ...order, lineItems: updatedLineItems });
 
             const res = await fetch(`/api/retail/web-orders/${order._id}/line-item`, {
@@ -215,13 +255,13 @@ export default function WebOrderDetailPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     lineItemId: editingLineItemId,
+                    skuIndex: editingSkuIndex >= 0 ? editingSkuIndex : undefined,
                     lotNumber: lotNumber || null,
                 })
             });
 
             if (res.ok) {
                 toast.success(lotNumber ? `Lot updated to ${lotNumber}` : 'Lot cleared');
-                // Re-fetch order to get virtual cost from API
                 fetchOrder();
             } else {
                 fetchOrder();
@@ -234,7 +274,48 @@ export default function WebOrderDetailPage() {
             setIsLotModalOpen(false);
             setEditingLineItemId(null);
             setEditingSkuId(null);
+            setEditingSkuIndex(-1);
             setEditingCurrentLot(undefined);
+        }
+    };
+
+    // ─── Variation Selection Handler ──────────────────────────────────────
+    const handleSelectVariation = async (item: LineItem, variation: AvailableVariation) => {
+        if (!order) return;
+
+        // Build a display name from attributes if available
+        const varName = variation.attributes && variation.attributes.length > 0
+            ? variation.attributes.map((a: any) => a.option || a.name).join(' / ')
+            : variation.name;
+
+        // Optimistic UI
+        const updatedLineItems = order.lineItems.map(li => {
+            if (li.id !== item.id) return li;
+            return { ...li, variationId: variation.id, variationName: varName, availableVariations: undefined };
+        });
+        setOrder({ ...order, lineItems: updatedLineItems });
+
+        try {
+            const res = await fetch(`/api/retail/web-orders/${order._id}/line-item`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    lineItemId: item.id,
+                    variationId: variation.id,
+                    variationName: varName,
+                })
+            });
+
+            if (res.ok) {
+                toast.success(`Variant set to: ${varName}`);
+                fetchOrder();
+            } else {
+                fetchOrder();
+                toast.error('Failed to update variant');
+            }
+        } catch (e) {
+            fetchOrder();
+            toast.error('Error updating variant');
         }
     };
 
@@ -512,75 +593,167 @@ export default function WebOrderDetailPage() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-border">
-                                        {order.lineItems?.map((item) => (
-                                            <tr
-                                                key={item.id}
-                                                className="hover:bg-secondary/50 transition-colors"
-                                            >
-                                                <td className="px-3 py-2">
-                                                    {(item.webProductId || item.parentProductId) ? (
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                router.push(`/warehouse/web-products/${item.webProductId || item.parentProductId}`);
-                                                            }}
-                                                            className="text-xs font-bold text-foreground cursor-pointer text-left transition-colors hover:text-blue-500"
-                                                        >
-                                                            {item.name}
-                                                        </button>
-                                                    ) : (
-                                                        <span className="text-xs font-bold text-foreground">{item.name}</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-3 py-2">
-                                                    {item.variationId > 0 ? (
-                                                        <span className="text-[10px] text-foreground font-bold">{item.variationName || item.variationId}</span>
-                                                    ) : (
-                                                        <span className="text-[10px] text-muted-foreground/50">-</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-3 py-2">
-                                                    {item.linkedSkuId ? (
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                router.push(`/warehouse/skus/${item.linkedSkuId}`);
-                                                            }}
-                                                            className="flex items-center space-x-1 text-xs font-bold text-foreground cursor-pointer transition-colors group hover:text-blue-500"
-                                                        >
-                                                            <span>{item.linkedSkuName || item.linkedSkuId}</span>
-                                                            <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-                                                        </button>
-                                                    ) : (
-                                                        <span className="text-[10px] text-muted-foreground/50">-</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-3 py-2 text-xs text-foreground group">
-                                                    <div className="flex items-center gap-1">
-                                                        {item.lotNumber ? (
-                                                            <span className="text-foreground font-mono font-bold">{item.lotNumber}</span>
-                                                        ) : (
-                                                            <span>-</span>
-                                                        )}
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleOpenLotModal(item);
-                                                            }}
-                                                            className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-blue-500 transition-all p-0.5"
-                                                            title="Edit Lot #"
-                                                        >
-                                                            <Edit2 className="w-2.5 h-2.5" />
-                                                        </button>
-                                                    </div>
-                                                </td>
+                                        {order.lineItems?.map((item) => {
+                                            const hasMultiSkus = item.linkedSkus && item.linkedSkus.length > 0;
+                                            const skuRows = hasMultiSkus ? item.linkedSkus! : (
+                                                item.linkedSkuId ? [{ skuId: item.linkedSkuId, skuName: item.linkedSkuName, multiplier: 1, lotNumber: item.lotNumber, cost: item.cost }] : []
+                                            );
+                                            const rowSpan = Math.max(1, skuRows.length);
 
-                                                <td className="px-3 py-2 text-right text-xs text-foreground font-mono font-bold">{item.quantity}</td>
-                                                <td className="px-3 py-2 text-right text-xs text-orange-500 font-mono font-bold whitespace-nowrap">{item.cost != null && item.cost > 0 ? formatCurrency(item.cost) : '-'}</td>
-                                                <td className="px-3 py-2 text-right text-xs text-foreground font-mono font-bold">{formatCurrency(item.price)}</td>
-                                                <td className="px-3 py-2 text-right text-xs text-foreground font-mono font-black bg-secondary/20">{formatCurrency(item.total)}</td>
-                                            </tr>
-                                        ))}
+                                            return skuRows.length <= 1 ? (
+                                                // Single SKU or no SKU — render single row
+                                                <tr key={item.id} className="hover:bg-secondary/50 transition-colors">
+                                                    <td className="px-3 py-2">
+                                                        {(item.webProductId || item.parentProductId) ? (
+                                                            <button onClick={(e) => { e.stopPropagation(); router.push(`/warehouse/web-products/${item.webProductId || item.parentProductId}`); }}
+                                                                className="text-xs font-bold text-foreground cursor-pointer text-left transition-colors hover:text-blue-500">
+                                                                {item.name}
+                                                            </button>
+                                                        ) : (
+                                                            <span className="text-xs font-bold text-foreground">{item.name}</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-3 py-2">
+                                                        {item.variationId > 0 ? (
+                                                            <span className="text-[10px] text-foreground font-bold">{item.variationName || item.variationId}</span>
+                                                        ) : item.availableVariations && item.availableVariations.length > 0 ? (
+                                                            <div className="relative">
+                                                                <select
+                                                                    className="appearance-none bg-amber-500/10 border border-amber-500/30 text-amber-500 text-[10px] font-bold rounded px-2 py-1 pr-6 cursor-pointer hover:bg-amber-500/20 transition-colors outline-none w-full"
+                                                                    value=""
+                                                                    onChange={(e) => {
+                                                                        const v = item.availableVariations!.find(av => String(av.id) === e.target.value);
+                                                                        if (v) handleSelectVariation(item, v);
+                                                                    }}
+                                                                >
+                                                                    <option value="" disabled>Select variant...</option>
+                                                                    {item.availableVariations.map(v => {
+                                                                        const label = v.attributes && v.attributes.length > 0
+                                                                            ? v.attributes.map((a: any) => a.option || a.name).join(' / ')
+                                                                            : v.name;
+                                                                        return <option key={v.id} value={v.id}>{label}</option>;
+                                                                    })}
+                                                                </select>
+                                                                <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-amber-500 pointer-events-none" />
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-[10px] text-muted-foreground/50">-</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-3 py-2">
+                                                        {skuRows.length === 1 ? (
+                                                            <button onClick={(e) => { e.stopPropagation(); router.push(`/warehouse/skus/${skuRows[0].skuId}`); }}
+                                                                className="flex items-center space-x-1 text-xs font-bold text-foreground cursor-pointer transition-colors group hover:text-blue-500">
+                                                                <span>{skuRows[0].skuName || skuRows[0].skuId}</span>
+                                                                <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                                                            </button>
+                                                        ) : <span className="text-[10px] text-muted-foreground/50">-</span>}
+                                                    </td>
+                                                    <td className="px-3 py-2 text-xs text-foreground group">
+                                                        <div className="flex items-center gap-1">
+                                                            {skuRows.length === 1 && skuRows[0].lotNumber ? (
+                                                                <span className="text-foreground font-mono font-bold">{skuRows[0].lotNumber}</span>
+                                                            ) : <span>-</span>}
+                                                            {skuRows.length === 1 && (
+                                                                <button onClick={(e) => { e.stopPropagation(); handleOpenLotModal(item, hasMultiSkus ? 0 : undefined); }}
+                                                                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-blue-500 transition-all p-0.5" title="Edit Lot #">
+                                                                    <Edit2 className="w-2.5 h-2.5" />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-3 py-2 text-right text-xs text-foreground font-mono font-bold">{item.quantity}</td>
+                                                    <td className="px-3 py-2 text-right text-xs text-orange-500 font-mono font-bold whitespace-nowrap">{(skuRows[0]?.cost ?? item.cost ?? 0) > 0 ? formatCurrency(skuRows[0]?.cost ?? item.cost ?? 0) : '-'}</td>
+                                                    <td className="px-3 py-2 text-right text-xs text-foreground font-mono font-bold">{formatCurrency(item.price)}</td>
+                                                    <td className="px-3 py-2 text-right text-xs text-foreground font-mono font-black bg-secondary/20">{formatCurrency(item.total)}</td>
+                                                </tr>
+                                            ) : (
+                                                // Multi-SKU — render multiple sub-rows
+                                                <React.Fragment key={item.id}>
+                                                    {skuRows.map((sku, skuIdx) => (
+                                                        <tr key={`${item.id}-sku-${skuIdx}`} className={cn(
+                                                            'hover:bg-secondary/50 transition-colors',
+                                                            skuIdx > 0 && 'border-t border-dashed border-border/40'
+                                                        )}>
+                                                            {/* Product/Variation/Qty/Price/Total only on first row */}
+                                                            {skuIdx === 0 && (
+                                                                <>
+                                                                    <td className="px-3 py-2" rowSpan={rowSpan}>
+                                                                        {(item.webProductId || item.parentProductId) ? (
+                                                                            <button onClick={(e) => { e.stopPropagation(); router.push(`/warehouse/web-products/${item.webProductId || item.parentProductId}`); }}
+                                                                                className="text-xs font-bold text-foreground cursor-pointer text-left transition-colors hover:text-blue-500">
+                                                                                {item.name}
+                                                                            </button>
+                                                                        ) : (
+                                                                            <span className="text-xs font-bold text-foreground">{item.name}</span>
+                                                                        )}
+                                                                    </td>
+                                                                    <td className="px-3 py-2" rowSpan={rowSpan}>
+                                                                        {item.variationId > 0 ? (
+                                                                            <span className="text-[10px] text-foreground font-bold">{item.variationName || item.variationId}</span>
+                                                                        ) : item.availableVariations && item.availableVariations.length > 0 ? (
+                                                                            <div className="relative">
+                                                                                <select
+                                                                                    className="appearance-none bg-amber-500/10 border border-amber-500/30 text-amber-500 text-[10px] font-bold rounded px-2 py-1 pr-6 cursor-pointer hover:bg-amber-500/20 transition-colors outline-none w-full"
+                                                                                    value=""
+                                                                                    onChange={(e) => {
+                                                                                        const v = item.availableVariations!.find(av => String(av.id) === e.target.value);
+                                                                                        if (v) handleSelectVariation(item, v);
+                                                                                    }}
+                                                                                >
+                                                                                    <option value="" disabled>Select variant...</option>
+                                                                                    {item.availableVariations.map(v => {
+                                                                                        const label = v.attributes && v.attributes.length > 0
+                                                                                            ? v.attributes.map((a: any) => a.option || a.name).join(' / ')
+                                                                                            : v.name;
+                                                                                        return <option key={v.id} value={v.id}>{label}</option>;
+                                                                                    })}
+                                                                                </select>
+                                                                                <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-amber-500 pointer-events-none" />
+                                                                            </div>
+                                                                        ) : (
+                                                                            <span className="text-[10px] text-muted-foreground/50">-</span>
+                                                                        )}
+                                                                    </td>
+                                                                </>
+                                                            )}
+                                                            {/* SKU cell — one per linked SKU */}
+                                                            <td className="px-3 py-1.5">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <span className="text-[10px] font-mono text-muted-foreground/60 shrink-0">{sku.multiplier}×</span>
+                                                                    <button onClick={(e) => { e.stopPropagation(); router.push(`/warehouse/skus/${sku.skuId}`); }}
+                                                                        className="flex items-center space-x-1 text-xs font-bold text-foreground cursor-pointer transition-colors group hover:text-blue-500">
+                                                                        <span>{sku.skuName || sku.skuId}</span>
+                                                                        <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                            {/* Lot # cell — one per linked SKU */}
+                                                            <td className="px-3 py-1.5 text-xs text-foreground group">
+                                                                <div className="flex items-center gap-1">
+                                                                    {sku.lotNumber ? (
+                                                                        <span className="text-foreground font-mono font-bold">{sku.lotNumber}</span>
+                                                                    ) : <span>-</span>}
+                                                                    <button onClick={(e) => { e.stopPropagation(); handleOpenLotModal(item, skuIdx); }}
+                                                                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-blue-500 transition-all p-0.5" title="Edit Lot #">
+                                                                        <Edit2 className="w-2.5 h-2.5" />
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                            {/* Qty and Cost on every row; Price/Total only on first row */}
+                                                            <td className="px-3 py-1.5 text-right text-xs text-foreground font-mono font-bold">{sku.multiplier || 1}</td>
+                                                            <td className="px-3 py-1.5 text-right text-xs text-orange-500 font-mono font-bold whitespace-nowrap">{(sku.cost ?? 0) > 0 ? formatCurrency(sku.cost!) : '-'}</td>
+                                                            {skuIdx === 0 && (
+                                                                <>
+                                                                    <td className="px-3 py-2 text-right text-xs text-foreground font-mono font-bold" rowSpan={rowSpan}>{formatCurrency(item.price)}</td>
+                                                                    <td className="px-3 py-2 text-right text-xs text-foreground font-mono font-black bg-secondary/20" rowSpan={rowSpan}>{formatCurrency(item.total)}</td>
+                                                                </>
+                                                            )}
+                                                        </tr>
+                                                    ))}
+                                                </React.Fragment>
+                                            );
+                                        })}
                                         {(!order.lineItems || order.lineItems.length === 0) && (
                                             <tr>
                                                 <td colSpan={8} className="px-3 py-6 text-center text-xs font-bold text-muted-foreground uppercase tracking-wider">

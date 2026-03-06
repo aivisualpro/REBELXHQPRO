@@ -55,7 +55,7 @@ import {
     Ticket,
     Settings
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import Papa from 'papaparse';
 import { MODULE_BLUEPRINTS, generateDefaultModules } from '@/constants/workspace-modules';
@@ -1425,7 +1425,7 @@ function SettingsPageContent() {
                                                         onChange={e => setSettings({ ...settings, dateFormat: e.target.value })}
                                                         className="text-foreground focus:ring-black"
                                                     />
-                                                    <span className="text-sm font-medium text-muted-foreground">{fmt} <span className="text-muted-foreground text-xs ml-2">(e.g. {new Date().toLocaleDateString()})</span></span>
+                                                    <span className="text-sm font-medium text-muted-foreground">{fmt} <span className="text-muted-foreground text-xs ml-2">(e.g. {formatDate()})</span></span>
                                                 </label>
                                             ))}
                                         </div>

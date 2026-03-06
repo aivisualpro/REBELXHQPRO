@@ -4,7 +4,6 @@ import dbConnect from '@/lib/mongoose';
 import AuditAdjustment from '@/models/AuditAdjustment';
 import Sku from '@/models/Sku';
 import User from '@/models/User';
-import { buildFuzzySearchQuery, buildFuzzyRegex } from '@/lib/fuzzy-search';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,22 +22,44 @@ export async function GET(request: Request) {
 
         let query: any = {};
 
-        if (search) {
-            const fuzzyRegex = buildFuzzyRegex(search);
-            const matchingSkus = await Sku.find({ name: { $regex: fuzzyRegex, $options: 'i' } }).select('_id legacyId').lean();
-            const skuIds = matchingSkus.map(s => s._id.toString());
-            const skuLegacyIds = matchingSkus.map((s: any) => s.legacyId).filter(Boolean);
+        // Filter by specific adjustment ID (from ledger link)
+        const filterId = searchParams.get('id');
+        if (filterId) {
+            query._id = filterId;
+        }
 
-            const fuzzyQuery = buildFuzzySearchQuery(search, ['lotNumber', 'reason', 'createdBy']);
-            // Merge fuzzy field search with SKU ID match
-            if (fuzzyQuery) {
-                // Each token must match in at least one place: direct fields OR sku match
-                query.$and = fuzzyQuery.$and.map((cond: any) => ({
-                    $or: [
-                        ...cond.$or,
-                        ...(skuIds.length > 0 ? [{ sku: { $in: [...skuIds, ...skuLegacyIds] } }] : [])
-                    ]
+        if (search) {
+            const tokens = search.trim().split(/\s+/).filter(Boolean);
+            if (tokens.length > 0) {
+                // For each token, find SKUs matching that specific token
+                // This ensures ALL tokens must match (AND logic), not just any one
+                const escRx = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+                const andConditions = await Promise.all(tokens.map(async (token) => {
+                    const escaped = escRx(token);
+                    const patterns: string[] = [escaped];
+                    if (token.length >= 4) patterns.push(escRx(token.slice(0, -1)));
+                    if (token.length >= 6) patterns.push(escRx(token.slice(0, -2)));
+                    const tokenPattern = [...new Set(patterns)].join('|');
+
+                    // Find SKUs matching THIS token only
+                    const tokenSkus = await Sku.find({ name: { $regex: tokenPattern, $options: 'i' } }).select('_id legacyId').lean();
+                    const tokenSkuIds = tokenSkus.map(s => s._id.toString());
+                    const tokenLegacyIds = tokenSkus.map((s: any) => s.legacyId).filter(Boolean);
+
+                    const fieldMatches = ['lotNumber', 'reason', 'createdBy'].map(field => ({
+                        [field]: { $regex: tokenPattern, $options: 'i' }
+                    }));
+
+                    return {
+                        $or: [
+                            ...fieldMatches,
+                            ...(tokenSkuIds.length > 0 ? [{ sku: { $in: [...tokenSkuIds, ...tokenLegacyIds] } }] : [])
+                        ]
+                    };
                 }));
+
+                query.$and = andConditions;
             }
         }
 

@@ -6,7 +6,7 @@ import { createPortal } from 'react-dom';
 import { ArrowLeft, Package, Calendar, Archive, Scale, Pencil, Save, X, FileText, User, Fingerprint, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 
 export default function AuditAdjustmentDetailPage() {
     const params = useParams();
@@ -19,7 +19,7 @@ export default function AuditAdjustmentDetailPage() {
     const [isLotModalOpen, setIsLotModalOpen] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [headerPortal, setHeaderPortal] = useState<HTMLElement | null>(null);
-    
+
     const [formData, setFormData] = useState({
         lotNumber: '',
         qty: 0,
@@ -136,16 +136,8 @@ export default function AuditAdjustmentDetailPage() {
         ), { duration: 10000, position: 'top-center', style: { maxWidth: '360px', background: '#1a1a1a', color: '#fff', marginTop: '40vh' } });
     };
 
-    const formatDate = (dateStr?: string) => {
-        if (!dateStr) return '-';
-        return new Date(dateStr).toLocaleDateString('en-US', {
-            month: 'long',
-            day: 'numeric',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    };
+
+
 
     const getSkuName = () => {
         if (item?.sku && typeof item.sku === 'object') return item.sku.name;
@@ -201,8 +193,8 @@ export default function AuditAdjustmentDetailPage() {
             {headerPortal && item && createPortal(
                 <>
                     <div className="flex items-center space-x-2">
-                        <button 
-                            onClick={() => router.back()} 
+                        <button
+                            onClick={() => router.back()}
                             className="flex items-center space-x-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded transition-all cursor-pointer border border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
                         >
                             <ArrowLeft className="w-3.5 h-3.5" />
@@ -223,7 +215,7 @@ export default function AuditAdjustmentDetailPage() {
                                 <div className="text-[8px] text-muted-foreground uppercase tracking-widest font-bold mb-1">Number</div>
                                 <div className="text-[10px] font-mono text-foreground font-bold break-all">{item._id?.slice(-8)}</div>
                             </div>
-                            <div 
+                            <div
                                 className="border border-border rounded-md p-3 bg-background text-center flex flex-col items-center justify-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all"
                                 onClick={() => router.push(`/warehouse/skus/${getSkuId()}`)}
                             >
@@ -321,14 +313,14 @@ export default function AuditAdjustmentDetailPage() {
                                 <div className="space-y-1.5">
                                     <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Lot Number</label>
                                     <div className="flex gap-2">
-                                        <input 
-                                            type="text" 
+                                        <input
+                                            type="text"
                                             value={formData.lotNumber}
-                                            onChange={e => setFormData({...formData, lotNumber: e.target.value})}
+                                            onChange={e => setFormData({ ...formData, lotNumber: e.target.value })}
                                             className="flex-1 h-9 px-3 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 font-mono transition-colors"
                                             placeholder="Lot #"
                                         />
-                                        <button 
+                                        <button
                                             onClick={() => setIsLotModalOpen(true)}
                                             className="px-3 py-1.5 bg-secondary border border-border rounded-md text-muted-foreground hover:bg-secondary/80 hover:text-foreground active:scale-95 transition-all cursor-pointer"
                                         >
@@ -341,10 +333,10 @@ export default function AuditAdjustmentDetailPage() {
                                 <div className="space-y-1.5">
                                     <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Quantity Adjustment</label>
                                     <div className="flex items-center gap-2">
-                                        <input 
-                                            type="number" 
+                                        <input
+                                            type="number"
                                             value={formData.qty}
-                                            onChange={e => setFormData({...formData, qty: parseFloat(e.target.value) || 0})}
+                                            onChange={e => setFormData({ ...formData, qty: parseFloat(e.target.value) || 0 })}
                                             className="w-40 h-9 px-3 border border-border rounded-md text-sm font-bold bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors"
                                             step="any"
                                         />
@@ -358,9 +350,9 @@ export default function AuditAdjustmentDetailPage() {
                                 {/* Reason */}
                                 <div className="space-y-1.5">
                                     <label className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Reason</label>
-                                    <textarea 
+                                    <textarea
                                         value={formData.reason}
-                                        onChange={e => setFormData({...formData, reason: e.target.value})}
+                                        onChange={e => setFormData({ ...formData, reason: e.target.value })}
                                         className="w-full px-3 py-2 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 min-h-[120px] transition-colors"
                                         placeholder="Reason for adjustment..."
                                     />

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Check, AlertCircle, Search, Ban, Clock, Package, TrendingUp, Sparkles } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 interface Lot {
@@ -126,14 +126,14 @@ export function LotSelectionModal({
             return dateA - dateB;
         });
 
-        // Filter: hide zero-balance lots unless it's the currently selected lot
+        // Filter: hide zero-and-negative-balance lots unless it's the currently selected lot
         const filtered = sorted.filter(lot => {
             const matchesSearch = lot.lotNumber.toLowerCase().includes(searchQuery.toLowerCase());
             const isCurrent = lot.lotNumber === currentLotNumber;
-            const hasBalance = Math.abs(lot.balance) >= 1;
+            const hasPositiveBalance = lot.balance >= 1;
 
-            if (searchQuery) return matchesSearch && (hasBalance || isCurrent);
-            return hasBalance || isCurrent;
+            if (searchQuery) return matchesSearch && (hasPositiveBalance || isCurrent);
+            return hasPositiveBalance || isCurrent;
         });
 
         const selected = filtered.find(lot => lot.lotNumber === currentLotNumber) || null;
@@ -166,10 +166,8 @@ export function LotSelectionModal({
 
     if (!isOpen) return null;
 
-    const formatDate = (dateStr: string) => {
-        const date = new Date(dateStr);
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    };
+
+
 
     const getRelativeAge = (dateStr: string) => {
         const date = new Date(dateStr);

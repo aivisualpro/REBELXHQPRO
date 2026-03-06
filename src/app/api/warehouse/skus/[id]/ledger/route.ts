@@ -95,7 +95,8 @@ export async function GET(
                 $or: [
                     { "lineItems.sku": id },
                     { "lineItems.varianceId": { $in: varianceIds } },
-                    { "lineItems.linkedSkuId": id }
+                    { "lineItems.linkedSkuId": id },
+                    { "lineItems.linkedSkus.skuId": id }
                 ],
                 ...dateFilter
             })
@@ -104,10 +105,12 @@ export async function GET(
             WebProduct.find({
                 $or: [
                     { linkedSkuId: id },
-                    { 'variations.linkedSkuId': id }
+                    { 'variations.linkedSkuId': id },
+                    { 'linkedSkus.skuId': id },
+                    { 'variations.linkedSkus.skuId': id }
                 ]
             })
-                .select('_id webId website multiplier variations.id variations._id variations.multiplier variations.linkedSkuId linkedSkuId')
+                .select('_id webId website multiplier variations.id variations._id variations.multiplier variations.linkedSkuId variations.linkedSkus linkedSkuId linkedSkus')
                 .lean()
         ]);
 
@@ -363,7 +366,7 @@ export async function GET(
                 uom: sku.uom || 'Unit',
                 cost: round8(lotCosts.get(adj.lotNumber) || adj.cost || 0),
                 docId: adj._id,
-                link: `/warehouse/audit-adjustments/${adj._id}`,
+                link: `/warehouse/audit-adjustments?id=${adj._id}`,
                 status: adj.status || 'Completed'
             });
         });
@@ -372,23 +375,31 @@ export async function GET(
         webOrders.forEach((wo: any) => {
             wo.lineItems?.forEach((line: any) => {
                 const lineSkuId = (line.sku?._id || line.sku)?.toString();
-                if (lineSkuId === id || (line.varianceId && varianceIds.includes(line.varianceId)) || line.linkedSkuId === id) {
-                    const lot = line.lotNumber || '';
+                // Check if this line item references the current SKU
+                const isDirectMatch = lineSkuId === id || line.linkedSkuId === id;
+                const isVarianceMatch = line.varianceId && varianceIds.includes(line.varianceId);
+                // Check multi-SKU linkedSkus array
+                const linkedSkuMatch = line.linkedSkus?.find((ls: any) => ls.skuId === id);
+
+                if (isDirectMatch || isVarianceMatch || linkedSkuMatch) {
+                    // For multi-SKU entries, use the matching entry's lot/cost/multiplier
+                    const lot = linkedSkuMatch ? (linkedSkuMatch.lotNumber || '') : (line.lotNumber || '');
                     const virtualCost = lotCosts.get(lot);
 
                     const key = line.variationId ? `${wo.website}-${line.productId}-${line.variationId}` : `${wo.website}-${line.productId}`;
-                    const multiplier = multiplierMap.get(key) || 1;
+                    // For multi-SKU, use the per-entry multiplier; for legacy, use multiplierMap
+                    const multiplier = linkedSkuMatch ? (linkedSkuMatch.multiplier || 1) : (multiplierMap.get(key) || 1);
                     const qtyToDeduct = round8(-Math.abs((line.quantity || 0) * multiplier));
 
                     transactions.push({
-                        _id: line._id || `${wo._id}_${id}`,
+                        _id: linkedSkuMatch ? `${wo._id}_${line.id || line._id}_${id}` : (line._id || `${wo._id}_${id}`),
                         date: wo.dateCompleted ? new Date(wo.dateCompleted) : new Date(wo.createdAt),
                         type: 'Web Order',
                         reference: line.varianceId ? `${wo._id} (${line.varianceId})` : wo._id,
                         lotNumber: cleanLot(lot) || 'N/A',
                         quantity: qtyToDeduct,
                         uom: 'Unit',
-                        cost: round8(virtualCost !== undefined ? virtualCost : (line.cost || 0)),
+                        cost: round8(virtualCost !== undefined ? virtualCost : (linkedSkuMatch?.cost || line.cost || 0)),
                         salePrice: round8((line.total && line.quantity) ? (line.total / line.quantity) : 0),
                         docId: wo._id,
                         link: `/sales/web-orders/${wo._id}`,
