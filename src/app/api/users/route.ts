@@ -23,10 +23,12 @@ export async function GET(request: Request) {
         const search = searchParams.get('search') || '';
 
         let query: any = {};
+        const status = searchParams.get('status') || '';
         if (search) {
             const fuzzyQuery = buildFuzzySearchQuery(search, ['firstName', 'lastName', 'email', 'department']);
             if (fuzzyQuery) Object.assign(query, fuzzyQuery);
         }
+        if (status) query.status = { $in: status.split(',') };
 
         // Apply Global Date Filter
         query = await applyDateFilter(query, 'createdAt');
@@ -45,6 +47,7 @@ export async function GET(request: Request) {
             users,
             total,
             page,
+            hasMore: page * limit < total,
             totalPages: Math.ceil(total / limit)
         });
     } catch (error: any) {

@@ -69,14 +69,13 @@ function VendorStatusBadge({ status }: { status?: string }) {
 const COLUMNS = [
   { key: 'name', label: 'Company', width: 'w-[200px]' },
   { key: 'contactName', label: 'Contact', width: 'w-[130px]' },
-  { key: 'phone', label: 'Phone', width: 'w-[120px]' },
-  { key: 'email', label: 'Email', width: 'w-[180px]' },
-  { key: 'address', label: 'Address', width: 'w-[160px]' },
+  { key: 'phone', label: 'Phone', width: 'w-[130px]' },
+  { key: 'email', label: 'Email', width: 'w-[200px]' },
+  { key: 'address', label: 'Address', width: 'w-[170px]' },
   { key: 'city', label: 'City', width: 'w-[100px]' },
-  { key: 'paymentTerms', label: 'Pay Terms', width: 'w-[90px]' },
-  { key: 'carrierPreference', label: 'Carrier', width: 'w-[100px]' },
+  { key: 'paymentTerms', label: 'Pay Terms', width: 'w-[100px]' },
   { key: 'status', label: 'Status', width: 'w-[80px]' },
-  { key: 'createdAt', label: 'Created', width: 'w-[90px]' },
+  { key: 'createdAt', label: 'Created', width: 'w-[100px]' },
 ];
 
 // ─── Skeleton Row ─────────────────────────────────────────────────────────────
@@ -114,14 +113,13 @@ const VendorRow = React.memo(function VendorRow({
         </div>
       </td>
       <td className="px-2.5 py-2.5 w-[130px] text-[12px] text-foreground/70 truncate">{vendor.contactName || '—'}</td>
-      <td className="px-2.5 py-2.5 w-[120px] text-[12px] font-mono text-foreground/70">{vendor.phone || '—'}</td>
-      <td className="px-2.5 py-2.5 w-[180px] text-[12px] text-foreground/70 truncate">{vendor.email || '—'}</td>
-      <td className="px-2.5 py-2.5 w-[160px] text-[12px] text-foreground/60 truncate">{vendor.address || '—'}</td>
+      <td className="px-2.5 py-2.5 w-[130px] text-[12px] font-mono text-foreground/70">{vendor.phone || '—'}</td>
+      <td className="px-2.5 py-2.5 w-[200px] text-[12px] text-foreground/70 truncate">{vendor.email || '—'}</td>
+      <td className="px-2.5 py-2.5 w-[170px] text-[12px] text-foreground/60 truncate">{vendor.address || '—'}</td>
       <td className="px-2.5 py-2.5 w-[100px] text-[12px] text-foreground/60">{vendor.city || '—'}</td>
-      <td className="px-2.5 py-2.5 w-[90px] text-[12px] text-foreground/70 uppercase font-medium">{vendor.paymentTerms || '—'}</td>
-      <td className="px-2.5 py-2.5 w-[100px] text-[12px] text-foreground/60 truncate">{vendor.carrierPreference || '—'}</td>
+      <td className="px-2.5 py-2.5 w-[100px] text-[12px] text-foreground/70 uppercase font-medium">{vendor.paymentTerms || '—'}</td>
       <td className="px-2.5 py-2.5 w-[80px]"><VendorStatusBadge status={vendor.status} /></td>
-      <td className="px-2.5 py-2.5 w-[90px] text-[12px] font-mono text-foreground/60">{new Date(vendor.createdAt).toLocaleDateString()}</td>
+      <td className="px-2.5 py-2.5 w-[100px] text-[12px] font-mono text-foreground/60">{new Date(vendor.createdAt).toLocaleDateString()}</td>
     </tr>
   );
 });
@@ -140,8 +138,8 @@ function VendorsContent() {
 
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [sortBy, setSortBy] = useState('name');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [sortBy, setSortBy] = useState('createdAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [activeStatus, setActiveStatus] = useState<string>('All');
   const [highlightId, setHighlightId] = useState<string | null>(null);
 
