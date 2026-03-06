@@ -4,6 +4,68 @@ import { authOptions } from '@/lib/auth';
 import { getGmailClient } from '@/lib/google-api';
 import dbConnect from '@/lib/mongoose';
 import User from '@/models/User';
+import Client from '@/models/Client';
+
+// Cache client emails in memory with a TTL
+let clientEmailCache: { emails: Set<string>; ts: number } | null = null;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+/** Load all client email addresses into a Set for O(1) lookups */
+async function getClientEmails(): Promise<Set<string>> {
+    if (clientEmailCache && Date.now() - clientEmailCache.ts < CACHE_TTL) {
+        return clientEmailCache.emails;
+    }
+    await dbConnect();
+    const clients = await Client.find({}, { 'emails.value': 1, 'contacts.email': 1 }).lean();
+    const emailSet = new Set<string>();
+    for (const client of clients) {
+        // Client-level emails
+        if ((client as any).emails) {
+            for (const e of (client as any).emails) {
+                if (e.value) emailSet.add(e.value.toLowerCase().trim());
+            }
+        }
+        // Contact-level emails
+        if ((client as any).contacts) {
+            for (const c of (client as any).contacts) {
+                if (c.email) emailSet.add(c.email.toLowerCase().trim());
+            }
+        }
+    }
+    clientEmailCache = { emails: emailSet, ts: Date.now() };
+    return emailSet;
+}
+
+/** Extract all email addresses from a raw header value like "Name <email>, Other <email2>" */
+function extractEmails(headerValue: string): string[] {
+    if (!headerValue) return [];
+    const matches = headerValue.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g);
+    return matches ? matches.map(e => e.toLowerCase().trim()) : [];
+}
+
+/** Check if a message involves any client email */
+function messageInvolvesClient(msg: any, clientEmails: Set<string>, direction: 'inbox' | 'sent' | 'search'): boolean {
+    if (direction === 'inbox') {
+        // Inbox: sender must be a client
+        const senderEmail = msg.senderEmail?.toLowerCase()?.trim();
+        if (senderEmail && clientEmails.has(senderEmail)) return true;
+        // Also check raw From header for edge cases
+        return extractEmails(msg.senderEmail || '').some(e => clientEmails.has(e));
+    } else if (direction === 'sent') {
+        // Sent: any recipient (to/cc) must be a client
+        const toEmails = extractEmails(msg.recipient || '');
+        const ccEmails = extractEmails(msg.cc || '');
+        return [...toEmails, ...ccEmails].some(e => clientEmails.has(e));
+    } else {
+        // Search: any participant is a client
+        const allEmails = [
+            ...extractEmails(msg.senderEmail || ''),
+            ...extractEmails(msg.recipient || ''),
+            ...extractEmails(msg.cc || ''),
+        ];
+        return allEmails.some(e => clientEmails.has(e));
+    }
+}
 
 // Helper to fetch and parse message details
 async function fetchMessageDetails(gmail: any, messages: any[]) {
@@ -18,14 +80,14 @@ async function fetchMessageDetails(gmail: any, messages: any[]) {
 
                 const headers = details.data.payload?.headers || [];
                 const findHeader = (name: string) => headers.find((h: any) => h.name?.toLowerCase() === name.toLowerCase())?.value || '';
-                
+
                 const subject = findHeader('Subject') || '(No Subject)';
                 const from = findHeader('From') || '(Unknown Sender)';
                 const to = findHeader('To') || '(Unknown Recipient)';
                 const cc = findHeader('Cc');
                 const bcc = findHeader('Bcc');
                 const date = findHeader('Date') || '';
-                
+
                 // Extract body and attachments
                 let body = '';
                 const attachments: any[] = [];
@@ -104,7 +166,7 @@ export async function GET(request: NextRequest) {
     try {
         // If searching (q exists), we search across ALL connected users
         // If traversing inbox (label exists, q missing), we only check current user
-        
+
         let detailedMessages: any[] = [];
         let nextPageToken = null;
         let resultSizeEstimate = 0;
@@ -122,7 +184,7 @@ export async function GET(request: NextRequest) {
                     const gmail = await getGmailClient(user._id as string);
                     const listResponse = await gmail.users.messages.list({
                         userId: 'me',
-                        q: q, 
+                        q: q,
                         maxResults: 20 // Fetch top 20 from each user to combine
                     });
 
@@ -140,9 +202,13 @@ export async function GET(request: NextRequest) {
             detailedMessages = allResults.flat();
             // Sort merged results by timestamp descending
             detailedMessages.sort((a, b) => b.timestamp - a.timestamp);
-            
+
+            // Filter to only show emails involving client emails
+            const clientEmails = await getClientEmails();
+            detailedMessages = detailedMessages.filter(msg => messageInvolvesClient(msg, clientEmails, 'search'));
+
             resultSizeEstimate = detailedMessages.length;
-            
+
         } else {
             // STANDARD SINGLE USER MODE
             const gmail = await getGmailClient(session.user.id);
@@ -163,22 +229,28 @@ export async function GET(request: NextRequest) {
                     },
                 });
             }
-            
-            // Fetch list of messages
+
+            // Fetch more messages to have enough after client filtering
             const listResponse = await gmail.users.messages.list({
                 userId: 'me',
                 q: label === 'SENT' ? 'in:sent' : 'in:inbox',
-                maxResults: 50,
+                maxResults: 200,
                 pageToken: pageToken || undefined
             });
 
             const messages = listResponse.data.messages || [];
             console.log(`Found ${messages.length} messages for current user in ${label || 'Inbox'}`);
-            
-            detailedMessages = await fetchMessageDetails(gmail, messages);
-            
+
+            const allMessages = await fetchMessageDetails(gmail, messages);
+
+            // Filter to only show emails involving client emails
+            const clientEmails = await getClientEmails();
+            const direction = label === 'SENT' ? 'sent' : 'inbox';
+            detailedMessages = allMessages.filter(msg => messageInvolvesClient(msg, clientEmails, direction));
+            console.log(`After client filter: ${detailedMessages.length} of ${allMessages.length} messages`);
+
             nextPageToken = listResponse.data.nextPageToken;
-            resultSizeEstimate = listResponse.data.resultSizeEstimate || 0;
+            resultSizeEstimate = detailedMessages.length;
 
             // Fetch unread count only for current user context
             try {
@@ -192,7 +264,7 @@ export async function GET(request: NextRequest) {
             }
         }
 
-        return NextResponse.json({ 
+        return NextResponse.json({
             emails: detailedMessages,
             nextPageToken,
             resultSizeEstimate,
@@ -293,15 +365,15 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true });
     } catch (error: any) {
         console.error('Gmail Send Error:', error);
-        
+
         // Check for insufficient scopes error
         if (error.code === 403 || error.message?.includes('insufficient authentication scopes')) {
-            return NextResponse.json({ 
+            return NextResponse.json({
                 error: 'Missing permission to send emails. Please reconnect your Google account from your Profile page to grant email sending permissions.',
                 code: 'INSUFFICIENT_SCOPES'
             }, { status: 403 });
         }
-        
+
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

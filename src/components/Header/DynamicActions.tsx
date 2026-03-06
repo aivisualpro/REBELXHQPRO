@@ -124,8 +124,8 @@ const DynamicActionsContent = () => {
             <button
                 onClick={() => setIsPanelOpen(true)}
                 className={`relative p-1.5 rounded-full transition-all cursor-pointer ${activeTimerCount > 0
-                        ? 'text-red-500 hover:text-red-400 hover:bg-red-500/10'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+                    ? 'text-red-500 hover:text-red-400 hover:bg-red-500/10'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
                     }`}
                 title={activeTimerCount > 0 ? `${activeTimerCount} active timer${activeTimerCount > 1 ? 's' : ''}` : 'No active timers'}
             >
@@ -181,7 +181,7 @@ const DynamicActionsContent = () => {
                                 <p className="text-xs text-foreground font-bold truncate">{session?.user?.name || session?.user?.email}</p>
                             </div>
                             <Link
-                                href="/profile"
+                                href={`/profile/${(session?.user as any)?.profileId || (session?.user as any)?.id || ''}`}
                                 onClick={() => setIsUserMenuOpen(false)}
                                 className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-muted hover:text-foreground hover:bg-secondary transition-colors"
                             >

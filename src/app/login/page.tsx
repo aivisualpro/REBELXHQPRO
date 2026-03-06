@@ -29,7 +29,15 @@ export default function LoginPage() {
             if (result?.error) {
                 setError(result.error);
             } else {
-                router.push('/');
+                // Fetch session to get profileId for redirect
+                const sessionRes = await fetch('/api/auth/session');
+                const sess = await sessionRes.json();
+                const profileId = sess?.user?.profileId;
+                if (profileId) {
+                    router.push(`/profile/${profileId}`);
+                } else {
+                    router.push('/profile');
+                }
                 router.refresh();
             }
         } catch (err) {

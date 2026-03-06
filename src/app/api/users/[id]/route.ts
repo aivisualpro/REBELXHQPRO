@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import User from '@/models/User';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,15 +13,26 @@ export async function GET(
     try {
         await dbConnect();
         const { id } = await context.params;
-        const user = await User.findById(id).lean();
+        // Try profileId first (secure URL), then fall back to _id (legacy/internal)
+        let user = await User.findOne({ profileId: id }).lean();
+        if (!user) {
+            user = await User.findById(id).lean();
+        }
 
         if (!user) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        // Return user data, but exclude password for security
-        const { password, googleRefreshToken, googleAccessToken, ...safeUser } = user as any;
-        return NextResponse.json(safeUser);
+        const session = await getServerSession(authOptions);
+        const isSuperAdmin = (session?.user as any)?.role === 'SuperAdmin';
+
+        // SuperAdmin can see password, others cannot
+        const { googleRefreshToken, googleAccessToken, ...userData } = user as any;
+        if (!isSuperAdmin) {
+            const { password, ...safeUser } = userData;
+            return NextResponse.json(safeUser);
+        }
+        return NextResponse.json(userData);
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
@@ -34,7 +47,11 @@ export async function PATCH(
         const { id } = await context.params;
         const body = await request.json();
 
-        const updatedUser = await User.findByIdAndUpdate(id, body, { new: true, runValidators: true });
+        // Try profileId first, then _id
+        let updatedUser = await User.findOneAndUpdate({ profileId: id }, body, { new: true, runValidators: true });
+        if (!updatedUser) {
+            updatedUser = await User.findByIdAndUpdate(id, body, { new: true, runValidators: true });
+        }
 
         if (!updatedUser) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -54,7 +71,11 @@ export async function DELETE(
         await dbConnect();
         const { id } = await context.params;
 
-        const deletedUser = await User.findByIdAndDelete(id);
+        // Try profileId first, then _id
+        let deletedUser = await User.findOneAndDelete({ profileId: id });
+        if (!deletedUser) {
+            deletedUser = await User.findByIdAndDelete(id);
+        }
 
         if (!deletedUser) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });

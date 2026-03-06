@@ -23,6 +23,7 @@ interface User {
   phone?: string;
   hourlyRate?: number;
   profileImage?: string;
+  workspaceId?: string;
   status: 'Active' | 'Inactive';
 }
 
@@ -42,12 +43,13 @@ const PAGE_SIZE = 50;
 // ─── Columns ─────────────────────────────────────────────────────────────────
 
 const COLUMNS = [
-  { key: 'firstName', label: 'Name', width: 'w-[200px]' },
-  { key: 'role', label: 'Role', width: 'w-[140px]' },
+  { key: 'firstName', label: 'Name', width: 'w-[180px]' },
+  { key: 'role', label: 'Role', width: 'w-[120px]' },
   { key: 'department', label: 'Department', width: 'w-[120px]' },
-  { key: 'email', label: 'Email', width: 'w-[220px]' },
+  { key: 'workspace', label: 'Workspace', width: 'w-[120px]' },
+  { key: 'email', label: 'Email', width: 'w-[200px]' },
   { key: 'phone', label: 'Phone', width: 'w-[120px]' },
-  { key: 'hourlyRate', label: 'Rate', width: 'w-[80px]', align: 'text-right' as const },
+  { key: 'hourlyRate', label: 'Rate', width: 'w-[70px]', align: 'text-right' as const },
   { key: 'status', label: 'Status', width: 'w-[80px]' },
 ];
 
@@ -85,8 +87,9 @@ function UserStatusBadge({ status }: { status: string }) {
 // ─── Table Row ───────────────────────────────────────────────────────────────
 
 const UserTableRow = React.memo(function UserTableRow({
-  user, onClick, onEdit, onDelete, highlight
-}: { user: User; onClick: () => void; onEdit: () => void; onDelete: () => void; highlight?: boolean }) {
+  user, onClick, onEdit, onDelete, highlight, workspaces
+}: { user: User; onClick: () => void; onEdit: () => void; onDelete: () => void; highlight?: boolean; workspaces: { _id: string; name: string }[] }) {
+  const wsName = workspaces.find(w => w._id === (user as any).workspaceId)?.name;
   return (
     <tr data-user-id={user._id}
       className={cn(
@@ -111,6 +114,7 @@ const UserTableRow = React.memo(function UserTableRow({
       </td>
       <td className="px-2.5 py-2.5 w-[140px] text-[11px] uppercase font-bold text-foreground/60">{user.role}</td>
       <td className="px-2.5 py-2.5 w-[120px] text-[11px] uppercase font-bold text-foreground/50 tracking-tight">{user.department === 'SUPERADMIN' ? 'Admin' : user.department}</td>
+      <td className="px-2.5 py-2.5 w-[120px] text-[11px] font-semibold text-foreground/60 truncate">{wsName || <span className="text-muted-foreground/30">—</span>}</td>
       <td className="px-2.5 py-2.5 w-[220px] text-[12px] text-foreground/70 truncate">
         <div className="flex items-center gap-1.5"><Mail className="w-3 h-3 text-muted-foreground/40 shrink-0" /><span className="truncate">{user.email}</span></div>
       </td>
@@ -193,9 +197,17 @@ function UsersContent() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [formData, setFormData] = useState({ firstName: '', lastName: '', email: '', password: '', role: ROLES[3], department: DEPARTMENTS[0], phone: '', hourlyRate: 0, profileImage: '', status: 'Active' as 'Active' | 'Inactive' });
+  const [formData, setFormData] = useState({ firstName: '', lastName: '', email: '', password: '', role: ROLES[3], department: DEPARTMENTS[0], phone: '', hourlyRate: 0, profileImage: '', workspaceId: '', status: 'Active' as 'Active' | 'Inactive' });
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [availableWorkspaces, setAvailableWorkspaces] = useState<{ _id: string; name: string }[]>([]);
+
+  // Fetch workspaces for dropdown
+  useEffect(() => {
+    fetch('/api/workspaces').then(r => r.json()).then(d => {
+      if (d.data) setAvailableWorkspaces(d.data);
+    }).catch(() => { });
+  }, []);
 
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -213,29 +225,130 @@ function UsersContent() {
   const openModal = (user?: User) => {
     if (user) {
       setEditingUser(user);
-      setFormData({ firstName: user.firstName, lastName: user.lastName, email: user.email, password: '', role: user.role, department: user.department, phone: user.phone || '', hourlyRate: user.hourlyRate || 0, profileImage: user.profileImage || '', status: user.status });
+      setFormData({ firstName: user.firstName, lastName: user.lastName, email: user.email, password: '', role: user.role, department: user.department, phone: user.phone || '', hourlyRate: user.hourlyRate || 0, profileImage: user.profileImage || '', workspaceId: (user as any).workspaceId || '', status: user.status });
     } else {
       setEditingUser(null);
-      setFormData({ firstName: '', lastName: '', email: '', password: '', role: ROLES[3], department: DEPARTMENTS[0], phone: '', hourlyRate: 0, profileImage: '', status: 'Active' });
+      setFormData({ firstName: '', lastName: '', email: '', password: '', role: ROLES[3], department: DEPARTMENTS[0], phone: '', hourlyRate: 0, profileImage: '', workspaceId: '', status: 'Active' });
     }
     setIsModalOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault(); setIsSubmitting(true);
+    e.preventDefault();
+    // Validate workspace for non-SuperAdmin
+    if (formData.role !== 'SuperAdmin' && !formData.workspaceId) {
+      toast.error('Workspace is required');
+      return;
+    }
+    setIsSubmitting(true);
+
+    const isEdit = !!editingUser;
+    const url = isEdit ? `/api/users/${editingUser!._id}` : '/api/users';
+    const method = isEdit ? 'PATCH' : 'POST';
+    const payload = { ...formData };
+    if (isEdit && !payload.password) delete (payload as any).password;
+
+    // Close modal immediately for snappy feel
+    setIsModalOpen(false);
+
     try {
-      const url = editingUser ? `/api/users/${editingUser._id}` : '/api/users';
-      const method = editingUser ? 'PATCH' : 'POST';
-      const payload = { ...formData }; if (editingUser && !payload.password) delete (payload as any).password;
       const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      if (res.ok) { setIsModalOpen(false); refreshUsers(); fetchStatusCounts(); toast.success(editingUser ? 'User updated' : 'User created'); }
-      else { const err = await res.json(); toast.error(err.error || 'Error saving user'); }
-    } catch { toast.error('Error saving user'); } finally { setIsSubmitting(false); }
+      if (res.ok) {
+        const savedUser = await res.json();
+        if (isEdit) {
+          // Optimistic update: patch the user in-place
+          setUsers(prev => prev.map(u => u._id === editingUser!._id ? { ...u, ...savedUser } : u));
+          // Update global cache
+          if (globalCache.current) {
+            globalCache.current.users = globalCache.current.users.map(u => u._id === editingUser!._id ? { ...u, ...savedUser } : u);
+          }
+          // Update status counts if status changed
+          if (editingUser!.status !== savedUser.status) {
+            setStatusCounts(prev => {
+              const next = { ...prev };
+              next[editingUser!.status] = Math.max(0, (next[editingUser!.status] || 0) - 1);
+              next[savedUser.status] = (next[savedUser.status] || 0) + 1;
+              next.All = (next.Active || 0) + (next.Inactive || 0);
+              return next;
+            });
+          }
+          toast.success('User updated');
+        } else {
+          // Optimistic insert: prepend new user
+          setUsers(prev => [savedUser, ...prev]);
+          if (globalCache.current) {
+            globalCache.current.users = [savedUser, ...globalCache.current.users];
+          }
+          // Update counts
+          setStatusCounts(prev => ({
+            ...prev,
+            [savedUser.status]: (prev[savedUser.status] || 0) + 1,
+            All: (prev.All || 0) + 1,
+          }));
+          toast.success('User created');
+        }
+      } else {
+        const err = await res.json();
+        toast.error(err.error || 'Error saving user');
+      }
+    } catch {
+      toast.error('Error saving user');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleDelete = (id: string) => {
     confirmDeleteToast('Delete this user?', async () => {
-      try { const res = await fetch(`/api/users/${id}`, { method: 'DELETE' }); if (res.ok) { refreshUsers(); fetchStatusCounts(); toast.success('User deleted'); } } catch { toast.error('Error deleting user'); }
+      // Snapshot for rollback
+      const prevUsers = [...users];
+      const deletedUser = users.find(u => u._id === id);
+
+      // Optimistic remove
+      setUsers(prev => prev.filter(u => u._id !== id));
+      if (globalCache.current) {
+        globalCache.current.users = globalCache.current.users.filter(u => u._id !== id);
+      }
+      // Optimistic count update
+      if (deletedUser) {
+        setStatusCounts(prev => {
+          const next = { ...prev };
+          next[deletedUser.status] = Math.max(0, (next[deletedUser.status] || 0) - 1);
+          next.All = Math.max(0, (next.All || 0) - 1);
+          return next;
+        });
+      }
+
+      try {
+        const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          toast.success('User deleted');
+        } else {
+          // Revert on failure
+          setUsers(prevUsers);
+          if (globalCache.current) globalCache.current.users = prevUsers;
+          if (deletedUser) {
+            setStatusCounts(prev => ({
+              ...prev,
+              [deletedUser.status]: (prev[deletedUser.status] || 0) + 1,
+              All: (prev.All || 0) + 1,
+            }));
+          }
+          toast.error('Error deleting user');
+        }
+      } catch {
+        // Revert on error
+        setUsers(prevUsers);
+        if (globalCache.current) globalCache.current.users = prevUsers;
+        if (deletedUser) {
+          setStatusCounts(prev => ({
+            ...prev,
+            [deletedUser.status]: (prev[deletedUser.status] || 0) + 1,
+            All: (prev.All || 0) + 1,
+          }));
+        }
+        toast.error('Error deleting user');
+      }
     });
   };
 
@@ -332,7 +445,7 @@ function UsersContent() {
                   onMouseEnter={e => { if (!isActive && sc) (e.currentTarget as HTMLButtonElement).style.backgroundColor = sc.hoverBg; }}
                   onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'; }}>
                   {tab}
-                  <span className="ml-1.5 text-[11px] tabular-nums" style={{ opacity: isActive ? 0.75 : 0.5 }}>
+                  <span className="ml-1.5 text-[11px] tabular-nums">
                     {countsLoaded ? statusCounts[tab]?.toLocaleString() || 0 : <span className="inline-block w-4 h-3 rounded-sm bg-muted-foreground/10 animate-pulse align-middle" />}
                   </span>
                 </button>
@@ -383,7 +496,7 @@ function UsersContent() {
           </div>
           {/* Add */}
           <button onClick={() => openModal()}
-            className="h-8 px-3 bg-primary text-black hover:opacity-90 transition-all rounded-lg shadow flex items-center gap-1.5 cursor-pointer shrink-0">
+            className="h-8 px-3 bg-primary text-black hover:bg-primary/90 transition-all rounded-lg shadow flex items-center gap-1.5 cursor-pointer shrink-0">
             <Plus className="w-3.5 h-3.5" /><span className="text-[11px] font-black uppercase tracking-widest">Add</span>
           </button>
         </div>
@@ -425,10 +538,11 @@ function UsersContent() {
               ) : (
                 users.map(user => (
                   <UserTableRow key={user._id} user={user} highlight={highlightId === user._id}
+                    workspaces={availableWorkspaces}
                     onClick={() => {
                       sessionStorage.setItem('user_scroll_to', user._id);
                       if (scrollRef.current) sessionStorage.setItem('user_scroll_top', String(scrollRef.current.scrollTop));
-                      router.push(`/profile/${user._id}`);
+                      router.push(`/profile/${(user as any).profileId || user._id}`);
                     }}
                     onEdit={() => openModal(user)}
                     onDelete={() => handleDelete(user._id)} />
@@ -507,6 +621,20 @@ function UsersContent() {
                     {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
                   </select>
                 </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase">Workspace <span className="text-red-500">*</span></label>
+                {formData.role === 'SuperAdmin' ? (
+                  <div className="px-3 h-[36px] bg-secondary/30 border border-border rounded flex items-center">
+                    <span className="text-xs text-muted-foreground italic">SuperAdmin — full access, no workspace needed</span>
+                  </div>
+                ) : (
+                  <select value={formData.workspaceId} onChange={e => setFormData({ ...formData, workspaceId: e.target.value })} required
+                    className={cn("w-full px-3 h-[36px] bg-background border text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/10 rounded", !formData.workspaceId ? 'border-red-500/40' : 'border-border')}>
+                    <option value="">Select a workspace</option>
+                    {availableWorkspaces.map(ws => <option key={ws._id} value={ws._id}>{ws.name}</option>)}
+                  </select>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">

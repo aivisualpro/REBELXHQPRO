@@ -38,22 +38,364 @@ import {
     Search,
     Loader2,
     Plus,
-    X
+    X,
+    LayoutGrid,
+    ChevronRight,
+    ChevronDown,
+    Eye,
+    EyeOff,
+    Pencil,
+    Trash2,
+    FolderOpen,
+    Copy,
+    Check,
+    AlertTriangle,
+    UsersRound,
+    Database,
+    Ticket,
+    Settings
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import Papa from 'papaparse';
+import { MODULE_BLUEPRINTS, generateDefaultModules } from '@/constants/workspace-modules';
 
-type Tab = 'general' | 'localization' | 'crm' | 'notifications' | 'security' | 'dataFilter' | 'modules';
+type Tab = 'workspaces' | 'general' | 'localization' | 'crm' | 'notifications' | 'security' | 'dataFilter' | 'modules';
 type ModuleSubTab = 'sales' | 'warehouse' | 'reports' | 'help';
+
+// ─── Toggle Switch Component ─────────────────────────────────────────────────
+function ToggleSwitch({ checked, onChange, size = 'md', activeColor = '#10b981' }: {
+    checked: boolean;
+    onChange: (val: boolean) => void;
+    size?: 'sm' | 'md';
+    activeColor?: string;
+}) {
+    const w = size === 'sm' ? 32 : 40;
+    const h = size === 'sm' ? 18 : 22;
+    const dot = size === 'sm' ? 14 : 18;
+    const pad = 2;
+    return (
+        <button
+            type="button"
+            role="switch"
+            aria-checked={checked}
+            onClick={() => onChange(!checked)}
+            className="cursor-pointer shrink-0 focus:outline-none"
+            style={{
+                position: 'relative',
+                width: w,
+                height: h,
+                borderRadius: h / 2,
+                backgroundColor: checked ? activeColor : 'hsl(var(--secondary))',
+                border: checked ? `1px solid ${activeColor}` : '1px solid hsl(var(--border))',
+                transition: 'background-color 0.2s ease, border-color 0.2s ease',
+            }}
+        >
+            <span
+                style={{
+                    position: 'absolute',
+                    top: pad,
+                    left: checked ? w - dot - pad - 2 : pad,
+                    width: dot,
+                    height: dot,
+                    borderRadius: '50%',
+                    backgroundColor: '#ffffff',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                    transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                }}
+            />
+        </button>
+    );
+}
+
+// Module icon mapping
+const MODULE_ICONS: Record<string, React.ElementType> = {
+    admin: Settings,
+    crm: UsersRound,
+    sales: Truck,
+    warehouse: Database,
+    reports: BarChart3,
+    help: HelpCircle,
+};
 
 function SettingsPageContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
 
     // URL-synced tab state
-    const activeTab = (searchParams.get('tab') as Tab) || 'general';
+    const activeTab = (searchParams.get('tab') as Tab) || 'workspaces';
     const moduleSubTab = (searchParams.get('moduleTab') as ModuleSubTab) || 'sales';
+
+    // ── Workspace Management State ──
+    const [workspaces, setWorkspaces] = useState<any[]>([]);
+    const [wsLoading, setWsLoading] = useState(false);
+    const [wsEditing, setWsEditing] = useState<any>(null);
+    const [wsFormOpen, setWsFormOpen] = useState(false);
+    const [wsSaving, setWsSaving] = useState(false);
+    const [wsDeleting, setWsDeleting] = useState<string | null>(null);
+    const [wsFormData, setWsFormData] = useState({
+        name: '',
+        description: '',
+        color: '#f2b61c',
+        isDefault: false,
+        modules: generateDefaultModules(),
+    });
+    const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
+    const [expandedSubModules, setExpandedSubModules] = useState<Record<string, boolean>>({});
+
+    // Fetch workspaces
+    const fetchWorkspaces = useCallback(async () => {
+        setWsLoading(true);
+        try {
+            const res = await fetch('/api/workspaces');
+            if (res.ok) {
+                const data = await res.json();
+                setWorkspaces(data.data || []);
+            }
+        } catch (error) {
+            console.error('Failed to fetch workspaces', error);
+        } finally {
+            setWsLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (activeTab === 'workspaces') {
+            fetchWorkspaces();
+        }
+    }, [activeTab, fetchWorkspaces]);
+
+    // Open create form
+    const openCreateWorkspace = () => {
+        setWsEditing(null);
+        setWsFormData({
+            name: '',
+            description: '',
+            color: '#f2b61c',
+            isDefault: false,
+            modules: generateDefaultModules(),
+        });
+        setExpandedModules({});
+        setExpandedSubModules({});
+        setWsFormOpen(true);
+    };
+
+    // Open edit form
+    const openEditWorkspace = (ws: any) => {
+        setWsEditing(ws);
+        // Merge saved modules with blueprint to handle any new modules/sub-modules added
+        const savedModules = ws.modules || [];
+        const mergedModules = generateDefaultModules().map(blueprint => {
+            const saved = savedModules.find((m: any) => m.key === blueprint.key);
+            if (!saved) return blueprint;
+            return {
+                ...blueprint,
+                enabled: saved.enabled,
+                subModules: blueprint.subModules.map(subBp => {
+                    const savedSub = (saved.subModules || []).find((s: any) => s.key === subBp.key);
+                    if (!savedSub) return subBp;
+                    return {
+                        ...subBp,
+                        enabled: savedSub.enabled,
+                        crud: savedSub.crud || subBp.crud,
+                        fields: subBp.fields.map(fBp => {
+                            const savedField = (savedSub.fields || []).find((f: any) => f.field === fBp.field);
+                            return savedField ? { ...fBp, visible: savedField.visible } : fBp;
+                        }),
+                    };
+                }),
+            };
+        });
+        setWsFormData({
+            name: ws.name,
+            description: ws.description || '',
+            color: ws.color || '#f2b61c',
+            isDefault: ws.isDefault || false,
+            modules: mergedModules,
+        });
+        setExpandedModules({});
+        setExpandedSubModules({});
+        setWsFormOpen(true);
+    };
+
+    // Save workspace
+    const handleWsSave = async () => {
+        if (!wsFormData.name.trim()) {
+            toast.error('Workspace name is required');
+            return;
+        }
+        setWsSaving(true);
+        try {
+            const url = wsEditing ? `/api/workspaces/${wsEditing._id}` : '/api/workspaces';
+            const method = wsEditing ? 'PUT' : 'POST';
+            const res = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(wsFormData),
+            });
+            if (res.ok) {
+                toast.success(wsEditing ? 'Workspace updated' : 'Workspace created');
+                setWsFormOpen(false);
+                fetchWorkspaces();
+            } else {
+                const err = await res.json();
+                toast.error(err.error || 'Failed to save workspace');
+            }
+        } catch (error) {
+            toast.error('Failed to save workspace');
+        } finally {
+            setWsSaving(false);
+        }
+    };
+
+    // Delete workspace
+    const handleWsDelete = async (id: string) => {
+        setWsDeleting(id);
+        try {
+            const res = await fetch(`/api/workspaces/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                toast.success('Workspace deleted');
+                fetchWorkspaces();
+            } else {
+                toast.error('Failed to delete workspace');
+            }
+        } catch (error) {
+            toast.error('Failed to delete workspace');
+        } finally {
+            setWsDeleting(null);
+        }
+    };
+
+    // Toggle module enabled
+    const toggleModuleEnabled = (moduleKey: string) => {
+        setWsFormData(prev => ({
+            ...prev,
+            modules: prev.modules.map(m =>
+                m.key === moduleKey
+                    ? {
+                        ...m,
+                        enabled: !m.enabled,
+                        // When enabling a module, enable all sub-modules by default
+                        subModules: m.subModules.map(s => ({
+                            ...s,
+                            enabled: !m.enabled ? true : s.enabled,
+                        })),
+                    }
+                    : m
+            ),
+        }));
+    };
+
+    // Toggle sub-module enabled
+    const toggleSubModuleEnabled = (moduleKey: string, subKey: string) => {
+        setWsFormData(prev => ({
+            ...prev,
+            modules: prev.modules.map(m =>
+                m.key === moduleKey
+                    ? {
+                        ...m,
+                        subModules: m.subModules.map(s =>
+                            s.key === subKey ? { ...s, enabled: !s.enabled } : s
+                        ),
+                    }
+                    : m
+            ),
+        }));
+    };
+
+    // Toggle CRUD permission
+    const toggleCrudPermission = (moduleKey: string, subKey: string, op: 'create' | 'read' | 'update' | 'delete') => {
+        setWsFormData(prev => ({
+            ...prev,
+            modules: prev.modules.map(m =>
+                m.key === moduleKey
+                    ? {
+                        ...m,
+                        subModules: m.subModules.map(s =>
+                            s.key === subKey
+                                ? { ...s, crud: { ...s.crud, [op]: !s.crud[op] } }
+                                : s
+                        ),
+                    }
+                    : m
+            ),
+        }));
+    };
+
+    // Toggle field visibility
+    const toggleFieldVisibility = (moduleKey: string, subKey: string, fieldName: string) => {
+        setWsFormData(prev => ({
+            ...prev,
+            modules: prev.modules.map(m =>
+                m.key === moduleKey
+                    ? {
+                        ...m,
+                        subModules: m.subModules.map(s =>
+                            s.key === subKey
+                                ? {
+                                    ...s,
+                                    fields: s.fields.map(f =>
+                                        f.field === fieldName ? { ...f, visible: !f.visible } : f
+                                    ),
+                                }
+                                : s
+                        ),
+                    }
+                    : m
+            ),
+        }));
+    };
+
+    // Enable all / Disable all for a module
+    const setAllSubModules = (moduleKey: string, enabled: boolean) => {
+        setWsFormData(prev => ({
+            ...prev,
+            modules: prev.modules.map(m =>
+                m.key === moduleKey
+                    ? {
+                        ...m,
+                        subModules: m.subModules.map(s => ({ ...s, enabled })),
+                    }
+                    : m
+            ),
+        }));
+    };
+
+    // Duplicate workspace
+    const duplicateWorkspace = (ws: any) => {
+        setWsEditing(null);
+        const mergedModules = generateDefaultModules().map(blueprint => {
+            const saved = (ws.modules || []).find((m: any) => m.key === blueprint.key);
+            if (!saved) return blueprint;
+            return {
+                ...blueprint,
+                enabled: saved.enabled,
+                subModules: blueprint.subModules.map(subBp => {
+                    const savedSub = (saved.subModules || []).find((s: any) => s.key === subBp.key);
+                    if (!savedSub) return subBp;
+                    return {
+                        ...subBp,
+                        enabled: savedSub.enabled,
+                        crud: savedSub.crud || subBp.crud,
+                        fields: subBp.fields.map(fBp => {
+                            const savedField = (savedSub.fields || []).find((f: any) => f.field === fBp.field);
+                            return savedField ? { ...fBp, visible: savedField.visible } : fBp;
+                        }),
+                    };
+                }),
+            };
+        });
+        setWsFormData({
+            name: `${ws.name} (Copy)`,
+            description: ws.description || '',
+            color: ws.color || '#f2b61c',
+            isDefault: false,
+            modules: mergedModules,
+        });
+        setExpandedModules({});
+        setExpandedSubModules({});
+        setWsFormOpen(true);
+    };
 
     const setActiveTab = useCallback((tab: Tab) => {
         const params = new URLSearchParams(searchParams.toString());
@@ -435,6 +777,7 @@ function SettingsPageContent() {
     };
 
     const tabs = [
+        { id: 'workspaces', label: 'Workspaces', icon: LayoutGrid, keywords: 'workspaces permissions roles modules crud fields access control' },
         { id: 'general', label: 'General', icon: Building, keywords: 'company name email phone address support general' },
         { id: 'localization', label: 'Localization', icon: Globe, keywords: 'currency timezone date format locale localization language' },
         { id: 'dataFilter', label: 'Data Filter', icon: Calendar, keywords: 'data filter date range crm revenue' },
@@ -548,6 +891,415 @@ function SettingsPageContent() {
                 {/* Content Area */}
                 <div className="flex-1 overflow-y-auto p-4">
                     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        {/* WORKSPACES TAB */}
+                        {activeTab === 'workspaces' && (
+                            <div className="space-y-6">
+                                {!wsFormOpen ? (
+                                    /* ═══ WORKSPACE LIST VIEW ═══ */
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <h2 className="text-sm font-black uppercase tracking-widest text-foreground">Workspaces</h2>
+                                                <p className="text-xs text-muted-foreground mt-0.5">Create and manage permission workspaces for your team</p>
+                                            </div>
+                                            <button
+                                                onClick={openCreateWorkspace}
+                                                className="h-8 px-4 bg-primary text-black hover:opacity-90 transition-all rounded-lg shadow flex items-center gap-1.5 cursor-pointer"
+                                            >
+                                                <Plus className="w-3.5 h-3.5" />
+                                                <span className="text-[11px] font-black uppercase tracking-widest">New Workspace</span>
+                                            </button>
+                                        </div>
+
+                                        {/* SuperAdmin Badge */}
+                                        <div className="p-4 border border-emerald-500/20 bg-emerald-500/5 rounded-lg flex items-start space-x-4">
+                                            <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0">
+                                                <Shield className="w-5 h-5 text-emerald-600" />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-sm font-bold text-emerald-600 dark:text-emerald-400">SuperAdmin Access</h4>
+                                                <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70 mt-1">
+                                                    SuperAdmin users have unrestricted access to all modules, sub-modules, and fields.
+                                                    No workspace assignment is needed for SuperAdmin accounts.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Workspace Cards */}
+                                        {wsLoading ? (
+                                            <div className="flex items-center justify-center py-12">
+                                                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                                                <span className="ml-2 text-sm text-muted-foreground">Loading workspaces...</span>
+                                            </div>
+                                        ) : workspaces.length === 0 ? (
+                                            <div className="flex flex-col items-center justify-center py-16 border-2 border-dashed border-border rounded-lg">
+                                                <LayoutGrid className="w-12 h-12 text-muted-foreground/30 mb-3" />
+                                                <p className="text-sm font-medium text-muted-foreground">No workspaces yet</p>
+                                                <p className="text-xs text-muted-foreground/60 mt-1">Create your first workspace to define team permissions</p>
+                                                <button
+                                                    onClick={openCreateWorkspace}
+                                                    className="mt-4 h-8 px-4 bg-primary text-black hover:opacity-90 transition-all rounded-lg shadow flex items-center gap-1.5 cursor-pointer"
+                                                >
+                                                    <Plus className="w-3.5 h-3.5" />
+                                                    <span className="text-[11px] font-black uppercase tracking-widest">Create Workspace</span>
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                                {workspaces.map((ws) => {
+                                                    const enabledModCount = (ws.modules || []).filter((m: any) => m.enabled).length;
+                                                    const totalSubMods = (ws.modules || []).reduce((acc: number, m: any) => acc + (m.subModules || []).filter((s: any) => s.enabled).length, 0);
+                                                    return (
+                                                        <div
+                                                            key={ws._id}
+                                                            className="group relative border border-border rounded-lg p-5 hover:border-border/80 transition-all bg-background hover:shadow-md"
+                                                        >
+                                                            {/* Color accent bar */}
+                                                            <div className="absolute top-0 left-0 right-0 h-1 rounded-t-lg" style={{ backgroundColor: ws.color || '#f2b61c' }} />
+
+                                                            <div className="flex items-start justify-between mt-1">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${ws.color || '#f2b61c'}15` }}>
+                                                                        <LayoutGrid className="w-5 h-5" style={{ color: ws.color || '#f2b61c' }} />
+                                                                    </div>
+                                                                    <div>
+                                                                        <div className="flex items-center gap-2">
+                                                                            <h3 className="text-sm font-bold text-foreground">{ws.name}</h3>
+                                                                            {ws.isDefault && (
+                                                                                <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-primary/10 text-primary rounded">
+                                                                                    Default
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                        {ws.description && (
+                                                                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{ws.description}</p>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                    <button
+                                                                        onClick={() => duplicateWorkspace(ws)}
+                                                                        className="p-1.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                                                                        title="Duplicate"
+                                                                    >
+                                                                        <Copy className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => openEditWorkspace(ws)}
+                                                                        className="p-1.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                                                                        title="Edit"
+                                                                    >
+                                                                        <Pencil className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleWsDelete(ws._id)}
+                                                                        disabled={wsDeleting === ws._id}
+                                                                        className="p-1.5 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50"
+                                                                        title="Delete"
+                                                                    >
+                                                                        {wsDeleting === ws._id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Stats */}
+                                                            <div className="flex items-center gap-4 mt-4 pt-3 border-t border-border">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <FolderOpen className="w-3.5 h-3.5 text-muted-foreground" />
+                                                                    <span className="text-xs text-muted-foreground">
+                                                                        <span className="font-bold text-foreground">{enabledModCount}</span> modules
+                                                                    </span>
+                                                                </div>
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <Layers className="w-3.5 h-3.5 text-muted-foreground" />
+                                                                    <span className="text-xs text-muted-foreground">
+                                                                        <span className="font-bold text-foreground">{totalSubMods}</span> sub-modules
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Module pills */}
+                                                            <div className="flex flex-wrap gap-1.5 mt-3">
+                                                                {(ws.modules || []).filter((m: any) => m.enabled).map((m: any) => (
+                                                                    <span
+                                                                        key={m.key}
+                                                                        className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full border border-border text-muted-foreground bg-secondary/50"
+                                                                    >
+                                                                        {m.label}
+                                                                    </span>
+                                                                ))}
+                                                                {enabledModCount === 0 && (
+                                                                    <span className="text-[10px] text-muted-foreground/50 italic">No modules enabled</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    /* ═══ WORKSPACE FORM/EDITOR ═══ */
+                                    <div className="space-y-6">
+                                        {/* Header */}
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <button
+                                                    onClick={() => setWsFormOpen(false)}
+                                                    className="p-1.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                </button>
+                                                <div>
+                                                    <h2 className="text-sm font-black uppercase tracking-widest text-foreground">
+                                                        {wsEditing ? 'Edit Workspace' : 'New Workspace'}
+                                                    </h2>
+                                                    <p className="text-[10px] text-muted-foreground mt-0.5">Configure modules, permissions, and field visibility</p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={handleWsSave}
+                                                disabled={wsSaving}
+                                                className="h-8 px-4 bg-primary text-black hover:opacity-90 transition-all rounded-lg shadow flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                            >
+                                                {wsSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                                                <span className="text-[11px] font-black uppercase tracking-widest">{wsSaving ? 'Saving...' : 'Save Workspace'}</span>
+                                            </button>
+                                        </div>
+
+                                        {/* Basic Info */}
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border border-border rounded-lg bg-secondary/20">
+                                            <div className="space-y-1.5">
+                                                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Workspace Name *</label>
+                                                <input
+                                                    type="text"
+                                                    value={wsFormData.name}
+                                                    onChange={e => setWsFormData(prev => ({ ...prev, name: e.target.value }))}
+                                                    placeholder="e.g. Sales Team, Warehouse Crew"
+                                                    className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50"
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Description</label>
+                                                <input
+                                                    type="text"
+                                                    value={wsFormData.description}
+                                                    onChange={e => setWsFormData(prev => ({ ...prev, description: e.target.value }))}
+                                                    placeholder="Optional description"
+                                                    className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50"
+                                                />
+                                            </div>
+                                            <div className="flex gap-4">
+                                                <div className="space-y-1.5 flex-1">
+                                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Color</label>
+                                                    <div className="flex items-center gap-2">
+                                                        <input
+                                                            type="color"
+                                                            value={wsFormData.color}
+                                                            onChange={e => setWsFormData(prev => ({ ...prev, color: e.target.value }))}
+                                                            className="w-8 h-8 rounded border border-border cursor-pointer"
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            value={wsFormData.color}
+                                                            onChange={e => setWsFormData(prev => ({ ...prev, color: e.target.value }))}
+                                                            className="flex-1 px-3 py-2 bg-background border border-border rounded text-sm font-mono focus:outline-none focus:ring-1 focus:ring-primary/30"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Default</label>
+                                                    <div className="mt-1.5">
+                                                        <ToggleSwitch
+                                                            checked={wsFormData.isDefault}
+                                                            onChange={(val) => setWsFormData(prev => ({ ...prev, isDefault: val }))}
+                                                            activeColor="hsl(var(--primary))"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Module Permission Builder */}
+                                        <div className="space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground">Module Permissions</h3>
+                                                <p className="text-[10px] text-muted-foreground">Enable modules → configure sub-modules → set CRUD → toggle fields</p>
+                                            </div>
+
+                                            {wsFormData.modules.map((mod) => {
+                                                const ModIcon = MODULE_ICONS[mod.key] || Layers;
+                                                const isExpanded = expandedModules[mod.key];
+                                                const enabledSubs = mod.subModules.filter(s => s.enabled).length;
+                                                const totalSubs = mod.subModules.length;
+
+                                                return (
+                                                    <div
+                                                        key={mod.key}
+                                                        className={cn(
+                                                            "border rounded-lg overflow-hidden transition-all",
+                                                            mod.enabled ? "border-border" : "border-border/50 opacity-60"
+                                                        )}
+                                                    >
+                                                        {/* Module Header */}
+                                                        <div className={cn(
+                                                            "flex items-center gap-3 px-4 py-3 transition-colors",
+                                                            mod.enabled ? "bg-secondary/30" : "bg-secondary/10"
+                                                        )}>
+                                                            <button
+                                                                onClick={() => setExpandedModules(prev => ({ ...prev, [mod.key]: !prev[mod.key] }))}
+                                                                className="p-0.5 rounded hover:bg-secondary text-muted-foreground cursor-pointer"
+                                                            >
+                                                                {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                                            </button>
+                                                            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${wsFormData.color}15` }}>
+                                                                <ModIcon className="w-4 h-4" style={{ color: wsFormData.color }} />
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-sm font-bold text-foreground">{mod.label}</span>
+                                                                    {mod.enabled && (
+                                                                        <span className="text-[10px] text-muted-foreground">
+                                                                            {enabledSubs}/{totalSubs} sub-modules
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                            {mod.enabled && (
+                                                                <div className="flex items-center gap-2 mr-2">
+                                                                    <button
+                                                                        onClick={() => setAllSubModules(mod.key, true)}
+                                                                        className="text-[9px] font-bold uppercase tracking-wider text-primary hover:underline cursor-pointer"
+                                                                    >
+                                                                        All On
+                                                                    </button>
+                                                                    <span className="text-muted-foreground/30">|</span>
+                                                                    <button
+                                                                        onClick={() => setAllSubModules(mod.key, false)}
+                                                                        className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground hover:underline cursor-pointer"
+                                                                    >
+                                                                        All Off
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                            <ToggleSwitch
+                                                                checked={mod.enabled}
+                                                                onChange={() => toggleModuleEnabled(mod.key)}
+                                                            />
+                                                        </div>
+
+                                                        {/* Sub-modules */}
+                                                        {isExpanded && mod.enabled && (
+                                                            <div className="border-t border-border">
+                                                                {mod.subModules.map((sub) => {
+                                                                    const subExpandKey = `${mod.key}.${sub.key}`;
+                                                                    const isSubExpanded = expandedSubModules[subExpandKey];
+
+                                                                    return (
+                                                                        <div key={sub.key} className={cn(
+                                                                            "border-b border-border last:border-b-0",
+                                                                            sub.enabled ? "" : "opacity-50"
+                                                                        )}>
+                                                                            {/* Sub-module row */}
+                                                                            <div className="flex items-center gap-3 px-4 py-2.5 pl-14">
+                                                                                <button
+                                                                                    onClick={() => setExpandedSubModules(prev => ({ ...prev, [subExpandKey]: !prev[subExpandKey] }))}
+                                                                                    className="p-0.5 rounded hover:bg-secondary text-muted-foreground cursor-pointer"
+                                                                                    disabled={!sub.enabled}
+                                                                                >
+                                                                                    {isSubExpanded && sub.enabled ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                                                                                </button>
+                                                                                <span className="text-xs font-semibold text-foreground flex-1">{sub.label}</span>
+
+                                                                                {/* CRUD Pills */}
+                                                                                {sub.enabled && (
+                                                                                    <div className="flex items-center gap-1">
+                                                                                        {(['create', 'read', 'update', 'delete'] as const).map(op => (
+                                                                                            <button
+                                                                                                key={op}
+                                                                                                onClick={() => toggleCrudPermission(mod.key, sub.key, op)}
+                                                                                                className={cn(
+                                                                                                    "px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded transition-all cursor-pointer",
+                                                                                                    sub.crud[op]
+                                                                                                        ? op === 'create' ? 'bg-emerald-500/15 text-emerald-600 border border-emerald-500/30'
+                                                                                                            : op === 'read' ? 'bg-blue-500/15 text-blue-600 border border-blue-500/30'
+                                                                                                                : op === 'update' ? 'bg-amber-500/15 text-amber-600 border border-amber-500/30'
+                                                                                                                    : 'bg-red-500/15 text-red-600 border border-red-500/30'
+                                                                                                        : 'bg-secondary/50 text-muted-foreground/40 border border-transparent line-through'
+                                                                                                )}
+                                                                                            >
+                                                                                                {op.charAt(0).toUpperCase()}
+                                                                                            </button>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                )}
+
+                                                                                <ToggleSwitch
+                                                                                    checked={sub.enabled}
+                                                                                    onChange={() => toggleSubModuleEnabled(mod.key, sub.key)}
+                                                                                    size="sm"
+                                                                                />
+                                                                            </div>
+
+                                                                            {/* Field Permissions */}
+                                                                            {isSubExpanded && sub.enabled && sub.fields.length > 0 && (
+                                                                                <div className="bg-secondary/20 px-4 py-3 pl-20">
+                                                                                    <div className="flex items-center gap-2 mb-2">
+                                                                                        <Eye className="w-3 h-3 text-muted-foreground" />
+                                                                                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Field Visibility</span>
+                                                                                    </div>
+                                                                                    <div className="flex flex-wrap gap-1.5">
+                                                                                        {sub.fields.map(field => (
+                                                                                            <button
+                                                                                                key={field.field}
+                                                                                                onClick={() => toggleFieldVisibility(mod.key, sub.key, field.field)}
+                                                                                                className={cn(
+                                                                                                    "flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded-md transition-all cursor-pointer border",
+                                                                                                    field.visible
+                                                                                                        ? 'bg-background border-border text-foreground hover:border-red-500/30'
+                                                                                                        : 'bg-red-500/5 border-red-500/20 text-red-500/60 line-through hover:border-emerald-500/30'
+                                                                                                )}
+                                                                                            >
+                                                                                                {field.visible ? <Eye className="w-2.5 h-2.5" /> : <EyeOff className="w-2.5 h-2.5" />}
+                                                                                                {field.label}
+                                                                                            </button>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+
+                                        {/* Bottom Save Button */}
+                                        <div className="flex items-center justify-between pt-4 border-t border-border">
+                                            <button
+                                                onClick={() => setWsFormOpen(false)}
+                                                className="h-8 px-4 border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-all rounded-lg flex items-center gap-1.5 cursor-pointer text-[11px] font-bold uppercase tracking-widest"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={handleWsSave}
+                                                disabled={wsSaving}
+                                                className="h-8 px-6 bg-primary text-black hover:opacity-90 transition-all rounded-lg shadow flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                            >
+                                                {wsSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                                                <span className="text-[11px] font-black uppercase tracking-widest">{wsSaving ? 'Saving...' : 'Save Workspace'}</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {/* GENERAL TAB */}
                         {activeTab === 'general' && (
                             <div className="space-y-6">

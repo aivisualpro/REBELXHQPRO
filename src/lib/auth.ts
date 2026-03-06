@@ -51,7 +51,9 @@ export const authOptions: NextAuthOptions = {
                             name: `${user.firstName} ${user.lastName}`,
                             role: user.role,
                             department: user.department,
-                            image: user.profileImage
+                            image: user.profileImage,
+                            profileId: user.profileId || null,
+                            workspaceId: user.workspaceId || null
                         };
                     }
                 } catch (dbError) {
@@ -69,7 +71,25 @@ export const authOptions: NextAuthOptions = {
                 token.id = user.id;
                 token.role = (user as any).role;
                 token.department = (user as any).department;
+                token.profileId = (user as any).profileId || null;
+                token.workspaceId = (user as any).workspaceId || null;
             }
+
+            // Always refresh workspaceId from DB (so changes take effect without re-login)
+            // Skip for master admin (id = "master-admin") since they're not in the DB
+            if (token.id && token.id !== 'master-admin') {
+                try {
+                    await dbConnect();
+                    const dbUser = await User.findById(token.id).select('workspaceId profileId').lean();
+                    if (dbUser) {
+                        token.workspaceId = (dbUser as any).workspaceId || null;
+                        token.profileId = (dbUser as any).profileId || null;
+                    }
+                } catch {
+                    // Silently fail — keep existing token value
+                }
+            }
+
             return token;
         },
         async session({ session, token }) {
@@ -77,6 +97,8 @@ export const authOptions: NextAuthOptions = {
                 (session.user as any).id = token.id;
                 (session.user as any).role = token.role;
                 (session.user as any).department = token.department;
+                (session.user as any).profileId = token.profileId || null;
+                (session.user as any).workspaceId = token.workspaceId || null;
             }
             return session;
         }

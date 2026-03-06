@@ -7,14 +7,34 @@ import { MENU_ITEMS } from '@/constants/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useSession } from 'next-auth/react';
+import { usePermissions } from '@/hooks/usePermissions';
+
+// Map navigation menu titles to workspace module keys
+const MENU_TO_MODULE_KEY: Record<string, string> = {
+    'Admin': 'admin',
+    'CRM': 'crm',
+    'Sales': 'sales',
+    'Warehouse': 'warehouse',
+    'Reports': 'reports',
+    'Help': 'help',
+};
 
 export const MegaMenu = () => {
     const { data: session } = useSession();
+    const { isSuperAdmin, isModuleEnabled, isRouteEnabled } = usePermissions();
     const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
     const visibleMenuItems = MENU_ITEMS.filter(item => {
+        // Admin menu: only SuperAdmin
         if (item.title === 'Admin') {
             return (session?.user as any)?.role === 'SuperAdmin';
+        }
+        // SuperAdmin sees everything
+        if (isSuperAdmin) return true;
+        // Check workspace module permission
+        const moduleKey = MENU_TO_MODULE_KEY[item.title];
+        if (moduleKey) {
+            return isModuleEnabled(moduleKey);
         }
         return true;
     });
@@ -24,6 +44,14 @@ export const MegaMenu = () => {
             {visibleMenuItems.map((menu) => {
                 const isLinkOnly = menu.items.length === 0 || menu.title === 'CRM';
                 const href = menu.items[0]?.href || '#';
+
+                // Filter sub-items by route permissions (SuperAdmin sees all)
+                const visibleItems = isSuperAdmin
+                    ? menu.items
+                    : menu.items.filter(item => isRouteEnabled(item.href));
+
+                // If no visible items, skip entire menu
+                if (visibleItems.length === 0 && !isLinkOnly) return null;
 
                 if (isLinkOnly) {
                     return (
@@ -65,7 +93,7 @@ export const MegaMenu = () => {
                                     className="absolute top-full left-0 pt-2 z-50"
                                 >
                                     <div className="bg-card rounded-lg shadow-xl border border-border py-2 min-w-[200px]">
-                                        {menu.items.map((item) => (
+                                        {visibleItems.map((item) => (
                                             <Link
                                                 key={item.href}
                                                 href={item.href}

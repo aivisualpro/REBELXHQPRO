@@ -1,63 +1,68 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { useRouter, useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import {
-    ArrowLeft, User, Mail, Phone, Building, Briefcase, Shield, Calendar,
-    Globe, Check, MapPin, DollarSign, Clock, FileText, Activity,
-    ChevronRight, ExternalLink, Lock,
+    User, Mail, Phone, Building, Shield, Clock, Globe, Check,
+    DollarSign, Activity, ChevronRight, Lock, Eye, EyeOff,
+    Briefcase, LayoutDashboard, Zap, ArrowUpRight, Sparkles,
+    Calendar, TrendingUp, Target, Award, Coffee, MapPin
 } from 'lucide-react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
+import { useTheme } from '@/components/ThemeProvider';
+import { usePermissions } from '@/hooks/usePermissions';
 
-// ─── Info Row ─────────────────────────────────────────────────────────────────
+// ─── Quick Link Card ──────────────────────────────────────────────────────────
 
-function InfoRow({ icon: Icon, label, value, valueClass }: {
-    icon: React.ElementType; label: string; value: React.ReactNode; valueClass?: string;
+function QuickLinkCard({ icon: Icon, label, description, href, color, gradient, isDark }: {
+    icon: React.ElementType; label: string; description: string; href: string;
+    color: string; gradient: string; isDark: boolean;
 }) {
+    const router = useRouter();
     return (
-        <div className="flex items-center justify-between py-2.5 border-b border-border/40 last:border-0 group">
-            <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-md bg-secondary/60 flex items-center justify-center shrink-0">
-                    <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+        <button
+            onClick={() => router.push(href)}
+            className={cn(
+                "group relative overflow-hidden rounded-2xl p-5 text-left transition-all hover:scale-[1.02] cursor-pointer border",
+                isDark
+                    ? "bg-slate-800/40 hover:bg-slate-800/60 border-slate-700/50 hover:border-slate-600"
+                    : "bg-white/80 hover:bg-white border-slate-200 hover:border-slate-300 shadow-sm hover:shadow-md"
+            )}
+        >
+            <div className={cn("absolute top-0 right-0 w-24 h-24 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500", gradient)} />
+            <div className="relative z-10">
+                <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center mb-3", color)}>
+                    <Icon className="w-5 h-5" />
                 </div>
-                <span className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider">{label}</span>
+                <h3 className={cn("text-sm font-bold mb-1", isDark ? "text-white" : "text-slate-900")}>{label}</h3>
+                <p className={cn("text-[11px]", isDark ? "text-slate-400" : "text-slate-500")}>{description}</p>
             </div>
-            <span className={cn("text-[12px] font-bold text-foreground text-right max-w-[55%] truncate", valueClass)}>{value || <span className="text-muted-foreground/40">—</span>}</span>
-        </div>
-    );
-}
-
-// ─── Stat Card ────────────────────────────────────────────────────────────────
-
-function StatCard({ label, value, icon: Icon, color }: {
-    label: string; value: string | number; icon: React.ElementType; color: string;
-}) {
-    return (
-        <div className="bg-background border border-border rounded-lg p-4 hover:border-border/80 transition-all group">
-            <div className="flex items-center justify-between mb-3">
-                <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", color)}>
-                    <Icon className="w-4 h-4" />
-                </div>
-            </div>
-            <p className="text-2xl font-black text-foreground tabular-nums tracking-tight">{value}</p>
-            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mt-1">{label}</p>
-        </div>
+            <ArrowUpRight className={cn("absolute top-4 right-4 w-4 h-4 opacity-0 group-hover:opacity-100 transition-all translate-y-1 group-hover:translate-y-0", isDark ? "text-slate-400" : "text-slate-500")} />
+        </button>
     );
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function EmployeeProfilePage() {
-    const router = useRouter();
+export default function UserProfilePage() {
     const { data: session } = useSession();
     const params = useParams();
+    const router = useRouter();
+    const { theme } = useTheme();
+    const isDark = theme === 'dark';
     const id = params.id as string;
+    const { isModuleEnabled } = usePermissions();
 
     const [user, setUser] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState('overview');
+    const [workspaces, setWorkspaces] = useState<{ _id: string; name: string; color: string }[]>([]);
+    const [currentTime, setCurrentTime] = useState(new Date());
+    const [showPassword, setShowPassword] = useState(false);
+
+    const isSuperAdmin = (session?.user as any)?.role === 'SuperAdmin';
+    const isOwnProfile = (session?.user as any)?.profileId === id || (session?.user as any)?.id === id;
 
     useEffect(() => {
         if (!id) return;
@@ -70,368 +75,330 @@ export default function EmployeeProfilePage() {
         })();
     }, [id]);
 
+    useEffect(() => {
+        fetch('/api/workspaces').then(r => r.json()).then(d => {
+            if (d.data) setWorkspaces(d.data);
+        }).catch(() => { });
+    }, []);
+
+    useEffect(() => {
+        const timer = setInterval(() => setCurrentTime(new Date()), 60000);
+        return () => clearInterval(timer);
+    }, []);
+
+    const getGreeting = () => {
+        const hour = currentTime.getHours();
+        if (hour < 12) return "Good Morning";
+        if (hour < 18) return "Good Afternoon";
+        return "Good Evening";
+    };
+
+    const getWorkspaceName = () => {
+        if (!user?.workspaceId) return null;
+        return workspaces.find(w => w._id === user.workspaceId)?.name || null;
+    };
+
+    const memberSince = user?.createdAt
+        ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+        : 'N/A';
+
+    // Build quick links based on workspace permissions
+    const quickLinks = [];
+    if (isSuperAdmin || isModuleEnabled('crm')) {
+        quickLinks.push({ icon: Mail, label: 'CRM Inbox', description: 'Manage leads & emails', href: '/crm/inbox', color: 'bg-blue-500/20 text-blue-500', gradient: 'bg-blue-500/20' });
+        quickLinks.push({ icon: Target, label: 'Leads', description: 'Track your pipeline', href: '/crm/leads', color: 'bg-purple-500/20 text-purple-500', gradient: 'bg-purple-500/20' });
+    }
+    if (isSuperAdmin || isModuleEnabled('sales')) {
+        quickLinks.push({ icon: DollarSign, label: 'Wholesale Orders', description: 'View & manage orders', href: '/sales/wholesale-orders', color: 'bg-emerald-500/20 text-emerald-500', gradient: 'bg-emerald-500/20' });
+    }
+    if (isSuperAdmin || isModuleEnabled('warehouse')) {
+        quickLinks.push({ icon: Activity, label: 'Manufacturing', description: 'Production pipeline', href: '/warehouse/manufacturing', color: 'bg-orange-500/20 text-orange-500', gradient: 'bg-orange-500/20' });
+    }
+    if (isSuperAdmin || isModuleEnabled('reports')) {
+        quickLinks.push({ icon: TrendingUp, label: 'Dashboard', description: 'Business analytics', href: '/reports/dashboard', color: 'bg-cyan-500/20 text-cyan-500', gradient: 'bg-cyan-500/20' });
+    }
+    if (isSuperAdmin || isModuleEnabled('admin')) {
+        quickLinks.push({ icon: Shield, label: 'Admin', description: 'Users & settings', href: '/admin/users', color: 'bg-rose-500/20 text-rose-500', gradient: 'bg-rose-500/20' });
+    }
+
     if (loading) {
         return (
-            <div className="flex flex-col h-[calc(100vh-48px)] bg-background">
-                {/* Skeleton header */}
-                <div className="shrink-0 border-b border-border bg-background px-4 py-3">
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full bg-secondary animate-pulse" />
-                        <div className="space-y-2">
-                            <div className="h-4 w-40 rounded bg-secondary animate-pulse" />
-                            <div className="h-3 w-24 rounded bg-secondary animate-pulse" />
-                        </div>
-                    </div>
-                </div>
-                {/* Skeleton body */}
-                <div className="flex-1 p-6">
-                    <div className="grid grid-cols-3 gap-4">
-                        {Array.from({ length: 6 }).map((_, i) => (
-                            <div key={i} className="h-24 rounded-lg bg-secondary/50 animate-pulse" style={{ animationDelay: `${i * 50}ms` }} />
-                        ))}
-                    </div>
-                </div>
+            <div className={cn("flex items-center justify-center h-full", isDark ? "bg-slate-900" : "bg-slate-50")}>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
             </div>
         );
     }
 
     if (!user) {
         return (
-            <div className="flex flex-col items-center justify-center h-[calc(100vh-48px)] bg-background gap-4">
-                <User className="w-12 h-12 text-muted-foreground/20" />
-                <p className="text-sm text-muted-foreground font-bold uppercase tracking-widest">User not found</p>
+            <div className={cn("flex flex-col items-center justify-center h-full gap-4", isDark ? "bg-slate-900" : "bg-slate-50")}>
+                <User className="w-12 h-12 text-muted-foreground/30" />
+                <p className="text-muted-foreground text-sm">User not found</p>
                 <button onClick={() => router.back()} className="text-xs text-primary hover:underline cursor-pointer">Go Back</button>
             </div>
         );
     }
 
-    const fullName = user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (user.name || 'Unknown');
-    const initials = `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase() || '?';
-    const department = (user.department === 'SUPERADMIN' || user.department === 'Management') ? 'Admin' : (user.department || 'N/A');
-    const isOwnProfile = session?.user?.id === user._id;
-    const joinDate = user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null;
-
-    const sessionRole = (session?.user as any)?.role;
-    const isAdmin = sessionRole === 'SuperAdmin' || sessionRole === 'Admin';
-
-    const tabs = [
-        { id: 'overview', label: 'Overview', icon: User },
-        { id: 'work', label: 'Work Info', icon: Briefcase },
-        { id: 'files', label: 'Files', icon: FileText },
-        ...(isAdmin ? [{ id: 'permissions', label: 'Permissions', icon: Lock }] : []),
-    ];
-
     return (
-        <div className="flex flex-col h-[calc(100vh-48px)] bg-background">
-            {/* ── Header Banner ────────────────────────────────────────────────────── */}
-            <div className="shrink-0 border-b border-border bg-background">
-                {/* Gradient accent */}
-                <div className="h-20 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent relative overflow-hidden">
-                    <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.02)_25%,rgba(255,255,255,0.02)_50%,transparent_50%,transparent_75%,rgba(255,255,255,0.02)_75%)] bg-[length:30px_30px]" />
-                </div>
-                {/* Profile bar */}
-                <div className="px-6 -mt-8 pb-3 flex items-end gap-4">
-                    <button onClick={() => router.back()} className="text-muted-foreground hover:text-foreground transition-colors mb-2 cursor-pointer shrink-0" title="Back">
-                        <ArrowLeft className="w-4 h-4" />
-                    </button>
-                    {/* Avatar */}
-                    <div className="relative shrink-0">
-                        <div className="w-16 h-16 rounded-full border-[3px] border-background shadow-lg overflow-hidden bg-secondary">
-                            {user.profileImage || user.image ? (
-                                <Image src={user.profileImage || user.image} alt={fullName} fill className="object-cover" />
-                            ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-primary/10">
-                                    <span className="text-lg font-black text-primary">{initials}</span>
+        <div className={cn(
+            "h-full flex flex-col relative overflow-hidden",
+            isDark
+                ? "bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white"
+                : "bg-gradient-to-br from-slate-50 via-white to-slate-100 text-slate-900"
+        )}>
+            {/* Background Effects */}
+            <div className={cn("absolute inset-0 pointer-events-none", isDark ? "opacity-[0.03]" : "opacity-[0.04]")} style={{
+                backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='${isDark ? '%23ffffff' : '%23000000'}' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+            }} />
+            <div className={cn("absolute top-20 left-20 w-96 h-96 rounded-full blur-[120px] animate-pulse pointer-events-none", isDark ? "bg-blue-500/10" : "bg-blue-500/[0.07]")} />
+            <div className={cn("absolute bottom-20 right-20 w-96 h-96 rounded-full blur-[120px] animate-pulse pointer-events-none", isDark ? "bg-purple-500/10" : "bg-purple-500/[0.06]")} style={{ animationDelay: '1s' }} />
+
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto relative z-10">
+                <div className="max-w-[1400px] mx-auto p-6 lg:p-8 space-y-8">
+
+                    {/* ═══ Hero Section ═══ */}
+                    <section className={cn(
+                        "relative overflow-hidden rounded-3xl p-8 lg:p-10",
+                        isDark
+                            ? "bg-gradient-to-r from-slate-800/80 to-slate-800/40 border border-slate-700/50 backdrop-blur-sm"
+                            : "bg-gradient-to-r from-white to-slate-50 border border-slate-200 shadow-lg"
+                    )}>
+                        {/* Decorative gradient */}
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500" />
+                        <div className={cn("absolute top-0 right-0 w-64 h-64 rounded-full blur-[100px] pointer-events-none", isDark ? "bg-blue-500/10" : "bg-blue-500/5")} />
+
+                        <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center gap-6">
+                            {/* Avatar */}
+                            <div className="relative group">
+                                <div className="w-24 h-24 rounded-2xl overflow-hidden ring-4 ring-primary/20 shadow-2xl shadow-primary/10">
+                                    {user.profileImage ? (
+                                        <Image src={user.profileImage} alt={user.firstName} width={96} height={96} className="object-cover w-full h-full" />
+                                    ) : (
+                                        <div className={cn("w-full h-full flex items-center justify-center text-3xl font-black", isDark ? "bg-slate-700 text-slate-300" : "bg-slate-200 text-slate-500")}>
+                                            {user.firstName?.[0]}{user.lastName?.[0]}
+                                        </div>
+                                    )}
                                 </div>
-                            )}
-                        </div>
-                        {/* Status indicator */}
-                        <div className={cn(
-                            "absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-background",
-                            user.status === 'Active' ? 'bg-emerald-500' : 'bg-muted-foreground/30'
-                        )} />
-                    </div>
-                    {/* Name & role */}
-                    <div className="flex-1 min-w-0 mb-1">
-                        <h1 className="text-lg font-black text-foreground tracking-tight truncate">{fullName}</h1>
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-[11px] font-bold text-primary/80 uppercase tracking-wider">{user.role || 'N/A'}</span>
-                            <span className="text-muted-foreground/40">·</span>
-                            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{department}</span>
-                            {user.status && (
-                                <>
-                                    <span className="text-muted-foreground/40">·</span>
-                                    <span className={cn(
-                                        "text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full",
-                                        user.status === 'Active' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-muted-foreground/10 text-muted-foreground'
-                                    )}>{user.status}</span>
-                                </>
-                            )}
-                        </div>
-                    </div>
-                    {/* Quick actions */}
-                    <div className="flex items-center gap-2 mb-1 shrink-0">
-                        {user.email && (
-                            <a href={`mailto:${user.email}`} className="h-8 px-3 bg-primary text-primary-foreground hover:opacity-90 transition-all rounded-lg shadow flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest">
-                                <Mail className="w-3.5 h-3.5" />
-                                <span>Message</span>
-                            </a>
-                        )}
-                        {user.phone && (
-                            <a href={`tel:${user.phone}`} className="h-8 px-3 bg-secondary border border-border text-foreground hover:bg-secondary/80 transition-all rounded-lg flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest">
-                                <Phone className="w-3.5 h-3.5" />
-                                <span>Call</span>
-                            </a>
-                        )}
-                    </div>
-                </div>
-                {/* Tab bar */}
-                <div className="px-6 flex items-center gap-1">
-                    {tabs.map(tab => {
-                        const Icon = tab.icon;
-                        const active = activeTab === tab.id;
-                        return (
-                            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                                className={cn(
-                                    "px-4 py-2.5 text-[11px] font-bold uppercase tracking-widest border-b-2 transition-all flex items-center gap-1.5 cursor-pointer -mb-px",
-                                    active ? 'text-foreground border-foreground' : 'text-muted-foreground border-transparent hover:text-foreground hover:border-muted-foreground/30'
+                                <div className={cn(
+                                    "absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 flex items-center justify-center",
+                                    user.status === 'Active'
+                                        ? "bg-emerald-500 border-emerald-400/50"
+                                        : "bg-slate-500 border-slate-400/50",
+                                    isDark ? "border-slate-800" : "border-white"
                                 )}>
-                                <Icon className="w-3.5 h-3.5" />
-                                <span>{tab.label}</span>
-                            </button>
-                        );
-                    })}
-                </div>
-            </div>
-
-            {/* ── Content ──────────────────────────────────────────────────────────── */}
-            <div className="flex-1 overflow-y-auto scrollbar-custom">
-                <div className="max-w-6xl mx-auto px-6 py-6">
-
-                    {/* Overview Tab */}
-                    {activeTab === 'overview' && (
-                        <div className="animate-in fade-in duration-300 space-y-6">
-                            {/* Stats row */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <StatCard label="Hourly Rate" value={user.hourlyRate ? `$${user.hourlyRate}` : '—'} icon={DollarSign} color="bg-emerald-500/10 text-emerald-500" />
-                                <StatCard label="Department" value={department} icon={Building} color="bg-blue-500/10 text-blue-500" />
-                                <StatCard label="Role" value={user.role || '—'} icon={Shield} color="bg-purple-500/10 text-purple-500" />
-                                <StatCard label="Status" value={user.status || '—'} icon={Activity} color={user.status === 'Active' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-muted-foreground/10 text-muted-foreground'} />
-                            </div>
-
-                            {/* Two column layout */}
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                {/* Contact Information */}
-                                <div className="border border-border rounded-lg overflow-hidden">
-                                    <div className="px-5 py-3 bg-secondary/30 border-b border-border">
-                                        <h3 className="text-[11px] font-black uppercase tracking-widest text-foreground flex items-center gap-2">
-                                            <Mail className="w-3.5 h-3.5 text-muted-foreground" />
-                                            Contact Information
-                                        </h3>
-                                    </div>
-                                    <div className="px-5 py-2">
-                                        <InfoRow icon={Mail} label="Email" value={
-                                            user.email ? <a href={`mailto:${user.email}`} className="text-primary hover:underline">{user.email}</a> : null
-                                        } />
-                                        <InfoRow icon={Phone} label="Phone" value={
-                                            user.phone ? <a href={`tel:${user.phone}`} className="text-primary hover:underline font-mono">{user.phone}</a> : null
-                                        } />
-                                        <InfoRow icon={Globe} label="Google" value={
-                                            user.googleConnected
-                                                ? <span className="flex items-center gap-1 text-emerald-500"><Check className="w-3 h-3" /> Connected</span>
-                                                : <span className="text-muted-foreground/50">Not Connected</span>
-                                        } />
-                                    </div>
-                                </div>
-
-                                {/* Employment Details */}
-                                <div className="border border-border rounded-lg overflow-hidden">
-                                    <div className="px-5 py-3 bg-secondary/30 border-b border-border">
-                                        <h3 className="text-[11px] font-black uppercase tracking-widest text-foreground flex items-center gap-2">
-                                            <Briefcase className="w-3.5 h-3.5 text-muted-foreground" />
-                                            Employment Details
-                                        </h3>
-                                    </div>
-                                    <div className="px-5 py-2">
-                                        <InfoRow icon={User} label="Employee ID" value={<span className="font-mono text-[11px]">{user._id}</span>} />
-                                        <InfoRow icon={Shield} label="Role" value={user.role} />
-                                        <InfoRow icon={Building} label="Department" value={department} />
-                                        <InfoRow icon={DollarSign} label="Hourly Rate" value={user.hourlyRate ? <span className="font-mono">${user.hourlyRate}/hr</span> : null} />
-                                        {joinDate && <InfoRow icon={Calendar} label="Joined" value={joinDate} />}
-                                    </div>
+                                    <Check className="w-3 h-3 text-white" />
                                 </div>
                             </div>
 
-                            {/* Google Integration - only for own profile */}
-                            {isOwnProfile && (
-                                <div className="border border-border rounded-lg overflow-hidden">
-                                    <div className="px-5 py-3 bg-secondary/30 border-b border-border flex items-center justify-between">
-                                        <h3 className="text-[11px] font-black uppercase tracking-widest text-foreground flex items-center gap-2">
-                                            <Globe className="w-3.5 h-3.5 text-muted-foreground" />
-                                            Google Integration
-                                        </h3>
-                                        {user.googleConnected ? (
-                                            <span className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-500 uppercase tracking-widest">
-                                                <Check className="w-3 h-3" /> Connected
-                                            </span>
-                                        ) : (
-                                            <button onClick={() => window.location.href = '/api/auth/google'}
-                                                className="h-7 px-3 bg-primary text-primary-foreground hover:opacity-90 transition-all rounded text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 cursor-pointer">
-                                                <Globe className="w-3 h-3" /> Connect Google
+                            {/* User Info */}
+                            <div className="flex-1">
+                                {isOwnProfile && (
+                                    <p className={cn("text-sm font-medium mb-1", isDark ? "text-slate-400" : "text-slate-500")}>
+                                        {getGreeting()} 👋
+                                    </p>
+                                )}
+                                <h1 className={cn("text-3xl font-black tracking-tight leading-none mb-2", isDark ? "text-white" : "text-slate-900")}>
+                                    {user.firstName} {user.lastName}
+                                </h1>
+                                <div className="flex flex-wrap items-center gap-2 mt-3">
+                                    <span className={cn(
+                                        "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest",
+                                        isDark ? "bg-primary/20 text-primary" : "bg-primary/10 text-primary"
+                                    )}>
+                                        <Shield className="w-3 h-3" /> {user.role}
+                                    </span>
+                                    <span className={cn(
+                                        "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest",
+                                        isDark ? "bg-slate-700/60 text-slate-300" : "bg-slate-100 text-slate-600"
+                                    )}>
+                                        <Building className="w-3 h-3" /> {user.department}
+                                    </span>
+                                    {getWorkspaceName() && (
+                                        <span className={cn(
+                                            "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest",
+                                            isDark ? "bg-blue-500/20 text-blue-400" : "bg-blue-50 text-blue-600"
+                                        )}>
+                                            <LayoutDashboard className="w-3 h-3" /> {getWorkspaceName()}
+                                        </span>
+                                    )}
+                                    <span className={cn(
+                                        "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest",
+                                        user.status === 'Active'
+                                            ? isDark ? "bg-emerald-500/20 text-emerald-400" : "bg-emerald-50 text-emerald-600"
+                                            : isDark ? "bg-slate-700 text-slate-400" : "bg-slate-100 text-slate-500"
+                                    )}>
+                                        <Zap className="w-3 h-3" /> {user.status}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Right Stats */}
+                            <div className="flex items-center gap-6">
+                                <div className="text-center">
+                                    <div className={cn("text-3xl font-black tabular-nums", isDark ? "text-white" : "text-slate-900")}>
+                                        {user.hourlyRate ? `$${user.hourlyRate}` : '—'}
+                                    </div>
+                                    <div className={cn("text-[10px] font-bold uppercase tracking-widest mt-1", isDark ? "text-slate-400" : "text-slate-500")}>
+                                        Hourly Rate
+                                    </div>
+                                </div>
+                                <div className={cn("h-12 w-px", isDark ? "bg-slate-700" : "bg-slate-200")} />
+                                <div className="text-center">
+                                    <div className={cn("text-[11px] font-bold", isDark ? "text-slate-300" : "text-slate-700")}>
+                                        {memberSince}
+                                    </div>
+                                    <div className={cn("text-[10px] font-bold uppercase tracking-widest mt-1", isDark ? "text-slate-400" : "text-slate-500")}>
+                                        Member Since
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* ═══ Contact & Details Row ═══ */}
+                    <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Contact Information */}
+                        <div className={cn(
+                            "rounded-2xl p-6 border",
+                            isDark ? "bg-slate-800/40 border-slate-700/50 backdrop-blur-sm" : "bg-white border-slate-200 shadow-sm"
+                        )}>
+                            <div className="flex items-center gap-2 mb-5">
+                                <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                                    <Mail className="w-4 h-4 text-blue-500" />
+                                </div>
+                                <h3 className={cn("text-xs font-black uppercase tracking-widest", isDark ? "text-white" : "text-slate-900")}>Contact</h3>
+                            </div>
+                            <div className="space-y-4">
+                                <div>
+                                    <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-1", isDark ? "text-slate-500" : "text-slate-400")}>Email</p>
+                                    <p className={cn("text-sm font-semibold truncate", isDark ? "text-white" : "text-slate-900")}>{user.email}</p>
+                                </div>
+                                <div>
+                                    <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-1", isDark ? "text-slate-500" : "text-slate-400")}>Phone</p>
+                                    <p className={cn("text-sm font-semibold", isDark ? "text-white" : "text-slate-900")}>{user.phone || '—'}</p>
+                                </div>
+                                {/* Password (SuperAdmin only) */}
+                                {isSuperAdmin && user.password && (
+                                    <div>
+                                        <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-1", isDark ? "text-slate-500" : "text-slate-400")}>Password</p>
+                                        <div className="flex items-center gap-2">
+                                            <p className={cn("text-sm font-mono font-semibold", isDark ? "text-white" : "text-slate-900")}>
+                                                {showPassword ? user.password : '••••••••'}
+                                            </p>
+                                            <button onClick={() => setShowPassword(!showPassword)} className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+                                                {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                                             </button>
-                                        )}
+                                        </div>
                                     </div>
-                                    <div className="px-5 py-4">
-                                        <p className="text-[12px] text-muted-foreground leading-relaxed">
-                                            {user.googleConnected
-                                                ? `Your Google account (${user.googleEmail || user.email}) is connected. You can access Google Calendar, Sheets, and other integrations.`
-                                                : 'Connect your Google account to enable Calendar sync, Drive access, and other productivity integrations.'}
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
+                                )}
+                            </div>
                         </div>
-                    )}
 
-                    {/* Work Info Tab */}
-                    {activeTab === 'work' && (
-                        <div className="animate-in fade-in duration-300 space-y-6">
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                {/* Work Information */}
-                                <div className="border border-border rounded-lg overflow-hidden">
-                                    <div className="px-5 py-3 bg-secondary/30 border-b border-border">
-                                        <h3 className="text-[11px] font-black uppercase tracking-widest text-foreground flex items-center gap-2">
-                                            <Briefcase className="w-3.5 h-3.5 text-muted-foreground" />
-                                            Work Information
-                                        </h3>
-                                    </div>
-                                    <div className="px-5 py-2">
-                                        <InfoRow icon={User} label="Employee ID" value={<span className="font-mono text-[11px]">{user._id}</span>} />
-                                        <InfoRow icon={Shield} label="Role" value={user.role} />
-                                        <InfoRow icon={Building} label="Department" value={department} />
-                                        <InfoRow icon={Clock} label="Employment Type" value="Full-Time" />
-                                        <InfoRow icon={DollarSign} label="Hourly Rate" value={user.hourlyRate ? <span className="font-mono">${user.hourlyRate}/hr</span> : null} />
-                                        {joinDate && <InfoRow icon={Calendar} label="Start Date" value={joinDate} />}
-                                    </div>
+                        {/* Work Information */}
+                        <div className={cn(
+                            "rounded-2xl p-6 border",
+                            isDark ? "bg-slate-800/40 border-slate-700/50 backdrop-blur-sm" : "bg-white border-slate-200 shadow-sm"
+                        )}>
+                            <div className="flex items-center gap-2 mb-5">
+                                <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                                    <Briefcase className="w-4 h-4 text-purple-500" />
                                 </div>
-
-                                {/* Status & Access */}
-                                <div className="border border-border rounded-lg overflow-hidden">
-                                    <div className="px-5 py-3 bg-secondary/30 border-b border-border">
-                                        <h3 className="text-[11px] font-black uppercase tracking-widest text-foreground flex items-center gap-2">
-                                            <Shield className="w-3.5 h-3.5 text-muted-foreground" />
-                                            Status & Access
-                                        </h3>
-                                    </div>
-                                    <div className="px-5 py-2">
-                                        <InfoRow icon={Activity} label="Status" value={
-                                            <span className={cn(
-                                                "flex items-center gap-1.5 text-[11px] font-black uppercase",
-                                                user.status === 'Active' ? 'text-emerald-500' : 'text-muted-foreground'
-                                            )}>
-                                                <div className={cn("w-2 h-2 rounded-full", user.status === 'Active' ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground/30')} />
-                                                {user.status || 'Inactive'}
-                                            </span>
-                                        } />
-                                        <InfoRow icon={Globe} label="Google Account" value={
-                                            user.googleConnected
-                                                ? <span className="flex items-center gap-1 text-emerald-500"><Check className="w-3 h-3" /> Connected</span>
-                                                : <span className="text-muted-foreground/50">Not Connected</span>
-                                        } />
-                                        <InfoRow icon={Mail} label="Email" value={user.email} />
-                                        <InfoRow icon={Phone} label="Phone" value={user.phone} />
-                                    </div>
+                                <h3 className={cn("text-xs font-black uppercase tracking-widest", isDark ? "text-white" : "text-slate-900")}>Work Info</h3>
+                            </div>
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <p className={cn("text-[10px] font-bold uppercase tracking-widest", isDark ? "text-slate-500" : "text-slate-400")}>Role</p>
+                                    <p className={cn("text-sm font-bold", isDark ? "text-white" : "text-slate-900")}>{user.role}</p>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <p className={cn("text-[10px] font-bold uppercase tracking-widest", isDark ? "text-slate-500" : "text-slate-400")}>Department</p>
+                                    <p className={cn("text-sm font-bold", isDark ? "text-white" : "text-slate-900")}>{user.department}</p>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <p className={cn("text-[10px] font-bold uppercase tracking-widest", isDark ? "text-slate-500" : "text-slate-400")}>Workspace</p>
+                                    <p className={cn("text-sm font-bold", isDark ? "text-blue-400" : "text-blue-600")}>{getWorkspaceName() || '—'}</p>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <p className={cn("text-[10px] font-bold uppercase tracking-widest", isDark ? "text-slate-500" : "text-slate-400")}>Type</p>
+                                    <p className={cn("text-sm font-bold", isDark ? "text-white" : "text-slate-900")}>Full-Time</p>
                                 </div>
                             </div>
                         </div>
-                    )}
 
-                    {/* Files Tab */}
-                    {activeTab === 'files' && (
-                        <div className="animate-in fade-in duration-300">
-                            <div className="flex flex-col items-center justify-center py-20 gap-4">
-                                <div className="w-16 h-16 rounded-2xl bg-secondary/50 flex items-center justify-center">
-                                    <FileText className="w-8 h-8 text-muted-foreground/30" />
+                        {/* Activity Summary */}
+                        <div className={cn(
+                            "rounded-2xl p-6 border",
+                            isDark ? "bg-slate-800/40 border-slate-700/50 backdrop-blur-sm" : "bg-white border-slate-200 shadow-sm"
+                        )}>
+                            <div className="flex items-center gap-2 mb-5">
+                                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                                    <Activity className="w-4 h-4 text-emerald-500" />
                                 </div>
-                                <p className="text-sm text-muted-foreground font-bold uppercase tracking-widest">No files uploaded</p>
-                                <p className="text-[12px] text-muted-foreground/60">Employee documents will appear here</p>
+                                <h3 className={cn("text-xs font-black uppercase tracking-widest", isDark ? "text-white" : "text-slate-900")}>Activity</h3>
+                            </div>
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <p className={cn("text-[10px] font-bold uppercase tracking-widest", isDark ? "text-slate-500" : "text-slate-400")}>Status</p>
+                                    <span className={cn(
+                                        "text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg",
+                                        user.status === 'Active'
+                                            ? isDark ? "bg-emerald-500/20 text-emerald-400" : "bg-emerald-50 text-emerald-600"
+                                            : isDark ? "bg-slate-700 text-slate-400" : "bg-slate-100 text-slate-500"
+                                    )}>
+                                        {user.status}
+                                    </span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <p className={cn("text-[10px] font-bold uppercase tracking-widest", isDark ? "text-slate-500" : "text-slate-400")}>Google</p>
+                                    <span className={cn(
+                                        "text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg flex items-center gap-1",
+                                        user.googleConnected
+                                            ? isDark ? "bg-blue-500/20 text-blue-400" : "bg-blue-50 text-blue-600"
+                                            : isDark ? "bg-slate-700 text-slate-400" : "bg-slate-100 text-slate-500"
+                                    )}>
+                                        <Globe className="w-3 h-3" /> {user.googleConnected ? 'Connected' : 'Not Connected'}
+                                    </span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <p className={cn("text-[10px] font-bold uppercase tracking-widest", isDark ? "text-slate-500" : "text-slate-400")}>Joined</p>
+                                    <p className={cn("text-sm font-bold", isDark ? "text-white" : "text-slate-900")}>{memberSince}</p>
+                                </div>
+                                {user.hourlyRate && (
+                                    <div className="flex items-center justify-between">
+                                        <p className={cn("text-[10px] font-bold uppercase tracking-widest", isDark ? "text-slate-500" : "text-slate-400")}>Rate</p>
+                                        <p className={cn("text-sm font-black tabular-nums", isDark ? "text-emerald-400" : "text-emerald-600")}>${user.hourlyRate}/hr</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
-                    )}
+                    </section>
 
-                    {/* Permissions Tab (Admin only) */}
-                    {activeTab === 'permissions' && isAdmin && (
-                        <div className="animate-in fade-in duration-300 space-y-6">
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                {/* Role & Access Level */}
-                                <div className="border border-border rounded-lg overflow-hidden">
-                                    <div className="px-5 py-3 bg-secondary/30 border-b border-border">
-                                        <h3 className="text-[11px] font-black uppercase tracking-widest text-foreground flex items-center gap-2">
-                                            <Shield className="w-3.5 h-3.5 text-muted-foreground" />
-                                            Role & Access Level
-                                        </h3>
-                                    </div>
-                                    <div className="px-5 py-2">
-                                        <InfoRow icon={Shield} label="Role" value={
-                                            <span className={cn(
-                                                "text-[11px] font-black uppercase px-2 py-0.5 rounded-full",
-                                                user.role === 'SuperAdmin' ? 'bg-red-500/10 text-red-500' :
-                                                    user.role === 'Admin' ? 'bg-purple-500/10 text-purple-500' :
-                                                        'bg-blue-500/10 text-blue-500'
-                                            )}>{user.role || 'N/A'}</span>
-                                        } />
-                                        <InfoRow icon={Activity} label="Status" value={
-                                            <span className={cn(
-                                                "flex items-center gap-1.5 text-[11px] font-black uppercase",
-                                                user.status === 'Active' ? 'text-emerald-500' : 'text-muted-foreground'
-                                            )}>
-                                                <div className={cn("w-2 h-2 rounded-full", user.status === 'Active' ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground/30')} />
-                                                {user.status || 'Inactive'}
-                                            </span>
-                                        } />
-                                        <InfoRow icon={Building} label="Department" value={department} />
-                                        <InfoRow icon={Mail} label="Email" value={user.email} />
-                                    </div>
+                    {/* ═══ Quick Links / Workspace Navigation ═══ */}
+                    {quickLinks.length > 0 && (
+                        <section>
+                            <div className="flex items-center gap-3 mb-5">
+                                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center">
+                                    <Sparkles className="w-4 h-4 text-blue-400" />
                                 </div>
-
-                                {/* Workspace Access */}
-                                <div className="border border-border rounded-lg overflow-hidden">
-                                    <div className="px-5 py-3 bg-secondary/30 border-b border-border">
-                                        <h3 className="text-[11px] font-black uppercase tracking-widest text-foreground flex items-center gap-2">
-                                            <Lock className="w-3.5 h-3.5 text-muted-foreground" />
-                                            Workspace Access
-                                        </h3>
-                                    </div>
-                                    <div className="px-5 py-4">
-                                        {user.workspace && user.workspace.length > 0 ? (
-                                            <div className="space-y-2">
-                                                {(Array.isArray(user.workspace) ? user.workspace : [user.workspace]).map((ws: string, idx: number) => (
-                                                    <div key={idx} className="flex items-center gap-3 px-3 py-2.5 bg-secondary border border-border rounded-lg">
-                                                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                                                            <Building className="w-4 h-4 text-primary" />
-                                                        </div>
-                                                        <div>
-                                                            <div className="text-[12px] font-bold text-foreground">{ws}</div>
-                                                            <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Assigned Workspace</div>
-                                                        </div>
-                                                        <Check className="w-4 h-4 text-emerald-500 ml-auto" />
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <div className="flex flex-col items-center justify-center py-8 gap-2">
-                                                <div className="w-12 h-12 rounded-xl bg-secondary/50 flex items-center justify-center">
-                                                    <Lock className="w-6 h-6 text-muted-foreground/30" />
-                                                </div>
-                                                <p className="text-[12px] text-muted-foreground font-bold uppercase tracking-widest">No workspaces assigned</p>
-                                                <p className="text-[11px] text-muted-foreground/60">This user does not have any workspace permissions.</p>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
+                                <h2 className={cn("text-lg font-bold", isDark ? "text-white" : "text-slate-900")}>Quick Access</h2>
+                                <span className={cn(
+                                    "text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-widest",
+                                    isDark ? "bg-blue-500/20 text-blue-300" : "bg-blue-100 text-blue-600"
+                                )}>
+                                    {isSuperAdmin ? 'SuperAdmin' : getWorkspaceName() || 'Workspace'}
+                                </span>
                             </div>
-                        </div>
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                                {quickLinks.map((link, idx) => (
+                                    <QuickLinkCard key={idx} {...link} isDark={isDark} />
+                                ))}
+                            </div>
+                        </section>
                     )}
+
+                    {/* Bottom Spacer */}
+                    <div className="h-4" />
                 </div>
             </div>
         </div>

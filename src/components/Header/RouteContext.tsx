@@ -233,9 +233,17 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
     }
 
     // Dashboard
-    if (pathname === '/') {
+    if (pathname === '/' || pathname === '/reports/dashboard') {
         return {
             title: 'Dashboard',
+            actions: []
+        };
+    }
+
+    // Profile
+    if (pathname === '/profile' || pathname.startsWith('/profile/')) {
+        return {
+            title: 'Profile',
             actions: []
         };
     }

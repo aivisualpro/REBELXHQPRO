@@ -1,4 +1,10 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import crypto from 'crypto';
+
+/** Generate a short, URL-safe random ID (12 chars) */
+function generateProfileId(): string {
+    return crypto.randomBytes(9).toString('base64url'); // 12 chars, URL-safe
+}
 
 export interface IUser extends Document {
     firstName: string;
@@ -10,6 +16,8 @@ export interface IUser extends Document {
     phone?: string;
     hourlyRate?: number;
     profileImage?: string;
+    workspaceId?: string;
+    profileId: string;
     status: 'Active' | 'Inactive';
 }
 
@@ -24,6 +32,8 @@ const UserSchema: Schema = new Schema({
     phone: { type: String },
     hourlyRate: { type: Number },
     profileImage: { type: String },
+    workspaceId: { type: String },
+    profileId: { type: String, unique: true, index: true },
     status: { type: String, enum: ['Active', 'Inactive'], default: 'Active', index: true },
     // Google Integration Fields
     googleConnected: { type: Boolean, default: false },
@@ -34,6 +44,14 @@ const UserSchema: Schema = new Schema({
 }, {
     timestamps: true,
     _id: false // Disable auto _id generation so we can manually set it
+});
+
+// Auto-generate profileId on new documents
+UserSchema.pre('save', function (next: any) {
+    if (!this.profileId) {
+        this.profileId = generateProfileId();
+    }
+    next();
 });
 
 export default mongoose.models.RXHQUsers || mongoose.model<IUser>('RXHQUsers', UserSchema);
