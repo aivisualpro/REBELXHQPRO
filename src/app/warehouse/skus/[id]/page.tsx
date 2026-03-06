@@ -112,6 +112,19 @@ interface LinkedWebProduct {
 
 const PAGE_SIZE = 20; // Load 20 rows at a time
 
+// Website color map — simple solid colors like status badges
+const WEBSITE_COLOR_MAP: Record<string, string> = {
+    'KING': 'bg-amber-600',
+    'GRASS': 'bg-emerald-600',
+    'GRHK': 'bg-sky-600',
+    'REBEL': 'bg-violet-600',
+    'GUD': 'bg-rose-600',
+};
+const getWebsiteColorClass = (name: string) => {
+    const key = Object.keys(WEBSITE_COLOR_MAP).find(k => name?.toUpperCase().includes(k));
+    return key ? WEBSITE_COLOR_MAP[key] : 'bg-zinc-500';
+};
+
 function SkuDetailsPageContent() {
     const params = useParams();
     const router = useRouter();
@@ -734,17 +747,24 @@ function SkuDetailsPageContent() {
 
                         {/* Lots Summary Section */}
                         {lots.length > 0 && (
-                            <div className="p-4 bg-background border-b border-border">
-                                <h3 className="text-sm font-bold text-foreground uppercase tracking-wider mb-3 border-b border-border pb-2">Lot Inventory</h3>
+                            <div className="bg-background border-b border-border">
+                                <div className="px-4 pt-4 pb-3">
+                                    <div className="flex items-center justify-between">
+                                        <h3 className="text-sm font-black text-foreground uppercase tracking-widest">Lot Inventory</h3>
+                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                                            {lots.filter(l => Math.abs(l.balance) >= 1).length} lots
+                                        </span>
+                                    </div>
+                                </div>
                                 <div className="overflow-hidden">
-                                    <table className="w-full text-left">
-                                        <thead>
-                                            <tr className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                                                <th className="pb-2">Lot #</th>
-                                                <th className="pb-2">Type</th>
-                                                <th className="pb-2">Date</th>
-                                                <th className="pb-2 text-right">Cost</th>
-                                                <th className="pb-2 text-right">Balance</th>
+                                    <table className="w-full text-left border-collapse">
+                                        <thead className="bg-secondary/50 border-y border-border">
+                                            <tr>
+                                                <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">Lot #</th>
+                                                <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">Type</th>
+                                                <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">Date</th>
+                                                <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap text-right">Cost</th>
+                                                <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap text-right">Balance</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-border">
@@ -752,28 +772,37 @@ function SkuDetailsPageContent() {
                                                 <tr
                                                     key={lot.lotNumber}
                                                     className={cn(
-                                                        "text-sm hover:bg-secondary/50 cursor-pointer transition-colors",
+                                                        "hover:bg-secondary/50 cursor-pointer transition-colors",
                                                         selectedLot === lot.lotNumber && "bg-primary/10 hover:bg-primary/15"
                                                     )}
                                                     onClick={() => setSelectedLot(selectedLot === lot.lotNumber ? 'All' : lot.lotNumber)}
                                                 >
-                                                    <td className="py-2 font-mono font-medium text-foreground truncate max-w-[160px]" title={lot.lotNumber}>
+                                                    <td className="px-3 py-2.5 text-xs font-mono font-bold text-foreground truncate max-w-[160px]" title={lot.lotNumber}>
                                                         {lot.lotNumber}
                                                     </td>
-                                                    <td className="py-2 text-muted-foreground truncate max-w-[80px]" title={lot.source}>
-                                                        {lot.source === 'Opening Balance' ? 'OB' :
-                                                            lot.source === 'Manufacturing' ? 'MFG' :
-                                                                lot.source === 'Audit Adjustment' ? 'ADJ' :
-                                                                    lot.source.startsWith('PO') ? 'PO' : lot.source.substring(0, 8)}
+                                                    <td className="px-3 py-2.5">
+                                                        <span className={cn(
+                                                            "text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-none",
+                                                            lot.source === 'Opening Balance' ? 'bg-purple-600 text-white' :
+                                                                lot.source === 'Manufacturing' ? 'bg-orange-500 text-white' :
+                                                                    lot.source === 'Purchase Order' ? 'bg-blue-600 text-white' :
+                                                                        lot.source === 'Audit Adjustment' ? 'bg-red-600 text-white' :
+                                                                            'bg-secondary text-muted-foreground'
+                                                        )}>
+                                                            {lot.source === 'Opening Balance' ? 'OB' :
+                                                                lot.source === 'Manufacturing' ? 'MFG' :
+                                                                    lot.source === 'Audit Adjustment' ? 'ADJ' :
+                                                                        lot.source.startsWith('PO') ? 'PO' : lot.source.substring(0, 8)}
+                                                        </span>
                                                     </td>
-                                                    <td className="py-2 text-muted-foreground font-mono">
+                                                    <td className="px-3 py-2.5 text-xs text-muted-foreground font-mono font-bold">
                                                         {lot.date ? new Date(lot.date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) : '-'}
                                                     </td>
-                                                    <td className="py-2 text-right font-mono text-muted-foreground font-medium text-sm">
+                                                    <td className="px-3 py-2.5 text-right text-xs font-mono font-bold text-muted-foreground">
                                                         {lot.cost > 0 ? `$${lot.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
                                                     </td>
                                                     <td className={cn(
-                                                        "py-2 text-right font-mono font-bold",
+                                                        "px-3 py-2.5 text-right text-sm font-mono font-black",
                                                         lot.balance > 0 ? "text-emerald-500" : lot.balance < 0 ? "text-rose-500" : "text-muted-foreground"
                                                     )}>
                                                         {lot.balance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
@@ -788,15 +817,15 @@ function SkuDetailsPageContent() {
 
                         {/* Linked Web Products Section */}
                         {(linkedWebProducts.length > 0 || loadingLinkedProducts) && (
-                            <div className="p-4 bg-background border-b border-border">
-                                <div className="flex items-center justify-between mb-3 border-b border-border pb-2">
-                                    <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
-                                        <Link className="w-3.5 h-3.5 text-indigo-400" />
+                            <div className="bg-background border-b border-border">
+                                <div className="px-4 pt-4 pb-3 flex items-center justify-between">
+                                    <h3 className="text-sm font-black text-foreground uppercase tracking-widest flex items-center gap-2">
+                                        <Link className="w-4 h-4 text-indigo-400" />
                                         Web Products
-                                        <span className="text-[9px] font-medium text-muted-foreground/60 normal-case tracking-normal">
-                                            ({linkedWebProducts.length})
-                                        </span>
                                     </h3>
+                                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                                        {linkedWebProducts.length}
+                                    </span>
                                 </div>
                                 {loadingLinkedProducts ? (
                                     <div className="flex items-center justify-center py-4">
@@ -804,99 +833,68 @@ function SkuDetailsPageContent() {
                                         <span className="text-[10px] text-muted-foreground ml-2">Loading…</span>
                                     </div>
                                 ) : (
-                                    <div className="space-y-1">
-                                        {linkedWebProducts.map((wp) => (
-                                            <div
-                                                key={wp._id}
-                                                className="group flex items-center gap-2 px-2 py-1.5 rounded hover:bg-secondary/50 transition-all cursor-pointer relative"
-                                                onClick={() => router.push(`/warehouse/web-products?search=${encodeURIComponent(wp.name)}`)}
-                                            >
-                                                {/* Image */}
-                                                {wp.image ? (
-                                                    <img
-                                                        src={wp.image}
-                                                        alt=""
-                                                        className="w-7 h-7 rounded object-cover border border-border shrink-0"
-                                                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                                                    />
-                                                ) : (
-                                                    <div className="w-7 h-7 rounded bg-secondary flex items-center justify-center shrink-0 border border-border">
-                                                        <Globe className="w-3 h-3 text-muted-foreground/50" />
-                                                    </div>
-                                                )}
-
-                                                {/* Content */}
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-1.5">
-                                                        {/* Website badge */}
-                                                        {wp.website && (
-                                                            <span className="text-[7px] font-black uppercase tracking-wider px-1 py-px rounded bg-indigo-500/10 text-indigo-400/80 border border-indigo-500/15 shrink-0">
-                                                                {wp.website.length > 12 ? wp.website.substring(0, 12) : wp.website}
-                                                            </span>
-                                                        )}
-                                                        <p className="text-[9px] font-bold text-foreground truncate leading-none" title={wp.name}>
-                                                            {wp.name}
-                                                        </p>
-                                                    </div>
-                                                    <div className="flex items-center gap-1 mt-0.5">
-                                                        {/* Status */}
-                                                        <span className={cn(
-                                                            "text-[7px] font-bold uppercase tracking-wider px-1 py-px rounded shrink-0",
-                                                            wp.status === 'publish' ? 'bg-emerald-500/10 text-emerald-500/80' :
-                                                                wp.status === 'draft' ? 'bg-amber-500/10 text-amber-500/80' :
-                                                                    'bg-secondary text-muted-foreground/60'
-                                                        )}>
-                                                            {wp.status || '?'}
-                                                        </span>
-                                                        {/* Type */}
-                                                        <span className={cn(
-                                                            "text-[7px] font-bold uppercase tracking-wider px-1 py-px rounded shrink-0",
-                                                            wp.type === 'variable' ? 'bg-purple-500/10 text-purple-400/80' : 'bg-blue-500/10 text-blue-400/80'
-                                                        )}>
-                                                            {wp.type || 'simple'}
-                                                        </span>
-                                                        {/* Linked variations inline */}
-                                                        {wp.linkedVariations.length > 0 && (
-                                                            <>
-                                                                <span className="text-[7px] text-muted-foreground/30">→</span>
-                                                                {wp.linkedVariations.slice(0, 2).map((v) => (
-                                                                    <span key={v._id} className="text-[8px] text-muted-foreground/60 truncate max-w-[60px]" title={v.name || v.sku}>
-                                                                        {v.name || v.sku || `#${v.id}`}
-                                                                    </span>
-                                                                ))}
-                                                                {wp.linkedVariations.length > 2 && (
-                                                                    <span className="text-[8px] text-muted-foreground/40">+{wp.linkedVariations.length - 2}</span>
-                                                                )}
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                {/* Right: Price + Orders */}
-                                                <div className="shrink-0 text-right">
-                                                    <p className="text-[10px] font-bold text-foreground font-mono leading-none">
-                                                        {wp.price != null ? `$${wp.price.toFixed(2)}` : '-'}
-                                                    </p>
-                                                    <p className="text-[8px] text-muted-foreground/50 font-mono mt-0.5">
-                                                        {wp.totalWebOrders || 0} ord
-                                                    </p>
-                                                </div>
-
-                                                {/* External link */}
-                                                {wp.permalink && (
-                                                    <a
-                                                        href={wp.permalink}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        className="p-0.5 hover:bg-secondary rounded transition-all opacity-0 group-hover:opacity-100 shrink-0"
-                                                        title="Open in store"
+                                    <div className="overflow-hidden">
+                                        <table className="w-full text-left border-collapse">
+                                            <thead className="bg-secondary/50 border-y border-border">
+                                                <tr>
+                                                    <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[40px]"></th>
+                                                    <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">Website</th>
+                                                    <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">Web Product</th>
+                                                    <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">Variance</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-border">
+                                                {linkedWebProducts.map((wp) => (
+                                                    <tr
+                                                        key={wp._id}
+                                                        className="hover:bg-secondary/50 cursor-pointer transition-colors group"
+                                                        onClick={() => router.push(`/warehouse/web-products?search=${encodeURIComponent(wp.name)}`)}
                                                     >
-                                                        <ExternalLink className="w-2.5 h-2.5 text-muted-foreground hover:text-indigo-400" />
-                                                    </a>
-                                                )}
-                                            </div>
-                                        ))}
+                                                        <td className="px-3 py-2">
+                                                            {wp.image ? (
+                                                                <img
+                                                                    src={wp.image}
+                                                                    alt=""
+                                                                    className="w-7 h-7 object-cover border border-border shrink-0"
+                                                                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                                                />
+                                                            ) : (
+                                                                <div className="w-7 h-7 bg-secondary flex items-center justify-center shrink-0 border border-border">
+                                                                    <Globe className="w-3 h-3 text-muted-foreground/50" />
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-3 py-2">
+                                                            {wp.website ? (
+                                                                <span className={cn("text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 text-white rounded shadow-sm", getWebsiteColorClass(wp.website || ''))}>
+                                                                    {wp.website}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-[10px] text-muted-foreground/50">-</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-3 py-2">
+                                                            <span className="text-xs font-bold text-foreground group-hover:text-blue-500 transition-colors" title={wp.name}>
+                                                                {wp.name}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-3 py-2">
+                                                            {wp.linkedVariations.length > 0 ? (
+                                                                <div className="flex flex-wrap gap-1">
+                                                                    {wp.linkedVariations.map((v) => (
+                                                                        <span key={v._id} className="text-[9px] font-bold text-muted-foreground bg-secondary px-1.5 py-0.5 border border-border" title={v.name || v.sku}>
+                                                                            {v.name || v.sku || `#${v.id}`}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-[10px] text-muted-foreground/50">-</span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
                                     </div>
                                 )}
                             </div>
@@ -904,121 +902,125 @@ function SkuDetailsPageContent() {
 
                         {/* Financial Summary */}
                         {financials && (
-                            <div className="p-4 bg-background space-y-8">
-                                <h3 className="text-xs font-bold text-foreground uppercase tracking-wider mb-4 border-b border-border pb-2">Financials</h3>
+                            <div className="bg-background border-b border-border">
+                                <div className="px-4 pt-4 pb-3">
+                                    <h3 className="text-sm font-black text-foreground uppercase tracking-widest">Financials</h3>
+                                </div>
+                                <div className="px-4 pb-6 space-y-8">
 
-                                {/* Tier 1 & 2: Show Revenue, Cost of Sales, Gross Profit */}
-                                {(sku?.tier === 1 || sku?.tier === 2) && (
-                                    <div className="space-y-4">
-                                        <div className="flex justify-between items-baseline">
-                                            <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">Total Revenue</span>
-                                            <span className="text-base font-black text-foreground">${financials.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                        </div>
-                                        <div className="flex justify-between items-baseline">
-                                            <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">Cost of Sales</span>
-                                            <span className="text-base font-medium text-muted-foreground">${financials.costOfSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                        </div>
-                                        <div className="flex justify-between items-baseline pt-2 border-t border-border">
-                                            <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">Gross Profit</span>
-                                            <span className={cn("text-base font-black", financials.grossProfit >= 0 ? "text-emerald-600" : "text-rose-600")}>
-                                                ${financials.grossProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                            </span>
-                                        </div>
+                                    {/* Tier 1 & 2: Show Revenue, Cost of Sales, Gross Profit */}
+                                    {(sku?.tier === 1 || sku?.tier === 2) && (
+                                        <div className="space-y-4">
+                                            <div className="flex justify-between items-baseline">
+                                                <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">Total Revenue</span>
+                                                <span className="text-base font-black text-foreground">${financials.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                            </div>
+                                            <div className="flex justify-between items-baseline">
+                                                <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">Cost of Sales</span>
+                                                <span className="text-base font-medium text-muted-foreground">${financials.costOfSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                            </div>
+                                            <div className="flex justify-between items-baseline pt-2 border-t border-border">
+                                                <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">Gross Profit</span>
+                                                <span className={cn("text-base font-black", financials.grossProfit >= 0 ? "text-emerald-600" : "text-rose-600")}>
+                                                    ${financials.grossProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </span>
+                                            </div>
 
-                                        <div className="mt-8">
-                                            <h4 className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-4">Last 12 Months Turnover</h4>
-                                            <div className="flex items-end space-x-1 pt-6 h-32">
-                                                {financials.chartData.map((d, i) => {
-                                                    const maxRev = Math.max(...financials.chartData.map(c => c.revenue), 100);
-                                                    const heightPct = (d.revenue / maxRev) * 100;
-                                                    const monthLabel = d.date ? new Date(d.date + '-01').toLocaleString('en-US', { month: 'short' }) : '';
-                                                    return (
-                                                        <div key={i} className="flex-1 h-full flex flex-col group relative">
-                                                            <div className="relative h-full flex flex-col justify-end w-full pb-px px-0.5">
-                                                                <div
-                                                                    className="bg-foreground/80 rounded-t hover:bg-foreground transition-all w-full relative group"
-                                                                    style={{ height: d.revenue > 0 ? `${Math.max(heightPct, 4)}%` : '2px' }}
-                                                                >
-                                                                    {d.revenue > 0 ? (
-                                                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 flex flex-col items-center pointer-events-none w-max z-10 opacity-100 group-hover:scale-110 transition-transform">
-                                                                            <span className="text-[9px] font-bold text-foreground tracking-tighter">${Math.round(d.revenue).toLocaleString()}</span>
-                                                                            <span className="text-[7px] text-muted-foreground font-medium uppercase">{d.qty || 0}</span>
+                                            <div className="mt-8">
+                                                <h4 className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-4">Last 12 Months Turnover</h4>
+                                                <div className="flex items-end space-x-1 pt-6 h-32">
+                                                    {financials.chartData.map((d, i) => {
+                                                        const maxRev = Math.max(...financials.chartData.map(c => c.revenue), 100);
+                                                        const heightPct = (d.revenue / maxRev) * 100;
+                                                        const monthLabel = d.date ? new Date(d.date + '-01').toLocaleString('en-US', { month: 'short' }) : '';
+                                                        return (
+                                                            <div key={i} className="flex-1 h-full flex flex-col group relative">
+                                                                <div className="relative h-full flex flex-col justify-end w-full pb-px px-0.5">
+                                                                    <div
+                                                                        className="bg-foreground/80 rounded-t hover:bg-foreground transition-all w-full relative group"
+                                                                        style={{ height: d.revenue > 0 ? `${Math.max(heightPct, 4)}%` : '2px' }}
+                                                                    >
+                                                                        {d.revenue > 0 ? (
+                                                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 flex flex-col items-center pointer-events-none w-max z-10 opacity-100 group-hover:scale-110 transition-transform">
+                                                                                <span className="text-[9px] font-bold text-foreground tracking-tighter">${Math.round(d.revenue).toLocaleString()}</span>
+                                                                                <span className="text-[7px] text-muted-foreground font-medium uppercase">{d.qty || 0}</span>
+                                                                            </div>
+                                                                        ) : null}
+                                                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-8 hidden group-hover:block z-30 bg-black text-white text-[9px] px-2 py-1 rounded whitespace-nowrap shadow-xl">
+                                                                            <p className="font-bold border-b border-white/20 mb-1">{d.date}</p>
+                                                                            <p>Rev: ${d.revenue.toLocaleString()}</p>
+                                                                            <p>Qty: {d.qty} units</p>
                                                                         </div>
-                                                                    ) : null}
-                                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-8 hidden group-hover:block z-30 bg-black text-white text-[9px] px-2 py-1 rounded whitespace-nowrap shadow-xl">
-                                                                        <p className="font-bold border-b border-white/20 mb-1">{d.date}</p>
-                                                                        <p>Rev: ${d.revenue.toLocaleString()}</p>
-                                                                        <p>Qty: {d.qty} units</p>
                                                                     </div>
                                                                 </div>
+                                                                <div className="text-[7px] text-muted-foreground font-medium text-center mt-1 uppercase tracking-tight">{monthLabel}</div>
                                                             </div>
-                                                            <div className="text-[7px] text-muted-foreground font-medium text-center mt-1 uppercase tracking-tight">{monthLabel}</div>
-                                                        </div>
-                                                    );
-                                                })}
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
 
-                                {/* Tier 2: Also show COGM, COGP and Manufacturing Chart */}
-                                {sku?.tier === 2 && (
-                                    <div className="pt-8 border-t border-border space-y-4">
-                                        <div className="flex justify-between items-baseline">
-                                            <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">COGM</span>
-                                            <span className="text-base font-black text-foreground">${(financials.cogm || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                        </div>
-                                        <div className="flex justify-between items-baseline">
-                                            <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">COGP</span>
-                                            <span className="text-base font-medium text-muted-foreground">${(financials.cogp || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                        </div>
+                                    {/* Tier 2: Also show COGM, COGP and Manufacturing Chart */}
+                                    {sku?.tier === 2 && (
+                                        <div className="pt-8 border-t border-border space-y-4">
+                                            <div className="flex justify-between items-baseline">
+                                                <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">COGM</span>
+                                                <span className="text-base font-black text-foreground">${(financials.cogm || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                            </div>
+                                            <div className="flex justify-between items-baseline">
+                                                <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">COGP</span>
+                                                <span className="text-base font-medium text-muted-foreground">${(financials.cogp || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                            </div>
 
-                                        <div className="mt-8">
-                                            <h4 className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-4">Last 12 Months Manufacturing</h4>
-                                            <div className="flex items-end space-x-1 pt-6 h-32">
-                                                {financials.chartData.map((d, i) => {
-                                                    const maxQty = Math.max(...financials.chartData.map(c => c.productionQty || 0), 10);
-                                                    const heightPct = ((d.productionQty || 0) / maxQty) * 100;
-                                                    const monthLabel = d.date ? new Date(d.date + '-01').toLocaleString('en-US', { month: 'short' }) : '';
-                                                    return (
-                                                        <div key={i} className="flex-1 h-full flex flex-col group relative">
-                                                            <div className="relative h-full flex flex-col justify-end w-full pb-px px-0.5">
-                                                                <div
-                                                                    className="bg-orange-500 rounded-t hover:bg-orange-600 transition-all w-full relative group"
-                                                                    style={{ height: d.productionQty && d.productionQty > 0 ? `${Math.max(heightPct, 4)}%` : '2px' }}
-                                                                >
-                                                                    {d.productionQty && d.productionQty > 0 ? (
-                                                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 flex flex-col items-center pointer-events-none w-max z-10 opacity-100 group-hover:scale-110 transition-transform">
-                                                                            <span className="text-[9px] font-bold text-orange-700 tracking-tighter">{d.productionQty.toLocaleString()}</span>
+                                            <div className="mt-8">
+                                                <h4 className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-4">Last 12 Months Manufacturing</h4>
+                                                <div className="flex items-end space-x-1 pt-6 h-32">
+                                                    {financials.chartData.map((d, i) => {
+                                                        const maxQty = Math.max(...financials.chartData.map(c => c.productionQty || 0), 10);
+                                                        const heightPct = ((d.productionQty || 0) / maxQty) * 100;
+                                                        const monthLabel = d.date ? new Date(d.date + '-01').toLocaleString('en-US', { month: 'short' }) : '';
+                                                        return (
+                                                            <div key={i} className="flex-1 h-full flex flex-col group relative">
+                                                                <div className="relative h-full flex flex-col justify-end w-full pb-px px-0.5">
+                                                                    <div
+                                                                        className="bg-orange-500 rounded-t hover:bg-orange-600 transition-all w-full relative group"
+                                                                        style={{ height: d.productionQty && d.productionQty > 0 ? `${Math.max(heightPct, 4)}%` : '2px' }}
+                                                                    >
+                                                                        {d.productionQty && d.productionQty > 0 ? (
+                                                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 flex flex-col items-center pointer-events-none w-max z-10 opacity-100 group-hover:scale-110 transition-transform">
+                                                                                <span className="text-[9px] font-bold text-orange-700 tracking-tighter">{d.productionQty.toLocaleString()}</span>
+                                                                            </div>
+                                                                        ) : null}
+                                                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-8 hidden group-hover:block z-30 bg-black text-white text-[9px] px-2 py-1 rounded whitespace-nowrap shadow-xl">
+                                                                            <p className="font-bold border-b border-white/20 mb-1">{d.date}</p>
+                                                                            <p>Prod: {d.productionQty?.toLocaleString()} units</p>
+                                                                            <p>Cost: ${d.productionCost?.toLocaleString()}</p>
                                                                         </div>
-                                                                    ) : null}
-                                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-8 hidden group-hover:block z-30 bg-black text-white text-[9px] px-2 py-1 rounded whitespace-nowrap shadow-xl">
-                                                                        <p className="font-bold border-b border-white/20 mb-1">{d.date}</p>
-                                                                        <p>Prod: {d.productionQty?.toLocaleString()} units</p>
-                                                                        <p>Cost: ${d.productionCost?.toLocaleString()}</p>
                                                                     </div>
                                                                 </div>
+                                                                <div className="text-[7px] text-muted-foreground font-medium text-center mt-1 uppercase tracking-tight">{monthLabel}</div>
                                                             </div>
-                                                            <div className="text-[7px] text-muted-foreground font-medium text-center mt-1 uppercase tracking-tight">{monthLabel}</div>
-                                                        </div>
-                                                    );
-                                                })}
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
 
-                                {/* Tier 3: Show COGP (Raw Materials are purchased) */}
-                                {sku?.tier === 3 && (
-                                    <div className="space-y-4">
-                                        <div className="flex justify-between items-baseline">
-                                            <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">COGP</span>
-                                            <span className="text-base font-black text-foreground">${(financials.cogp || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    {/* Tier 3: Show COGP (Raw Materials are purchased) */}
+                                    {sku?.tier === 3 && (
+                                        <div className="space-y-4">
+                                            <div className="flex justify-between items-baseline">
+                                                <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">COGP</span>
+                                                <span className="text-base font-black text-foreground">${(financials.cogp || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                            </div>
+                                            <p className="text-[10px] text-muted-foreground italic">Raw material - consumed in manufacturing only</p>
                                         </div>
-                                        <p className="text-[10px] text-muted-foreground italic">Raw material - consumed in manufacturing only</p>
-                                    </div>
-                                )}
-                                <div className="h-4" />
+                                    )}
+                                    <div className="h-4" />
+                                </div>
                             </div>
                         )}
                     </div>
@@ -1048,7 +1050,7 @@ function SkuDetailsPageContent() {
                     {/* Nested Sticky Layer 1: Toolbar */}
                     <div className="sticky top-0 z-[30] bg-background border-b border-border px-4 h-10 flex items-center justify-between gap-4">
                         <div className="flex items-center space-x-3">
-                            <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">Transaction Ledger</h3>
+                            <h3 className="text-sm font-black text-foreground uppercase tracking-widest">Transaction Ledger</h3>
                             {isSaving && (
                                 <span className="text-[10px] font-bold text-blue-500 animate-pulse">Saving changes...</span>
                             )}
@@ -1188,16 +1190,16 @@ function SkuDetailsPageContent() {
 
                     {/* Nested Sticky Layer 2: Table Header (Pinned exactly below toolbar) */}
                     <table className="w-full text-left border-collapse">
-                        <thead className="sticky top-10 z-[20] bg-secondary border-b border-border">
+                        <thead className="sticky top-10 z-[20] bg-secondary/50 border-y border-border">
                             <tr>
-                                <th className="px-3 py-3 text-xs font-bold text-muted-foreground uppercase tracking-widest border-r border-border">Date</th>
-                                <th className="px-3 py-3 text-xs font-bold text-muted-foreground uppercase tracking-widest border-r border-border">Type</th>
-                                <th className="px-3 py-3 text-xs font-bold text-muted-foreground uppercase tracking-widest border-r border-border">Reference</th>
-                                <th className="px-3 py-3 text-xs font-bold text-muted-foreground uppercase tracking-widest border-r border-border">Lot #</th>
-                                <th className="px-3 py-3 text-xs font-bold text-muted-foreground uppercase tracking-widest text-right border-r border-border">In/Out</th>
-                                <th className="px-3 py-3 text-xs font-bold text-muted-foreground uppercase tracking-widest border-r border-border">Status</th>
-                                <th className="px-3 py-3 text-xs font-bold text-muted-foreground uppercase tracking-widest text-right border-r border-border">Balance</th>
-                                <th className="px-3 py-3 text-xs font-bold text-muted-foreground uppercase tracking-widest text-right">Cost</th>
+                                <th className="px-3 py-2.5 text-[10px] font-black text-muted-foreground uppercase tracking-widest border-r border-border">Date</th>
+                                <th className="px-3 py-2.5 text-[10px] font-black text-muted-foreground uppercase tracking-widest border-r border-border">Type</th>
+                                <th className="px-3 py-2.5 text-[10px] font-black text-muted-foreground uppercase tracking-widest border-r border-border">Reference</th>
+                                <th className="px-3 py-2.5 text-[10px] font-black text-muted-foreground uppercase tracking-widest border-r border-border">Lot #</th>
+                                <th className="px-3 py-2.5 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right border-r border-border">In/Out</th>
+                                <th className="px-3 py-2.5 text-[10px] font-black text-muted-foreground uppercase tracking-widest border-r border-border">Status</th>
+                                <th className="px-3 py-2.5 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right border-r border-border">Balance</th>
+                                <th className="px-3 py-2.5 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right">Cost</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
@@ -1210,7 +1212,27 @@ function SkuDetailsPageContent() {
                                             <span className="text-[11px] uppercase font-black text-muted-foreground">{tx.type}</span>
                                         </div>
                                     </td>
-                                    <td className="px-3 py-3 text-sm text-foreground/80 font-medium truncate max-w-[150px]">{tx.reference}</td>
+                                    <td className="px-3 py-3 text-sm text-foreground/80 font-medium">
+                                        {tx.type === 'Web Order' && tx.reference ? (() => {
+                                            // Parse WC-WEBSITENAME-ORDERNUM format
+                                            const parts = tx.reference.split('-');
+                                            if (parts.length >= 3) {
+                                                const website = parts.slice(1, -1).join('-');
+                                                const orderNum = parts[parts.length - 1];
+                                                return (
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={cn("text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 text-white rounded shadow-sm whitespace-nowrap shrink-0", getWebsiteColorClass(website))}>
+                                                            {website}
+                                                        </span>
+                                                        <span className="text-xs font-bold font-mono text-foreground">{orderNum}</span>
+                                                    </div>
+                                                );
+                                            }
+                                            return <span className="truncate max-w-[150px]">{tx.reference}</span>;
+                                        })() : (
+                                            <span className="truncate max-w-[150px] block">{tx.reference}</span>
+                                        )}
+                                    </td>
                                     <td className="px-3 py-3 text-sm text-foreground/80 font-mono group/cell relative">
                                         <div className="flex items-center justify-between">
                                             <span>{tx.lotNumber || '-'}</span>

@@ -29,8 +29,9 @@ interface SearchableSelectProps {
 function buildFuzzyPatterns(token: string): string[] {
     const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const patterns = [escaped];
-    if (token.length >= 4) patterns.push(escaped.slice(0, -1));
-    if (token.length >= 6) patterns.push(escaped.slice(0, -2));
+    // Trim from the RAW token first, then escape to avoid broken escape sequences
+    if (token.length >= 4) patterns.push(token.slice(0, -1).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    if (token.length >= 6) patterns.push(token.slice(0, -2).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
     return [...new Set(patterns)];
 }
 
@@ -158,21 +159,21 @@ export function SearchableSelect({
         if (isOpen && containerRef.current) {
             const rect = containerRef.current.getBoundingClientRect();
             const windowHeight = window.innerHeight;
-            
+
             const shouldFlip = (windowHeight - rect.bottom) < 320 && rect.top > 320;
-            
+
             if (shouldFlip) {
                 // If flipping, we want the bottom of the dropdown to be at rect.top - 4
-                 setDropdownPos({
+                setDropdownPos({
                     top: -1, // signal to use bottom
                     bottom: windowHeight - rect.top + 4,
                     left: rect.left,
                     width: rect.width
                 });
             } else {
-                 setDropdownPos({
+                setDropdownPos({
                     top: rect.bottom + 4,
-                    bottom: undefined, 
+                    bottom: undefined,
                     left: rect.left,
                     width: rect.width
                 });
@@ -183,7 +184,7 @@ export function SearchableSelect({
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (
-                containerRef.current && 
+                containerRef.current &&
                 !containerRef.current.contains(event.target as Node) &&
                 dropdownRef.current &&
                 !dropdownRef.current.contains(event.target as Node)
@@ -228,7 +229,7 @@ export function SearchableSelect({
     const dropdownId = `searchable-select-dropdown-${options.length}-${placeholder}`;
 
     const dropdownContent = (
-        <div 
+        <div
             ref={dropdownRef}
             id={dropdownId}
             style={{
@@ -256,7 +257,7 @@ export function SearchableSelect({
                     />
                 </div>
             </div>
-            
+
             <div className="max-h-60 overflow-y-auto scrollbar-custom bg-card">
                 {filteredOptions.length === 0 && !showCreate ? (
                     <div className="px-4 py-6 text-sm text-muted-foreground text-center">No results found</div>

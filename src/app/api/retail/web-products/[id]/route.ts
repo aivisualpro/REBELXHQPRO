@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import WebProduct from '@/models/WebProduct';
+import Sku from '@/models/Sku';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,10 +12,36 @@ export async function GET(
     try {
         await dbConnect();
         const { id } = await context.params;
-        const product = await WebProduct.findById(id);
+        const product = await WebProduct.findById(id).lean();
 
         if (!product) {
             return NextResponse.json({ error: 'Web Product not found' }, { status: 404 });
+        }
+
+        // Resolve linked SKU names
+        const linkedSkuIds: string[] = [];
+        if ((product as any).linkedSkuId) linkedSkuIds.push((product as any).linkedSkuId);
+        if ((product as any).variations) {
+            for (const v of (product as any).variations) {
+                if (v.linkedSkuId) linkedSkuIds.push(v.linkedSkuId);
+            }
+        }
+
+        if (linkedSkuIds.length > 0) {
+            const uniqueIds = [...new Set(linkedSkuIds)];
+            const skus = await Sku.find({ _id: { $in: uniqueIds } }).select('_id name').lean();
+            const skuMap = new Map(skus.map((s: any) => [s._id.toString(), s.name]));
+
+            if ((product as any).linkedSkuId) {
+                (product as any).linkedSkuName = skuMap.get((product as any).linkedSkuId) || null;
+            }
+            if ((product as any).variations) {
+                for (const v of (product as any).variations) {
+                    if (v.linkedSkuId) {
+                        v.linkedSkuName = skuMap.get(v.linkedSkuId) || null;
+                    }
+                }
+            }
         }
 
         return NextResponse.json(product);

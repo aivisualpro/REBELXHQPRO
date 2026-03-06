@@ -433,8 +433,9 @@ function WebProductsContent() {
     tokens.forEach(token => {
       const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       allPatterns.push(escaped);
-      if (token.length >= 4) allPatterns.push(escaped.slice(0, -1));
-      if (token.length >= 6) allPatterns.push(escaped.slice(0, -2));
+      // Trim from the RAW token first, then escape to avoid broken escape sequences
+      if (token.length >= 4) allPatterns.push(token.slice(0, -1).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+      if (token.length >= 6) allPatterns.push(token.slice(0, -2).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
     });
     allPatterns.sort((a, b) => b.length - a.length);
     const uniquePatterns = [...new Set(allPatterns)].filter(p => p.length > 0);

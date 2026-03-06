@@ -501,14 +501,14 @@ export default function WebOrderDetailPage() {
                                 <table className="w-full border-collapse text-left">
                                     <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
                                         <tr>
-                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap max-w-[280px]">Product</th>
-                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[120px]">Variation</th>
-                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[220px]">Linked SKU</th>
-                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[100px]">Lot #</th>
-                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap text-center w-[50px]">Qty</th>
-                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[70px]">Cost</th>
-                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[70px]">Price</th>
-                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[70px]">Total</th>
+                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">Product</th>
+                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">Variation</th>
+                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">Linked SKU</th>
+                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">Lot #</th>
+                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap text-right">Qty</th>
+                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap text-right">Cost</th>
+                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap text-right">Price</th>
+                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap text-right">Total</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-border">
@@ -524,17 +524,17 @@ export default function WebOrderDetailPage() {
                                                                 e.stopPropagation();
                                                                 router.push(`/warehouse/web-products/${item.webProductId || item.parentProductId}`);
                                                             }}
-                                                            className="text-xs font-bold text-foreground cursor-pointer line-clamp-2 text-left transition-colors hover:text-blue-500"
+                                                            className="text-xs font-bold text-foreground cursor-pointer text-left transition-colors hover:text-blue-500"
                                                         >
                                                             {item.name}
                                                         </button>
                                                     ) : (
-                                                        <span className="text-xs font-bold text-foreground line-clamp-2">{item.name}</span>
+                                                        <span className="text-xs font-bold text-foreground">{item.name}</span>
                                                     )}
                                                 </td>
                                                 <td className="px-3 py-2">
                                                     {item.variationId > 0 ? (
-                                                        <span className="text-[10px] text-foreground font-bold truncate max-w-[130px] block" title={item.variationName || String(item.variationId)}>{item.variationName || item.variationId}</span>
+                                                        <span className="text-[10px] text-foreground font-bold">{item.variationName || item.variationId}</span>
                                                     ) : (
                                                         <span className="text-[10px] text-muted-foreground/50">-</span>
                                                     )}
@@ -546,10 +546,10 @@ export default function WebOrderDetailPage() {
                                                                 e.stopPropagation();
                                                                 router.push(`/warehouse/skus/${item.linkedSkuId}`);
                                                             }}
-                                                            className="flex items-center space-x-1 text-[10px] font-mono font-bold text-foreground cursor-pointer transition-colors group hover:text-blue-500"
+                                                            className="flex items-center space-x-1 text-xs font-bold text-foreground cursor-pointer transition-colors group hover:text-blue-500"
                                                         >
-                                                            <span className="truncate max-w-[200px]">{item.linkedSkuName || item.linkedSkuId}</span>
-                                                            <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                            <span>{item.linkedSkuName || item.linkedSkuId}</span>
+                                                            <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                                                         </button>
                                                     ) : (
                                                         <span className="text-[10px] text-muted-foreground/50">-</span>
@@ -575,10 +575,10 @@ export default function WebOrderDetailPage() {
                                                     </div>
                                                 </td>
 
-                                                <td className="px-3 py-2 text-center text-xs text-foreground font-mono font-bold">{item.quantity}</td>
-                                                <td className="px-3 py-2 text-xs text-orange-500 font-mono font-bold whitespace-nowrap">{item.cost != null && item.cost > 0 ? formatCurrency(item.cost) : '-'}</td>
-                                                <td className="px-3 py-2 text-xs text-foreground font-mono font-bold">{formatCurrency(item.price)}</td>
-                                                <td className="px-3 py-2 text-xs text-foreground font-mono font-black bg-secondary/20">{formatCurrency(item.total)}</td>
+                                                <td className="px-3 py-2 text-right text-xs text-foreground font-mono font-bold">{item.quantity}</td>
+                                                <td className="px-3 py-2 text-right text-xs text-orange-500 font-mono font-bold whitespace-nowrap">{item.cost != null && item.cost > 0 ? formatCurrency(item.cost) : '-'}</td>
+                                                <td className="px-3 py-2 text-right text-xs text-foreground font-mono font-bold">{formatCurrency(item.price)}</td>
+                                                <td className="px-3 py-2 text-right text-xs text-foreground font-mono font-black bg-secondary/20">{formatCurrency(item.total)}</td>
                                             </tr>
                                         ))}
                                         {(!order.lineItems || order.lineItems.length === 0) && (
