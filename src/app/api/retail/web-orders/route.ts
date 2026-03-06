@@ -18,7 +18,7 @@ export async function GET(request: Request) {
         const status = searchParams.get('status') || '';
         const sortBy = searchParams.get('sortBy') || 'dateCreated';
         const sortOrder = searchParams.get('sortOrder') === 'asc' ? 1 : -1;
-        
+
         let query: any = {};
 
         if (search) {
@@ -62,6 +62,7 @@ export async function GET(request: Request) {
             orders,
             total,
             page,
+            hasMore: page * limit < total,
             totalPages: Math.ceil(total / limit)
         });
 

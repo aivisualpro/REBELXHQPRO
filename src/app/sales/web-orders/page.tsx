@@ -1,23 +1,15 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
-import { createPortal } from 'react-dom';
 import {
-  Search,
-  Loader2,
-  CreditCard,
-  Truck,
-  X,
-  Download,
-  Upload,
+  ArrowUpDown, Search, Loader2, CreditCard, Truck, X, Download, Upload, ShoppingBag,
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
-import { Pagination } from '@/components/ui/Pagination';
-import { TableColumnHeader } from '@/components/ui/TableColumnHeader';
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface WebOrder {
   _id: string;
@@ -31,379 +23,444 @@ interface WebOrder {
   shippingTotal: number;
   discountTotal: number;
   billing: {
-    firstName: string;
-    lastName: string;
-    email: string;
-    phone: string;
-    city: string;
-    state: string;
-    country: string;
+    firstName: string; lastName: string; email: string; phone: string;
+    city: string; state: string; country: string;
   };
+  firstName: string; lastName: string; email: string; phone: string;
+  city: string; state: string; country: string;
   paymentMethodTitle: string;
   website: string;
   lineItems: any[];
 }
 
-export default function WebOrdersPage() {
+// ─── Cache ───────────────────────────────────────────────────────────────────
+
+interface CacheEntry {
+  orders: WebOrder[]; hasMore: boolean; page: number;
+  sortBy: string; sortOrder: string; search: string; status: string; timestamp: number;
+}
+const globalCache: { current: CacheEntry | null } = { current: null };
+const CACHE_TTL = 120_000;
+const PAGE_SIZE = 50;
+
+// ─── Columns ─────────────────────────────────────────────────────────────────
+
+const COLUMNS = [
+  { key: 'dateCreated', label: 'Date', width: 'w-[90px]' },
+  { key: 'number', label: 'Order #', width: 'w-[80px]' },
+  { key: 'website', label: 'Website', width: 'w-[100px]' },
+  { key: 'billing.firstName', label: 'Customer', width: 'w-[160px]' },
+  { key: 'status', label: 'Status', width: 'w-[95px]' },
+  { key: 'total', label: 'Total', width: 'w-[100px]', align: 'text-right' as const },
+  { key: 'shippingTotal', label: 'Shipping', width: 'w-[80px]', align: 'text-right' as const },
+  { key: 'discountTotal', label: 'Discount', width: 'w-[80px]', align: 'text-right' as const },
+  { key: 'totalTax', label: 'Tax', width: 'w-[70px]', align: 'text-right' as const },
+  { key: 'paymentMethodTitle', label: 'Payment', width: 'w-[110px]' },
+  { key: 'lineItems', label: 'Items', width: 'w-[55px]', align: 'text-right' as const },
+  { key: 'billing.city', label: 'Location', width: 'w-[130px]' },
+];
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function fmtCurrency(v: number) {
+  if (!v && v !== 0) return <span className="text-muted-foreground/30">—</span>;
+  if (v === 0) return <span className="text-muted-foreground/30">—</span>;
+  return <span className="tabular-nums">${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>;
+}
+
+// ─── Status Badge ────────────────────────────────────────────────────────────
+
+function StatusBadge({ status }: { status: string }) {
+  const styleMap: Record<string, { bg: string; color: string }> = {
+    'completed': { bg: '#059669', color: '#ffffff' },
+    'processing': { bg: '#0284c7', color: '#ffffff' },
+    'on-hold': { bg: '#d97706', color: '#ffffff' },
+    'pending': { bg: '#e2e8f0', color: '#000000' },
+    'cancelled': { bg: '#dc2626', color: '#ffffff' },
+    'refunded': { bg: '#7c3aed', color: '#ffffff' },
+    'failed': { bg: '#991b1b', color: '#ffffff' },
+  };
+  const s = styleMap[status];
+  return (
+    <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-black uppercase tracking-wider"
+      style={s ? { backgroundColor: s.bg, color: s.color, borderRadius: '4px' } : { borderRadius: '4px' }}>
+      {status || '—'}
+    </span>
+  );
+}
+
+function WebsiteBadge({ website }: { website: string }) {
+  const colorMap: Record<string, string> = {
+    'KING': 'bg-gradient-to-r from-amber-600 to-orange-500',
+    'GRASS': 'bg-gradient-to-r from-emerald-600 to-green-500',
+    'GRHK': 'bg-gradient-to-r from-sky-600 to-blue-500',
+    'REBEL': 'bg-gradient-to-r from-violet-600 to-purple-500',
+    'GUD': 'bg-gradient-to-r from-rose-600 to-pink-500',
+  };
+  const key = Object.keys(colorMap).find(k => website?.includes(k));
+  return (
+    <span className={cn("px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider text-white shadow-sm", key ? colorMap[key] : 'bg-zinc-500')}>
+      {website || 'N/A'}
+    </span>
+  );
+}
+
+// ─── Skeleton Row ────────────────────────────────────────────────────────────
+
+function WebSkeletonRow({ index }: { index: number }) {
+  return (
+    <tr className="border-b border-border/30">
+      {COLUMNS.map((col) => (
+        <td key={col.key} className={cn('px-2 py-2.5', col.width)}>
+          <div className={cn('h-3.5 rounded-sm bg-secondary/80 animate-pulse',
+            col.key === 'billing.firstName' ? 'w-4/5' : col.key === 'status' ? 'w-14' : col.key === 'number' ? 'w-10' : 'w-8'
+          )} style={{ animationDelay: `${index * 30}ms` }} />
+        </td>
+      ))}
+    </tr>
+  );
+}
+
+// ─── Table Row ───────────────────────────────────────────────────────────────
+
+const WebTableRow = React.memo(function WebTableRow({
+  order, onClick, highlight
+}: { order: WebOrder; onClick: () => void; highlight?: boolean }) {
+  return (
+    <tr data-order-id={order._id}
+      className={cn(
+        'group hover:bg-muted/30 dark:hover:bg-muted/10 transition-colors duration-150 cursor-pointer border-b border-border/60',
+        highlight && 'animate-[rowGlow_0.75s_ease-in-out_4] ring-1 ring-primary/40 bg-primary/[0.06]'
+      )}
+      onClick={onClick}>
+      <td className="px-2.5 py-2.5 w-[90px] text-[12px] font-mono text-foreground/60">
+        {order.dateCreated ? new Date(order.dateCreated).toLocaleDateString() : '-'}
+      </td>
+      <td className="px-2.5 py-2.5 w-[80px] text-[12px] font-mono font-bold text-foreground/90 group-hover:text-foreground transition-colors">
+        <span className="group-hover:border-l-2 group-hover:border-l-primary group-hover:pl-1.5 transition-all">#{order.number}</span>
+      </td>
+      <td className="px-2.5 py-2.5 w-[100px]"><WebsiteBadge website={order.website} /></td>
+      <td className="px-2.5 py-2.5 w-[160px] text-[12px] text-foreground/90 group-hover:text-foreground transition-colors font-semibold truncate">
+        {order.billing?.firstName} {order.billing?.lastName}
+      </td>
+      <td className="px-2.5 py-2.5 w-[95px]"><StatusBadge status={order.status} /></td>
+      <td className="px-2.5 py-2.5 w-[100px] text-[12px] font-mono text-right font-black text-foreground group-hover:text-foreground transition-colors">{fmtCurrency(order.total)}</td>
+      <td className="px-2.5 py-2.5 w-[80px] text-[12px] font-mono text-right text-foreground/70">{fmtCurrency(order.shippingTotal)}</td>
+      <td className="px-2.5 py-2.5 w-[80px] text-[12px] font-mono text-right text-foreground/70">{fmtCurrency(order.discountTotal)}</td>
+      <td className="px-2.5 py-2.5 w-[70px] text-[12px] font-mono text-right text-foreground/70">{fmtCurrency(order.totalTax)}</td>
+      <td className="px-2.5 py-2.5 w-[110px] text-[12px] text-foreground/60 truncate">
+        <div className="flex items-center gap-1.5"><CreditCard className="w-3 h-3 opacity-40 shrink-0" /><span className="truncate">{order.paymentMethodTitle || '-'}</span></div>
+      </td>
+      <td className="px-2.5 py-2.5 w-[55px] text-[12px] font-mono text-right">
+        <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-secondary text-[9px] font-black text-foreground/70">{order.lineItems?.length || 0}</span>
+      </td>
+      <td className="px-2.5 py-2.5 w-[130px] text-[12px] text-foreground/60 truncate">
+        {order.billing?.city}{order.billing?.state ? `, ${order.billing.state}` : ''}
+      </td>
+    </tr>
+  );
+});
+
+// ─── Main Component ──────────────────────────────────────────────────────────
+
+function WebOrdersContent() {
   const router = useRouter();
-  const [orders, setOrders] = useState<WebOrder[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalOrders, setTotalOrders] = useState(0);
+
+  const [orders, setOrders] = useState<WebOrder[]>(globalCache.current?.orders || []);
+  const [isLoading, setIsLoading] = useState(!globalCache.current);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(globalCache.current?.hasMore ?? true);
+  const [error, setError] = useState<string | null>(null);
+
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [sortBy, setSortBy] = useState('dateCreated');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [activeStatus, setActiveStatus] = useState<string>('All');
 
+  const pageRef = useRef(globalCache.current?.page || 0);
+  const mountedRef = useRef(true);
+  const fetchingRef = useRef(false);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
+  useEffect(() => { const t = setTimeout(() => setDebouncedSearch(search), 250); return () => clearTimeout(t); }, [search]);
 
-  // Header portal
-  const [headerPortalTarget, setHeaderPortalTarget] = useState<HTMLElement | null>(null);
+  // Scroll-back & highlight
+  const [highlightId, setHighlightId] = useState<string | null>(null);
   useEffect(() => {
-    const el = document.getElementById('header-portal-target');
-    if (el) setHeaderPortalTarget(el);
+    const savedId = sessionStorage.getItem('wo_scroll_to');
+    const savedScroll = sessionStorage.getItem('wo_scroll_top');
+    if (savedId) {
+      sessionStorage.removeItem('wo_scroll_to'); sessionStorage.removeItem('wo_scroll_top');
+      setHighlightId(savedId);
+      if (savedScroll && scrollRef.current) scrollRef.current.scrollTop = parseInt(savedScroll, 10);
+      const tryScroll = (attempts = 0) => {
+        const row = document.querySelector(`[data-order-id="${savedId}"]`);
+        if (row) { setTimeout(() => row.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50); setTimeout(() => setHighlightId(null), 3000); }
+        else if (attempts < 30) setTimeout(() => tryScroll(attempts + 1), 200);
+      };
+      setTimeout(() => tryScroll(), 100);
+    }
   }, []);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search);
-      setPage(1);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [search]);
+  // Status tabs & counts
+  const STATUS_TABS = ['All', 'processing', 'completed', 'on-hold', 'pending', 'cancelled', 'refunded', 'failed'] as const;
+  const STATUS_LABELS: Record<string, string> = { All: 'All', processing: 'Processing', completed: 'Completed', 'on-hold': 'On Hold', pending: 'Pending', cancelled: 'Cancelled', refunded: 'Refunded', failed: 'Failed' };
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({ All: 0, processing: 0, completed: 0, 'on-hold': 0, pending: 0, cancelled: 0, refunded: 0, failed: 0 });
+  const [countsLoaded, setCountsLoaded] = useState(false);
+  const fetchStatusCounts = useCallback(async () => {
+    try { const res = await fetch('/api/retail/web-orders/counts'); if (res.ok) { const d = await res.json(); if (d.counts) { setStatusCounts(d.counts); setCountsLoaded(true); } } } catch { }
+  }, []);
+  useEffect(() => { fetchStatusCounts(); }, [fetchStatusCounts]);
+  useEffect(() => { if (orders.length > 0) fetchStatusCounts(); }, [orders.length, fetchStatusCounts]);
 
-  const fetchOrders = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: '25',
-        search: debouncedSearch,
-        sortBy,
-        sortOrder,
-
-      });
-
-      const res = await fetch(`/api/retail/web-orders?${params.toString()}`);
-      const data = await res.json();
-
-      if (res.ok) {
-        setOrders(data.orders || []);
-        setTotalPages(data.totalPages || 1);
-        setTotalOrders(data.total || 0);
-      } else {
-        toast.error('Failed to load orders');
-      }
-    } catch (e) {
-      toast.error('Error loading orders');
-    } finally {
-      setLoading(false);
-    }
-  }, [page, debouncedSearch, sortBy, sortOrder]);
-
-  useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
-
-  const handleSort = (col: string) => {
-    if (sortBy === col) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(col);
-      setSortOrder('desc');
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-      case 'processing': return 'bg-blue-100 text-blue-700 border-blue-200';
-      case 'on-hold': return 'bg-amber-100 text-amber-700 border-amber-200';
-      case 'pending': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-      case 'cancelled': case 'refunded': case 'failed': return 'bg-rose-100 text-rose-700 border-rose-200';
-      default: return 'bg-slate-100 text-slate-600 border-slate-200';
-    }
-  };
-
-  const getWebsiteColor = (website: string) => {
-    if (website?.includes('KING')) return 'bg-gradient-to-r from-amber-600 to-orange-500';
-    if (website?.includes('GRASS')) return 'bg-gradient-to-r from-emerald-600 to-green-500';
-    if (website?.includes('GRHK')) return 'bg-gradient-to-r from-sky-600 to-blue-500';
-    if (website?.includes('REBEL')) return 'bg-gradient-to-r from-violet-600 to-purple-500';
-    if (website?.includes('GUD')) return 'bg-gradient-to-r from-rose-600 to-pink-500';
-    return 'bg-zinc-500';
-  };
-
-  // === Export / Import ===
+  // Export/Import
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
 
   const handleExportLineItems = async () => {
-    setExporting(true);
-    const toastId = toast.loading('Exporting line items...');
+    setExporting(true); const toastId = toast.loading('Exporting line items...');
     try {
-      const res = await fetch('/api/retail/web-orders/export-lineitems');
-      const json = await res.json();
+      const res = await fetch('/api/retail/web-orders/export-lineitems'); const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Export failed');
-
-      const csv = Papa.unparse(json.data);
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `web-order-lineitems-${new Date().toISOString().slice(0, 10)}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
+      const csv = Papa.unparse(json.data); const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob); const a = document.createElement('a');
+      a.href = url; a.download = `web-order-lineitems-${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(url);
       toast.success(`Exported ${json.total} line items`, { id: toastId });
-    } catch (e: any) {
-      toast.error(e.message || 'Export failed', { id: toastId });
-    } finally {
-      setExporting(false);
-    }
+    } catch (e: any) { toast.error(e.message || 'Export failed', { id: toastId }); } finally { setExporting(false); }
   };
 
   const handleImportLineItems = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImporting(true);
-    const toastId = toast.loading('Parsing CSV...');
-
-    const BATCH_SIZE = 2000;
-
+    const file = e.target.files?.[0]; if (!file) return;
+    setImporting(true); const toastId = toast.loading('Parsing CSV...');
     Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
+      header: true, skipEmptyLines: true,
       complete: async (results) => {
         try {
-          const allRows = results.data as any[];
-          const totalRows = allRows.length;
-          const totalBatches = Math.ceil(totalRows / BATCH_SIZE);
-
-          let totalUpdated = 0;
-          let totalSkipped = 0;
-          let totalErrors = 0;
-
+          const allRows = results.data as any[]; const BATCH = 2000; const totalBatches = Math.ceil(allRows.length / BATCH);
+          let totalUpdated = 0, totalSkipped = 0, totalErrors = 0;
           for (let i = 0; i < totalBatches; i++) {
-            const batch = allRows.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE);
-            toast.loading(
-              `Uploading batch ${i + 1}/${totalBatches} (${Math.min((i + 1) * BATCH_SIZE, totalRows)}/${totalRows} rows)...`,
-              { id: toastId }
-            );
-
-            const res = await fetch('/api/retail/web-orders/update-lineitems', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ data: batch })
-            });
-            const json = await res.json();
-            if (!res.ok) throw new Error(json.error || `Batch ${i + 1} failed`);
-
-            totalUpdated += json.updated || 0;
-            totalSkipped += json.skipped || 0;
-            totalErrors += json.errorCount || 0;
+            toast.loading(`Uploading batch ${i + 1}/${totalBatches}...`, { id: toastId });
+            const res = await fetch('/api/retail/web-orders/update-lineitems', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: allRows.slice(i * BATCH, (i + 1) * BATCH) }) });
+            const json = await res.json(); if (!res.ok) throw new Error(json.error || `Batch ${i + 1} failed`);
+            totalUpdated += json.updated || 0; totalSkipped += json.skipped || 0; totalErrors += json.errorCount || 0;
           }
-
-          toast.success(
-            `Done! Updated: ${totalUpdated} | Skipped: ${totalSkipped}${totalErrors ? ` | Errors: ${totalErrors}` : ''}`,
-            { id: toastId, duration: 6000 }
-          );
-          fetchOrders();
-        } catch (err: any) {
-          toast.error(err.message || 'Import failed', { id: toastId });
-        } finally {
-          setImporting(false);
-          if (fileInputRef.current) fileInputRef.current.value = '';
-        }
+          toast.success(`Done! Updated: ${totalUpdated} | Skipped: ${totalSkipped}${totalErrors ? ` | Errors: ${totalErrors}` : ''}`, { id: toastId, duration: 6000 });
+          refreshOrders();
+        } catch (err: any) { toast.error(err.message || 'Import failed', { id: toastId }); }
+        finally { setImporting(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
       },
-      error: (err) => {
-        toast.error(`CSV parse error: ${err.message}`, { id: toastId });
-        setImporting(false);
-      }
+      error: (err) => { toast.error(`CSV parse error: ${err.message}`, { id: toastId }); setImporting(false); }
     });
   };
 
+  // ─── Fetch ──────────────────────────────────────────────────────────────────
+  const abortRef = useRef<AbortController | null>(null);
+  const seqRef = useRef(0);
+
+  const fetchPage = useCallback(async (pageNum: number, isAppend: boolean) => {
+    if (abortRef.current) abortRef.current.abort();
+    const ctrl = new AbortController(); abortRef.current = ctrl;
+    const seq = ++seqRef.current; fetchingRef.current = true;
+    if (isAppend) setIsLoadingMore(true); else setIsLoading(true);
+    try {
+      const params = new URLSearchParams({ page: String(pageNum), limit: String(PAGE_SIZE), sortBy, sortOrder, search: debouncedSearch });
+      if (activeStatus !== 'All') params.set('status', activeStatus);
+      const res = await fetch(`/api/retail/web-orders?${params}`, { signal: ctrl.signal });
+      const data = await res.json();
+      if (seq !== seqRef.current || !mountedRef.current) return;
+      if (res.ok) {
+        const newOrders = data.orders || []; const newHasMore = data.hasMore ?? false;
+        if (isAppend) {
+          setOrders(prev => {
+            const ids = new Set(prev.map(o => o._id));
+            const merged = [...prev, ...newOrders.filter((o: WebOrder) => !ids.has(o._id))];
+            globalCache.current = { orders: merged, hasMore: newHasMore, page: pageNum, sortBy, sortOrder, search: debouncedSearch, status: activeStatus, timestamp: Date.now() };
+            return merged;
+          });
+        } else {
+          setOrders(newOrders);
+          globalCache.current = { orders: newOrders, hasMore: newHasMore, page: pageNum, sortBy, sortOrder, search: debouncedSearch, status: activeStatus, timestamp: Date.now() };
+        }
+        setHasMore(newHasMore); pageRef.current = pageNum; setError(null);
+      } else { setError(data.error || 'Failed to fetch'); }
+    } catch (e: any) { if (e?.name === 'AbortError') return; if (mountedRef.current) setError(e.message); }
+    finally { fetchingRef.current = false; if (mountedRef.current) { setIsLoading(false); setIsLoadingMore(false); } }
+  }, [sortBy, sortOrder, debouncedSearch, activeStatus]);
+
+  const fetchPageRef = useRef(fetchPage); fetchPageRef.current = fetchPage;
+  const isFirstMount = useRef(true);
+
+  useEffect(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      const c = globalCache.current;
+      if (c && c.orders.length > 0 && (Date.now() - c.timestamp) < CACHE_TTL && c.sortBy === sortBy && c.sortOrder === sortOrder && c.search === debouncedSearch && c.status === activeStatus) {
+        setOrders(c.orders); setHasMore(c.hasMore); pageRef.current = c.page; setIsLoading(false); return;
+      }
+    }
+    globalCache.current = null; pageRef.current = 0; setOrders([]); setHasMore(true);
+    fetchPageRef.current(1, false);
+  }, [sortBy, sortOrder, debouncedSearch, activeStatus]);
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current; const container = scrollRef.current;
+    if (!sentinel || !container) return;
+    const obs = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting && hasMore && !fetchingRef.current && !isLoading) fetchPage(pageRef.current + 1, true);
+    }, { root: container, rootMargin: '600px' });
+    obs.observe(sentinel); return () => obs.disconnect();
+  }, [hasMore, isLoading, fetchPage]);
+
+  const handleSort = (column: string) => {
+    if (sortBy === column) setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    else { setSortBy(column); setSortOrder('asc'); }
+    scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  const handleTabChange = (tab: string) => { setActiveStatus(tab); scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const refreshOrders = () => { globalCache.current = null; pageRef.current = 0; setOrders([]); setHasMore(true); fetchPageRef.current(1, false); };
+
+  // ─── Status Tab Colors ─────────────────────────────────────────────────────
+  const statusColors: Record<string, { bg: string; color: string; hoverBg: string }> = {
+    'All': { bg: '#fe9900', color: '#ffffff', hoverBg: 'rgba(254,153,0,0.08)' },
+    'processing': { bg: '#0284c7', color: '#ffffff', hoverBg: 'rgba(2,132,199,0.08)' },
+    'completed': { bg: '#059669', color: '#ffffff', hoverBg: 'rgba(5,150,105,0.08)' },
+    'on-hold': { bg: '#d97706', color: '#ffffff', hoverBg: 'rgba(217,119,6,0.08)' },
+    'pending': { bg: '#64748b', color: '#ffffff', hoverBg: 'rgba(100,116,139,0.08)' },
+    'cancelled': { bg: '#dc2626', color: '#ffffff', hoverBg: 'rgba(220,38,38,0.08)' },
+    'refunded': { bg: '#7c3aed', color: '#ffffff', hoverBg: 'rgba(124,58,237,0.08)' },
+    'failed': { bg: '#991b1b', color: '#ffffff', hoverBg: 'rgba(153,27,27,0.08)' },
+  };
 
   return (
     <div className="flex flex-col h-[calc(100vh-48px)] bg-background transition-colors duration-300">
-      {/* Header Portal: search */}
-      {headerPortalTarget && createPortal(
-        <>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search orders..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 pr-8 h-8 w-64 bg-background border border-border text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
-            />
-            {search && (
-              <button
-                onClick={() => setSearch('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors z-20 cursor-pointer"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
+      {/* Header */}
+      <div className="shrink-0 border-b border-border bg-background">
+        <div className="px-4 py-2.5 flex items-center gap-4">
+          <div className="flex items-center gap-2 shrink-0">
+            <ShoppingBag className="w-4 h-4 text-primary" />
+            <h1 className="text-[14px] font-black uppercase tracking-widest text-foreground">Web Orders</h1>
+          </div>
+          <div className="h-5 w-px bg-border shrink-0" />
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-thin">
+            {STATUS_TABS.map((tab) => {
+              const sc = statusColors[tab]; const isActive = activeStatus === tab;
+              return (
+                <button key={tab} onClick={() => handleTabChange(tab)}
+                  className="px-3 py-1.5 rounded-lg text-[12px] font-semibold whitespace-nowrap transition-all cursor-pointer"
+                  style={isActive ? { backgroundColor: sc?.bg, color: sc?.color, boxShadow: '0 1px 4px rgba(0,0,0,0.15)' } : { color: 'inherit', backgroundColor: 'transparent' }}
+                  onMouseEnter={e => { if (!isActive && sc) (e.currentTarget as HTMLButtonElement).style.backgroundColor = sc.hoverBg; }}
+                  onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'; }}>
+                  {STATUS_LABELS[tab]}
+                  <span className="ml-1.5 text-[11px] tabular-nums" style={{ opacity: isActive ? 0.75 : 0.5 }}>
+                    {countsLoaded ? statusCounts[tab]?.toLocaleString() || 0 : <span className="inline-block w-4 h-3 rounded-sm bg-muted-foreground/10 animate-pulse align-middle" />}
+                  </span>
+                </button>
+              );
+            })}
           </div>
           <div className="flex-1" />
-          <button
-            onClick={handleExportLineItems}
-            disabled={exporting}
-            className="flex items-center space-x-1.5 px-3 h-8 text-[10px] font-bold uppercase tracking-wider rounded border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer disabled:opacity-50"
-          >
-            {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-            <span>Export</span>
+          {/* Search */}
+          <div className="relative shrink-0">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <input type="text" placeholder="Search orders..." value={search} onChange={e => setSearch(e.target.value)}
+              className="pl-8 pr-8 h-8 w-56 bg-background border border-border text-[12px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded" />
+            {search && (<button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors z-20 cursor-pointer"><X className="h-3 w-3" /></button>)}
+          </div>
+          {/* Export */}
+          <button onClick={handleExportLineItems} disabled={exporting}
+            className="flex items-center space-x-1.5 px-3 h-8 text-[10px] font-bold uppercase tracking-wider rounded border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer disabled:opacity-50 shrink-0">
+            {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}<span>Export</span>
           </button>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={importing}
-            className="flex items-center space-x-1.5 px-3 h-8 text-[10px] font-bold uppercase tracking-wider rounded border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer disabled:opacity-50"
-          >
-            {importing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-            <span>Import</span>
+          {/* Import */}
+          <button onClick={() => fileInputRef.current?.click()} disabled={importing}
+            className="flex items-center space-x-1.5 px-3 h-8 text-[10px] font-bold uppercase tracking-wider rounded border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer disabled:opacity-50 shrink-0">
+            {importing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}<span>Import</span>
           </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv"
-            onChange={handleImportLineItems}
-            className="hidden"
-          />
-        </>,
-        headerPortalTarget
-      )}
-
-
-
-      {/* Table */}
-      <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
-        <div className="min-w-full px-2 py-2">
-          <table className="w-full text-left border-separate border-spacing-0 relative z-0">
-            <thead className="sticky top-0 bg-secondary/80 z-10 border-b border-border backdrop-blur-md transition-colors">
-              <tr>
-                {[
-                  { key: 'dateCreated', label: 'Date' },
-                  { key: 'number', label: 'Order #' },
-                  { key: 'website', label: 'Website' },
-                  { key: 'billing.firstName', label: 'Customer' },
-                  { key: 'status', label: 'Status' },
-                  { key: 'total', label: 'Total' },
-                  { key: 'paymentMethodTitle', label: 'Payment Type' },
-                ].map(col => (
-                  <th
-                    key={col.key}
-                    className="border-r border-border last:border-0"
-                  >
-                    <TableColumnHeader
-                      column={col}
-                      title={col.label}
-                      currentSortBy={sortBy}
-                      currentSortOrder={sortOrder}
-                      onSort={(key, dir) => {
-                        setSortBy(key);
-                        setSortOrder(dir);
-                      }}
-                      onFilter={(key) => {
-                        toast(`Filtering by ${col.label} implementation pending`);
-                      }}
-                      className="text-muted-foreground"
-                    />
-                  </th>
-                ))}
-                <th className="px-4 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-center border-r border-border">Items</th>
-                <th className="px-4 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Location</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border bg-background/50">
-              {loading ? (
-                <tr><td colSpan={9} className="px-3 py-12 text-center text-[11px] text-muted-foreground">Loading Web Orders...</td></tr>
-              ) : orders.length === 0 ? (
-                <tr><td colSpan={9} className="px-3 py-12 text-center text-[11px] text-muted-foreground uppercase tracking-tighter opacity-50">No Orders Found</td></tr>
-              ) : orders.map(order => (
-                <tr
-                  key={order._id}
-                  onClick={() => router.push(`/sales/web-orders/${order._id}`)}
-                  className="hover:bg-secondary/40 hover:scale-[1.002] hover:shadow-md transition-all duration-200 group relative z-0 hover:z-10 bg-background cursor-pointer"
-                >
-                  {/* Date */}
-                  <td className="px-3 py-1.5 border-r border-border font-mono text-[11px] text-muted-foreground">
-                    {order.dateCreated ? new Date(order.dateCreated).toLocaleDateString() : '-'}
-                  </td>
-                  {/* Order # */}
-                  <td className="px-3 py-1.5 border-r border-border">
-                    <span className="text-[11px] text-muted-foreground font-mono tracking-tighter">#{order.number}</span>
-                  </td>
-                  {/* Website */}
-                  <td className="px-3 py-1.5 border-r border-border">
-                    <span className={cn(
-                      "px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider text-white shadow-sm",
-                      getWebsiteColor(order.website)
-                    )}>
-                      {order.website || 'N/A'}
-                    </span>
-                  </td>
-                  {/* Customer */}
-                  <td className="px-3 py-1.5 border-r border-border">
-                    <span className="text-[11px] text-muted-foreground truncate">{order.billing?.firstName} {order.billing?.lastName}</span>
-                  </td>
-                  {/* Status */}
-                  <td className="px-3 py-1.5 border-r border-border text-center">
-                    <span className={cn(
-                      "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border",
-                      getStatusColor(order.status)
-                    )}>
-                      {order.status}
-                    </span>
-                  </td>
-                  {/* Total */}
-                  <td className="px-3 py-1.5 border-r border-border">
-                    <div className="flex flex-col">
-                      <span className="text-muted-foreground font-mono text-[11px]">${order.total?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                      {order.shippingTotal > 0 && (
-                        <span className="flex items-center space-x-0.5 text-[9px] text-muted-foreground">
-                          <Truck className="w-2.5 h-2.5" />
-                          <span>+${order.shippingTotal?.toFixed(2)}</span>
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  {/* Payment Type */}
-                  <td className="px-3 py-1.5 border-r border-border">
-                    <div className="flex items-center space-x-1.5 text-[11px] text-muted-foreground">
-                      <CreditCard className="w-3 h-3 opacity-50" />
-                      <span className="truncate max-w-[80px]">{order.paymentMethodTitle || '-'}</span>
-                    </div>
-                  </td>
-                  {/* Items */}
-                  <td className="px-3 py-1.5 border-r border-border text-center">
-                    <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-secondary text-[9px] font-black text-foreground/70">
-                      {order.lineItems?.length || 0}
-                    </span>
-                  </td>
-                  {/* Location */}
-                  <td className="px-3 py-1.5 text-[11px] text-muted-foreground truncate max-w-[100px]">
-                    {order.billing?.city}, {order.billing?.state}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <input ref={fileInputRef} type="file" accept=".csv" onChange={handleImportLineItems} className="hidden" />
         </div>
       </div>
 
-      <div className="border-t border-border bg-background transition-colors duration-300">
-        <Pagination
-          currentPage={page}
-          totalPages={totalPages}
-          onPageChange={setPage}
-          totalItems={totalOrders}
-          itemsPerPage={25}
-          itemName="Orders"
-        />
+      {/* Table */}
+      <div ref={scrollRef} className="flex-1 overflow-x-auto overflow-y-auto scrollbar-custom relative">
+        <div className="min-w-fit px-2 py-1">
+          <table className="w-full text-left border-separate border-spacing-0 relative z-0 table-fixed">
+            <thead className="bg-background border-b border-border sticky top-0 z-10 box-border">
+              <tr>
+                {COLUMNS.map(col => (
+                  <th key={col.key} onClick={() => handleSort(col.key)}
+                    className={cn(
+                      'px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary/60 dark:hover:bg-secondary/50 transition-colors border-r border-border/40 last:border-0 select-none shadow-[0_1px_0_0_hsl(var(--border))]',
+                      col.width, col.align || 'text-left'
+                    )}>
+                    <div className={cn('flex items-center gap-1', col.align === 'text-right' && 'justify-end')}>
+                      <span>{col.label}</span>
+                      <ArrowUpDown className={cn('w-2.5 h-2.5 transition-colors', sortBy === col.key ? 'text-primary' : 'text-muted-foreground/25')} />
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                Array.from({ length: 25 }).map((_, i) => <WebSkeletonRow key={i} index={i} />)
+              ) : error ? (
+                <tr><td colSpan={12} className="px-2 py-8 text-center text-destructive text-[12px]">{error}</td></tr>
+              ) : orders.length === 0 ? (
+                <tr><td colSpan={12} className="px-2 py-16 text-center">
+                  <ShoppingBag className="w-8 h-8 mx-auto mb-3 text-muted-foreground/20" />
+                  <p className="text-[12px] text-muted-foreground/50 uppercase tracking-widest font-bold">
+                    {debouncedSearch ? 'No matching orders' : activeStatus !== 'All' ? `No ${STATUS_LABELS[activeStatus]} orders` : 'No orders found'}
+                  </p>
+                </td></tr>
+              ) : (
+                orders.map(order => (
+                  <WebTableRow key={order._id} order={order} highlight={highlightId === order._id}
+                    onClick={() => {
+                      sessionStorage.setItem('wo_scroll_to', order._id);
+                      if (scrollRef.current) sessionStorage.setItem('wo_scroll_top', String(scrollRef.current.scrollTop));
+                      router.push(`/sales/web-orders/${order._id}`);
+                    }} />
+                ))
+              )}
+              {isLoadingMore && Array.from({ length: 8 }).map((_, i) => <WebSkeletonRow key={`m-${i}`} index={i} />)}
+            </tbody>
+          </table>
+          <div ref={sentinelRef} className="h-1" />
+          {!isLoading && !hasMore && orders.length > 0 && (
+            <div className="flex items-center justify-center py-4 gap-2">
+              <div className="h-px w-12 bg-border" />
+              <span className="text-[12px] text-muted-foreground/40 uppercase tracking-widest font-bold">{orders.length} orders loaded</span>
+              <div className="h-px w-12 bg-border" />
+            </div>
+          )}
+        </div>
       </div>
     </div>
+  );
+}
+
+export default function WebOrdersPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col h-[calc(100vh-48px)] bg-background">
+        <div className="shrink-0 border-b border-border bg-background px-4 py-2.5 flex items-center gap-4">
+          <div className="h-4 w-4 rounded bg-secondary animate-pulse" />
+          <div className="h-4 w-32 rounded bg-secondary animate-pulse" />
+          <div className="h-5 w-px bg-border" />
+          {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-6 w-16 rounded-lg bg-secondary animate-pulse" />)}
+        </div>
+        <div className="flex-1 p-2">
+          <table className="w-full"><tbody>
+            {Array.from({ length: 20 }).map((_, i) => <WebSkeletonRow key={i} index={i} />)}
+          </tbody></table>
+        </div>
+      </div>
+    }>
+      <WebOrdersContent />
+    </Suspense>
   );
 }
