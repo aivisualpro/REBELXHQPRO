@@ -15,6 +15,7 @@ import {
 import { cn, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface LinkedSkuEntry {
     skuId: string;
@@ -124,6 +125,9 @@ export default function WebOrderDetailPage() {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<TabType>('Line Items');
     const [headerPortal, setHeaderPortal] = useState<HTMLElement | null>(null);
+
+    const { isFieldVisible } = usePermissions();
+    const isFieldVisibleCost = isFieldVisible('cost');
 
     // Lot Selection State
     const [isLotModalOpen, setIsLotModalOpen] = useState(false);
@@ -587,7 +591,7 @@ export default function WebOrderDetailPage() {
                                             <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">Linked SKU</th>
                                             <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">Lot #</th>
                                             <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap text-right">Qty</th>
-                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap text-right">Cost</th>
+                                            {isFieldVisibleCost && <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap text-right">Cost</th>}
                                             <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap text-right">Price</th>
                                             <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap text-right">Total</th>
                                         </tr>
@@ -663,7 +667,7 @@ export default function WebOrderDetailPage() {
                                                         </div>
                                                     </td>
                                                     <td className="px-3 py-2 text-right text-xs text-foreground font-mono font-bold">{item.quantity}</td>
-                                                    <td className="px-3 py-2 text-right text-xs text-orange-500 font-mono font-bold whitespace-nowrap">{(skuRows[0]?.cost ?? item.cost ?? 0) > 0 ? formatCurrency(skuRows[0]?.cost ?? item.cost ?? 0) : '-'}</td>
+                                                    {isFieldVisibleCost && <td className="px-3 py-2 text-right text-xs text-orange-500 font-mono font-bold whitespace-nowrap">{(skuRows[0]?.cost ?? item.cost ?? 0) > 0 ? formatCurrency(skuRows[0]?.cost ?? item.cost ?? 0) : '-'}</td>}
                                                     <td className="px-3 py-2 text-right text-xs text-foreground font-mono font-bold">{formatCurrency(item.price)}</td>
                                                     <td className="px-3 py-2 text-right text-xs text-foreground font-mono font-black bg-secondary/20">{formatCurrency(item.total)}</td>
                                                 </tr>
@@ -742,7 +746,7 @@ export default function WebOrderDetailPage() {
                                                             </td>
                                                             {/* Qty and Cost on every row; Price/Total only on first row */}
                                                             <td className="px-3 py-1.5 text-right text-xs text-foreground font-mono font-bold">{sku.multiplier || 1}</td>
-                                                            <td className="px-3 py-1.5 text-right text-xs text-orange-500 font-mono font-bold whitespace-nowrap">{(sku.cost ?? 0) > 0 ? formatCurrency(sku.cost!) : '-'}</td>
+                                                            {isFieldVisibleCost && <td className="px-3 py-1.5 text-right text-xs text-orange-500 font-mono font-bold whitespace-nowrap">{(sku.cost ?? 0) > 0 ? formatCurrency(sku.cost!) : '-'}</td>}
                                                             {skuIdx === 0 && (
                                                                 <>
                                                                     <td className="px-3 py-2 text-right text-xs text-foreground font-mono font-bold" rowSpan={rowSpan}>{formatCurrency(item.price)}</td>
@@ -769,7 +773,7 @@ export default function WebOrderDetailPage() {
                                                 <td className="px-3 py-2 text-xs font-black text-foreground text-center">
                                                     {order.lineItems.reduce((sum, item) => sum + (item.quantity || 0), 0)}
                                                 </td>
-                                                <td className="px-3 py-2"></td>
+                                                {isFieldVisibleCost && <td className="px-3 py-2"></td>}
                                                 <td className="px-3 py-2"></td>
                                                 <td className="px-3 py-2 text-xs font-black text-foreground">{formatCurrency(subtotal)}</td>
                                             </tr>

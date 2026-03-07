@@ -24,6 +24,7 @@ import { cn, formatDate, toDateInputValue } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
+import { usePermissions } from '@/hooks/usePermissions';
 
 
 interface LineItem {
@@ -210,10 +211,10 @@ function OrderStatusBadge({ status }: { status: string }) {
   );
 }
 
-function WholesaleSkeletonRow({ index }: { index: number }) {
+function WholesaleSkeletonRow({ index, visibleColumns }: { index: number; visibleColumns: typeof COLUMNS }) {
   return (
     <tr className="border-b border-border/30">
-      {COLUMNS.map((col) => (
+      {visibleColumns.map((col) => (
         <td key={col.key} className={cn('px-2 py-2.5', col.width)}>
           <div
             className={cn(
@@ -240,12 +241,13 @@ interface QuickEditValues {
 }
 
 const WholesaleTableRow = React.memo(function WholesaleTableRow({
-  order, onClick, highlight, isQuickEdit, quickEditValues, onQuickEditChange
+  order, onClick, highlight, isQuickEdit, quickEditValues, onQuickEditChange, isFieldVisibleCost
 }: {
   order: SaleOrder; onClick: () => void; highlight?: boolean;
   isQuickEdit?: boolean;
   quickEditValues?: QuickEditValues;
   onQuickEditChange?: (orderId: string, field: keyof QuickEditValues, value: string) => void;
+  isFieldVisibleCost?: boolean;
 }) {
   const subtotal = calcSubtotal(order);
   const shipping = quickEditValues ? (parseFloat(quickEditValues.shippingCost) || 0) : (order.shippingCost ?? 0);
@@ -334,8 +336,12 @@ const WholesaleTableRow = React.memo(function WholesaleTableRow({
       )}
       <td className="px-2.5 py-2.5 w-[90px] text-[12px] font-mono text-right font-black text-foreground group-hover:text-foreground transition-colors">{fmtCurrency(grandTotal)}</td>
       <td className={cn('px-2.5 py-2.5 w-[85px] text-[12px] font-mono text-right font-bold', Math.abs(balance) <= 0.01 ? 'text-muted-foreground/30' : balance > 0 ? 'text-red-500' : 'text-emerald-500')}>{Math.abs(balance) <= 0.01 ? <span className="text-muted-foreground/30">—</span> : fmtCurrency(balance)}</td>
-      <td className="px-2.5 py-2.5 w-[80px] text-[12px] font-mono text-right text-foreground/70">{fmtCurrency(cost)}</td>
-      <td className={cn('px-2.5 py-2.5 w-[80px] text-[12px] font-mono text-right font-bold', margin < 0 ? 'text-red-500' : 'text-emerald-500')}>{fmtCurrency(margin)}</td>
+      {isFieldVisibleCost && (
+        <>
+          <td className="px-2.5 py-2.5 w-[80px] text-[12px] font-mono text-right text-foreground/70">{fmtCurrency(cost)}</td>
+          <td className={cn('px-2.5 py-2.5 w-[80px] text-[12px] font-mono text-right font-bold', margin < 0 ? 'text-red-500' : 'text-emerald-500')}>{fmtCurrency(margin)}</td>
+        </>
+      )}
     </tr>
   );
 });
@@ -343,6 +349,13 @@ const WholesaleTableRow = React.memo(function WholesaleTableRow({
 function SaleOrdersContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { isFieldVisible } = usePermissions();
+  const isFieldVisibleCost = isFieldVisible('cost');
+
+  const visibleColumns = COLUMNS.filter(col => {
+    if (col.key === 'cost' || col.key === 'margin') return isFieldVisibleCost;
+    return true;
+  });
 
   const [orders, setOrders] = useState<SaleOrder[]>(globalCache.current?.orders || []);
   const [isLoading, setIsLoading] = useState(!globalCache.current);
@@ -1234,7 +1247,7 @@ function SaleOrdersContent() {
           <table className="w-full text-left border-separate border-spacing-0 relative z-0 table-fixed">
             <thead className="bg-background border-b border-border sticky top-0 z-10 box-border">
               <tr>
-                {COLUMNS.map((col) => (
+                {visibleColumns.map((col) => (
                   <th key={col.key} onClick={() => handleSort(col.key)}
                     className={cn(
                       'px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary/60 dark:hover:bg-secondary/50 transition-colors border-r border-border/40 last:border-0 select-none shadow-[0_1px_0_0_hsl(var(--border))]',
@@ -1250,7 +1263,7 @@ function SaleOrdersContent() {
             </thead>
             <tbody>
               {isLoading ? (
-                Array.from({ length: 25 }).map((_, i) => <WholesaleSkeletonRow key={i} index={i} />)
+                Array.from({ length: 25 }).map((_, i) => <WholesaleSkeletonRow key={i} index={i} visibleColumns={visibleColumns} />)
               ) : error ? (
                 <tr><td colSpan={14} className="px-2 py-8 text-center text-destructive text-[12px]">{error}</td></tr>
               ) : orders.length === 0 ? (
@@ -1273,7 +1286,7 @@ function SaleOrdersContent() {
                     }} />
                 ))
               )}
-              {isLoadingMore && Array.from({ length: 8 }).map((_, i) => <WholesaleSkeletonRow key={`loading-${i}`} index={i} />)}
+              {isLoadingMore && Array.from({ length: 8 }).map((_, i) => <WholesaleSkeletonRow key={`loading-${i}`} index={i} visibleColumns={visibleColumns} />)}
             </tbody>
           </table>
           <div ref={sentinelRef} className="h-1" />
@@ -1796,7 +1809,7 @@ export default function SaleOrdersPage() {
         </div>
         <div className="flex-1 p-2">
           <table className="w-full"><tbody>
-            {Array.from({ length: 20 }).map((_, i) => <WholesaleSkeletonRow key={i} index={i} />)}
+            {Array.from({ length: 20 }).map((_, i) => <WholesaleSkeletonRow key={i} index={i} visibleColumns={COLUMNS} />)}
           </tbody></table>
         </div>
       </div>
