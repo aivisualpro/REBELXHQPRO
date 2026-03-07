@@ -1213,23 +1213,22 @@ function SettingsPageContent() {
                                                                                 <span className="text-xs font-semibold text-foreground flex-1">{sub.label}</span>
 
                                                                                 {/* CRUD Pills */}
-                                                                                {sub.enabled && (
-                                                                                    <div className="flex items-center gap-1">
-                                                                                        {(['create', 'read', 'update', 'delete'] as const).map(op => (
+                                                                                {sub.enabled && mod.key !== 'reports' && (
+                                                                                    <div className="flex items-center gap-1.5">
+                                                                                        {(['create', 'update', 'delete'] as const).map(op => (
                                                                                             <button
                                                                                                 key={op}
                                                                                                 onClick={() => toggleCrudPermission(mod.key, sub.key, op)}
                                                                                                 className={cn(
-                                                                                                    "px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded transition-all cursor-pointer",
+                                                                                                    "px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all cursor-pointer",
                                                                                                     sub.crud[op]
                                                                                                         ? op === 'create' ? 'bg-emerald-500/15 text-emerald-600 border border-emerald-500/30'
-                                                                                                            : op === 'read' ? 'bg-blue-500/15 text-blue-600 border border-blue-500/30'
-                                                                                                                : op === 'update' ? 'bg-amber-500/15 text-amber-600 border border-amber-500/30'
-                                                                                                                    : 'bg-red-500/15 text-red-600 border border-red-500/30'
+                                                                                                            : op === 'update' ? 'bg-amber-500/15 text-amber-600 border border-amber-500/30'
+                                                                                                                : 'bg-red-500/15 text-red-600 border border-red-500/30'
                                                                                                         : 'bg-secondary/50 text-muted-foreground/40 border border-transparent line-through'
                                                                                                 )}
                                                                                             >
-                                                                                                {op.charAt(0).toUpperCase()}
+                                                                                                {op === 'create' ? 'Add' : op === 'update' ? 'Edit' : 'Delete'}
                                                                                             </button>
                                                                                         ))}
                                                                                     </div>
