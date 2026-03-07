@@ -254,8 +254,8 @@ const WholesaleTableRow = React.memo(function WholesaleTableRow({
   const discount = quickEditValues ? (parseFloat(quickEditValues.discount) || 0) : (order.discount ?? 0);
   const tax = quickEditValues ? (parseFloat(quickEditValues.tax) || 0) : (order.tax ?? 0);
   const grandTotal = subtotal + shipping + tax - discount;
-  const cost = calcCost(order);
-  const margin = grandTotal - cost;
+  const cost = isFieldVisibleCost ? calcCost(order) : 0;
+  const margin = isFieldVisibleCost ? grandTotal - cost : 0;
   const orderPaid = (order.payments || []).reduce((sum, p) => sum + (p.paymentAmount || 0), 0);
   const balance = grandTotal - orderPaid;
 
@@ -1265,9 +1265,9 @@ function SaleOrdersContent() {
               {isLoading ? (
                 Array.from({ length: 25 }).map((_, i) => <WholesaleSkeletonRow key={i} index={i} visibleColumns={visibleColumns} />)
               ) : error ? (
-                <tr><td colSpan={14} className="px-2 py-8 text-center text-destructive text-[12px]">{error}</td></tr>
+                <tr><td colSpan={visibleColumns.length} className="px-2 py-8 text-center text-destructive text-[12px]">{error}</td></tr>
               ) : orders.length === 0 ? (
-                <tr><td colSpan={14} className="px-2 py-16 text-center">
+                <tr><td colSpan={visibleColumns.length} className="px-2 py-16 text-center">
                   <ShoppingCart className="w-8 h-8 mx-auto mb-3 text-muted-foreground/20" />
                   <p className="text-[12px] text-muted-foreground/50 uppercase tracking-widest font-bold">
                     {debouncedSearch ? 'No matching orders' : activeStatus !== 'All' ? `No ${activeStatus} orders` : 'No orders found'}
@@ -1279,6 +1279,7 @@ function SaleOrdersContent() {
                     isQuickEdit={isQuickEditMode}
                     quickEditValues={quickEditData[order._id]}
                     onQuickEditChange={handleQuickEditChange}
+                    isFieldVisibleCost={isFieldVisibleCost}
                     onClick={() => {
                       sessionStorage.setItem('ws_scroll_to', order._id);
                       if (scrollRef.current) sessionStorage.setItem('ws_scroll_top', String(scrollRef.current.scrollTop));

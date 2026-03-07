@@ -341,7 +341,7 @@ export default function WebOrderDetailPage() {
     }
 
     const subtotal = order.lineItems?.reduce((sum, item) => sum + (item.total || 0), 0) || 0;
-    const totalCost = order.lineItems?.reduce((sum, item) => sum + ((item.cost || 0) * (item.quantity || 0)), 0) || 0;
+    const totalCost = isFieldVisibleCost ? (order.lineItems?.reduce((sum, item) => sum + ((item.cost || 0) * (item.quantity || 0)), 0) || 0) : 0;
 
     // Tab counts
     const tabCounts: Record<TabType, number> = {
