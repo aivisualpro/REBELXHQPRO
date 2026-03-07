@@ -13,6 +13,20 @@ export async function GET(
     try {
         await dbConnect();
         const { id } = await context.params;
+
+        if (id === 'master-admin') {
+            return NextResponse.json({
+                _id: 'master-admin',
+                firstName: 'Master',
+                lastName: 'Admin',
+                email: process.env.AUTHOR_USERNAME,
+                role: 'SuperAdmin',
+                department: 'Management',
+                status: 'Active',
+                profileImage: 'https://res.cloudinary.com/dwkq4s4rg/image/upload/v1766349101/rebelx-headquarters/assets/rebelx_favicon_new.png'
+            });
+        }
+
         // Try profileId first (secure URL), then fall back to _id (legacy/internal)
         let user = await User.findOne({ profileId: id }).lean();
         if (!user) {
