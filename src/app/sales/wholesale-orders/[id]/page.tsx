@@ -5,7 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, CreditCard, Truck, Plus, X, Trash2, Pencil, User, MapPin, DollarSign, List, RefreshCw, MessageSquare, Phone, Mail, Eye, EyeOff, Download, FileText, Loader2 } from 'lucide-react';
+import { ArrowLeft, Calendar, CreditCard, Truck, Plus, X, Trash2, Pencil, User, MapPin, DollarSign, List, RefreshCw, MessageSquare, Phone, Mail, Eye, EyeOff, Download, FileText, Loader2, MailPlus } from 'lucide-react';
+import { OrderEmailsTab } from '@/components/sales/OrderEmailsTab';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
 import { cn, formatDate, toDateInputValue } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -121,7 +122,7 @@ const UOM_OPTIONS = [
     { label: 'Lb', value: 'Lb' },
 ];
 
-const TABS = ['Line Items', 'Payments', 'Notes'] as const;
+const TABS = ['Line Items', 'Payments', 'Notes', 'Emails'] as const;
 type TabType = typeof TABS[number];
 
 export default function SaleOrderDetailPage() {
@@ -1213,9 +1214,11 @@ export default function SaleOrderDetailPage() {
                                     <span>{tab}</span>
                                     <span className={cn(
                                         "px-1.5 py-0.5 rounded-none text-[9px] font-bold",
-                                        activeTab === tab ? "bg-foreground text-background" : "bg-secondary text-muted-foreground"
+                                        activeTab === tab
+                                            ? tab === 'Emails' ? "bg-purple-600 text-white" : "bg-foreground text-background"
+                                            : tab === 'Emails' ? "bg-purple-500/10 text-purple-500" : "bg-secondary text-muted-foreground"
                                     )}>
-                                        {tab === 'Line Items' ? order.lineItems?.length || 0 : tab === 'Payments' ? order.payments?.length || 0 : order.notes?.length || 0}
+                                        {tab === 'Line Items' ? order.lineItems?.length || 0 : tab === 'Payments' ? order.payments?.length || 0 : tab === 'Emails' ? <Mail className="w-2.5 h-2.5" /> : order.notes?.length || 0}
                                     </span>
                                 </button>
                             ))}
@@ -1492,6 +1495,14 @@ export default function SaleOrderDetailPage() {
                                     ))
                                 )}
                             </div>
+                        )}
+
+                        {activeTab === 'Emails' && (
+                            <OrderEmailsTab
+                                orderId={order._id}
+                                orderLabel={order.label}
+                                client={typeof order.clientId === 'object' && order.clientId ? order.clientId as any : null}
+                            />
                         )}
                     </div>
                 </div>

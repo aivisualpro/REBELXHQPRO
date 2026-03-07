@@ -114,7 +114,7 @@ export function usePermissions(routeOverride?: string) {
     const isFieldVisible = useCallback((fieldName: string, route?: string): boolean => {
         if (isSuperAdmin) return true;
         if (!hasWorkspace) return false;
-        if (!perms) return true;
+        if (!perms) return false; // Hide sensitive fields until permissions are loaded
 
         const target = route || targetRoute;
         const routePerm = perms.routePermissions[target];
@@ -126,7 +126,7 @@ export function usePermissions(routeOverride?: string) {
             return true;
         }
         return routePerm.fields[fieldName] ?? true; // Default visible if not defined
-    }, [isSuperAdmin, perms, targetRoute]);
+    }, [isSuperAdmin, hasWorkspace, perms, targetRoute]);
 
     // Module-level check
     const isModuleEnabled = useCallback((moduleKey: string): boolean => {
