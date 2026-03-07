@@ -1,5 +1,6 @@
-import { NextAuthOptions } from "next-auth";
+import NextAuth, { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import GoogleProvider from "next-auth/providers/google";
 import dbConnect from "@/lib/mongoose";
 import User from "@/models/User";
 
@@ -63,16 +64,59 @@ export const authOptions: NextAuthOptions = {
 
                 throw new Error("Invalid credentials");
             }
-        })
+        }),
+        GoogleProvider({
+            clientId: process.env.GOOGLE_CLIENT_ID || "",
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+        }),
     ],
     callbacks: {
-        async jwt({ token, user }) {
+        async signIn({ user, account, profile }) {
+            if (account?.provider === "google") {
+                try {
+                    await dbConnect();
+                    // Let the master admin in via Google if emails match
+                    const masterEmail = process.env.AUTHOR_USERNAME?.trim();
+                    if (masterEmail && user.email === masterEmail) {
+                        return true;
+                    }
+
+                    // Otherwise, must exist in DB and be active
+                    const dbUser = await User.findOne({ email: user.email });
+                    if (!dbUser || dbUser.status !== "Active") {
+                        return false;
+                    }
+                    // Mutate the user object so jwt callback gets the right data
+                    user.id = dbUser._id.toString();
+                    (user as any).role = dbUser.role;
+                    (user as any).department = dbUser.department;
+                    (user as any).profileId = dbUser.profileId || null;
+                    (user as any).workspaceId = dbUser.workspaceId || null;
+                    return true;
+                } catch (error) {
+                    console.error("Google verify error:", error);
+                    return false;
+                }
+            }
+            return true;
+        },
+        async jwt({ token, user, account }) {
+            // When user first signs in, `user` object is populated
             if (user) {
-                token.id = user.id;
-                token.role = (user as any).role;
-                token.department = (user as any).department;
-                token.profileId = (user as any).profileId || null;
-                token.workspaceId = (user as any).workspaceId || null;
+                // If this was a Google login and it's the master admin
+                if (account?.provider === "google" && user.email === process.env.AUTHOR_USERNAME?.trim()) {
+                    token.id = "master-admin";
+                    token.role = "SuperAdmin";
+                    token.department = "Management";
+                    token.profileId = null;
+                    token.workspaceId = null;
+                } else {
+                    token.id = user.id;
+                    token.role = (user as any).role;
+                    token.department = (user as any).department;
+                    token.profileId = (user as any).profileId || null;
+                    token.workspaceId = (user as any).workspaceId || null;
+                }
             }
 
             // Always refresh workspaceId from DB (so changes take effect without re-login)

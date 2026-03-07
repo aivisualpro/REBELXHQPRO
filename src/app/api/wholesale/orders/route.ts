@@ -45,11 +45,10 @@ export async function GET(request: Request) {
                     { label: { $regex: `^${trimmedSearch}`, $options: 'i' } }
                 ];
             } else {
-                const fuzzyRegex = buildFuzzyRegex(search);
-                const matchingClients = await Client.find(
-                    { name: { $regex: fuzzyRegex, $options: 'i' } },
-                    { _id: 1 }
-                ).lean();
+                const clientSearchQuery = buildFuzzySearchQuery(search, ['name']);
+                const matchingClients = clientSearchQuery
+                    ? await Client.find(clientSearchQuery, { _id: 1 }).lean()
+                    : [];
                 const matchingClientIds = matchingClients.map((c: any) => c._id);
 
                 const fuzzyQuery = buildFuzzySearchQuery(search, ['label', 'paymentMethod']);
@@ -87,6 +86,115 @@ export async function GET(request: Request) {
         }
 
         query = await applyDateFilter(query, 'createdAt');
+
+        // Computed columns that need aggregation-based sorting
+        const COMPUTED_SORT_COLUMNS = new Set(['subtotal', 'grandTotal', 'balance', 'cost', 'margin']);
+
+        if (COMPUTED_SORT_COLUMNS.has(sortBy)) {
+            // Use aggregation pipeline for computed column sorting
+            const pipeline: any[] = [];
+
+            // Match stage
+            pipeline.push({ $match: query });
+
+            // Add computed fields
+            pipeline.push({
+                $addFields: {
+                    _subtotal: {
+                        $sum: {
+                            $map: {
+                                input: { $ifNull: ['$lineItems', []] },
+                                as: 'item',
+                                in: { $multiply: [{ $ifNull: ['$$item.qtyShipped', 0] }, { $ifNull: ['$$item.price', 0] }] }
+                            }
+                        }
+                    },
+                    _cost: {
+                        $sum: {
+                            $map: {
+                                input: { $ifNull: ['$lineItems', []] },
+                                as: 'item',
+                                in: { $multiply: [{ $ifNull: ['$$item.qtyShipped', 0] }, { $ifNull: ['$$item.cost', 0] }] }
+                            }
+                        }
+                    },
+                    _totalPayments: {
+                        $sum: {
+                            $map: {
+                                input: { $ifNull: ['$payments', []] },
+                                as: 'p',
+                                in: { $ifNull: ['$$p.paymentAmount', 0] }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Add grandTotal, balance, margin
+            pipeline.push({
+                $addFields: {
+                    _grandTotal: {
+                        $subtract: [
+                            { $add: ['$_subtotal', { $ifNull: ['$shippingCost', 0] }, { $ifNull: ['$tax', 0] }] },
+                            { $ifNull: ['$discount', 0] }
+                        ]
+                    }
+                }
+            });
+
+            pipeline.push({
+                $addFields: {
+                    _balance: { $subtract: ['$_grandTotal', '$_totalPayments'] },
+                    _margin: { $subtract: ['$_grandTotal', '$_cost'] }
+                }
+            });
+
+            // Map sortBy to computed field name
+            const sortFieldMap: Record<string, string> = {
+                subtotal: '_subtotal',
+                grandTotal: '_grandTotal',
+                balance: '_balance',
+                cost: '_cost',
+                margin: '_margin'
+            };
+
+            // Count total (use a facet or separate count)
+            const countResult = await SaleOrder.countDocuments(query);
+
+            // Sort, skip, limit
+            pipeline.push({ $sort: { [sortFieldMap[sortBy]]: sortOrder } });
+            pipeline.push({ $skip: (page - 1) * limit });
+            pipeline.push({ $limit: limit });
+
+            // Remove computed fields from output
+            pipeline.push({
+                $project: {
+                    _subtotal: 0,
+                    _cost: 0,
+                    _totalPayments: 0,
+                    _grandTotal: 0,
+                    _balance: 0,
+                    _margin: 0
+                }
+            });
+
+            let orders = await SaleOrder.aggregate(pipeline);
+
+            // Populate references after aggregation
+            orders = await SaleOrder.populate(orders, [
+                { path: 'clientId', select: 'name' },
+                { path: 'salesRep', select: 'firstName lastName' },
+                { path: 'lineItems.sku', select: 'name' }
+            ]);
+
+            return NextResponse.json({
+                orders,
+                total: countResult,
+                page,
+                hasMore: page * limit < countResult,
+                totalPages: Math.ceil(countResult / limit)
+            });
+        }
 
         const [total, orders] = await Promise.all([
             SaleOrder.countDocuments(query),

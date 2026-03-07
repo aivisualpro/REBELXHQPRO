@@ -185,8 +185,7 @@ function calcMargin(o: SaleOrder) {
   return calcGrandTotal(o) - calcCost(o);
 }
 
-// Columns that are computed on the frontend and must be sorted client-side
-const COMPUTED_SORT_COLUMNS = new Set(['subtotal', 'grandTotal', 'balance', 'cost', 'margin']);
+
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
@@ -298,7 +297,7 @@ const WholesaleTableRow = React.memo(function WholesaleTableRow({
           <td className="px-1 py-1 w-[75px]">
             <input
               type="text"
-              value={quickEditValues?.shippingCost || ''}
+              value={quickEditValues?.shippingCost ?? ''}
               onChange={(e) => handleInputChange('shippingCost', e.target.value)}
               onClick={(e) => e.stopPropagation()}
               placeholder="0.00"
@@ -308,7 +307,7 @@ const WholesaleTableRow = React.memo(function WholesaleTableRow({
           <td className="px-1 py-1 w-[75px]">
             <input
               type="text"
-              value={quickEditValues?.discount || ''}
+              value={quickEditValues?.discount ?? ''}
               onChange={(e) => handleInputChange('discount', e.target.value)}
               onClick={(e) => e.stopPropagation()}
               placeholder="0.00"
@@ -318,7 +317,7 @@ const WholesaleTableRow = React.memo(function WholesaleTableRow({
           <td className="px-1 py-1 w-[65px]">
             <input
               type="text"
-              value={quickEditValues?.tax || ''}
+              value={quickEditValues?.tax ?? ''}
               onChange={(e) => handleInputChange('tax', e.target.value)}
               onClick={(e) => e.stopPropagation()}
               placeholder="0.00"
@@ -334,7 +333,7 @@ const WholesaleTableRow = React.memo(function WholesaleTableRow({
         </>
       )}
       <td className="px-2.5 py-2.5 w-[90px] text-[12px] font-mono text-right font-black text-foreground group-hover:text-foreground transition-colors">{fmtCurrency(grandTotal)}</td>
-      <td className={cn('px-2.5 py-2.5 w-[85px] text-[12px] font-mono text-right font-bold', balance > 0.01 ? 'text-red-500' : 'text-emerald-500')}>{fmtCurrency(balance)}</td>
+      <td className={cn('px-2.5 py-2.5 w-[85px] text-[12px] font-mono text-right font-bold', Math.abs(balance) <= 0.01 ? 'text-muted-foreground/30' : balance > 0 ? 'text-red-500' : 'text-emerald-500')}>{Math.abs(balance) <= 0.01 ? <span className="text-muted-foreground/30">—</span> : fmtCurrency(balance)}</td>
       <td className="px-2.5 py-2.5 w-[80px] text-[12px] font-mono text-right text-foreground/70">{fmtCurrency(cost)}</td>
       <td className={cn('px-2.5 py-2.5 w-[80px] text-[12px] font-mono text-right font-bold', margin < 0 ? 'text-red-500' : 'text-emerald-500')}>{fmtCurrency(margin)}</td>
     </tr>
@@ -544,15 +543,27 @@ function SaleOrdersContent() {
       if (res.ok) {
         const data = await res.json();
         toast.success(`Updated ${data.count} order${data.count !== 1 ? 's' : ''}`);
-        // Update local orders state optimistically
-        setOrders(prev => prev.map(o => {
-          const edit = quickEditData[o._id];
-          if (edit && modified.some(([id]) => id === o._id)) {
-            return { ...o, shippingCost: parseFloat(edit.shippingCost) || 0, discount: parseFloat(edit.discount) || 0, tax: parseFloat(edit.tax) || 0 };
-          }
-          return o;
-        }));
-        setQuickEditData({});
+        // Update local orders state optimistically and re-populate quick edit data
+        setOrders(prev => {
+          const updatedOrders = prev.map(o => {
+            const edit = quickEditData[o._id];
+            if (edit && modified.some(([id]) => id === o._id)) {
+              return { ...o, shippingCost: parseFloat(edit.shippingCost) || 0, discount: parseFloat(edit.discount) || 0, tax: parseFloat(edit.tax) || 0 };
+            }
+            return o;
+          });
+          // Re-populate quickEditData with updated values so inputs stay correct in quick edit mode
+          const refreshed: Record<string, QuickEditValues> = {};
+          updatedOrders.forEach(o => {
+            refreshed[o._id] = {
+              shippingCost: String(o.shippingCost || 0),
+              discount: String(o.discount || 0),
+              tax: String(o.tax || 0),
+            };
+          });
+          setQuickEditData(refreshed);
+          return updatedOrders;
+        });
         // Also invalidate cache
         globalCache.current = null;
       } else {
@@ -604,14 +615,14 @@ function SaleOrdersContent() {
   useEffect(() => {
     const fetchResources = async () => {
       try {
-        const res = await fetch('/api/clients?limit=5000');
+        const res = await fetch('/api/clients?limit=5000&simple=true');
         if (res.ok) {
           const data = await res.json();
           const clients_list = data.clients || [];
           setAllClients(clients_list);
           setClientOptions(clients_list.map((c: any) => ({ label: c.name, value: c._id })));
         }
-        const sRes = await fetch('/api/skus?limit=5000');
+        const sRes = await fetch('/api/skus?limit=5000&simple=true');
         if (sRes.ok) {
           const data = await sRes.json();
           setAllSkus(data.skus || []);
@@ -706,7 +717,7 @@ function SaleOrdersContent() {
     if (isAppend) setIsLoadingMore(true); else setIsLoading(true);
 
     try {
-      const apiSortBy = COMPUTED_SORT_COLUMNS.has(sortBy) ? 'createdAt' : sortBy;
+      const apiSortBy = sortBy;
       const params = new URLSearchParams({
         page: String(pageNum), limit: String(PAGE_SIZE), sortBy: apiSortBy, sortOrder, search: debouncedSearch,
       });
@@ -755,19 +766,7 @@ function SaleOrdersContent() {
 
   useEffect(() => {
     const prev = prevFiltersRef.current;
-    const sortChanged = prev.sortBy !== sortBy || prev.sortOrder !== sortOrder;
-    const otherFiltersChanged = prev.search !== debouncedSearch || prev.status !== activeStatus;
     prevFiltersRef.current = { sortBy, sortOrder, search: debouncedSearch, status: activeStatus };
-
-    // If only sort changed and we're now sorting by a computed column, skip API re-fetch
-    // (client-side sort via useMemo handles it)
-    if (sortChanged && !otherFiltersChanged && COMPUTED_SORT_COLUMNS.has(sortBy)) {
-      return;
-    }
-    // If sort changed from one computed to another computed, also skip
-    if (sortChanged && !otherFiltersChanged && COMPUTED_SORT_COLUMNS.has(prev.sortBy) && COMPUTED_SORT_COLUMNS.has(sortBy)) {
-      return;
-    }
 
     if (isFirstMount.current) {
       isFirstMount.current = false;
@@ -803,26 +802,8 @@ function SaleOrdersContent() {
     scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Client-side sort for computed columns
-  const sortedOrders = React.useMemo(() => {
-    if (!COMPUTED_SORT_COLUMNS.has(sortBy)) return orders;
-    const computeValue = (o: SaleOrder): number => {
-      switch (sortBy) {
-        case 'subtotal': return calcSubtotal(o);
-        case 'grandTotal': return calcGrandTotal(o);
-        case 'balance': return calcBalance(o);
-        case 'cost': return calcCost(o);
-        case 'margin': return calcMargin(o);
-        default: return 0;
-      }
-    };
-    const sorted = [...orders].sort((a, b) => {
-      const aVal = computeValue(a);
-      const bVal = computeValue(b);
-      return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
-    });
-    return sorted;
-  }, [orders, sortBy, sortOrder]);
+  // All sorting (including computed columns) is now handled server-side
+  const sortedOrders = orders;
 
   const handleTabChange = (tab: string) => {
     setActiveStatus(tab);
@@ -967,6 +948,7 @@ function SaleOrdersContent() {
       tax: Number(newOrder.tax) || 0,
       lineItems: newLineItems.map(item => ({
         sku: item.sku,
+        productDescription: item.productDescription,
         qtyShipped: item.qtyShipped,
         price: item.price,
         uom: item.uom,
@@ -1030,6 +1012,19 @@ function SaleOrdersContent() {
 
       if (skuObj && skuObj.salePrice) {
         newPrice = skuObj.salePrice;
+      }
+
+      // Check for locked price
+      if (newOrder.clientId) {
+        try {
+          const lockRes = await fetch(`/api/wholesale/orders/locked-price?clientId=${newOrder.clientId}&skuId=${value}`);
+          if (lockRes.ok) {
+            const lockData = await lockRes.json();
+            if (lockData.price !== null && lockData.price !== undefined) {
+              newPrice = lockData.price;
+            }
+          }
+        } catch (e) { console.error(e); }
       }
 
       // Auto-Suggest Lot (FIFO)
@@ -1336,9 +1331,9 @@ function SaleOrdersContent() {
       </div>
 
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-background rounded-lg shadow-2xl w-full max-w-7xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[95vh] border border-border">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-secondary/20 shrink-0">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-md p-4">
+          <div className="bg-background/95 backdrop-blur-xl rounded-xl shadow-[0_0_40px_rgba(0,0,0,0.15)] ring-1 ring-white/5 w-full max-w-7xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[95vh] border border-border/40">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border/40 bg-secondary/10 shrink-0">
               <h2 className="text-sm font-bold uppercase text-foreground tracking-wider flex items-center gap-2">
                 {editingOrderId ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
                 {editingOrderId ? 'Edit Sale Order' : 'Create Sale Order'}
@@ -1581,24 +1576,24 @@ function SaleOrdersContent() {
                       </button>
                     </div>
                   ) : (
-                    <div className="border border-border rounded-none">
-                      <table className="w-full text-left border-collapse border-b border-border">
-                        <thead className="bg-secondary/50 text-muted-foreground">
+                    <div className="border border-border/40 rounded-none">
+                      <table className="w-full text-left border-collapse border-b border-border/40">
+                        <thead className="bg-secondary/20 text-muted-foreground">
                           <tr>
-                            <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[25%] border-r border-border">Item / SKU</th>
-                            <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[20%] border-r border-border">Description</th>
-                            <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[12%] border-r border-border">Lot #</th>
-                            <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[8%] border-r border-border">UOM</th>
-                            <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[8%] border-r border-border">Qty</th>
-                            <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[12%] border-r border-border">Price</th>
-                            <th className="px-2 py-2 text-[9px] uppercase font-bold tracking-wider w-[10%] text-right border-r border-border">Total</th>
-                            <th className="px-2 py-2 w-[5%] bg-card"></th>
+                            <th className="px-3 py-2.5 text-[9px] uppercase font-bold tracking-widest w-[25%] border-r border-border/40">Item / SKU</th>
+                            <th className="px-3 py-2.5 text-[9px] uppercase font-bold tracking-widest w-[20%] border-r border-border/40">Description</th>
+                            <th className="px-3 py-2.5 text-[9px] uppercase font-bold tracking-widest w-[12%] border-r border-border/40">Lot #</th>
+                            <th className="px-3 py-2.5 text-[9px] uppercase font-bold tracking-widest w-[8%] border-r border-border/40">UOM</th>
+                            <th className="px-3 py-2.5 text-[9px] uppercase font-bold tracking-widest w-[8%] border-r border-border/40">Qty</th>
+                            <th className="px-3 py-2.5 text-[9px] uppercase font-bold tracking-widest w-[12%] border-r border-border/40">Price</th>
+                            <th className="px-3 py-2.5 text-[9px] uppercase font-bold tracking-widest w-[10%] text-right border-r border-border/40">Total</th>
+                            <th className="px-3 py-2.5 w-[5%] bg-card"></th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-border bg-card">
+                        <tbody className="divide-y divide-border/40 bg-card">
                           {newLineItems.map((item, index) => (
                             <tr key={item.id} className="group">
-                              <td className="p-0 border-r border-border text-foreground">
+                              <td className="p-0 border-r border-border/40 text-foreground">
                                 <div className="w-full h-full">
                                   <SearchableSelect
                                     options={(() => {
@@ -1625,10 +1620,11 @@ function SaleOrdersContent() {
                                     onChange={(val) => updateLineItem(item.id, 'sku', val)}
                                     placeholder={item._originalSkuLabel || "Select SKU"}
                                     className="w-full rounded-none border-none text-xs focus:ring-0 bg-transparent text-foreground h-[32px]"
+                                    triggerClassName="bg-transparent border-none rounded-none shadow-none ring-0 focus-within:ring-0 hover:border-none focus:ring-0"
                                   />
                                 </div>
                               </td>
-                              <td className="p-0 border-r border-border">
+                              <td className="p-0 border-r border-border/40">
                                 <input
                                   type="text"
                                   value={item.productDescription || ''}
@@ -1637,7 +1633,7 @@ function SaleOrdersContent() {
                                   placeholder="Description..."
                                 />
                               </td>
-                              <td className="p-0 border-r border-border">
+                              <td className="p-0 border-r border-border/40">
                                 <div
                                   className="w-full h-[32px] px-2 flex items-center cursor-pointer hover:bg-secondary/30 transition-colors"
                                   onClick={() => {
@@ -1656,7 +1652,7 @@ function SaleOrdersContent() {
                                   </span>
                                 </div>
                               </td>
-                              <td className="p-0 border-r border-border text-foreground">
+                              <td className="p-0 border-r border-border/40 text-foreground">
                                 <SearchableSelect
                                   options={UOM_OPTIONS}
                                   value={item.uom}
@@ -1664,9 +1660,10 @@ function SaleOrdersContent() {
                                   placeholder="UOM"
                                   creatable
                                   className="w-full rounded-none border-none focus:ring-0 bg-transparent text-foreground h-[32px] text-xs"
+                                  triggerClassName="bg-transparent border-none rounded-none shadow-none ring-0 focus-within:ring-0 hover:border-none focus:ring-0"
                                 />
                               </td>
-                              <td className="p-0 border-r border-border">
+                              <td className="p-0 border-r border-border/40">
                                 <input
                                   type="number"
                                   min="1"
@@ -1676,7 +1673,7 @@ function SaleOrdersContent() {
                                   className="w-full h-[32px] px-2 text-xs focus:outline-none focus:bg-primary/5 transition-colors font-mono rounded-none bg-transparent text-foreground"
                                 />
                               </td>
-                              <td className="p-0 border-r border-border">
+                              <td className="p-0 border-r border-border/40">
                                 <div className="relative h-full w-full">
                                   <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">$</span>
                                   <input
@@ -1690,7 +1687,7 @@ function SaleOrdersContent() {
                                   />
                                 </div>
                               </td>
-                              <td className="px-2 py-0 align-middle text-right border-r border-border bg-secondary/10">
+                              <td className="px-2 py-0 align-middle text-right border-r border-border/40 bg-secondary/10">
                                 <span className="text-xs font-bold text-foreground font-mono">
                                   {formatCurrency((item.qtyShipped || 0) * (item.price || 0))}
                                 </span>
@@ -1708,13 +1705,13 @@ function SaleOrdersContent() {
                             </tr>
                           ))}
                         </tbody>
-                        <tfoot className="bg-secondary/50">
+                        <tfoot className="bg-secondary/20">
                           <tr>
-                            <td colSpan={6} className="px-2 py-2 text-[10px] font-bold text-muted-foreground uppercase text-right tracking-wider border-r border-border">Subtotal</td>
-                            <td className="px-2 py-2 text-xs font-black text-foreground font-mono text-right border-r border-border">
+                            <td colSpan={6} className="px-3 py-3 text-[10px] font-black text-muted-foreground uppercase text-right tracking-widest border-r border-border/40 bg-muted/20">Subtotal</td>
+                            <td className="px-3 py-3 text-sm font-black text-primary font-mono text-right border-r border-border/40 bg-muted/20">
                               {formatCurrency(newLineItems.reduce((sum, item) => sum + ((item.qtyShipped || 0) * (item.price || 0)), 0))}
                             </td>
-                            <td></td>
+                            <td className="bg-muted/20"></td>
                           </tr>
                         </tfoot>
                       </table>
@@ -1724,11 +1721,11 @@ function SaleOrdersContent() {
               </form>
             </div>
 
-            <div className="p-4 border-t border-border bg-secondary/30 flex justify-end shrink-0">
+            <div className="px-6 py-4 border-t border-border/40 bg-card/80 backdrop-blur-md flex items-center justify-end shrink-0">
               <button
                 type="submit"
                 form="create-so-form"
-                className="px-6 py-2.5 bg-primary text-primary-foreground text-xs font-bold uppercase rounded hover:bg-primary/90 transition-colors"
+                className="px-8 py-2.5 bg-primary text-primary-foreground text-xs font-black tracking-widest uppercase rounded-lg hover:bg-primary/90 hover:-translate-y-0.5 transition-all shadow-xl hover:shadow-primary/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 flex items-center space-x-2"
               >
                 {editingOrderId ? 'Save Changes' : 'Create Order'}
               </button>

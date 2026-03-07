@@ -61,7 +61,7 @@ export async function GET(request: Request) {
         }
 
         if (salesPerson) query.salesPerson = { $in: salesPerson.split(',') };
-        
+
         if (contactStatus) {
             query.contactStatus = { $in: contactStatus.split(',') };
         } else if (contactStatusNin) {
@@ -73,10 +73,10 @@ export async function GET(request: Request) {
         } else if (contactTypeNin) {
             query.contactType = { $nin: contactTypeNin.split(',') };
         }
-        
+
         if (companyType) query.companyType = { $in: companyType.split(',') };
         if (defaultShippingTerms) query.defaultShippingTerms = { $in: defaultShippingTerms.split(',') };
-        
+
         if (city) query['addresses.city'] = { $in: city.split(',').map(c => new RegExp(c.trim(), 'i')) };
         if (state) query['addresses.state'] = { $in: state.split(',').map(s => new RegExp(s.trim(), 'i')) };
 
@@ -103,7 +103,7 @@ export async function GET(request: Request) {
                                 paid: { $sum: "$payments.paymentAmount" }
                             }
                         },
-                        { $group: { _id: null, total: { $sum: "$amount" }, paid: { $sum: "$paid" } } }
+                        { $group: { _id: null, total: { $sum: "$amount" }, paid: { $sum: "$paid" }, count: { $sum: 1 } } }
                     ],
                     as: 'pricing'
                 }
@@ -122,27 +122,32 @@ export async function GET(request: Request) {
         ];
 
         // Execute main fetch logic
-        if (minRevenue !== null || maxRevenue !== null || minBalance !== null || maxBalance !== null || sortBy === 'totalRevenue' || sortBy === 'balance') {
-            const basePipeline = [{ $match: query }, ...financialLookup];
-            
+        if (minRevenue !== null || maxRevenue !== null || minBalance !== null || maxBalance !== null || sortBy === 'totalRevenue' || sortBy === 'balance' || sortBy === 'orderCount') {
+            const basePipeline: any[] = [{ $match: query }, ...financialLookup];
+
+            // Add orderCount from the pricing lookup (count of non-cancelled orders)
+            basePipeline.push({
+                $addFields: {
+                    orderCount: { $ifNull: [{ $arrayElemAt: ['$pricing.count', 0] }, 0] }
+                }
+            });
+
             const rangeFilter: any = {};
             if (minRevenue !== null) rangeFilter.totalRevenue = { ...rangeFilter.totalRevenue, $gte: minRevenue };
             if (maxRevenue !== null) rangeFilter.totalRevenue = { ...rangeFilter.totalRevenue, $lt: maxRevenue };
-            
+
             if (minBalance !== null) rangeFilter.balance = { ...rangeFilter.balance, $gte: minBalance };
             if (maxBalance !== null) rangeFilter.balance = { ...rangeFilter.balance, $lt: maxBalance };
-            
+
             if (Object.keys(rangeFilter).length > 0) {
                 basePipeline.push({ $match: rangeFilter });
             }
 
-            // Using facet to get both count and paginated data in one go might be slower for very large collections,
-            // but for typical CRM sizes it's cleaner. Let's use parallel calls instead for better reliability.
             const [countRes, dataRes] = await Promise.all([
                 Client.aggregate([...basePipeline, { $count: 'total' }]),
                 Client.aggregate([
                     ...basePipeline,
-                    { $sort: { [sortBy === 'totalRevenue' || sortBy === 'balance' ? sortBy : sortBy]: sortOrder as any } },
+                    { $sort: { [sortBy]: sortOrder as any } },
                     { $skip: (page - 1) * limit },
                     { $limit: limit },
                     { $project: { pricing: 0 } } // Clean up temp fields
@@ -162,10 +167,21 @@ export async function GET(request: Request) {
             ]);
         }
 
+        const simpleMode = searchParams.get('simple') === 'true';
+        if (simpleMode) {
+            return NextResponse.json({
+                clients,
+                total,
+                page,
+                hasMore: page * limit < total,
+                totalPages: Math.ceil(total / limit)
+            });
+        }
+
         // Enrich with secondary data (Balance, Activities, SalesRep) in parallel
         if (clients.length > 0) {
             const clientIds = clients.map(c => c._id);
-            
+
             const [balanceAgg, activityAgg] = await Promise.all([
                 SaleOrder.aggregate([
                     { $match: { clientId: { $in: clientIds }, orderStatus: { $ne: 'Cancelled' } } },

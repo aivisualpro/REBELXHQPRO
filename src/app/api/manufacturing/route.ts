@@ -149,6 +149,20 @@ export async function GET(request: Request) {
                 { path: 'createdBy', select: 'firstName lastName' },
                 { path: 'finishedBy', select: 'firstName lastName' },
             ]);
+        } else if (sortBy === 'unitCost') {
+            // unitCost is computed as totalCost / qty — needs aggregation
+            orders = await Manufacturing.aggregate([
+                { $match: query },
+                { $addFields: { _unitCost: { $cond: [{ $gt: ['$qty', 0] }, { $divide: [{ $ifNull: ['$totalCost', 0] }, '$qty'] }, 0] } } },
+                { $sort: { _unitCost: sortOrder as 1 | -1 } },
+                { $skip: (page - 1) * limit },
+                { $limit: limit + 1 },
+                { $project: { _unitCost: 0, lineItems: 0, labor: 0, notes: 0, qualityCheck: 0, __v: 0 } }
+            ]);
+            await Manufacturing.populate(orders, [
+                { path: 'createdBy', select: 'firstName lastName' },
+                { path: 'finishedBy', select: 'firstName lastName' },
+            ]);
         } else {
             orders = await Manufacturing.find(query)
                 .select(listFields)

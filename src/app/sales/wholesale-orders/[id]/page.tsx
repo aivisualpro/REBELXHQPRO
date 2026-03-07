@@ -717,7 +717,7 @@ export default function SaleOrderDetailPage() {
                     <div className="flex-1 overflow-y-auto scrollbar-custom">
                         {/* Hero Bar: Order# | Client | Status */}
                         <div className="px-4 pt-4 pb-4">
-                            <div className="flex items-stretch border border-border overflow-hidden">
+                            <div className="flex items-stretch border border-border overflow-hidden h-[34px]">
                                 {/* Order # */}
                                 <div
                                     className="w-20 bg-amber-500 flex items-center justify-center shrink-0 cursor-pointer hover:bg-amber-600 transition-colors"
@@ -749,7 +749,7 @@ export default function SaleOrderDetailPage() {
                                 <button
                                     onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
                                     className={cn(
-                                        "w-full px-3 py-2.5 text-[12px] font-black uppercase tracking-widest text-center cursor-pointer transition-all border",
+                                        "w-full h-[34px] px-3 text-[12px] flex items-center justify-center font-black uppercase tracking-widest cursor-pointer transition-all border",
                                         order.orderStatus === 'Completed' ? "bg-emerald-500 text-white border-emerald-600 hover:bg-emerald-600" :
                                             order.orderStatus === 'Issued' ? "bg-sky-500 text-white border-sky-600 hover:bg-sky-600" :
                                                 order.orderStatus === 'Pending Payment' ? "bg-amber-500 text-white border-amber-600 hover:bg-amber-600" :
@@ -888,7 +888,7 @@ export default function SaleOrderDetailPage() {
                                     <span className="text-sm font-mono font-bold text-emerald-500 italic">{formatCurrency(totalPayments)}</span>
                                 </div>
                                 <div className={cn(
-                                    "flex justify-between items-center px-4 py-3 border shadow-sm",
+                                    "flex justify-between items-center px-4 h-[34px] border shadow-sm",
                                     balance > 0 ? "bg-red-500 border-red-600" : "bg-emerald-600 border-emerald-700"
                                 )}>
                                     <span className="text-xs font-black text-white uppercase tracking-widest">Balance</span>
@@ -1138,7 +1138,7 @@ export default function SaleOrderDetailPage() {
                                 });
                                 setIsHeaderModalOpen(true);
                             }}
-                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-secondary text-foreground border border-border hover:bg-secondary/80 transition-colors cursor-pointer"
+                            className="h-[34px] flex-1 flex items-center justify-center gap-1.5 px-3 text-[10px] font-bold uppercase tracking-widest bg-secondary text-foreground border border-border hover:bg-secondary/80 transition-colors cursor-pointer"
                         >
                             <Pencil className="w-3.5 h-3.5" />
                             <span>Edit</span>
@@ -1186,7 +1186,7 @@ export default function SaleOrderDetailPage() {
                                 ), { duration: 10000, position: 'top-center', style: { maxWidth: '360px', background: '#1a1a1a', color: '#fff', marginTop: '40vh' } });
                             }}
                             disabled={isDeleting}
-                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-red-500 text-white border border-red-600 hover:bg-red-600 transition-colors cursor-pointer disabled:opacity-50"
+                            className="h-[34px] flex-1 flex items-center justify-center gap-1.5 px-3 text-[10px] font-bold uppercase tracking-widest bg-red-500 text-white border border-red-600 hover:bg-red-600 transition-colors cursor-pointer disabled:opacity-50"
                         >
                             <Trash2 className="w-3.5 h-3.5" />
                             <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
@@ -1569,6 +1569,18 @@ export default function SaleOrderDetailPage() {
                                 </div>
                             </div>
 
+                            {/* Product Description */}
+                            <div className="space-y-1.5">
+                                <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Description</label>
+                                <input
+                                    type="text"
+                                    value={editingItem.productDescription || ''}
+                                    onChange={(e) => setEditingItem({ ...editingItem, productDescription: e.target.value })}
+                                    className="w-full h-[44px] px-3 border border-border rounded-md text-sm focus:outline-none bg-background text-foreground"
+                                    placeholder="Enter description..."
+                                />
+                            </div>
+
                             {/* Nested Lot Selection Modal for Item Modal */}
                             {isItemLotModalOpen && editingItem?.sku && (
                                 <LotSelectionModal
@@ -1714,7 +1726,16 @@ export default function SaleOrderDetailPage() {
                                 {/* Order Details Section */}
                                 <div>
                                     <h4 className="text-xs font-bold text-foreground uppercase tracking-wider mb-3 pb-1 border-b border-border">Order Details</h4>
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Date</label>
+                                            <input
+                                                type="date"
+                                                value={toDateInputValue(editingHeader.createdAt)}
+                                                onChange={(e) => setEditingHeader({ ...editingHeader, createdAt: e.target.value })}
+                                                className="w-full h-[34px] px-3 border border-input rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary/20 bg-background text-foreground"
+                                            />
+                                        </div>
                                         <div className="space-y-1.5">
                                             <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Order Name/ID</label>
                                             <input
@@ -1850,8 +1871,8 @@ export default function SaleOrderDetailPage() {
 
                                 {/* Costs Section */}
                                 <div>
-                                    <h4 className="text-xs font-bold text-foreground uppercase tracking-wider mb-3 pb-1 border-b border-border">Costs</h4>
-                                    <div className="grid grid-cols-3 gap-4">
+                                    <h4 className="text-xs font-bold text-foreground uppercase tracking-wider mb-3 pb-1 border-b border-border">Costs & Settings</h4>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                         <div className="space-y-1.5">
                                             <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Shipping Cost ($)</label>
                                             <input
@@ -1884,6 +1905,20 @@ export default function SaleOrderDetailPage() {
                                                 onChange={(e) => setEditingHeader({ ...editingHeader, tax: parseFloat(e.target.value) || 0 })}
                                                 className="w-full h-[34px] px-3 border border-input rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary/20 bg-background text-foreground"
                                             />
+                                        </div>
+                                        <div className="space-y-1.5 flex flex-col justify-end">
+                                            <label className="flex items-center space-x-2 h-[34px] cursor-pointer">
+                                                <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider whitespace-nowrap">Lock Price</span>
+                                                <button
+                                                    type="button"
+                                                    role="switch"
+                                                    aria-checked={editingHeader.lockPrice || false}
+                                                    onClick={() => setEditingHeader({ ...editingHeader, lockPrice: !editingHeader.lockPrice })}
+                                                    className={`w-9 h-5 rounded-full transition-colors relative shadow-inner ${editingHeader.lockPrice ? 'bg-primary' : 'bg-primary/20'}`}
+                                                >
+                                                    <span className={`block w-4 h-4 bg-white rounded-full transition-transform absolute top-0.5 left-0.5 shadow ${editingHeader.lockPrice ? 'translate-x-4' : 'translate-x-0'}`} />
+                                                </button>
+                                            </label>
                                         </div>
                                     </div>
                                 </div>
