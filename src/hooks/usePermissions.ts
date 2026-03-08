@@ -14,6 +14,7 @@ interface PermissionCache {
     workspaceName: string;
     workspaceColor: string;
     routePermissions: Record<string, RoutePerm>;
+    keyPermissions: Record<string, RoutePerm & { enabled: boolean }>;
     enabledModules: string[];
     enabledRoutes: string[];
 }
@@ -144,6 +145,24 @@ export function usePermissions(routeOverride?: string) {
         return perms.enabledRoutes.includes(route);
     }, [isSuperAdmin, hasWorkspace, perms]);
 
+    // Sub-module enabled check (by key)
+    const isSubModuleEnabled = useCallback((subKey: string): boolean => {
+        if (isSuperAdmin) return true;
+        if (!hasWorkspace) return false;
+        if (!perms) return false;
+        return perms.keyPermissions?.[subKey]?.enabled ?? false;
+    }, [isSuperAdmin, hasWorkspace, perms]);
+
+    // Field visibility check by sub-module key (for sub-modules sharing the same route)
+    const isFieldVisibleByKey = useCallback((subKey: string, fieldName: string): boolean => {
+        if (isSuperAdmin) return true;
+        if (!hasWorkspace) return false;
+        if (!perms) return false;
+        const keyPerm = perms.keyPermissions?.[subKey];
+        if (!keyPerm) return true; // Sub-module not in workspace — default visible
+        return keyPerm.fields[fieldName] ?? true;
+    }, [isSuperAdmin, hasWorkspace, perms]);
+
     return {
         loading,
         isSuperAdmin,
@@ -153,8 +172,10 @@ export function usePermissions(routeOverride?: string) {
         canUpdate: (r?: string) => can('update', r),
         canDelete: (r?: string) => can('delete', r),
         isFieldVisible,
+        isFieldVisibleByKey,
         isModuleEnabled,
         isRouteEnabled,
+        isSubModuleEnabled,
         workspaceName: perms?.workspaceName || '',
         workspaceColor: perms?.workspaceColor || '#f2b61c',
         // Force reload permissions (e.g. after workspace change)

@@ -22,7 +22,10 @@ import {
     X,
     Save,
     ExternalLink,
-    Link
+    Link,
+    Search,
+    Archive,
+    ArchiveRestore
 } from 'lucide-react';
 import { cn, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -43,8 +46,8 @@ interface Sku {
     cost?: number;
     reOrderPoint?: number;
     orderUpto?: number;
-    kitApplied?: boolean;
     isLotApplied?: boolean;
+    isArchived?: boolean;
     createdAt?: string;
     variances?: {
         _id: string;
@@ -160,6 +163,8 @@ function SkuDetailsPageContent() {
         showOnlyNoLot: false,
         showOnlyNoCost: false
     });
+    const [referenceSearch, setReferenceSearch] = useState('');
+    const [lotSearch, setLotSearch] = useState('');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
     const [selectedVarianceId, setSelectedVarianceId] = useState<string | null>(null);
     const [selectedLot, setSelectedLot] = useState<string>('All');
@@ -414,6 +419,16 @@ function SkuDetailsPageContent() {
         // New filters: show only records missing lot or cost
         if (filters.showOnlyNoLot && tx.lotNumber && tx.lotNumber !== '' && tx.lotNumber !== 'N/A' && tx.lotNumber !== '-') return false;
         if (filters.showOnlyNoCost && tx.cost && tx.cost > 0) return false;
+        // Reference search filter — search across reference, type, lotNumber, status, website
+        if (referenceSearch) {
+            const q = referenceSearch.toLowerCase().trim();
+            const matchesRef = tx.reference?.toLowerCase().includes(q);
+            const matchesType = tx.type?.toLowerCase().includes(q);
+            const matchesLot = tx.lotNumber?.toLowerCase().includes(q);
+            const matchesStatus = tx.status?.toLowerCase().includes(q);
+            const matchesWebsite = (tx as any).website?.toLowerCase().includes(q);
+            if (!matchesRef && !matchesType && !matchesLot && !matchesStatus && !matchesWebsite) return false;
+        }
         return true;
     }).sort((a, b) => {
         const dayA = new Date(new Date(a.date).toDateString()).getTime();
@@ -436,6 +451,9 @@ function SkuDetailsPageContent() {
     const isUnfulfilledConsumption = (tx: Transaction) => tx.type === 'Consumption' && (tx.status || '').toLowerCase() !== 'fulfilled';
 
     const finalTransactions = filteredTransactions.filter(tx => {
+        // When reference search is active, bypass lot/variance/warning filters
+        // so the search covers ALL data, not just the current filtered view
+        if (referenceSearch && referenceSearch.trim()) return true;
         if (selectedLot !== 'All' && tx.lotNumber !== selectedLot) return false;
         if (selectedVarianceId) {
             if (tx.type === 'Web Order') return tx.varianceId === selectedVarianceId || tx._id === selectedVarianceId;
@@ -482,7 +500,8 @@ function SkuDetailsPageContent() {
     // Reset visible count when filters/sort/lot changes
     useEffect(() => {
         setVisibleCount(PAGE_SIZE);
-    }, [filters, sortOrder, selectedLot, selectedVarianceId]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filters, sortOrder, selectedLot, selectedVarianceId, referenceSearch]);
 
     // Infinite scroll: load more when bottom is reached
     useEffect(() => {
@@ -532,7 +551,6 @@ function SkuDetailsPageContent() {
             salePrice: sku.salePrice || 0,
             orderUpto: sku.orderUpto || 0,
             reOrderPoint: sku.reOrderPoint || 0,
-            kitApplied: sku.kitApplied || false,
             isLotApplied: sku.isLotApplied || false,
         });
         setIsEditModalOpen(true);
@@ -1043,6 +1061,35 @@ function SkuDetailsPageContent() {
                             <span>Edit</span>
                         </button>
                         <button
+                            onClick={async () => {
+                                const isArchived = (sku as any).isArchived;
+                                const toastId = toast.loading(isArchived ? 'Restoring...' : 'Archiving...');
+                                try {
+                                    const res = await fetch(`/api/skus/${id}`, {
+                                        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ isArchived: !isArchived })
+                                    });
+                                    if (res.ok) {
+                                        toast.success(isArchived ? 'Restored' : 'Archived', { id: toastId });
+                                        fetchSkuDetails(true);
+                                    } else {
+                                        toast.error('Failed', { id: toastId });
+                                    }
+                                } catch {
+                                    toast.error('Failed', { id: toastId });
+                                }
+                            }}
+                            className={cn(
+                                "flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-bold uppercase tracking-widest rounded transition-colors cursor-pointer shadow-[0_1px_4px_rgba(0,0,0,0.15)]",
+                                (sku as any).isArchived
+                                    ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                                    : "bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500/20"
+                            )}
+                        >
+                            {(sku as any).isArchived ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
+                            <span>{(sku as any).isArchived ? 'Restore' : 'Archive'}</span>
+                        </button>
+                        <button
                             onClick={handleDeleteSku}
                             disabled={isDeleting}
                             className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-bold uppercase tracking-widest bg-red-600 text-white rounded hover:bg-red-700 transition-colors cursor-pointer disabled:opacity-50 inline-flex shadow-[0_1px_4px_rgba(0,0,0,0.15)]"
@@ -1089,7 +1136,45 @@ function SkuDetailsPageContent() {
                                             </div>
                                             <div>
                                                 <label className="text-xs font-bold text-muted-foreground uppercase block mb-2">Lot Selection</label>
-                                                <SearchableSelect options={[{ label: 'All Lots', value: 'All' }, ...uniqueLots.map(l => ({ label: l!, value: l! }))]} value={selectedLot} onChange={(val) => setSelectedLot(val)} placeholder="Select Lot..." triggerClassName="py-1.5 text-xs font-medium border-border" />
+                                                <div className="relative">
+                                                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground/50 pointer-events-none" />
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Search lots..."
+                                                        value={lotSearch}
+                                                        onChange={e => setLotSearch(e.target.value)}
+                                                        className="w-full pl-7 pr-3 h-8 border border-border rounded text-xs bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 placeholder:text-muted-foreground/50"
+                                                    />
+                                                </div>
+                                                <div className="mt-1.5 max-h-40 overflow-y-auto border border-border rounded bg-background custom-scrollbar">
+                                                    {[{ label: 'All Lots', value: 'All' }, ...uniqueLots.map(l => ({ label: l!, value: l! }))]
+                                                        .filter(opt => !lotSearch || opt.label.toLowerCase().includes(lotSearch.toLowerCase()))
+                                                        .map(opt => (
+                                                            <button
+                                                                key={opt.value}
+                                                                onClick={() => { setSelectedLot(opt.value); setLotSearch(''); }}
+                                                                className={cn(
+                                                                    'w-full text-left px-3 py-1.5 text-xs font-medium hover:bg-secondary/80 transition-colors cursor-pointer',
+                                                                    selectedLot === opt.value ? 'bg-primary/10 text-primary font-bold' : 'text-foreground'
+                                                                )}
+                                                            >
+                                                                {opt.label}
+                                                            </button>
+                                                        ))}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-muted-foreground uppercase block mb-2">Search</label>
+                                                <div className="relative">
+                                                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground/50 pointer-events-none" />
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Search reference, type, lot..."
+                                                        value={referenceSearch}
+                                                        onChange={e => setReferenceSearch(e.target.value)}
+                                                        className="w-full pl-7 pr-3 h-8 border border-border rounded text-xs bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 placeholder:text-muted-foreground/50"
+                                                    />
+                                                </div>
                                             </div>
                                             <div>
                                                 <label className="text-xs font-bold text-muted-foreground uppercase block mb-3">Transaction Types</label>
@@ -1157,6 +1242,8 @@ function SkuDetailsPageContent() {
                                                             showOnlyNoLot: false, showOnlyNoCost: false
                                                         };
                                                         setFilters(defaultFilters);
+                                                        setReferenceSearch('');
+                                                        setLotSearch('');
                                                         setSelectedLot('All');
                                                         localStorage.removeItem(`sku_filters_${id}`);
                                                         localStorage.removeItem(`sku_lot_${id}`);
@@ -1215,34 +1302,43 @@ function SkuDetailsPageContent() {
                                 <tr key={tx._id} data-tx-id={tx._id} className={cn("hover:bg-secondary/50 transition-colors group cursor-pointer", (isPendingProduction(tx) || isUnfulfilledConsumption(tx)) && "!bg-red-500/10 hover:!bg-red-500/15 border-l-2 border-l-red-500", highlightedTxIds.has(tx._id) && "ledger-row-flash")} onClick={() => router.push(tx.link)}>
                                     <td className="px-3 py-3 text-xs text-foreground/80 font-mono font-medium">{formatDate(tx.date)}</td>
                                     <td className="px-3 py-3">
-                                        <div className="flex items-center space-x-2">
-                                            {getTypeIcon(tx.type)}
-                                            <span className="text-[11px] uppercase font-black text-muted-foreground">{tx.type}</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-3 py-3 text-sm text-foreground/80 font-medium">
                                         {tx.type === 'Web Order' && tx.reference ? (() => {
                                             // Parse WC-WEBSITENAME-ORDERNUM format
                                             const parts = tx.reference.split('-');
                                             if (parts.length >= 3) {
                                                 const website = parts.slice(1, -1).join('-');
-                                                const orderNum = parts[parts.length - 1];
+                                                const ws = getWebsiteStyle(website);
                                                 return (
-                                                    <div className="flex items-center gap-2">
-                                                        {(() => {
-                                                            const ws = getWebsiteStyle(website);
-                                                            return (
-                                                                <span
-                                                                    className="px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider shadow-sm whitespace-nowrap shrink-0"
-                                                                    style={{ background: ws.bg, color: ws.color }}
-                                                                >
-                                                                    {website}
-                                                                </span>
-                                                            );
-                                                        })()}
-                                                        <span className="text-xs font-bold font-mono text-foreground">{orderNum}</span>
+                                                    <div className="flex items-center space-x-2">
+                                                        {getTypeIcon(tx.type)}
+                                                        <span
+                                                            className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider shadow-sm whitespace-nowrap"
+                                                            style={{ background: ws.bg, color: ws.color }}
+                                                        >
+                                                            {website}
+                                                        </span>
                                                     </div>
                                                 );
+                                            }
+                                            return (
+                                                <div className="flex items-center space-x-2">
+                                                    {getTypeIcon(tx.type)}
+                                                    <span className="text-[11px] uppercase font-black text-muted-foreground">{tx.type}</span>
+                                                </div>
+                                            );
+                                        })() : (
+                                            <div className="flex items-center space-x-2">
+                                                {getTypeIcon(tx.type)}
+                                                <span className="text-[11px] uppercase font-black text-muted-foreground">{tx.type}</span>
+                                            </div>
+                                        )}
+                                    </td>
+                                    <td className="px-3 py-3 text-sm text-foreground/80 font-medium">
+                                        {tx.type === 'Web Order' && tx.reference ? (() => {
+                                            const parts = tx.reference.split('-');
+                                            if (parts.length >= 3) {
+                                                const orderNum = parts[parts.length - 1];
+                                                return <span className="text-xs font-bold font-mono text-foreground">{orderNum}</span>;
                                             }
                                             return <span className="truncate max-w-[150px]">{tx.reference}</span>;
                                         })() : (
@@ -1402,7 +1498,7 @@ function SkuDetailsPageContent() {
                                             onChange={e => setEditForm({ ...editForm, category: e.target.value })}
                                         >
                                             <option value="">Select</option>
-                                            {["Finished Goods", "High Priority", "Lab Testing", "Maintenance", "Packaging", "Part", "Shipping Category"].map(o => <option key={o} value={o}>{o}</option>)}
+                                            {["Finished Goods", "Part", "Packaging", "Shipping", "Lab Testing"].map(o => <option key={o} value={o}>{o}</option>)}
                                         </select>
                                     </div>
                                     <div className="space-y-1.5">
@@ -1458,10 +1554,6 @@ function SkuDetailsPageContent() {
                                 </div>
 
                                 <div className="flex items-center space-x-6 pt-2">
-                                    <label className="flex items-center space-x-2 cursor-pointer">
-                                        <input type="checkbox" className="w-4 h-4 accent-primary" checked={editForm.kitApplied} onChange={e => setEditForm({ ...editForm, kitApplied: e.target.checked })} />
-                                        <span className="text-xs font-bold uppercase text-muted-foreground">Kit Applied</span>
-                                    </label>
                                     <label className="flex items-center space-x-2 cursor-pointer">
                                         <input type="checkbox" className="w-4 h-4 accent-primary" checked={editForm.isLotApplied} onChange={e => setEditForm({ ...editForm, isLotApplied: e.target.checked })} />
                                         <span className="text-xs font-bold uppercase text-muted-foreground">Lot Applied (Traceability)</span>

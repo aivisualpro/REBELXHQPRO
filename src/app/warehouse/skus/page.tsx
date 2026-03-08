@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowUpDown, Plus, Search, X, Loader2 } from 'lucide-react';
+import { ArrowUpDown, Plus, Search, X, Loader2, Archive, ArchiveRestore } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTheme } from '@/components/ThemeProvider';
 import toast from 'react-hot-toast';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -19,8 +20,8 @@ interface Sku {
   salePrice?: number;
   orderUpto?: number;
   reOrderPoint?: number;
-  kitApplied?: boolean;
   isLotApplied?: boolean;
+  isArchived?: boolean;
   tier?: number;
   createdAt?: string;
 }
@@ -34,6 +35,7 @@ interface CacheEntry {
   sortOrder: string;
   search: string;
   category: string;
+  showArchived: boolean;
   timestamp: number;
 }
 
@@ -69,7 +71,6 @@ const COLUMNS = [
   { key: 'salePrice', label: 'Sale Price', width: 'w-[90px]', align: 'text-right' },
   { key: 'reOrderPoint', label: 'Re-Order Pt', width: 'w-[90px]', align: 'text-right' },
   { key: 'orderUpto', label: 'Order Upto', width: 'w-[90px]', align: 'text-right' },
-  { key: 'kitApplied', label: 'Kit', width: 'w-[50px]' },
 ];
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
@@ -126,12 +127,30 @@ function hashString(str: string): number {
   return Math.abs(h);
 }
 
+// Fixed overrides for specific values (bypass hash-based palette)
+const PILL_OVERRIDES: Record<string, Record<string, { bg: string; border: string }>> = {
+  category: {
+    'finished goods': { bg: '#FFB33F', border: '#FFB33F' },
+    'packaging': { bg: '#7AAACE', border: '#7AAACE' },
+    'shipping category': { bg: '#66D0BC', border: '#66D0BC' },
+    'shipping': { bg: '#66D0BC', border: '#66D0BC' },
+    'part': { bg: '#E57373', border: '#E57373' },
+    'lab testing': { bg: '#BA68C8', border: '#BA68C8' },
+  },
+  material: {
+    'tablets': { bg: '#AEB784', border: '#AEB784' },
+  },
+};
+
 function FieldPill({ value, type }: { value: string; type: 'category' | 'subCategory' | 'material' }) {
+  const override = PILL_OVERRIDES[type]?.[value.toLowerCase()];
   const palette = PILL_PALETTES[type];
-  const s = palette[hashString(value) % palette.length];
+  const s = override || palette[hashString(value) % palette.length];
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   return (
     <span
-      style={{ backgroundColor: s.bg, color: s.color, border: `1px solid ${s.border}`, borderRadius: '5px' }}
+      style={{ backgroundColor: s.bg, border: `1px solid ${s.border}`, borderRadius: '5px', color: isDark ? '#000000' : '#ffffff' }}
       className="inline-flex items-center px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap max-w-full truncate"
     >
       {value}
@@ -142,8 +161,7 @@ function FieldPill({ value, type }: { value: string; type: 'category' | 'subCate
 function UomPill({ value }: { value: string }) {
   return (
     <span
-      style={{ backgroundColor: '#ea580c', color: '#ffffff', border: '1px solid #ea580c', borderRadius: '5px' }}
-      className="inline-flex items-center px-2 py-0.5 text-[10px] font-black font-mono uppercase tracking-widest"
+      className="inline-flex items-center text-[10px] font-black font-mono uppercase tracking-widest text-foreground"
     >
       {value}
     </span>
@@ -153,8 +171,8 @@ function UomPill({ value }: { value: string }) {
 // ─── Table Row ────────────────────────────────────────────────────────────────
 
 const SkuRow = React.memo(function SkuRow({
-  sku, onClick, highlight
-}: { sku: Sku; onClick: () => void; highlight?: boolean }) {
+  sku, onClick, highlight, onToggleArchive, showArchived
+}: { sku: Sku; onClick: () => void; highlight?: boolean; onToggleArchive?: (skuId: string, isArchived: boolean) => void; showArchived?: boolean }) {
   const fmt = (n?: number) => n != null ? `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—';
   return (
     <tr
@@ -178,8 +196,20 @@ const SkuRow = React.memo(function SkuRow({
       <td className="px-2.5 py-2.5 w-[90px] text-[12px] font-mono text-right text-foreground/80">{fmt(sku.salePrice)}</td>
       <td className="px-2.5 py-2.5 w-[90px] text-[12px] font-mono text-right text-foreground/70">{sku.reOrderPoint?.toLocaleString() || '—'}</td>
       <td className="px-2.5 py-2.5 w-[90px] text-[12px] font-mono text-right text-foreground/70">{sku.orderUpto?.toLocaleString() || '—'}</td>
-      <td className="px-2.5 py-2.5 w-[50px] text-center">
-        {sku.kitApplied ? <span className="text-[10px] font-black text-primary">✓</span> : <span className="text-muted-foreground/30 text-[10px]">—</span>}
+      {/* Archive action */}
+      <td className="px-2.5 py-2.5 w-[70px] text-center">
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleArchive?.(sku._id, !!sku.isArchived); }}
+          className={cn(
+            'inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer',
+            sku.isArchived
+              ? 'bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25 border border-emerald-500/20'
+              : 'opacity-0 group-hover:opacity-100 bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 border border-rose-500/20'
+          )}
+          title={sku.isArchived ? 'Restore SKU' : 'Archive SKU'}
+        >
+          {sku.isArchived ? <><ArchiveRestore className="w-3 h-3" /> Restore</> : <><Archive className="w-3 h-3" /> Archive</>}
+        </button>
       </td>
     </tr>
   );
@@ -187,10 +217,10 @@ const SkuRow = React.memo(function SkuRow({
 
 // ─── Add/Edit Modal ───────────────────────────────────────────────────────────
 
-const INITIAL_FORM = { name: '', image: '', category: '', subCategory: '', materialType: '', uom: '', salePrice: 0, orderUpto: 0, reOrderPoint: 0, kitApplied: false, isLotApplied: false };
+const INITIAL_FORM = { name: '', image: '', category: '', subCategory: '', materialType: '', uom: '', salePrice: 0, orderUpto: 0, reOrderPoint: 0, isLotApplied: false };
 
 function SkuModal({ onClose, onSaved, editing }: { onClose: () => void; onSaved: () => void; editing?: Sku | null }) {
-  const [form, setForm] = useState(editing ? { name: editing.name, image: editing.image || '', category: editing.category || '', subCategory: editing.subCategory || '', materialType: editing.materialType || '', uom: editing.uom || '', salePrice: editing.salePrice || 0, orderUpto: editing.orderUpto || 0, reOrderPoint: editing.reOrderPoint || 0, kitApplied: editing.kitApplied || false, isLotApplied: editing.isLotApplied || false } : INITIAL_FORM);
+  const [form, setForm] = useState(editing ? { name: editing.name, image: editing.image || '', category: editing.category || '', subCategory: editing.subCategory || '', materialType: editing.materialType || '', uom: editing.uom || '', salePrice: editing.salePrice || 0, orderUpto: editing.orderUpto || 0, reOrderPoint: editing.reOrderPoint || 0, isLotApplied: editing.isLotApplied || false } : INITIAL_FORM);
   const [saving, setSaving] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -221,7 +251,7 @@ function SkuModal({ onClose, onSaved, editing }: { onClose: () => void; onSaved:
               <Field label="Category">
                 <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className={inp}>
                   <option value="">Select...</option>
-                  {['Finished Goods', 'High Priority', 'Lab Testing', 'Maintenance', 'Packaging', 'Part', 'Shipping Category'].map(o => <option key={o}>{o}</option>)}
+                  {['Finished Goods', 'Part', 'Packaging', 'Shipping Category', 'Lab Testing'].map(o => <option key={o}>{o}</option>)}
                 </select>
               </Field>
               <Field label="Sub Category">
@@ -248,10 +278,6 @@ function SkuModal({ onClose, onSaved, editing }: { onClose: () => void; onSaved:
             </div>
             <div className="flex items-center gap-6 pt-2">
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" className="w-4 h-4 accent-primary" checked={form.kitApplied} onChange={e => setForm({ ...form, kitApplied: e.target.checked })} />
-                <span className="text-[11px] font-bold uppercase text-muted-foreground">Kit Applied</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" className="w-4 h-4 accent-primary" checked={form.isLotApplied} onChange={e => setForm({ ...form, isLotApplied: e.target.checked })} />
                 <span className="text-[11px] font-bold uppercase text-muted-foreground">Lot Applied (Traceability)</span>
               </label>
@@ -277,13 +303,14 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 // ─── Category Filter Tabs ─────────────────────────────────────────────────────
 
-const CATEGORY_TABS = ['All', 'Finished Goods', 'Packaging', 'Raw Ingredients', 'Other'] as const;
+const CATEGORY_TABS = ['All', 'Finished Goods', 'Part', 'Packaging', 'Shipping', 'Lab Testing'] as const;
 const CATEGORY_COLORS: Record<string, { bg: string; color: string; hoverBg: string }> = {
   'All': { bg: '#fe9900', color: '#ffffff', hoverBg: 'rgba(254,153,0,0.08)' },
-  'Finished Goods': { bg: '#7c3aed', color: '#ffffff', hoverBg: 'rgba(124,58,237,0.08)' },
-  'Packaging': { bg: '#0891b2', color: '#ffffff', hoverBg: 'rgba(8,145,178,0.08)' },
-  'Raw Ingredients': { bg: '#65a30d', color: '#ffffff', hoverBg: 'rgba(101,163,13,0.08)' },
-  'Other': { bg: '#64748b', color: '#ffffff', hoverBg: 'rgba(100,116,139,0.08)' },
+  'Finished Goods': { bg: '#FFB33F', color: '#000000', hoverBg: 'rgba(255,179,63,0.08)' },
+  'Part': { bg: '#E57373', color: '#000000', hoverBg: 'rgba(229,115,115,0.08)' },
+  'Packaging': { bg: '#7AAACE', color: '#000000', hoverBg: 'rgba(122,170,206,0.08)' },
+  'Shipping': { bg: '#66D0BC', color: '#000000', hoverBg: 'rgba(102,208,188,0.08)' },
+  'Lab Testing': { bg: '#BA68C8', color: '#ffffff', hoverBg: 'rgba(186,104,200,0.08)' },
 };
 
 // ─── Main Content ─────────────────────────────────────────────────────────────
@@ -306,6 +333,7 @@ function SkusContent() {
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingSku, setEditingSku] = useState<Sku | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
 
   const pageRef = useRef(globalCache.current?.page || 0);
   const mountedRef = useRef(true);
@@ -369,14 +397,14 @@ function SkusContent() {
         simple: 'true',
         ignoreDate: 'true',
       });
+      if (showArchived) params.set('showArchived', 'true');
 
-      // Category filter
       if (activeCategory !== 'All') {
-        if (activeCategory === 'Other') {
-          // "Other" = not any of the named categories
-        } else {
-          params.set('category', activeCategory);
-        }
+        // Map display names to actual DB category values
+        const categoryDbMap: Record<string, string> = {
+          'Shipping': 'Shipping Category',
+        };
+        params.set('category', categoryDbMap[activeCategory] || activeCategory);
       }
 
       const res = await fetch(`/api/skus?${params}`, { signal: controller.signal });
@@ -387,10 +415,7 @@ function SkusContent() {
 
       if (res.ok) {
         const newSkus: Sku[] = data.skus || [];
-        // Client-side filter for "Other" category
-        const filtered = activeCategory === 'Other'
-          ? newSkus.filter(s => !['Finished Goods', 'Packaging', 'Raw Ingredients'].some(c => s.category?.includes(c)))
-          : newSkus;
+        const filtered = newSkus;
 
         const newHasMore = data.hasMore ?? (newSkus.length === PAGE_SIZE);
         const newTotal = data.total || 0;
@@ -399,13 +424,13 @@ function SkusContent() {
           setSkus(prev => {
             const ids = new Set(prev.map(s => s._id));
             const merged = [...prev, ...filtered.filter(s => !ids.has(s._id))];
-            globalCache.current = { skus: merged, hasMore: newHasMore, page: pageNum, total: newTotal, sortBy, sortOrder, search: debouncedSearch, category: activeCategory, timestamp: Date.now() };
+            globalCache.current = { skus: merged, hasMore: newHasMore, page: pageNum, total: newTotal, sortBy, sortOrder, search: debouncedSearch, category: activeCategory, showArchived, timestamp: Date.now() };
             return merged;
           });
         } else {
           setSkus(filtered);
           setTotal(newTotal);
-          globalCache.current = { skus: filtered, hasMore: newHasMore, page: pageNum, total: newTotal, sortBy, sortOrder, search: debouncedSearch, category: activeCategory, timestamp: Date.now() };
+          globalCache.current = { skus: filtered, hasMore: newHasMore, page: pageNum, total: newTotal, sortBy, sortOrder, search: debouncedSearch, category: activeCategory, showArchived, timestamp: Date.now() };
         }
 
         setHasMore(newHasMore);
@@ -421,25 +446,25 @@ function SkusContent() {
       fetchingRef.current = false;
       if (mountedRef.current) { setIsLoading(false); setIsLoadingMore(false); }
     }
-  }, [sortBy, sortOrder, debouncedSearch, activeCategory]);
+  }, [sortBy, sortOrder, debouncedSearch, activeCategory, showArchived]);
 
   // ─── Initial load / filter changes ─────────────────────────────────────
 
   const fetchPageRef = useRef(fetchPage);
   fetchPageRef.current = fetchPage;
   const isFirstMount = useRef(true);
-  const prevFiltersRef = useRef({ sortBy, sortOrder, search: debouncedSearch, category: activeCategory });
+  const prevFiltersRef = useRef({ sortBy, sortOrder, search: debouncedSearch, category: activeCategory, showArchived });
 
   useEffect(() => {
     const prev = prevFiltersRef.current;
-    const filtersChanged = prev.sortBy !== sortBy || prev.sortOrder !== sortOrder || prev.search !== debouncedSearch || prev.category !== activeCategory;
-    prevFiltersRef.current = { sortBy, sortOrder, search: debouncedSearch, category: activeCategory };
+    const filtersChanged = prev.sortBy !== sortBy || prev.sortOrder !== sortOrder || prev.search !== debouncedSearch || prev.category !== activeCategory || prev.showArchived !== showArchived;
+    prevFiltersRef.current = { sortBy, sortOrder, search: debouncedSearch, category: activeCategory, showArchived };
 
     if (isFirstMount.current) {
       isFirstMount.current = false;
       const cache = globalCache.current;
       if (cache && cache.skus.length > 0 && (Date.now() - cache.timestamp) < CACHE_TTL &&
-        cache.sortBy === sortBy && cache.sortOrder === sortOrder && cache.search === debouncedSearch && cache.category === activeCategory) {
+        cache.sortBy === sortBy && cache.sortOrder === sortOrder && cache.search === debouncedSearch && cache.category === activeCategory && cache.showArchived === showArchived) {
         setSkus(cache.skus); setHasMore(cache.hasMore); setTotal(cache.total); pageRef.current = cache.page; setIsLoading(false); return;
       }
     }
@@ -450,7 +475,38 @@ function SkusContent() {
     setHasMore(true);
     fetchPageRef.current(1, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sortBy, sortOrder, debouncedSearch, activeCategory]);
+  }, [sortBy, sortOrder, debouncedSearch, activeCategory, showArchived]);
+
+  // ─── Archive Toggle ─────────────────────────────────────────────────────
+
+  const handleToggleArchive = async (skuId: string, currentArchived: boolean) => {
+    const toastId = toast.loading(currentArchived ? 'Restoring...' : 'Archiving...');
+    // Optimistic: remove from list if hiding archived & archiving, or toggle flag
+    setSkus(prev => prev.filter(s => {
+      if (s._id === skuId && !showArchived && !currentArchived) return false;
+      return true;
+    }).map(s => {
+      if (s._id === skuId) return { ...s, isArchived: !currentArchived };
+      return s;
+    }));
+
+    try {
+      const res = await fetch(`/api/skus/${skuId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isArchived: !currentArchived })
+      });
+      if (res.ok) {
+        toast.success(currentArchived ? 'Restored' : 'Archived', { id: toastId });
+        globalCache.current = null;
+      } else {
+        toast.error('Failed', { id: toastId });
+        globalCache.current = null; fetchPage(1, false);
+      }
+    } catch {
+      toast.error('Failed', { id: toastId });
+      globalCache.current = null; fetchPage(1, false);
+    }
+  };
 
   // ─── Infinite scroll ─────────────────────────────────────────────────────
 
@@ -518,6 +574,16 @@ function SkusContent() {
 
         <div className="flex-1" />
 
+        {/* Show Archived toggle */}
+        <button
+          onClick={() => setShowArchived(p => !p)}
+          className={cn('h-8 px-3 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 text-[11px] font-bold uppercase tracking-widest', showArchived ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20 shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60')}
+          title={showArchived ? 'Viewing Archived SKUs' : 'Show Archived SKUs'}
+        >
+          <Archive className="w-3.5 h-3.5" />
+          <span>Archived</span>
+        </button>
+
         {/* Add Button */}
         <button
           onClick={() => { setEditingSku(null); setModalOpen(true); }}
@@ -539,7 +605,7 @@ function SkusContent() {
                     key={col.key}
                     onClick={() => handleSort(col.key)}
                     className={cn(
-                      'px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary/60 transition-colors border-r border-border/40 last:border-0 select-none shadow-[0_1px_0_0_hsl(var(--border))]',
+                      'px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary/60 transition-colors border-r border-border/40 select-none shadow-[0_1px_0_0_hsl(var(--border))]',
                       col.width
                     )}
                   >
@@ -549,20 +615,25 @@ function SkusContent() {
                     </div>
                   </th>
                 ))}
+                <th className="px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest w-[70px] text-center shadow-[0_1px_0_0_hsl(var(--border))]">
+                  <Archive className="w-3 h-3 mx-auto" />
+                </th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 Array.from({ length: 25 }).map((_, i) => <SkeletonRow key={i} index={i} />)
               ) : error ? (
-                <tr><td colSpan={COLUMNS.length} className="px-4 py-12 text-center text-[12px] text-destructive">{error}</td></tr>
+                <tr><td colSpan={COLUMNS.length + 1} className="px-4 py-12 text-center text-[12px] text-destructive">{error}</td></tr>
               ) : skus.length === 0 ? (
-                <tr><td colSpan={COLUMNS.length} className="px-4 py-16 text-center text-[12px] text-muted-foreground/50 uppercase tracking-widest">No SKUs found</td></tr>
+                <tr><td colSpan={COLUMNS.length + 1} className="px-4 py-16 text-center text-[12px] text-muted-foreground/50 uppercase tracking-widest">No SKUs found</td></tr>
               ) : skus.map(sku => (
                 <SkuRow
                   key={sku._id}
                   sku={sku}
                   highlight={highlightId === sku._id}
+                  onToggleArchive={handleToggleArchive}
+                  showArchived={showArchived}
                   onClick={() => {
                     sessionStorage.setItem('sku_scroll_to', sku._id);
                     if (scrollRef.current) sessionStorage.setItem('sku_scroll_top', String(scrollRef.current.scrollTop));

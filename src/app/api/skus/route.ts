@@ -57,6 +57,14 @@ export async function GET(request: Request) {
             query.isWebProduct = true;
         }
 
+        // Archive filter — default to hiding archived; when toggled, show ONLY archived
+        const showArchived = searchParams.get('showArchived') === 'true';
+        if (showArchived) {
+            query.isArchived = true;
+        } else {
+            query.isArchived = { $ne: true };
+        }
+
         const simpleMode = searchParams.get('simple') === 'true';
 
         console.log('SKU API Sort:', { sortBy, sortOrder, simpleMode });
@@ -170,13 +178,14 @@ export async function GET(request: Request) {
                 }
             ]),
 
-            // 7. Web Orders (By SKU — String type, including linkedSkuId)
+            // 7. Web Orders (By SKU — String type, including linkedSkuId and linkedSkus.skuId)
             WebOrder.aggregate([
                 {
                     $match: {
                         $or: [
                             { "lineItems.sku": { $in: skuIds } },
-                            { "lineItems.linkedSkuId": { $in: strSkuIds } }
+                            { "lineItems.linkedSkuId": { $in: strSkuIds } },
+                            { "lineItems.linkedSkus.skuId": { $in: strSkuIds } }
                         ],
                         status: { $in: ['completed', 'shipped', 'Completed', 'Shipped', 'processing', 'Processing', 'pending', 'Pending', 'on-hold', 'On Hold'] }
                     }
@@ -186,21 +195,55 @@ export async function GET(request: Request) {
                     $match: {
                         $or: [
                             { "lineItems.sku": { $in: skuIds } },
-                            { "lineItems.linkedSkuId": { $in: strSkuIds } }
+                            { "lineItems.linkedSkuId": { $in: strSkuIds } },
+                            { "lineItems.linkedSkus.skuId": { $in: strSkuIds } }
                         ]
                     }
                 },
-                // Normalize to a single key for grouping
+                // Unwind linkedSkus if present to create per-SKU rows
                 {
-                    $addFields: {
-                        resolvedSkuId: { $ifNull: ["$lineItems.linkedSkuId", { $ifNull: ["$lineItems.sku", null] }] }
+                    $facet: {
+                        // Branch 1: line items with linkedSkus array (multi-SKU)
+                        multiSku: [
+                            { $match: { "lineItems.linkedSkus": { $exists: true, $ne: [] } } },
+                            { $unwind: "$lineItems.linkedSkus" },
+                            { $match: { "lineItems.linkedSkus.skuId": { $in: strSkuIds } } },
+                            {
+                                $group: {
+                                    _id: "$lineItems.linkedSkus.skuId",
+                                    qty: { $sum: { $multiply: ["$lineItems.quantity", { $ifNull: ["$lineItems.linkedSkus.multiplier", 1] }] } },
+                                    revenue: { $sum: "$lineItems.total" }
+                                }
+                            }
+                        ],
+                        // Branch 2: line items without linkedSkus (legacy single-link)
+                        singleSku: [
+                            { $match: { $or: [{ "lineItems.linkedSkus": { $exists: false } }, { "lineItems.linkedSkus": { $size: 0 } }] } },
+                            {
+                                $addFields: {
+                                    resolvedSkuId: { $ifNull: ["$lineItems.linkedSkuId", { $ifNull: ["$lineItems.sku", null] }] }
+                                }
+                            },
+                            {
+                                $group: {
+                                    _id: "$resolvedSkuId",
+                                    qty: { $sum: "$lineItems.quantity" },
+                                    revenue: { $sum: "$lineItems.total" }
+                                }
+                            }
+                        ]
                     }
                 },
+                // Merge both branches
+                { $project: { combined: { $concatArrays: ["$multiSku", "$singleSku"] } } },
+                { $unwind: "$combined" },
+                { $replaceRoot: { newRoot: "$combined" } },
+                // Final group to merge duplicate SKU entries
                 {
                     $group: {
-                        _id: "$resolvedSkuId",
-                        qty: { $sum: "$lineItems.quantity" },
-                        revenue: { $sum: "$lineItems.total" }
+                        _id: "$_id",
+                        qty: { $sum: "$qty" },
+                        revenue: { $sum: "$revenue" }
                     }
                 }
             ]),

@@ -372,34 +372,107 @@ export async function GET(
         });
 
         // Web Orders
-        webOrders.forEach((wo: any) => {
+        // Phase 1: Process web orders already matched by direct query filters
+        // Phase 2: Also resolve multi-SKU links through WebProducts (since linkedSkus
+        //          may NOT be persisted on the WebOrder doc — only on the WebProduct)
+        const processedWebOrderLineItems = new Set<string>(); // track to avoid duplicates
+
+        // Build a lookup: for each WebProduct that links to this SKU, what multiplier should we use?
+        // This catches products where linkedSkuId is a different SKU but linkedSkus[] contains our SKU
+        const wpMultiplierForSku = new Map<string, Map<number | string, number>>(); // wpKey -> variationId|'simple' -> multiplier
+        (webProducts as any[]).forEach((wp: any) => {
+            const wpKey = `${wp.website}-${wp.webId}`;
+            // Check product-level linkedSkus
+            if (wp.linkedSkus?.length > 0) {
+                const match = wp.linkedSkus.find((ls: any) => ls.skuId === id);
+                if (match) {
+                    if (!wpMultiplierForSku.has(wpKey)) wpMultiplierForSku.set(wpKey, new Map());
+                    wpMultiplierForSku.get(wpKey)!.set('simple', match.multiplier || 1);
+                }
+            }
+            // Check variation-level linkedSkus
+            wp.variations?.forEach((v: any) => {
+                const vid = v.id || v._id;
+                const varLinkedSkus = v.linkedSkus?.length > 0 ? v.linkedSkus : (v.linkedSkuId ? [{ skuId: v.linkedSkuId, multiplier: v.multiplier || 1 }] : []);
+                const match = varLinkedSkus.find((ls: any) => ls.skuId === id);
+                if (match) {
+                    if (!wpMultiplierForSku.has(wpKey)) wpMultiplierForSku.set(wpKey, new Map());
+                    wpMultiplierForSku.get(wpKey)!.set(vid, match.multiplier || 1);
+                }
+            });
+        });
+
+        // Also find web orders whose products link to this SKU but weren't caught by the initial query
+        // (because linkedSkus isn't persisted on the WebOrder doc)
+        const wpWebIds = (webProducts as any[]).map((wp: any) => wp.webId).filter(Boolean);
+        const wpWebsites = [...new Set((webProducts as any[]).map((wp: any) => wp.website).filter(Boolean))];
+        let additionalWebOrders: any[] = [];
+        if (wpWebIds.length > 0) {
+            additionalWebOrders = await WebOrder.find({
+                "lineItems.productId": { $in: wpWebIds },
+                website: { $in: wpWebsites },
+                ...dateFilter
+            }).select('_id createdAt dateCompleted status lineItems website').lean();
+        }
+
+        // Merge all web orders (deduplicated by _id)
+        const allWebOrderMap = new Map<string, any>();
+        (webOrders as any[]).forEach(wo => allWebOrderMap.set(wo._id.toString(), wo));
+        additionalWebOrders.forEach(wo => allWebOrderMap.set(wo._id.toString(), wo));
+        const allWebOrders = Array.from(allWebOrderMap.values());
+
+        allWebOrders.forEach((wo: any) => {
             wo.lineItems?.forEach((line: any) => {
                 const lineSkuId = (line.sku?._id || line.sku)?.toString();
-                // Check if this line item references the current SKU
+                // Check if this line item references the current SKU directly
                 const isDirectMatch = lineSkuId === id || line.linkedSkuId === id;
                 const isVarianceMatch = line.varianceId && varianceIds.includes(line.varianceId);
-                // Check multi-SKU linkedSkus array
+                // Check persisted multi-SKU linkedSkus array
                 const linkedSkuMatch = line.linkedSkus?.find((ls: any) => ls.skuId === id);
 
-                if (isDirectMatch || isVarianceMatch || linkedSkuMatch) {
-                    // For multi-SKU entries, use the matching entry's lot/cost/multiplier
-                    const lot = linkedSkuMatch ? (linkedSkuMatch.lotNumber || '') : (line.lotNumber || '');
+                // Check via WebProduct resolution (covers un-persisted linkedSkus)
+                const wpKey = `${wo.website}-${line.productId}`;
+                const wpMap = wpMultiplierForSku.get(wpKey);
+                let wpResolvedMultiplier: number | null = null;
+                if (wpMap) {
+                    // Try variation-level first, then product-level
+                    if (line.variationId && wpMap.has(line.variationId)) {
+                        wpResolvedMultiplier = wpMap.get(line.variationId)!;
+                    } else if (wpMap.has('simple')) {
+                        wpResolvedMultiplier = wpMap.get('simple')!;
+                    }
+                }
+
+                if (isDirectMatch || isVarianceMatch || linkedSkuMatch || wpResolvedMultiplier !== null) {
+                    // Deduplicate: skip if we already processed this exact line item for this SKU
+                    const dedupeKey = `${wo._id}_${line.id || line._id}_${id}`;
+                    if (processedWebOrderLineItems.has(dedupeKey)) return;
+                    processedWebOrderLineItems.add(dedupeKey);
+
+                    // Determine lot: only use line.lotNumber for direct/single-SKU matches,
+                    // NOT for WebProduct-resolved multi-SKU entries (that lot belongs to a different SKU)
+                    const lot = linkedSkuMatch
+                        ? (linkedSkuMatch.lotNumber || '')
+                        : (wpResolvedMultiplier !== null
+                            ? '' // WebProduct-resolved: no lot assigned for this specific SKU yet
+                            : (isDirectMatch ? (line.lotNumber || '') : ''));
                     const virtualCost = lotCosts.get(lot);
 
                     const key = line.variationId ? `${wo.website}-${line.productId}-${line.variationId}` : `${wo.website}-${line.productId}`;
-                    // For multi-SKU, use the per-entry multiplier; for legacy, use multiplierMap
-                    const multiplier = linkedSkuMatch ? (linkedSkuMatch.multiplier || 1) : (multiplierMap.get(key) || 1);
+                    // Priority: linkedSkuMatch multiplier > wpResolved multiplier > multiplierMap > 1
+                    const multiplier = linkedSkuMatch ? (linkedSkuMatch.multiplier || 1)
+                        : (wpResolvedMultiplier !== null ? wpResolvedMultiplier : (multiplierMap.get(key) || 1));
                     const qtyToDeduct = round8(-Math.abs((line.quantity || 0) * multiplier));
 
                     transactions.push({
-                        _id: linkedSkuMatch ? `${wo._id}_${line.id || line._id}_${id}` : (line._id || `${wo._id}_${id}`),
+                        _id: `${wo._id}_${line.id || line._id}_${id}`,
                         date: wo.dateCompleted ? new Date(wo.dateCompleted) : new Date(wo.createdAt),
                         type: 'Web Order',
                         reference: line.varianceId ? `${wo._id} (${line.varianceId})` : wo._id,
                         lotNumber: cleanLot(lot) || 'N/A',
                         quantity: qtyToDeduct,
                         uom: 'Unit',
-                        cost: round8(virtualCost !== undefined ? virtualCost : (linkedSkuMatch?.cost || line.cost || 0)),
+                        cost: round8(virtualCost !== undefined ? virtualCost : (linkedSkuMatch?.cost || (isDirectMatch ? (line.cost || 0) : 0))),
                         salePrice: round8((line.total && line.quantity) ? (line.total / line.quantity) : 0),
                         docId: wo._id,
                         link: `/sales/web-orders/${wo._id}`,

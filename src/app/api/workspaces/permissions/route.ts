@@ -14,6 +14,7 @@ export const dynamic = 'force-dynamic';
  * {
  *   workspaceName: string,
  *   routePermissions: Record<string, { crud: {...}, fields: Record<string, boolean> }>,
+ *   keyPermissions: Record<string, { crud: {...}, fields: Record<string, boolean>, enabled: boolean }>,
  *   enabledModules: string[],
  *   enabledRoutes: string[]
  * }
@@ -39,6 +40,12 @@ export async function GET(request: Request) {
             crud: { create: boolean; read: boolean; update: boolean; delete: boolean };
             fields: Record<string, boolean>;
         }> = {};
+        // Key-based permissions for sub-modules sharing the same route
+        const keyPermissions: Record<string, {
+            crud: { create: boolean; read: boolean; update: boolean; delete: boolean };
+            fields: Record<string, boolean>;
+            enabled: boolean;
+        }> = {};
         const enabledModules: string[] = [];
         const enabledRoutes: string[] = [];
 
@@ -47,23 +54,38 @@ export async function GET(request: Request) {
             enabledModules.push(mod.key);
 
             for (const sub of mod.subModules || []) {
-                if (!sub.enabled) continue;
-                enabledRoutes.push(sub.route);
-
                 const fieldMap: Record<string, boolean> = {};
                 for (const f of sub.fields || []) {
                     fieldMap[f.field] = f.visible;
                 }
 
-                routePermissions[sub.route] = {
-                    crud: {
-                        create: sub.crud?.create ?? true,
-                        read: sub.crud?.read ?? true,
-                        update: sub.crud?.update ?? true,
-                        delete: sub.crud?.delete ?? true,
-                    },
-                    fields: fieldMap,
+                const crudPerm = {
+                    create: sub.crud?.create ?? true,
+                    read: sub.crud?.read ?? true,
+                    update: sub.crud?.update ?? true,
+                    delete: sub.crud?.delete ?? true,
                 };
+
+                // Always store by key (unique per sub-module)
+                keyPermissions[sub.key] = {
+                    crud: crudPerm,
+                    fields: fieldMap,
+                    enabled: sub.enabled ?? false,
+                };
+
+                if (!sub.enabled) continue;
+                enabledRoutes.push(sub.route);
+
+                // Route-based: merge fields if multiple sub-modules share a route
+                if (routePermissions[sub.route]) {
+                    // Merge fields from this sub-module into existing route entry
+                    Object.assign(routePermissions[sub.route].fields, fieldMap);
+                } else {
+                    routePermissions[sub.route] = {
+                        crud: crudPerm,
+                        fields: fieldMap,
+                    };
+                }
             }
         }
 
@@ -72,6 +94,7 @@ export async function GET(request: Request) {
             workspaceName: (workspace as any).name,
             workspaceColor: (workspace as any).color,
             routePermissions,
+            keyPermissions,
             enabledModules,
             enabledRoutes,
         });

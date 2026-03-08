@@ -55,6 +55,22 @@ body {
     border-radius: 0px !important;
   }
 
+  /* Global pointer cursor for all interactive elements */
+  button,
+  a,
+  [role="button"],
+  label[for],
+  select,
+  summary,
+  [onclick] {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [role="button"][aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+
   table {
     width: 100%;
   }

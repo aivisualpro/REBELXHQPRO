@@ -92,7 +92,7 @@ function SmartViewsSidebar({ isSidebarCollapsed }: { isSidebarCollapsed: boolean
   }, []);
 
   const isSmartViewActive = (viewId: string) => {
-    return pathname === '/crm/inbox/smart-view' && searchParams?.get('view') === viewId;
+    return pathname === '/crm/smart-view' && searchParams?.get('view') === viewId;
   };
 
   return (
@@ -105,7 +105,7 @@ function SmartViewsSidebar({ isSidebarCollapsed }: { isSidebarCollapsed: boolean
         return (
           <Link
             key={view.id}
-            href={`/crm/inbox/smart-view?view=${view.id}`}
+            href={`/crm/smart-view?view=${view.id}`}
             className="block"
             title={isSidebarCollapsed ? view.name : ''}
           >

@@ -831,10 +831,12 @@ function SettingsPageContent() {
     return (
         <div className="flex flex-col h-[calc(100vh-48px)] bg-background">
             {/* Page Header */}
-            <div className="shrink-0 border-b border-border bg-background">
+            <div className="shrink-0 border-b border-border bg-card/80 backdrop-blur-sm">
                 <div className="px-4 py-2.5 flex items-center gap-4">
                     <div className="flex items-center gap-2 shrink-0">
-                        <Save className="w-4 h-4 text-primary" />
+                        <div className="w-7 h-7 rounded-lg bg-primary/15 flex items-center justify-center">
+                            <Settings className="w-3.5 h-3.5 text-primary" />
+                        </div>
                         <h1 className="text-[14px] font-black uppercase tracking-widest text-foreground">Settings</h1>
                     </div>
                     <div className="h-5 w-px bg-border shrink-0" />
@@ -845,7 +847,7 @@ function SettingsPageContent() {
                             placeholder="Search settings..."
                             value={headerSearch}
                             onChange={e => setHeaderSearch(e.target.value)}
-                            className="pl-8 pr-8 h-8 w-56 bg-background border border-border text-[12px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded"
+                            className="pl-8 pr-8 h-8 w-56 bg-background border border-border text-[12px] focus:outline-none focus:ring-1 focus:ring-primary/30 transition-all placeholder:text-muted-foreground text-foreground rounded"
                         />
                         {headerSearch && (
                             <button onClick={() => setHeaderSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors z-20 cursor-pointer">
@@ -867,21 +869,25 @@ function SettingsPageContent() {
 
             <div className="flex flex-1 overflow-hidden">
                 {/* Sidebar */}
-                <div className="w-64 bg-background border-r border-border flex flex-col pt-6 shrink-0">
+                <div className="w-64 bg-card/50 border-r border-border flex flex-col pt-4 shrink-0">
+                    <div className="px-5 mb-3">
+                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Navigation</span>
+                    </div>
                     {filteredTabs.map(tab => {
                         const Icon = tab.icon;
+                        const isActive = activeTab === tab.id;
                         return (
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id as Tab)}
                                 className={cn(
-                                    "flex items-center space-x-3 px-6 py-3 text-sm font-medium transition-colors border-l-2",
-                                    activeTab === tab.id
-                                        ? "border-foreground text-foreground bg-background"
-                                        : "border-transparent text-muted-foreground hover:text-foreground hover:bg-background"
+                                    "flex items-center space-x-3 px-5 py-2.5 text-[12px] font-bold transition-all border-l-2 mx-2 rounded-r-lg",
+                                    isActive
+                                        ? "border-l-primary text-foreground bg-primary/10"
+                                        : "border-transparent text-muted-foreground hover:text-foreground hover:bg-secondary/60"
                                 )}
                             >
-                                <Icon className="w-4 h-4" />
+                                <Icon className={cn("w-4 h-4", isActive && "text-primary")} />
                                 <span>{tab.label}</span>
                             </button>
                         );
@@ -912,13 +918,13 @@ function SettingsPageContent() {
                                         </div>
 
                                         {/* SuperAdmin Badge */}
-                                        <div className="p-4 border border-emerald-500/20 bg-emerald-500/5 rounded-lg flex items-start space-x-4">
-                                            <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0">
-                                                <Shield className="w-5 h-5 text-emerald-600" />
+                                        <div className="p-4 border border-emerald-500/30 bg-emerald-950/40 rounded-lg flex items-start space-x-4">
+                                            <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
+                                                <Shield className="w-5 h-5 text-emerald-400" />
                                             </div>
                                             <div>
-                                                <h4 className="text-sm font-bold text-emerald-600 dark:text-emerald-400">SuperAdmin Access</h4>
-                                                <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70 mt-1">
+                                                <h4 className="text-sm font-bold text-emerald-400">SuperAdmin Access</h4>
+                                                <p className="text-xs text-emerald-400/70 mt-1">
                                                     SuperAdmin users have unrestricted access to all modules, sub-modules, and fields.
                                                     No workspace assignment is needed for SuperAdmin accounts.
                                                 </p>
@@ -952,21 +958,21 @@ function SettingsPageContent() {
                                                     return (
                                                         <div
                                                             key={ws._id}
-                                                            className="group relative border border-border rounded-lg p-5 hover:border-border/80 transition-all bg-background hover:shadow-md"
+                                                            className="group relative border border-border rounded-lg p-5 hover:border-primary/30 transition-all bg-card hover:shadow-lg hover:shadow-primary/5"
                                                         >
                                                             {/* Color accent bar */}
-                                                            <div className="absolute top-0 left-0 right-0 h-1 rounded-t-lg" style={{ backgroundColor: ws.color || '#f2b61c' }} />
+                                                            <div className="absolute top-0 left-0 right-0 h-1.5 rounded-t-lg" style={{ backgroundColor: ws.color || '#f2b61c' }} />
 
                                                             <div className="flex items-start justify-between mt-1">
                                                                 <div className="flex items-center gap-3">
-                                                                    <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${ws.color || '#f2b61c'}15` }}>
+                                                                    <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${ws.color || '#f2b61c'}25` }}>
                                                                         <LayoutGrid className="w-5 h-5" style={{ color: ws.color || '#f2b61c' }} />
                                                                     </div>
                                                                     <div>
                                                                         <div className="flex items-center gap-2">
-                                                                            <h3 className="text-sm font-bold text-foreground">{ws.name}</h3>
+                                                                            <h3 className="text-sm font-black text-foreground">{ws.name}</h3>
                                                                             {ws.isDefault && (
-                                                                                <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-primary/10 text-primary rounded">
+                                                                                <span className="px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider bg-primary/20 text-primary rounded">
                                                                                     Default
                                                                                 </span>
                                                                             )}
@@ -987,7 +993,7 @@ function SettingsPageContent() {
                                                                     </button>
                                                                     <button
                                                                         onClick={() => openEditWorkspace(ws)}
-                                                                        className="p-1.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                                                                        className="p-1.5 rounded hover:bg-primary/15 text-muted-foreground hover:text-primary transition-colors cursor-pointer"
                                                                         title="Edit"
                                                                     >
                                                                         <Pencil className="w-3.5 h-3.5" />
@@ -995,7 +1001,7 @@ function SettingsPageContent() {
                                                                     <button
                                                                         onClick={() => handleWsDelete(ws._id)}
                                                                         disabled={wsDeleting === ws._id}
-                                                                        className="p-1.5 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50"
+                                                                        className="p-1.5 rounded hover:bg-red-500/15 text-muted-foreground hover:text-red-400 transition-colors cursor-pointer disabled:opacity-50"
                                                                         title="Delete"
                                                                     >
                                                                         {wsDeleting === ws._id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
@@ -1004,7 +1010,7 @@ function SettingsPageContent() {
                                                             </div>
 
                                                             {/* Stats */}
-                                                            <div className="flex items-center gap-4 mt-4 pt-3 border-t border-border">
+                                                            <div className="flex items-center gap-4 mt-4 pt-3 border-t border-border/60">
                                                                 <div className="flex items-center gap-1.5">
                                                                     <FolderOpen className="w-3.5 h-3.5 text-muted-foreground" />
                                                                     <span className="text-xs text-muted-foreground">
@@ -1024,7 +1030,7 @@ function SettingsPageContent() {
                                                                 {(ws.modules || []).filter((m: any) => m.enabled).map((m: any) => (
                                                                     <span
                                                                         key={m.key}
-                                                                        className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full border border-border text-muted-foreground bg-secondary/50"
+                                                                        className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full border border-border text-foreground/70 bg-secondary/80"
                                                                     >
                                                                         {m.label}
                                                                     </span>
@@ -1043,7 +1049,7 @@ function SettingsPageContent() {
                                     /* ═══ WORKSPACE FORM/EDITOR ═══ */
                                     <div className="space-y-6">
                                         {/* Header */}
-                                        <div className="flex items-center justify-between">
+                                        <div className="flex items-center justify-between p-4 bg-card border border-border rounded-lg">
                                             <div className="flex items-center gap-3">
                                                 <button
                                                     onClick={() => setWsFormOpen(false)}
@@ -1051,6 +1057,9 @@ function SettingsPageContent() {
                                                 >
                                                     <X className="w-4 h-4" />
                                                 </button>
+                                                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${wsFormData.color}25` }}>
+                                                    <LayoutGrid className="w-4 h-4" style={{ color: wsFormData.color }} />
+                                                </div>
                                                 <div>
                                                     <h2 className="text-sm font-black uppercase tracking-widest text-foreground">
                                                         {wsEditing ? 'Edit Workspace' : 'New Workspace'}
@@ -1061,15 +1070,15 @@ function SettingsPageContent() {
                                             <button
                                                 onClick={handleWsSave}
                                                 disabled={wsSaving}
-                                                className="h-8 px-4 bg-primary text-black hover:opacity-90 transition-all rounded-lg shadow flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                                className="h-9 px-5 bg-primary text-black hover:opacity-90 transition-all rounded-lg shadow-lg flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                                             >
-                                                {wsSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                                                {wsSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                                                 <span className="text-[11px] font-black uppercase tracking-widest">{wsSaving ? 'Saving...' : 'Save Workspace'}</span>
                                             </button>
                                         </div>
 
                                         {/* Basic Info */}
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border border-border rounded-lg bg-secondary/20">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border border-border rounded-lg bg-card">
                                             <div className="space-y-1.5">
                                                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Workspace Name *</label>
                                                 <input
@@ -1123,8 +1132,11 @@ function SettingsPageContent() {
 
                                         {/* Module Permission Builder */}
                                         <div className="space-y-3">
-                                            <div className="flex items-center justify-between">
-                                                <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground">Module Permissions</h3>
+                                            <div className="flex items-center justify-between p-3 bg-card border border-border rounded-lg">
+                                                <div className="flex items-center gap-2">
+                                                    <Layers className="w-4 h-4 text-primary" />
+                                                    <h3 className="text-xs font-black uppercase tracking-widest text-foreground">Module Permissions</h3>
+                                                </div>
                                                 <p className="text-[10px] text-muted-foreground">Enable modules → configure sub-modules → set CRUD → toggle fields</p>
                                             </div>
 
@@ -1139,13 +1151,13 @@ function SettingsPageContent() {
                                                         key={mod.key}
                                                         className={cn(
                                                             "border rounded-lg overflow-hidden transition-all",
-                                                            mod.enabled ? "border-border" : "border-border/50 opacity-60"
+                                                            mod.enabled ? "border-border bg-card" : "border-border/30 opacity-50"
                                                         )}
                                                     >
                                                         {/* Module Header */}
                                                         <div className={cn(
-                                                            "flex items-center gap-3 px-4 py-3 transition-colors",
-                                                            mod.enabled ? "bg-secondary/30" : "bg-secondary/10"
+                                                            "flex items-center gap-3 px-4 py-3 transition-colors border-b",
+                                                            mod.enabled ? "bg-secondary/80 border-border" : "bg-secondary/30 border-transparent"
                                                         )}>
                                                             <button
                                                                 onClick={() => setExpandedModules(prev => ({ ...prev, [mod.key]: !prev[mod.key] }))}
@@ -1167,17 +1179,16 @@ function SettingsPageContent() {
                                                                 </div>
                                                             </div>
                                                             {mod.enabled && (
-                                                                <div className="flex items-center gap-2 mr-2">
+                                                                <div className="flex items-center gap-1.5 mr-2">
                                                                     <button
                                                                         onClick={() => setAllSubModules(mod.key, true)}
-                                                                        className="text-[9px] font-bold uppercase tracking-wider text-primary hover:underline cursor-pointer"
+                                                                        className="px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-600/20 rounded hover:bg-emerald-600/30 cursor-pointer transition-colors"
                                                                     >
                                                                         All On
                                                                     </button>
-                                                                    <span className="text-muted-foreground/30">|</span>
                                                                     <button
                                                                         onClick={() => setAllSubModules(mod.key, false)}
-                                                                        className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground hover:underline cursor-pointer"
+                                                                        className="px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-red-400 bg-red-600/20 rounded hover:bg-red-600/30 cursor-pointer transition-colors"
                                                                     >
                                                                         All Off
                                                                     </button>
@@ -1195,14 +1206,19 @@ function SettingsPageContent() {
                                                                 {mod.subModules.map((sub) => {
                                                                     const subExpandKey = `${mod.key}.${sub.key}`;
                                                                     const isSubExpanded = expandedSubModules[subExpandKey];
+                                                                    const isChildSub = sub.key.startsWith('wo-');
 
                                                                     return (
                                                                         <div key={sub.key} className={cn(
-                                                                            "border-b border-border last:border-b-0",
-                                                                            sub.enabled ? "" : "opacity-50"
+                                                                            "border-b border-border/60 last:border-b-0",
+                                                                            sub.enabled ? "" : "opacity-40",
+                                                                            isChildSub && "border-l-2 border-l-primary/20 ml-10 bg-secondary/20"
                                                                         )}>
                                                                             {/* Sub-module row */}
-                                                                            <div className="flex items-center gap-3 px-4 py-2.5 pl-14">
+                                                                            <div className={cn(
+                                                                                "flex items-center gap-3 px-4 py-2.5 hover:bg-secondary/40 transition-colors",
+                                                                                isChildSub ? "pl-6" : "pl-14"
+                                                                            )}>
                                                                                 <button
                                                                                     onClick={() => setExpandedSubModules(prev => ({ ...prev, [subExpandKey]: !prev[subExpandKey] }))}
                                                                                     className="p-0.5 rounded hover:bg-secondary text-muted-foreground cursor-pointer"
@@ -1210,7 +1226,10 @@ function SettingsPageContent() {
                                                                                 >
                                                                                     {isSubExpanded && sub.enabled ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                                                                                 </button>
-                                                                                <span className="text-xs font-semibold text-foreground flex-1">{sub.label}</span>
+                                                                                <span className="text-xs font-semibold text-foreground flex-1">
+                                                                                    {isChildSub && <span className="text-muted-foreground mr-1.5">↳</span>}
+                                                                                    {sub.label}
+                                                                                </span>
 
                                                                                 {/* CRUD Pills */}
                                                                                 {sub.enabled && mod.key !== 'reports' && (
@@ -1220,12 +1239,12 @@ function SettingsPageContent() {
                                                                                                 key={op}
                                                                                                 onClick={() => toggleCrudPermission(mod.key, sub.key, op)}
                                                                                                 className={cn(
-                                                                                                    "px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all cursor-pointer",
+                                                                                                    "px-2.5 py-1 text-[10px] font-black uppercase tracking-wider rounded-md transition-all cursor-pointer border",
                                                                                                     sub.crud[op]
-                                                                                                        ? op === 'create' ? 'bg-emerald-500/15 text-emerald-600 border border-emerald-500/30'
-                                                                                                            : op === 'update' ? 'bg-amber-500/15 text-amber-600 border border-amber-500/30'
-                                                                                                                : 'bg-red-500/15 text-red-600 border border-red-500/30'
-                                                                                                        : 'bg-secondary/50 text-muted-foreground/40 border border-transparent line-through'
+                                                                                                        ? op === 'create' ? 'bg-emerald-600/25 text-emerald-400 border-emerald-500/40'
+                                                                                                            : op === 'update' ? 'bg-amber-600/25 text-amber-400 border-amber-500/40'
+                                                                                                                : 'bg-red-600/25 text-red-400 border-red-500/40'
+                                                                                                        : 'bg-secondary/80 text-muted-foreground/30 border-border line-through'
                                                                                                 )}
                                                                                             >
                                                                                                 {op === 'create' ? 'Add' : op === 'update' ? 'Edit' : 'Delete'}
@@ -1243,10 +1262,10 @@ function SettingsPageContent() {
 
                                                                             {/* Field Permissions */}
                                                                             {isSubExpanded && sub.enabled && sub.fields.length > 0 && (
-                                                                                <div className="bg-secondary/20 px-4 py-3 pl-20">
-                                                                                    <div className="flex items-center gap-2 mb-2">
+                                                                                <div className="bg-background/60 px-4 py-3 pl-20 border-t border-border/40">
+                                                                                    <div className="flex items-center gap-2 mb-2.5">
                                                                                         <Eye className="w-3 h-3 text-muted-foreground" />
-                                                                                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Field Visibility</span>
+                                                                                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Field Visibility</span>
                                                                                     </div>
                                                                                     <div className="flex flex-wrap gap-1.5">
                                                                                         {sub.fields.map(field => (
@@ -1254,13 +1273,13 @@ function SettingsPageContent() {
                                                                                                 key={field.field}
                                                                                                 onClick={() => toggleFieldVisibility(mod.key, sub.key, field.field)}
                                                                                                 className={cn(
-                                                                                                    "flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded-md transition-all cursor-pointer border",
+                                                                                                    "flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-bold rounded-md transition-all cursor-pointer border",
                                                                                                     field.visible
-                                                                                                        ? 'bg-background border-border text-foreground hover:border-red-500/30'
-                                                                                                        : 'bg-red-500/5 border-red-500/20 text-red-500/60 line-through hover:border-emerald-500/30'
+                                                                                                        ? 'bg-card border-border text-foreground hover:border-red-500/40'
+                                                                                                        : 'bg-red-950/30 border-red-500/30 text-red-400 line-through hover:border-emerald-500/40'
                                                                                                 )}
                                                                                             >
-                                                                                                {field.visible ? <Eye className="w-2.5 h-2.5" /> : <EyeOff className="w-2.5 h-2.5" />}
+                                                                                                {field.visible ? <Eye className="w-3 h-3 text-emerald-500" /> : <EyeOff className="w-3 h-3 text-red-400" />}
                                                                                                 {field.label}
                                                                                             </button>
                                                                                         ))}
@@ -1312,7 +1331,10 @@ function SettingsPageContent() {
                                     I will write the FULL component again to be safe and ensure all tabs are there. 
                                 */}
                                 <div className="space-y-4">
-                                    <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground border-b border-border pb-2">Company Details</h2>
+                                    <div className="flex items-center gap-2 p-3 bg-card border border-border rounded-lg">
+                                        <Building className="w-4 h-4 text-primary" />
+                                        <h2 className="text-sm font-black uppercase tracking-widest text-foreground">Company Details</h2>
+                                    </div>
                                     <div className="grid grid-cols-1 gap-6">
                                         <div className="space-y-1.5">
                                             <label className="text-xs font-bold text-muted-foreground">Company Name</label>
@@ -1374,7 +1396,10 @@ function SettingsPageContent() {
                         {activeTab === 'localization' && (
                             <div className="space-y-6">
                                 <div className="space-y-4">
-                                    <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground border-b border-border pb-2">Regional Settings</h2>
+                                    <div className="flex items-center gap-2 p-3 bg-card border border-border rounded-lg">
+                                        <Globe className="w-4 h-4 text-primary" />
+                                        <h2 className="text-sm font-black uppercase tracking-widest text-foreground">Regional Settings</h2>
+                                    </div>
 
                                     <div className="grid grid-cols-2 gap-6">
                                         <div className="space-y-1.5">
@@ -1437,14 +1462,17 @@ function SettingsPageContent() {
                         {activeTab === 'dataFilter' && (
                             <div className="space-y-6">
                                 <div className="space-y-4">
-                                    <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground border-b border-border pb-2">Global Data Filtering</h2>
-                                    <div className="p-4 border border-blue-500/20 bg-blue-500/10 rounded-lg flex items-start space-x-4 mb-4">
+                                    <div className="flex items-center gap-2 p-3 bg-card border border-border rounded-lg">
+                                        <Calendar className="w-4 h-4 text-primary" />
+                                        <h2 className="text-sm font-black uppercase tracking-widest text-foreground">Global Data Filtering</h2>
+                                    </div>
+                                    <div className="p-4 border border-blue-500/30 bg-blue-950/40 rounded-lg flex items-start space-x-4 mb-4">
                                         <div className="shrink-0 mt-0.5">
-                                            <Filter className="w-5 h-5 text-blue-600" />
+                                            <Filter className="w-5 h-5 text-blue-400" />
                                         </div>
                                         <div>
-                                            <h4 className="text-sm font-bold text-blue-600 dark:text-blue-400">Start Date Filter</h4>
-                                            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                                            <h4 className="text-sm font-bold text-blue-400">Start Date Filter</h4>
+                                            <p className="text-xs text-blue-400/70 mt-1">
                                                 All data in the system (SKUs, Orders, Tickets, etc.) created BEFORE this date will be hidden from views.
                                                 Leave empty to show all history.
                                             </p>
@@ -1473,12 +1501,15 @@ function SettingsPageContent() {
                         {activeTab === 'notifications' && (
                             <div className="space-y-6">
                                 <div className="space-y-4">
-                                    <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground border-b border-border pb-2">Alert Preferences</h2>
+                                    <div className="flex items-center gap-2 p-3 bg-card border border-border rounded-lg">
+                                        <Bell className="w-4 h-4 text-primary" />
+                                        <h2 className="text-sm font-black uppercase tracking-widest text-foreground">Alert Preferences</h2>
+                                    </div>
                                     <div className="space-y-4">
                                         <div className="flex items-center justify-between p-4 border border-border rounded-lg">
                                             <div className="flex items-center space-x-4">
-                                                <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
-                                                    <Mail className="w-5 h-5 text-blue-600" />
+                                                <div className="w-10 h-10 rounded-full bg-blue-950/40 flex items-center justify-center">
+                                                    <Mail className="w-5 h-5 text-blue-400" />
                                                 </div>
                                                 <div>
                                                     <p className="text-sm font-bold text-foreground">Email Notifications</p>
@@ -1525,13 +1556,16 @@ function SettingsPageContent() {
                         {activeTab === 'security' && (
                             <div className="space-y-6">
                                 <div className="space-y-4">
-                                    <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground border-b border-border pb-2">Access Control</h2>
+                                    <div className="flex items-center gap-2 p-3 bg-card border border-border rounded-lg">
+                                        <Shield className="w-4 h-4 text-primary" />
+                                        <h2 className="text-sm font-black uppercase tracking-widest text-foreground">Access Control</h2>
+                                    </div>
 
-                                    <div className="p-4 border border-orange-500/20 bg-orange-500/10 rounded-lg flex items-start space-x-4">
-                                        <Shield className="w-5 h-5 text-orange-600 shrink-0 mt-0.5" />
+                                    <div className="p-4 border border-orange-500/30 bg-orange-950/40 rounded-lg flex items-start space-x-4">
+                                        <Shield className="w-5 h-5 text-orange-400 shrink-0 mt-0.5" />
                                         <div>
-                                            <h4 className="text-sm font-bold text-orange-600 dark:text-orange-400">Two-Factor Authentication (2FA)</h4>
-                                            <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">Enforce 2FA for all admin accounts to enhance security.</p>
+                                            <h4 className="text-sm font-bold text-orange-400">Two-Factor Authentication (2FA)</h4>
+                                            <p className="text-xs text-orange-400/70 mt-1">Enforce 2FA for all admin accounts to enhance security.</p>
                                         </div>
                                         <div className="ml-auto">
                                             <label className="relative inline-flex items-center cursor-pointer">
@@ -1624,22 +1658,22 @@ function SettingsPageContent() {
                                                 <div className={cn(
                                                     "p-3 rounded-lg text-sm font-medium",
                                                     importStatus.startsWith('✓') ? "bg-emerald-500/10 text-emerald-700 border border-emerald-500/20" :
-                                                        importStatus.startsWith('⚠️') ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20" :
+                                                        importStatus.startsWith('⚠️') ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" :
                                                             importStatus.startsWith('❌') ? "bg-red-500/10 text-red-700 border border-red-500/20" :
-                                                                "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+                                                                "bg-blue-950/40 text-blue-400 border border-blue-500/30"
                                                 )}>
                                                     {isImporting && <RefreshCw className="w-4 h-4 inline mr-2 animate-spin" />}
                                                     {importStatus}
                                                 </div>
                                             )}
 
-                                            <div className="p-4 border border-blue-500/20 bg-blue-500/10 rounded-lg flex items-start space-x-4 mb-4">
+                                            <div className="p-4 border border-blue-500/30 bg-blue-950/40 rounded-lg flex items-start space-x-4 mb-4">
                                                 <div className="shrink-0 mt-0.5">
-                                                    <Upload className="w-5 h-5 text-blue-600" />
+                                                    <Upload className="w-5 h-5 text-blue-400" />
                                                 </div>
                                                 <div>
-                                                    <h4 className="text-sm font-bold text-blue-600 dark:text-blue-400">Data Import</h4>
-                                                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                                                    <h4 className="text-sm font-bold text-blue-400">Data Import</h4>
+                                                    <p className="text-xs text-blue-400 mt-1">
                                                         Import wholesale orders data from CSV files. Orders use <code className="bg-blue-500/20 px-1 rounded">legacyId</code> for matching -
                                                         existing records will be updated, new records will be created.
                                                     </p>
@@ -1651,10 +1685,10 @@ function SettingsPageContent() {
                                                 <button
                                                     onClick={() => importOrdersRef.current?.click()}
                                                     disabled={isImporting}
-                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-lg hover:border-blue-400 hover:bg-blue-500/10 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-lg hover:border-blue-400 hover:bg-blue-950/40 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
                                                 >
                                                     <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center mb-3 group-hover:bg-blue-500/30 transition-colors">
-                                                        <FileSpreadsheet className="w-6 h-6 text-blue-600" />
+                                                        <FileSpreadsheet className="w-6 h-6 text-blue-400" />
                                                     </div>
                                                     <h4 className="text-sm font-bold text-muted-foreground">Import Orders</h4>
                                                     <p className="text-[10px] text-muted-foreground mt-1 text-center">
@@ -1696,10 +1730,10 @@ function SettingsPageContent() {
                                                 <button
                                                     onClick={() => importNotesRef.current?.click()}
                                                     disabled={isImporting}
-                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-lg hover:border-blue-400 hover:bg-blue-500/10 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-lg hover:border-blue-400 hover:bg-blue-950/40 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
                                                 >
                                                     <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center mb-3 group-hover:bg-blue-500/30 transition-colors">
-                                                        <MessageSquare className="w-6 h-6 text-blue-600" />
+                                                        <MessageSquare className="w-6 h-6 text-blue-400" />
                                                     </div>
                                                     <h4 className="text-sm font-bold text-muted-foreground">Import Notes</h4>
                                                     <p className="text-[10px] text-muted-foreground mt-1 text-center">
@@ -1735,13 +1769,13 @@ function SettingsPageContent() {
                                         <div className="space-y-4">
                                             <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground border-b border-border pb-2">Cost Synchronization</h2>
 
-                                            <div className="p-4 border border-amber-500/20 bg-amber-500/10 rounded-lg flex items-start space-x-4 mb-4">
+                                            <div className="p-4 border border-amber-500/30 bg-amber-950/40 rounded-lg flex items-start space-x-4 mb-4">
                                                 <div className="shrink-0 mt-0.5">
-                                                    <RefreshCw className="w-5 h-5 text-amber-600" />
+                                                    <RefreshCw className="w-5 h-5 text-amber-400" />
                                                 </div>
                                                 <div>
-                                                    <h4 className="text-sm font-bold text-amber-600 dark:text-amber-400">Sync Costs</h4>
-                                                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                                                    <h4 className="text-sm font-bold text-amber-400">Sync Costs</h4>
+                                                    <p className="text-xs text-amber-400 mt-1">
                                                         Scan all wholesale orders and update line item costs by matching SKU lot numbers from Opening Balances,
                                                         Purchase Orders, Manufacturing, and Audit Adjustments. This process runs in batches of 500 orders.
                                                     </p>
@@ -1754,7 +1788,7 @@ function SettingsPageContent() {
                                                     "p-3 rounded-lg text-sm font-medium font-mono",
                                                     syncStatus.startsWith('✓') ? "bg-emerald-500/10 text-emerald-700 border border-emerald-500/20" :
                                                         syncStatus === 'Error' ? "bg-red-500/10 text-red-700 border border-red-500/20" :
-                                                            "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+                                                            "bg-blue-950/40 text-blue-400 border border-blue-500/30"
                                                 )}>
                                                     {isSyncing && <RefreshCw className="w-4 h-4 inline mr-2 animate-spin" />}
                                                     {syncStatus}
@@ -1829,7 +1863,7 @@ function SettingsPageContent() {
                                                 className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-lg hover:border-amber-400 hover:bg-amber-500/10 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed w-full max-w-xs"
                                             >
                                                 <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center mb-3 group-hover:bg-amber-500/30 transition-colors">
-                                                    <RefreshCw className={cn("w-6 h-6 text-amber-600", isSyncing && "animate-spin")} />
+                                                    <RefreshCw className={cn("w-6 h-6 text-amber-400", isSyncing && "animate-spin")} />
                                                 </div>
                                                 <h4 className="text-sm font-bold text-muted-foreground">{isSyncing ? 'Syncing...' : 'Sync Costs'}</h4>
                                                 <p className="text-[10px] text-muted-foreground mt-1 text-center">
@@ -1869,13 +1903,13 @@ function SettingsPageContent() {
                                                 </div>
                                             )}
 
-                                            <div className="p-4 border border-blue-500/20 bg-blue-500/10 rounded-lg flex items-start space-x-4 mb-4">
+                                            <div className="p-4 border border-blue-500/30 bg-blue-950/40 rounded-lg flex items-start space-x-4 mb-4">
                                                 <div className="shrink-0 mt-0.5">
-                                                    <Globe className="w-5 h-5 text-blue-600" />
+                                                    <Globe className="w-5 h-5 text-blue-400" />
                                                 </div>
                                                 <div>
-                                                    <h4 className="text-sm font-bold text-blue-600 dark:text-blue-400">WooCommerce Sync</h4>
-                                                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                                                    <h4 className="text-sm font-bold text-blue-400">WooCommerce Sync</h4>
+                                                    <p className="text-xs text-blue-400 mt-1">
                                                         Sync web products from all connected WooCommerce stores. <strong>Incremental</strong> only syncs recently changed products. <strong>Full</strong> re-syncs everything from scratch.
                                                     </p>
                                                 </div>
@@ -1894,10 +1928,10 @@ function SettingsPageContent() {
                                                 <button
                                                     onClick={() => handleWebProductSync(false)}
                                                     disabled={wpSyncStatus.isSyncing}
-                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-lg hover:border-blue-400 hover:bg-blue-500/10 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-lg hover:border-blue-400 hover:bg-blue-950/40 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
                                                 >
                                                     <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center mb-3 group-hover:bg-blue-500/30 transition-colors">
-                                                        {wpSyncStatus.isSyncing ? <Loader2 className="w-6 h-6 text-blue-600 animate-spin" /> : <Globe className="w-6 h-6 text-blue-600" />}
+                                                        {wpSyncStatus.isSyncing ? <Loader2 className="w-6 h-6 text-blue-600 animate-spin" /> : <Globe className="w-6 h-6 text-blue-400" />}
                                                     </div>
                                                     <h4 className="text-sm font-bold text-muted-foreground">Sync</h4>
                                                     <p className="text-[10px] text-muted-foreground mt-1 text-center">
@@ -1912,7 +1946,7 @@ function SettingsPageContent() {
                                                     className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-lg hover:border-amber-400 hover:bg-amber-500/10 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
                                                 >
                                                     <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center mb-3 group-hover:bg-amber-500/30 transition-colors">
-                                                        <Globe className="w-6 h-6 text-amber-600" />
+                                                        <Globe className="w-6 h-6 text-amber-400" />
                                                     </div>
                                                     <h4 className="text-sm font-bold text-muted-foreground">Full Sync</h4>
                                                     <p className="text-[10px] text-muted-foreground mt-1 text-center">
@@ -2018,7 +2052,7 @@ function SettingsPageContent() {
                                                     className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-lg hover:border-amber-400 hover:bg-amber-500/10 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
                                                 >
                                                     <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center mb-3 group-hover:bg-amber-500/30 transition-colors">
-                                                        <ShoppingCart className="w-6 h-6 text-amber-600" />
+                                                        <ShoppingCart className="w-6 h-6 text-amber-400" />
                                                     </div>
                                                     <h4 className="text-sm font-bold text-muted-foreground">Full Sync</h4>
                                                     <p className="text-[10px] text-muted-foreground mt-1 text-center">
@@ -2194,9 +2228,9 @@ function SettingsPageContent() {
                                                 <div className={cn(
                                                     "p-3 rounded-lg text-sm font-medium",
                                                     importStatus.startsWith('✓') ? "bg-emerald-500/10 text-emerald-700 border border-emerald-500/20" :
-                                                        importStatus.startsWith('⚠️') ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20" :
+                                                        importStatus.startsWith('⚠️') ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" :
                                                             importStatus.startsWith('❌') ? "bg-red-500/10 text-red-700 border border-red-500/20" :
-                                                                "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+                                                                "bg-blue-950/40 text-blue-400 border border-blue-500/30"
                                                 )}>
                                                     {isImporting && <RefreshCw className="w-4 h-4 inline mr-2 animate-spin" />}
                                                     {importStatus}
@@ -2320,10 +2354,10 @@ function SettingsPageContent() {
                                                 <button
                                                     onClick={() => importPurchaseOrdersRef.current?.click()}
                                                     disabled={isImporting}
-                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-lg hover:border-blue-400 hover:bg-blue-500/10 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-lg hover:border-blue-400 hover:bg-blue-950/40 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
                                                 >
                                                     <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center mb-3 group-hover:bg-blue-500/30 transition-colors">
-                                                        <FileSpreadsheet className="w-6 h-6 text-blue-600" />
+                                                        <FileSpreadsheet className="w-6 h-6 text-blue-400" />
                                                     </div>
                                                     <h4 className="text-sm font-bold text-muted-foreground">Import POs</h4>
                                                     <p className="text-[10px] text-muted-foreground mt-1 text-center">
@@ -2469,13 +2503,13 @@ function SettingsPageContent() {
                                         <div className="space-y-4">
                                             <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground border-b border-border pb-2">Audit Adjustments Import</h2>
 
-                                            <div className="p-4 border border-amber-500/20 bg-amber-500/10 rounded-lg flex items-start space-x-4 mb-4">
+                                            <div className="p-4 border border-amber-500/30 bg-amber-950/40 rounded-lg flex items-start space-x-4 mb-4">
                                                 <div className="shrink-0 mt-0.5">
-                                                    <ClipboardCheck className="w-5 h-5 text-amber-600" />
+                                                    <ClipboardCheck className="w-5 h-5 text-amber-400" />
                                                 </div>
                                                 <div>
-                                                    <h4 className="text-sm font-bold text-amber-600 dark:text-amber-400">Audit Adjustments Import</h4>
-                                                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                                                    <h4 className="text-sm font-bold text-amber-400">Audit Adjustments Import</h4>
+                                                    <p className="text-xs text-amber-400 mt-1">
                                                         Import audit adjustments from CSV. The <code className="bg-amber-500/20 px-1 rounded">sku</code> column maps to SKU <code className="bg-amber-500/20 px-1 rounded">legacyId</code> for matching. New ObjectIds are generated for each record.
                                                     </p>
                                                 </div>
@@ -2488,7 +2522,7 @@ function SettingsPageContent() {
                                                     className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-lg hover:border-amber-400 hover:bg-amber-500/10 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
                                                 >
                                                     <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center mb-3 group-hover:bg-amber-500/30 transition-colors">
-                                                        <ClipboardCheck className="w-6 h-6 text-amber-600" />
+                                                        <ClipboardCheck className="w-6 h-6 text-amber-400" />
                                                     </div>
                                                     <h4 className="text-sm font-bold text-muted-foreground">Import Audit Adjustments</h4>
                                                     <p className="text-[10px] text-muted-foreground mt-1 text-center">
@@ -2510,13 +2544,13 @@ function SettingsPageContent() {
                                         <div className="space-y-4">
                                             <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground border-b border-border pb-2">Lab Results Import</h2>
 
-                                            <div className="p-4 border border-amber-500/20 bg-amber-500/10 rounded-lg flex items-start space-x-4 mb-4">
+                                            <div className="p-4 border border-amber-500/30 bg-amber-950/40 rounded-lg flex items-start space-x-4 mb-4">
                                                 <div className="shrink-0 mt-0.5">
-                                                    <FlaskConical className="w-5 h-5 text-amber-600" />
+                                                    <FlaskConical className="w-5 h-5 text-amber-400" />
                                                 </div>
                                                 <div>
-                                                    <h4 className="text-sm font-bold text-amber-600 dark:text-amber-400">Lab Results Import</h4>
-                                                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                                                    <h4 className="text-sm font-bold text-amber-400">Lab Results Import</h4>
+                                                    <p className="text-xs text-amber-400 mt-1">
                                                         Import lab results from CSV files. Records are matched by <code className="bg-amber-500/20 px-1 rounded">name</code> for upsert.
                                                     </p>
                                                 </div>
@@ -2529,7 +2563,7 @@ function SettingsPageContent() {
                                                     className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-lg hover:border-amber-400 hover:bg-amber-500/10 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
                                                 >
                                                     <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center mb-3 group-hover:bg-amber-500/30 transition-colors">
-                                                        <FlaskConical className="w-6 h-6 text-amber-600" />
+                                                        <FlaskConical className="w-6 h-6 text-amber-400" />
                                                     </div>
                                                     <h4 className="text-sm font-bold text-muted-foreground">Import Lab Results</h4>
                                                     <p className="text-[10px] text-muted-foreground mt-1 text-center">
@@ -2551,13 +2585,13 @@ function SettingsPageContent() {
                                         <div className="space-y-4">
                                             <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground border-b border-border pb-2">Recipes Import</h2>
 
-                                            <div className="p-4 border border-amber-500/20 bg-amber-500/10 rounded-lg flex items-start space-x-4 mb-4">
+                                            <div className="p-4 border border-amber-500/30 bg-amber-950/40 rounded-lg flex items-start space-x-4 mb-4">
                                                 <div className="shrink-0 mt-0.5">
-                                                    <UtensilsCrossed className="w-5 h-5 text-amber-600" />
+                                                    <UtensilsCrossed className="w-5 h-5 text-amber-400" />
                                                 </div>
                                                 <div>
-                                                    <h4 className="text-sm font-bold text-amber-600 dark:text-amber-400">Recipes Import</h4>
-                                                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                                                    <h4 className="text-sm font-bold text-amber-400">Recipes Import</h4>
+                                                    <p className="text-xs text-amber-400 mt-1">
                                                         Import recipes, line items, and steps from CSV. The <code className="bg-amber-500/20 px-1 rounded">sku</code> column maps to SKU <code className="bg-amber-500/20 px-1 rounded">legacyId</code>. Recipe <code className="bg-amber-500/20 px-1 rounded">legacyId</code> is used for matching parent recipes.
                                                     </p>
                                                 </div>
@@ -2570,7 +2604,7 @@ function SettingsPageContent() {
                                                     className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-lg hover:border-amber-400 hover:bg-amber-500/10 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
                                                 >
                                                     <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center mb-3 group-hover:bg-amber-500/30 transition-colors">
-                                                        <UtensilsCrossed className="w-6 h-6 text-amber-600" />
+                                                        <UtensilsCrossed className="w-6 h-6 text-amber-400" />
                                                     </div>
                                                     <h4 className="text-sm font-bold text-muted-foreground">Import Recipes</h4>
                                                     <p className="text-[10px] text-muted-foreground mt-1 text-center">
@@ -2583,7 +2617,7 @@ function SettingsPageContent() {
                                                     className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-lg hover:border-amber-400 hover:bg-amber-500/10 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
                                                 >
                                                     <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center mb-3 group-hover:bg-amber-500/30 transition-colors">
-                                                        <Layers className="w-6 h-6 text-amber-600" />
+                                                        <Layers className="w-6 h-6 text-amber-400" />
                                                     </div>
                                                     <h4 className="text-sm font-bold text-muted-foreground">Import Recipe Items</h4>
                                                     <p className="text-[10px] text-muted-foreground mt-1 text-center">
@@ -2596,7 +2630,7 @@ function SettingsPageContent() {
                                                     className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-lg hover:border-amber-400 hover:bg-amber-500/10 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
                                                 >
                                                     <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center mb-3 group-hover:bg-amber-500/30 transition-colors">
-                                                        <FileSpreadsheet className="w-6 h-6 text-amber-600" />
+                                                        <FileSpreadsheet className="w-6 h-6 text-amber-400" />
                                                     </div>
                                                     <h4 className="text-sm font-bold text-muted-foreground">Import Recipe Steps</h4>
                                                     <p className="text-[10px] text-muted-foreground mt-1 text-center">
@@ -2982,9 +3016,9 @@ function SettingsPageContent() {
                         )}
 
                     </div>
-                </div>
-            </div>
-        </div>
+                </div >
+            </div >
+        </div >
     );
 }
 
