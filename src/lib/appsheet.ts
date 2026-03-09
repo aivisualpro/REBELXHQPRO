@@ -25,6 +25,7 @@ export async function syncSkuToAppSheet(sku: any, action: 'Add' | 'Edit' | 'Dele
         'Re-Order Point': skuObj.reOrderPoint || 0,
         'Kit Applied': skuObj.kitApplied ? 'Y' : 'N',
         'isLotApplied': skuObj.isLotApplied ? 'Y' : 'N',
+        'isArchived': skuObj.isArchived ? 'Y' : 'N',
     };
 
     const payload = {

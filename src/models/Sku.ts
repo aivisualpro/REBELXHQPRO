@@ -14,8 +14,9 @@ const SkuSchema = new mongoose.Schema({
     reOrderPoint: Number,
     kitApplied: { type: Boolean, default: false },
     isLotApplied: { type: Boolean, default: false },
+    isArchived: { type: Boolean, default: false },
     isWebProduct: { type: Boolean, default: false },
-    website: String, 
+    website: String,
     // WooCommerce Specific Fields
     webId: Number,
     slug: String,

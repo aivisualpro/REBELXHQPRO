@@ -481,9 +481,14 @@ function SkusContent() {
 
   const handleToggleArchive = async (skuId: string, currentArchived: boolean) => {
     const toastId = toast.loading(currentArchived ? 'Restoring...' : 'Archiving...');
-    // Optimistic: remove from list if hiding archived & archiving, or toggle flag
+    // Optimistic: remove from list when archiving (on active view) or restoring (on archived view)
     setSkus(prev => prev.filter(s => {
-      if (s._id === skuId && !showArchived && !currentArchived) return false;
+      if (s._id === skuId) {
+        // Archiving from active list: remove it
+        if (!showArchived && !currentArchived) return false;
+        // Restoring from archived list: remove it
+        if (showArchived && currentArchived) return false;
+      }
       return true;
     }).map(s => {
       if (s._id === skuId) return { ...s, isArchived: !currentArchived };
