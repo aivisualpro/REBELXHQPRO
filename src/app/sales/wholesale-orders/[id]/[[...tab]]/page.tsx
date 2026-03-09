@@ -125,13 +125,31 @@ const UOM_OPTIONS = [
 const TABS = ['Line Items', 'Payments', 'Notes', 'Emails'] as const;
 type TabType = typeof TABS[number];
 
+// Tab slug <-> display name mapping
+const ORDER_TAB_SLUGS: Record<string, TabType> = {
+    'line-items': 'Line Items', payments: 'Payments', notes: 'Notes', emails: 'Emails',
+};
+const ORDER_TAB_TO_SLUG: Record<string, string> = {
+    'Line Items': 'line-items', Payments: 'payments', Notes: 'notes', Emails: 'emails',
+};
+
 export default function SaleOrderDetailPage() {
     const params = useParams();
     const router = useRouter();
     const { data: session } = useSession();
+
+    // Derive active tab from URL — default to 'Line Items'
+    const tabSegment = params.tab;
+    const tabSlug = Array.isArray(tabSegment) ? tabSegment[0] : tabSegment;
+    const activeTab: TabType = (tabSlug && ORDER_TAB_SLUGS[tabSlug]) || 'Line Items';
+
+    const setActiveTab = (tabId: TabType) => {
+        const slug = ORDER_TAB_TO_SLUG[tabId] || 'line-items';
+        router.replace(`/sales/wholesale-orders/${params.id}/${slug}`, { scroll: false });
+    };
+
     const [order, setOrder] = useState<SaleOrder | null>(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<TabType>('Line Items');
 
     // Item Modal State
     const [isItemModalOpen, setIsItemModalOpen] = useState(false);

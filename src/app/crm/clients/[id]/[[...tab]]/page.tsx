@@ -229,17 +229,33 @@ function SearchableDropdown({ label, value, onChange, options, placeholder }: {
     );
 }
 
+// Tab slug <-> display name mapping
+const TAB_SLUGS: Record<string, 'Emails' | 'Calls' | 'SMS' | 'Notes' | 'Orders'> = {
+    emails: 'Emails', calls: 'Calls', sms: 'SMS', notes: 'Notes', orders: 'Orders',
+};
+const TAB_TO_SLUG: Record<string, string> = {
+    Emails: 'emails', Calls: 'calls', SMS: 'sms', Notes: 'notes', Orders: 'orders',
+};
+
 export default function ClientDashboardPage() {
     const params = useParams();
     const router = useRouter();
-    const { id } = params;
+    const { id, tab: tabSegment } = params;
+
+    // Derive active tab from URL — default to 'Emails'
+    const tabSlug = Array.isArray(tabSegment) ? tabSegment[0] : tabSegment;
+    const activeTab = (tabSlug && TAB_SLUGS[tabSlug]) || 'Emails';
+
+    const setActiveTab = (tabId: string) => {
+        const slug = TAB_TO_SLUG[tabId] || 'emails';
+        router.replace(`/crm/clients/${id}/${slug}`, { scroll: false });
+    };
 
     const [client, setClient] = useState<Client | null>(null);
     const [summary, setSummary] = useState<Summary | null>(null);
     const [activities, setActivities] = useState<ActivityItem[]>([]);
     const [orders, setOrders] = useState<OrderItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'Emails' | 'Calls' | 'SMS' | 'Notes' | 'Orders'>('Emails');
 
     // Notes state
     const [clientNotes, setClientNotes] = useState<{ _id: string; note: string; createdAt: string; createdBy: string }[]>([]);
