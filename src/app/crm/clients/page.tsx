@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-    ArrowUpDown, Search, Plus, X, Loader2, Users, Mail, Phone, MessageSquare, Send, Trash2, Paperclip,
+    ArrowUpDown, Search, Plus, X, Loader2, Users, Mail, Phone, MessageSquare, Send, Trash2, Paperclip, ChevronDown, UserCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -28,6 +28,12 @@ interface Client {
     companyType: string;
 }
 
+interface Rep {
+    _id: string;
+    firstName: string;
+    lastName: string;
+}
+
 // ─── In-Memory Cache ─────────────────────────────────────────────────────────
 
 interface CacheEntry {
@@ -38,6 +44,7 @@ interface CacheEntry {
     sortOrder: string;
     search: string;
     companyType: string;
+    repFilter: string;
     timestamp: number;
 }
 
@@ -276,6 +283,10 @@ function ClientsContent() {
     const [sortBy, setSortBy] = useState('totalRevenue');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
     const [activeType, setActiveType] = useState<string>('All');
+    const [repFilter, setRepFilter] = useState<string>('');  // '' = All reps
+    const [repList, setRepList] = useState<Rep[]>([]);
+    const [repDropdownOpen, setRepDropdownOpen] = useState(false);
+    const repDropdownRef = useRef<HTMLDivElement | null>(null);
 
     const pageRef = useRef(globalCache.current?.page || 0);
     const mountedRef = useRef(true);
@@ -291,6 +302,25 @@ function ClientsContent() {
 
     useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
     useEffect(() => { const t = setTimeout(() => setDebouncedSearch(search), 250); return () => clearTimeout(t); }, [search]);
+
+    // Fetch reps for filter
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetch('/api/users?limit=200&sortBy=firstName&sortOrder=asc');
+                if (res.ok) { const d = await res.json(); setRepList(d.users || []); }
+            } catch { }
+        })();
+    }, []);
+
+    // Close rep dropdown on outside click
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (repDropdownRef.current && !repDropdownRef.current.contains(e.target as Node)) setRepDropdownOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
 
     // Scroll-back & highlight
     const [highlightId, setHighlightId] = useState<string | null>(null);
@@ -335,6 +365,7 @@ function ClientsContent() {
                 minRevenue: '20',
             });
             if (activeType !== 'All') params.set('companyType', activeType);
+            if (repFilter) params.set('salesPerson', repFilter);
             const res = await fetch(`/api/clients?${params}`, { signal: ctrl.signal });
             const data = await res.json();
             if (seq !== seqRef.current || !mountedRef.current) return;
@@ -345,18 +376,18 @@ function ClientsContent() {
                     setClients(prev => {
                         const ids = new Set(prev.map(c => c._id));
                         const merged = [...prev, ...newClients.filter((c: Client) => !ids.has(c._id))];
-                        globalCache.current = { clients: merged, hasMore: newHasMore, page: pageNum, sortBy, sortOrder, search: debouncedSearch, companyType: activeType, timestamp: Date.now() };
+                        globalCache.current = { clients: merged, hasMore: newHasMore, page: pageNum, sortBy, sortOrder, search: debouncedSearch, companyType: activeType, repFilter, timestamp: Date.now() };
                         return merged;
                     });
                 } else {
                     setClients(newClients);
-                    globalCache.current = { clients: newClients, hasMore: newHasMore, page: pageNum, sortBy, sortOrder, search: debouncedSearch, companyType: activeType, timestamp: Date.now() };
+                    globalCache.current = { clients: newClients, hasMore: newHasMore, page: pageNum, sortBy, sortOrder, search: debouncedSearch, companyType: activeType, repFilter, timestamp: Date.now() };
                 }
                 setHasMore(newHasMore); pageRef.current = pageNum; setError(null);
             } else { setError(data.error || 'Failed to fetch'); }
         } catch (e: any) { if (e?.name === 'AbortError') return; if (mountedRef.current) setError(e.message); }
         finally { fetchingRef.current = false; if (mountedRef.current) { setIsLoading(false); setIsLoadingMore(false); } }
-    }, [sortBy, sortOrder, debouncedSearch, activeType]);
+    }, [sortBy, sortOrder, debouncedSearch, activeType, repFilter]);
 
     const fetchPageRef = useRef(fetchPage); fetchPageRef.current = fetchPage;
     const isFirstMount = useRef(true);
@@ -365,13 +396,13 @@ function ClientsContent() {
         if (isFirstMount.current) {
             isFirstMount.current = false;
             const c = globalCache.current;
-            if (c && c.clients.length > 0 && (Date.now() - c.timestamp) < CACHE_TTL && c.sortBy === sortBy && c.sortOrder === sortOrder && c.search === debouncedSearch && c.companyType === activeType) {
+            if (c && c.clients.length > 0 && (Date.now() - c.timestamp) < CACHE_TTL && c.sortBy === sortBy && c.sortOrder === sortOrder && c.search === debouncedSearch && c.companyType === activeType && c.repFilter === repFilter) {
                 setClients(c.clients); setHasMore(c.hasMore); pageRef.current = c.page; setIsLoading(false); return;
             }
         }
         globalCache.current = null; pageRef.current = 0; setClients([]); setHasMore(true);
         fetchPageRef.current(1, false);
-    }, [sortBy, sortOrder, debouncedSearch, activeType]);
+    }, [sortBy, sortOrder, debouncedSearch, activeType, repFilter]);
 
     // Infinite scroll
     useEffect(() => {
@@ -389,6 +420,7 @@ function ClientsContent() {
         scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
     };
     const handleTabChange = (tab: string) => { setActiveType(tab); scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' }); };
+    const handleRepChange = (id: string) => { setRepFilter(id); setRepDropdownOpen(false); scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' }); };
 
     // ─── Google Voice ──────────────────────────────────────────────────────────
     const initiateGoogleVoice = (clientId: string, phoneNumber: string, type: 'calls' | 'messages') => {
@@ -490,6 +522,51 @@ function ClientsContent() {
                         <input type="text" placeholder="Search clients..." value={search} onChange={e => setSearch(e.target.value)}
                             className="pl-8 pr-8 h-8 w-56 bg-background border border-border text-[12px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded" />
                         {search && (<button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors z-20 cursor-pointer"><X className="h-3 w-3" /></button>)}
+                    </div>
+
+                    {/* Rep Filter Dropdown */}
+                    <div ref={repDropdownRef} className="relative shrink-0">
+                        <button
+                            onClick={() => setRepDropdownOpen(!repDropdownOpen)}
+                            className={cn(
+                                'flex items-center gap-1.5 h-8 px-2.5 border text-[12px] font-semibold rounded transition-all cursor-pointer whitespace-nowrap',
+                                repFilter
+                                    ? 'bg-primary/10 border-primary/30 text-primary'
+                                    : 'bg-background border-border text-muted-foreground hover:text-foreground hover:border-foreground/20'
+                            )}
+                        >
+                            <UserCircle className="w-3.5 h-3.5" />
+                            <span className="max-w-[100px] truncate">
+                                {repFilter ? repList.find(r => r._id === repFilter)?.firstName + ' ' + repList.find(r => r._id === repFilter)?.lastName : 'All Reps'}
+                            </span>
+                            <ChevronDown className={cn('w-3 h-3 transition-transform', repDropdownOpen && 'rotate-180')} />
+                        </button>
+                        {repDropdownOpen && (
+                            <div className="absolute top-full right-0 mt-1 w-56 bg-card border border-border rounded-lg shadow-xl z-50 py-1 max-h-72 overflow-y-auto scrollbar-custom animate-in fade-in slide-in-from-top-1 duration-150">
+                                <button
+                                    onClick={() => handleRepChange('')}
+                                    className={cn('w-full text-left px-3 py-2 text-[12px] font-medium hover:bg-muted/50 transition-colors cursor-pointer flex items-center gap-2',
+                                        !repFilter && 'text-primary font-bold bg-primary/5')}
+                                >
+                                    <Users className="w-3.5 h-3.5" />
+                                    All Reps
+                                </button>
+                                <div className="h-px bg-border my-1" />
+                                {repList.map(rep => (
+                                    <button
+                                        key={rep._id}
+                                        onClick={() => handleRepChange(rep._id)}
+                                        className={cn('w-full text-left px-3 py-2 text-[12px] font-medium hover:bg-muted/50 transition-colors cursor-pointer flex items-center gap-2',
+                                            repFilter === rep._id && 'text-primary font-bold bg-primary/5')}
+                                    >
+                                        <div className="w-5 h-5 rounded-full bg-secondary flex items-center justify-center text-[9px] font-black text-foreground shrink-0">
+                                            {rep.firstName?.[0]}{rep.lastName?.[0]}
+                                        </div>
+                                        {rep.firstName} {rep.lastName}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     {/* Add button */}

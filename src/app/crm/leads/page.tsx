@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
     ArrowUpDown, Search, Plus, X, Loader2, Briefcase, Mail, Phone, MessageSquare,
-    List, LayoutGrid, GripVertical, User, Layers, CheckCircle2, Calendar, Send, Trash2, Paperclip,
+    List, LayoutGrid, GripVertical, User, Layers, CheckCircle2, Calendar, Send, Trash2, Paperclip, ChevronDown, UserCircle, Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -32,6 +32,12 @@ interface Lead {
     contactStatus?: string;
 }
 
+interface Rep {
+    _id: string;
+    firstName: string;
+    lastName: string;
+}
+
 const PIPELINE_STAGES = [
     { id: 'Initial Contact', label: 'Initial Contact', color: 'text-white', bgColor: 'bg-slate-600 border-slate-700', icon: <User className="w-4 h-4" /> },
     { id: 'Sampling', label: 'Sampling', color: 'text-white', bgColor: 'bg-purple-600 border-purple-700', icon: <Layers className="w-4 h-4" /> },
@@ -51,6 +57,7 @@ interface CacheEntry {
     sortOrder: string;
     search: string;
     status: string;
+    repFilter: string;
     timestamp: number;
 }
 
@@ -379,6 +386,10 @@ function LeadsContent() {
     const [activeStatus, setActiveStatus] = useState<string>('All');
     const [viewMode, setViewMode] = useState<'table' | 'pipeline'>('table');
     const [minRevenueSlab, setMinRevenueSlab] = useState('20');
+    const [repFilter, setRepFilter] = useState<string>('');  // '' = All reps
+    const [repList, setRepList] = useState<Rep[]>([]);
+    const [repDropdownOpen, setRepDropdownOpen] = useState(false);
+    const repDropdownRef = useRef<HTMLDivElement | null>(null);
 
     const pageRef = useRef(globalCache.current?.page || 0);
     const mountedRef = useRef(true);
@@ -403,6 +414,25 @@ function LeadsContent() {
 
     useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
     useEffect(() => { const t = setTimeout(() => setDebouncedSearch(search), 250); return () => clearTimeout(t); }, [search]);
+
+    // Fetch reps for filter
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetch('/api/users?limit=200&sortBy=firstName&sortOrder=asc');
+                if (res.ok) { const d = await res.json(); setRepList(d.users || []); }
+            } catch { }
+        })();
+    }, []);
+
+    // Close rep dropdown on outside click
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (repDropdownRef.current && !repDropdownRef.current.contains(e.target as Node)) setRepDropdownOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
 
     // Fetch settings
     useEffect(() => {
@@ -453,6 +483,7 @@ function LeadsContent() {
                 page: String(pageNum), limit: String(PAGE_SIZE), sortBy, sortOrder, search: debouncedSearch,
                 maxRevenue: minRevenueSlab, contactType_nin: 'Client',
             });
+            if (repFilter) params.set('salesPerson', repFilter);
             if (activeStatus !== 'All') {
                 if (activeStatus === 'Uncategorized') {
                     const others = PIPELINE_STAGES.filter(s => s.id !== 'Uncategorized').map(s => s.id).join(',');
@@ -471,18 +502,18 @@ function LeadsContent() {
                     setLeads(prev => {
                         const ids = new Set(prev.map(l => l._id));
                         const merged = [...prev, ...newLeads.filter((l: Lead) => !ids.has(l._id))];
-                        globalCache.current = { leads: merged, hasMore: newHasMore, page: pageNum, sortBy, sortOrder, search: debouncedSearch, status: activeStatus, timestamp: Date.now() };
+                        globalCache.current = { leads: merged, hasMore: newHasMore, page: pageNum, sortBy, sortOrder, search: debouncedSearch, status: activeStatus, repFilter, timestamp: Date.now() };
                         return merged;
                     });
                 } else {
                     setLeads(newLeads);
-                    globalCache.current = { leads: newLeads, hasMore: newHasMore, page: pageNum, sortBy, sortOrder, search: debouncedSearch, status: activeStatus, timestamp: Date.now() };
+                    globalCache.current = { leads: newLeads, hasMore: newHasMore, page: pageNum, sortBy, sortOrder, search: debouncedSearch, status: activeStatus, repFilter, timestamp: Date.now() };
                 }
                 setHasMore(newHasMore); pageRef.current = pageNum; setError(null);
             } else { setError(data.error || 'Failed to fetch'); }
         } catch (e: any) { if (e?.name === 'AbortError') return; if (mountedRef.current) setError(e.message); }
         finally { fetchingRef.current = false; if (mountedRef.current) { setIsLoading(false); setIsLoadingMore(false); } }
-    }, [sortBy, sortOrder, debouncedSearch, activeStatus, minRevenueSlab]);
+    }, [sortBy, sortOrder, debouncedSearch, activeStatus, minRevenueSlab, repFilter]);
 
     const fetchPageRef = useRef(fetchPage); fetchPageRef.current = fetchPage;
     const isFirstMount = useRef(true);
@@ -492,13 +523,13 @@ function LeadsContent() {
         if (isFirstMount.current) {
             isFirstMount.current = false;
             const c = globalCache.current;
-            if (c && c.leads.length > 0 && (Date.now() - c.timestamp) < CACHE_TTL && c.sortBy === sortBy && c.sortOrder === sortOrder && c.search === debouncedSearch && c.status === activeStatus) {
+            if (c && c.leads.length > 0 && (Date.now() - c.timestamp) < CACHE_TTL && c.sortBy === sortBy && c.sortOrder === sortOrder && c.search === debouncedSearch && c.status === activeStatus && c.repFilter === repFilter) {
                 setLeads(c.leads); setHasMore(c.hasMore); pageRef.current = c.page; setIsLoading(false); return;
             }
         }
         globalCache.current = null; pageRef.current = 0; setLeads([]); setHasMore(true);
         fetchPageRef.current(1, false);
-    }, [sortBy, sortOrder, debouncedSearch, activeStatus, viewMode]);
+    }, [sortBy, sortOrder, debouncedSearch, activeStatus, viewMode, repFilter]);
 
     // ─── Fetch Pipeline ────────────────────────────────────────────────────────
     const fetchPipelineStage = useCallback(async (stageId: string, pageToFetch: number, isAppending = false) => {
@@ -508,6 +539,7 @@ function LeadsContent() {
                 page: String(pageToFetch), limit: '10', search: debouncedSearch, sortBy, sortOrder,
                 maxRevenue: minRevenueSlab, contactType_nin: 'Client',
             });
+            if (repFilter) params.set('salesPerson', repFilter);
             if (stageId === 'Uncategorized') {
                 params.set('contactStatus_nin', PIPELINE_STAGES.filter(s => s.id !== 'Uncategorized').map(s => s.id).join(','));
             } else { params.set('contactStatus', stageId); }
@@ -521,7 +553,7 @@ function LeadsContent() {
                 });
             }
         } catch { setPipelineData(prev => ({ ...prev, [stageId]: { ...prev[stageId], loading: false } })); }
-    }, [debouncedSearch, sortBy, sortOrder, minRevenueSlab]);
+    }, [debouncedSearch, sortBy, sortOrder, minRevenueSlab, repFilter]);
 
     useEffect(() => {
         if (viewMode === 'pipeline') PIPELINE_STAGES.forEach(s => fetchPipelineStage(s.id, 1, false));
@@ -544,6 +576,7 @@ function LeadsContent() {
         scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
     };
     const handleTabChange = (tab: string) => { setActiveStatus(tab); scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' }); };
+    const handleRepChange = (id: string) => { setRepFilter(id); setRepDropdownOpen(false); scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' }); };
 
     // ─── Google Voice ──────────────────────────────────────────────────────────
     const initiateGoogleVoice = (leadId: string, phoneNumber: string, type: 'calls' | 'messages') => {
@@ -624,6 +657,51 @@ function LeadsContent() {
                         <input type="text" placeholder="Search leads..." value={search} onChange={e => setSearch(e.target.value)}
                             className="pl-8 pr-8 h-8 w-56 bg-background border border-border text-[12px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded" />
                         {search && <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors z-20 cursor-pointer"><X className="h-3 w-3" /></button>}
+                    </div>
+
+                    {/* Rep Filter Dropdown */}
+                    <div ref={repDropdownRef} className="relative shrink-0">
+                        <button
+                            onClick={() => setRepDropdownOpen(!repDropdownOpen)}
+                            className={cn(
+                                'flex items-center gap-1.5 h-8 px-2.5 border text-[12px] font-semibold rounded transition-all cursor-pointer whitespace-nowrap',
+                                repFilter
+                                    ? 'bg-primary/10 border-primary/30 text-primary'
+                                    : 'bg-background border-border text-muted-foreground hover:text-foreground hover:border-foreground/20'
+                            )}
+                        >
+                            <UserCircle className="w-3.5 h-3.5" />
+                            <span className="max-w-[100px] truncate">
+                                {repFilter ? repList.find(r => r._id === repFilter)?.firstName + ' ' + repList.find(r => r._id === repFilter)?.lastName : 'All Reps'}
+                            </span>
+                            <ChevronDown className={cn('w-3 h-3 transition-transform', repDropdownOpen && 'rotate-180')} />
+                        </button>
+                        {repDropdownOpen && (
+                            <div className="absolute top-full right-0 mt-1 w-56 bg-card border border-border rounded-lg shadow-xl z-50 py-1 max-h-72 overflow-y-auto scrollbar-custom animate-in fade-in slide-in-from-top-1 duration-150">
+                                <button
+                                    onClick={() => handleRepChange('')}
+                                    className={cn('w-full text-left px-3 py-2 text-[12px] font-medium hover:bg-muted/50 transition-colors cursor-pointer flex items-center gap-2',
+                                        !repFilter && 'text-primary font-bold bg-primary/5')}
+                                >
+                                    <Users className="w-3.5 h-3.5" />
+                                    All Reps
+                                </button>
+                                <div className="h-px bg-border my-1" />
+                                {repList.map(rep => (
+                                    <button
+                                        key={rep._id}
+                                        onClick={() => handleRepChange(rep._id)}
+                                        className={cn('w-full text-left px-3 py-2 text-[12px] font-medium hover:bg-muted/50 transition-colors cursor-pointer flex items-center gap-2',
+                                            repFilter === rep._id && 'text-primary font-bold bg-primary/5')}
+                                    >
+                                        <div className="w-5 h-5 rounded-full bg-secondary flex items-center justify-center text-[9px] font-black text-foreground shrink-0">
+                                            {rep.firstName?.[0]}{rep.lastName?.[0]}
+                                        </div>
+                                        {rep.firstName} {rep.lastName}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     {/* Add */}
