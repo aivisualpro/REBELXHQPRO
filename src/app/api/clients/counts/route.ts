@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import Client from '@/models/Client';
-import Setting from '@/models/Setting';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,44 +9,8 @@ export async function GET() {
     try {
         await dbConnect();
 
-        // Get threshold
-        const thresholdSetting = await Setting.findOne({ key: 'crmMinRevenueSlab' });
-        const threshold = thresholdSetting ? parseFloat(thresholdSetting.value) : 20;
-
-        // Pipeline: count by companyType for clients (revenue >= threshold)
+        // Pipeline: count by companyType for all clients
         const pipeline = [
-            {
-                $lookup: {
-                    from: 'saleorders',
-                    localField: '_id',
-                    foreignField: 'clientId',
-                    pipeline: [
-                        { $match: { orderStatus: { $ne: 'Cancelled' } } },
-                        {
-                            $project: {
-                                amount: {
-                                    $subtract: [
-                                        { $add: [{ $sum: "$lineItems.total" }, { $ifNull: ["$shippingCost", 0] }, { $ifNull: ["$tax", 0] }] },
-                                        { $ifNull: ["$discount", 0] }
-                                    ]
-                                }
-                            }
-                        },
-                        { $group: { _id: null, total: { $sum: "$amount" } } }
-                    ],
-                    as: 'pricing'
-                }
-            },
-            {
-                $addFields: {
-                    totalRevenue: { $ifNull: [{ $arrayElemAt: ["$pricing.total", 0] }, 0] }
-                }
-            },
-            {
-                $match: {
-                    totalRevenue: { $gte: threshold }
-                }
-            },
             {
                 $group: {
                     _id: { $toUpper: { $ifNull: ['$companyType', 'UNKNOWN'] } },
@@ -58,10 +21,27 @@ export async function GET() {
 
         const typeCounts = await Client.aggregate(pipeline);
 
-        // Build counts object
+        // Map raw DB types into tab-bucket categories
+        const TAB_MATCHERS: [string, RegExp][] = [
+            ['MASTER DISTRO', /master\s*distro/i],
+            ['VAPE STORE', /vape/i],
+            ['DISTRO', /distro/i],
+            ['SHOP', /shop/i],
+            ['WHL', /whl/i],
+        ];
+
+        function classifyType(rawType: string): string {
+            for (const [bucket, regex] of TAB_MATCHERS) {
+                if (regex.test(rawType)) return bucket;
+            }
+            return 'POTENTIAL'; // default bucket for unknown types
+        }
+
+        // Build counts object with tab-aligned buckets
         const counts: Record<string, number> = { All: 0 };
         for (const tc of typeCounts) {
-            counts[tc._id] = tc.count;
+            const bucket = classifyType(tc._id);
+            counts[bucket] = (counts[bucket] || 0) + tc.count;
             counts['All'] += tc.count;
         }
 

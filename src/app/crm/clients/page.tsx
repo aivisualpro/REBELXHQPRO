@@ -362,7 +362,6 @@ function ClientsContent() {
         try {
             const params = new URLSearchParams({
                 page: String(pageNum), limit: String(PAGE_SIZE), sortBy, sortOrder, search: debouncedSearch,
-                minRevenue: '20',
             });
             if (activeType !== 'All') params.set('companyType', activeType);
             if (repFilter) params.set('salesPerson', repFilter);

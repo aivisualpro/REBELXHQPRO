@@ -7,6 +7,7 @@ import RXHQUsers from '@/models/User';
 import { applyDateFilter } from '@/lib/global-settings';
 import { syncOrderToAppSheet } from '@/lib/appsheet';
 import { buildFuzzySearchQuery, buildFuzzyRegex } from '@/lib/fuzzy-search';
+import mongoose from 'mongoose';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,7 +65,11 @@ export async function GET(request: Request) {
         }
 
         if (client) {
-            query.clientId = { $in: client.split(',') };
+            query.clientId = {
+                $in: client.split(',').map(id => {
+                    try { return new mongoose.Types.ObjectId(id); } catch { return id; }
+                })
+            };
         }
 
         if (status) {
@@ -85,7 +90,11 @@ export async function GET(request: Request) {
             if (toDate) query.createdAt.$lte = new Date(toDate);
         }
 
-        query = await applyDateFilter(query, 'createdAt');
+        // Only apply the global date filter when NOT scoped to a specific client.
+        // When viewing a client's orders, show ALL orders regardless of date.
+        if (!client) {
+            query = await applyDateFilter(query, 'createdAt');
+        }
 
         // Computed columns that need aggregation-based sorting
         const COMPUTED_SORT_COLUMNS = new Set(['subtotal', 'grandTotal', 'balance', 'cost', 'margin']);

@@ -74,7 +74,24 @@ export async function GET(request: Request) {
             query.contactType = { $nin: contactTypeNin.split(',') };
         }
 
-        if (companyType) query.companyType = { $in: companyType.split(',') };
+        if (companyType) {
+            // Tab-specific regex patterns to prevent cross-matching
+            const TAB_REGEXES: Record<string, RegExp> = {
+                'SHOP': /shop/i,
+                'DISTRO': /^(?!.*master).*distro/i,
+                'VAPE STORE': /vape/i,
+                'POTENTIAL': /^(?!.*(shop|distro|vape|whl|master)).*$/i,
+                'WHL': /whl/i,
+                'MASTER DISTRO': /master\s*distro/i,
+            };
+            const types = companyType.split(',').map(t => t.trim());
+            const regexes = types.map(t => TAB_REGEXES[t] || new RegExp(t, 'i'));
+            if (regexes.length === 1) {
+                query.companyType = { $regex: regexes[0] };
+            } else {
+                query.$and = [...(query.$and || []), { $or: regexes.map(r => ({ companyType: { $regex: r } })) }];
+            }
+        }
         if (defaultShippingTerms) query.defaultShippingTerms = { $in: defaultShippingTerms.split(',') };
 
         if (city) query['addresses.city'] = { $in: city.split(',').map(c => new RegExp(c.trim(), 'i')) };
