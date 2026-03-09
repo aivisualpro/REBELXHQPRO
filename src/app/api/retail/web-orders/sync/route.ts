@@ -4,6 +4,7 @@ import WebOrder from '@/models/WebOrder';
 import WebProduct from '@/models/WebProduct';
 import Sku from '@/models/Sku';
 import SyncMeta from '@/models/SyncMeta';
+import Notification from '@/models/Notification';
 import { getAvailableLotsForSkus, LotBalance } from '@/lib/inventory/lots';
 
 export const maxDuration = 300;
@@ -39,9 +40,9 @@ interface WebProductMapItem {
 }
 
 async function fetchOrdersFromWC(
-    baseUrl: string, 
-    key: string, 
-    secret: string, 
+    baseUrl: string,
+    key: string,
+    secret: string,
     siteName: string,
     modifiedAfter?: Date
 ) {
@@ -78,7 +79,7 @@ async function fetchOrdersFromWC(
             }
 
             const data = await res.json();
-            
+
             if (!Array.isArray(data) || data.length === 0) {
                 hasMore = false;
             } else {
@@ -93,24 +94,24 @@ async function fetchOrdersFromWC(
             throw error;
         }
     }
-    
+
     syncProgress.fetchingPhase = false;
     return allOrders;
 }
 
 // Transform WC order to MongoDB document
 function transformOrder(
-    order: any, 
-    site: any, 
+    order: any,
+    site: any,
     webProductMap: Map<string, WebProductMapItem>,
     lotMap: Map<string, LotBalance[]>
 ) {
     const orderId = `WC-${site.name}-${order.id}`;
-    
+
     const lineItems = (order.line_items || []).map((item: any) => {
         const wpKey = `${item.product_id}-${site.name}`;
         const webProduct = webProductMap.get(wpKey);
-        
+
         // Determine Linked SKU
         let linkedSkuId = null;
         if (webProduct) {
@@ -340,7 +341,7 @@ export async function POST(request: Request) {
                         site.baseUrl, site.key, site.secret, site.name,
                         lastSyncAt ? new Date(lastSyncAt) : undefined
                     );
-                    
+
                     // Filter out Cancelled, Trash, and Failed orders
                     const filteredOrders = orders.filter(order => {
                         const s = order.status?.toLowerCase();
@@ -355,7 +356,7 @@ export async function POST(request: Request) {
             }
 
             syncProgress.total = allWebOrders.length;
-            
+
             if (allWebOrders.length === 0) {
                 syncProgress.currentStep = 'Complete - No changes detected';
                 syncProgress.isSyncing = false;
@@ -371,10 +372,10 @@ export async function POST(request: Request) {
             for (let batchStart = 0; batchStart < allWebOrders.length; batchStart += BATCH_SIZE) {
                 const batchEnd = Math.min(batchStart + BATCH_SIZE, allWebOrders.length);
                 const batch = allWebOrders.slice(batchStart, batchEnd);
-                
+
                 syncProgress.progress = batchEnd;
                 syncProgress.currentStep = `Processing batch ${Math.floor(batchStart / BATCH_SIZE) + 1}...`;
-                
+
                 // Show last order in batch for progress feedback
                 const lastOrder = batch[batch.length - 1];
                 if (lastOrder) {
@@ -408,10 +409,10 @@ export async function POST(request: Request) {
 
                 // Transform all orders in batch
                 const transformedOrders = batch.map(({ site, order }) => transformOrder(order, site, webProductMap, lotMap));
-                
+
                 // Get existing order IDs to determine adds vs updates
                 // Note: transformOrder uses upsert=true, so we rely on bulkWrite return val
-                
+
                 // Build bulk operations
                 const bulkOps = transformedOrders.map(doc => ({
                     updateOne: {
@@ -437,19 +438,21 @@ export async function POST(request: Request) {
             // Actually, we should update SKU counters too if needed, but sticking to WebProduct focus.
             // But Sku.totalWebOrders is deprecated/replaced by webProducts.
             // Let's keep Sku update for backward compat as requested ("Maintain Sync Logic").
-            
+
             try {
                 syncProgress.currentStep = 'Updating product order counts...';
                 // Aggregate counts by webProductId
                 const wpCounts = await WebOrder.aggregate([
-                     { $match: { status: { $in: ['completed', 'shipped', 'Completed', 'Shipped', 'processing', 'Processing', 'pending', 'Pending'] } } },
-                     { $unwind: "$lineItems" },
-                     { $group: { 
-                         _id: "$lineItems.webProductId", 
-                         count: { $sum: 1 } 
-                     }}
+                    { $match: { status: { $in: ['completed', 'shipped', 'Completed', 'Shipped', 'processing', 'Processing', 'pending', 'Pending'] } } },
+                    { $unwind: "$lineItems" },
+                    {
+                        $group: {
+                            _id: "$lineItems.webProductId",
+                            count: { $sum: 1 }
+                        }
+                    }
                 ]);
-                
+
                 const wpUpdates = wpCounts.map(c => ({
                     updateOne: {
                         filter: { _id: c._id },
@@ -469,10 +472,10 @@ export async function POST(request: Request) {
             const syncTime = new Date();
             for (const site of websites) {
                 if (!site.baseUrl || !site.key || !site.secret) continue;
-                
+
                 const syncMetaId = `web-orders-${site.name}`;
                 const siteOrderCount = await WebOrder.countDocuments({ website: site.name });
-                
+
                 await SyncMeta.findOneAndUpdate(
                     { _id: syncMetaId },
                     {
@@ -499,6 +502,32 @@ export async function POST(request: Request) {
             syncProgress.isSyncing = false;
             syncProgress.logs.push(`✅ Sync complete: ${totalAdded} added, ${totalUpdated} updated`);
             syncProgress.logs.push(`⏱️ Duration: ${duration}s (${(allWebOrders.length / parseFloat(duration)).toFixed(0)} orders/sec)`);
+
+            // Create notification if there were changes
+            if (totalAdded > 0 || totalUpdated > 0) {
+                try {
+                    const parts: string[] = [];
+                    if (totalAdded > 0) parts.push(`${totalAdded} new`);
+                    if (totalUpdated > 0) parts.push(`${totalUpdated} updated`);
+
+                    await Notification.create({
+                        category: 'orders',
+                        title: `Web Orders Synced`,
+                        message: `${parts.join(', ')} order${(totalAdded + totalUpdated) > 1 ? 's' : ''} from WooCommerce (${duration}s)`,
+                        link: '/sales/web-orders',
+                        metadata: {
+                            type: 'web-order-sync',
+                            added: totalAdded,
+                            updated: totalUpdated,
+                            skipped: totalSkipped,
+                            duration: parseFloat(duration),
+                            mode: forceFullSync ? 'full' : 'incremental',
+                        }
+                    });
+                } catch (notifErr) {
+                    console.error('Failed to create sync notification:', notifErr);
+                }
+            }
 
         } catch (error: any) {
             syncProgress.isSyncing = false;

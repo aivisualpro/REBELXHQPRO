@@ -9,12 +9,14 @@ import { useSession, signOut } from 'next-auth/react';
 import { useTheme } from '@/components/ThemeProvider';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTimers } from '@/components/TimerContext';
+import { useNotifications } from '@/components/NotificationContext';
 
 const DynamicActionsContent = () => {
     const { data: session } = useSession();
     const { theme, toggleTheme } = useTheme();
-    const { timers, setIsPanelOpen } = useTimers();
-    const activeTimerCount = timers.length;
+    const { timers } = useTimers();
+    const { unreadCount, setIsPanelOpen } = useNotifications();
+    const totalBadge = unreadCount + timers.length;
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [searchValue, setSearchValue] = useState('');
@@ -123,16 +125,16 @@ const DynamicActionsContent = () => {
             {/* Global Actions */}
             <button
                 onClick={() => setIsPanelOpen(true)}
-                className={`relative p-1.5 rounded-full transition-all cursor-pointer ${activeTimerCount > 0
-                    ? 'text-red-500 hover:text-red-400 hover:bg-red-500/10'
+                className={`relative p-1.5 rounded-full transition-all cursor-pointer ${totalBadge > 0
+                    ? 'text-primary hover:text-primary/80 hover:bg-primary/10'
                     : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
                     }`}
-                title={activeTimerCount > 0 ? `${activeTimerCount} active timer${activeTimerCount > 1 ? 's' : ''}` : 'No active timers'}
+                title={totalBadge > 0 ? `${totalBadge} notification${totalBadge > 1 ? 's' : ''}` : 'No notifications'}
             >
-                <Bell className={`w-4 h-4 ${activeTimerCount > 0 ? 'animate-[wiggle_1s_ease-in-out_infinite]' : ''}`} />
-                {activeTimerCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center bg-red-500 text-white text-[9px] font-black rounded-full px-1 border-2 border-background shadow-lg">
-                        {activeTimerCount}
+                <Bell className={`w-4 h-4 ${timers.length > 0 ? 'animate-[wiggle_1s_ease-in-out_infinite]' : ''}`} />
+                {totalBadge > 0 && (
+                    <span className={`absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center text-white text-[9px] font-black rounded-full px-1 border-2 border-background shadow-lg ${timers.length > 0 ? 'bg-red-500' : 'bg-primary'}`}>
+                        {totalBadge}
                     </span>
                 )}
             </button>

@@ -48,8 +48,9 @@ const PAGE_SIZE = 50;
 const COLUMNS = [
   { key: 'dateCreated', label: 'Date', width: 'w-[90px]' },
   { key: 'number', label: 'Order #', width: 'w-[80px]' },
-  { key: 'website', label: 'Website', width: 'w-[100px]' },
+  { key: 'website', label: 'Website', width: 'w-[160px]' },
   { key: 'billing.firstName', label: 'Customer', width: 'w-[160px]' },
+  { key: 'billing.city', label: 'Location', width: 'w-[130px]' },
   { key: 'status', label: 'Status', width: 'w-[95px]' },
   { key: 'total', label: 'Total', width: 'w-[100px]', align: 'text-right' as const },
   { key: 'shippingTotal', label: 'Shipping', width: 'w-[80px]', align: 'text-right' as const },
@@ -57,7 +58,6 @@ const COLUMNS = [
   { key: 'totalTax', label: 'Tax', width: 'w-[70px]', align: 'text-right' as const },
   { key: 'paymentMethodTitle', label: 'Payment', width: 'w-[110px]' },
   { key: 'lineItems', label: 'Items', width: 'w-[55px]', align: 'text-right' as const },
-  { key: 'billing.city', label: 'Location', width: 'w-[130px]' },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -143,9 +143,12 @@ const WebTableRow = React.memo(function WebTableRow({
       <td className="px-2.5 py-2.5 w-[80px] text-[12px] font-mono font-bold text-foreground/90 group-hover:text-foreground transition-colors">
         <span className="group-hover:border-l-2 group-hover:border-l-primary group-hover:pl-1.5 transition-all">#{order.number}</span>
       </td>
-      <td className="px-2.5 py-2.5 w-[100px]"><WebsiteBadge website={order.website} /></td>
+      <td className="px-2.5 py-2.5 w-[160px]"><WebsiteBadge website={order.website} /></td>
       <td className="px-2.5 py-2.5 w-[160px] text-[12px] text-foreground/90 group-hover:text-foreground transition-colors font-semibold truncate">
         {order.billing?.firstName} {order.billing?.lastName}
+      </td>
+      <td className="px-2.5 py-2.5 w-[130px] text-[12px] text-foreground/60 truncate">
+        {order.billing?.city}{order.billing?.state ? `, ${order.billing.state}` : ''}
       </td>
       <td className="px-2.5 py-2.5 w-[95px]"><StatusBadge status={order.status} /></td>
       <td className="px-2.5 py-2.5 w-[100px] text-[12px] font-mono text-right font-black text-foreground group-hover:text-foreground transition-colors">{fmtCurrency(order.total)}</td>
@@ -157,9 +160,6 @@ const WebTableRow = React.memo(function WebTableRow({
       </td>
       <td className="px-2.5 py-2.5 w-[55px] text-[12px] font-mono text-right">
         <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-secondary text-[9px] font-black text-foreground/70">{order.lineItems?.length || 0}</span>
-      </td>
-      <td className="px-2.5 py-2.5 w-[130px] text-[12px] text-foreground/60 truncate">
-        {order.billing?.city}{order.billing?.state ? `, ${order.billing.state}` : ''}
       </td>
     </tr>
   );

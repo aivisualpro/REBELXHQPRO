@@ -138,14 +138,17 @@ export default function SaleOrderDetailPage() {
     const router = useRouter();
     const { data: session } = useSession();
 
-    // Derive active tab from URL — default to 'Line Items'
+    // Read initial tab from URL, then manage via client state (no DOM reload)
     const tabSegment = params.tab;
     const tabSlug = Array.isArray(tabSegment) ? tabSegment[0] : tabSegment;
-    const activeTab: TabType = (tabSlug && ORDER_TAB_SLUGS[tabSlug]) || 'Line Items';
+    const initialTab: TabType = (tabSlug && ORDER_TAB_SLUGS[tabSlug]) || 'Line Items';
+    const [activeTab, setActiveTabState] = useState<TabType>(initialTab);
 
     const setActiveTab = (tabId: TabType) => {
+        setActiveTabState(tabId);
         const slug = ORDER_TAB_TO_SLUG[tabId] || 'line-items';
-        router.replace(`/sales/wholesale-orders/${params.id}/${slug}`, { scroll: false });
+        // Update URL without triggering Next.js re-render
+        window.history.replaceState(null, '', `/sales/wholesale-orders/${params.id}/${slug}`);
     };
 
     const [order, setOrder] = useState<SaleOrder | null>(null);

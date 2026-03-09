@@ -242,13 +242,16 @@ export default function ClientDashboardPage() {
     const router = useRouter();
     const { id, tab: tabSegment } = params;
 
-    // Derive active tab from URL — default to 'Emails'
-    const tabSlug = Array.isArray(tabSegment) ? tabSegment[0] : tabSegment;
-    const activeTab = (tabSlug && TAB_SLUGS[tabSlug]) || 'Emails';
+    // Read initial tab from URL, then manage via client state (no DOM reload)
+    const initialTabSlug = Array.isArray(tabSegment) ? tabSegment[0] : tabSegment;
+    const initialTab = (initialTabSlug && TAB_SLUGS[initialTabSlug]) || 'Emails';
+    const [activeTab, setActiveTabState] = useState<string>(initialTab);
 
     const setActiveTab = (tabId: string) => {
+        setActiveTabState(tabId);
         const slug = TAB_TO_SLUG[tabId] || 'emails';
-        router.replace(`/crm/clients/${id}/${slug}`, { scroll: false });
+        // Update URL without triggering Next.js re-render
+        window.history.replaceState(null, '', `/crm/clients/${id}/${slug}`);
     };
 
     const [client, setClient] = useState<Client | null>(null);

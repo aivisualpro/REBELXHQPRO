@@ -1,0 +1,181 @@
+'use client';
+
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+
+interface NotificationItem {
+    _id: string;
+    category: 'orders' | 'timers' | 'others';
+    title: string;
+    message: string;
+    link?: string;
+    isRead: boolean;
+    createdAt: string;
+    metadata?: any;
+}
+
+interface NotificationContextType {
+    notifications: NotificationItem[];
+    unreadCount: number;
+    unreadByCategory: Record<string, number>;
+    isLoading: boolean;
+    isPanelOpen: boolean;
+    setIsPanelOpen: (open: boolean) => void;
+    activeCategory: string;
+    setActiveCategory: (cat: string) => void;
+    fetchNotifications: () => Promise<void>;
+    markAsRead: (id: string) => Promise<void>;
+    markAllAsRead: (category?: string) => Promise<void>;
+    lastSyncAt: string | null;
+    isSyncing: boolean;
+    triggerSync: () => Promise<void>;
+}
+
+const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
+
+const AUTO_SYNC_INTERVAL = 30 * 60 * 1000; // 30 minutes
+const NOTIFICATION_POLL_INTERVAL = 60 * 1000; // 1 minute
+
+export function NotificationProvider({ children }: { children: React.ReactNode }) {
+    const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+    const [unreadCount, setUnreadCount] = useState(0);
+    const [unreadByCategory, setUnreadByCategory] = useState<Record<string, number>>({});
+    const [isLoading, setIsLoading] = useState(false);
+    const [isPanelOpen, setIsPanelOpen] = useState(false);
+    const [activeCategory, setActiveCategory] = useState('orders');
+    const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+    const [isSyncing, setIsSyncing] = useState(false);
+    const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Fetch notifications from API
+    const fetchNotifications = useCallback(async () => {
+        try {
+            const res = await fetch('/api/notifications?limit=100');
+            if (res.ok) {
+                const data = await res.json();
+                setNotifications(data.notifications || []);
+                setUnreadCount(data.unreadCount || 0);
+                setUnreadByCategory(data.unreadByCategory || {});
+            }
+        } catch (e) {
+            console.error('Failed to fetch notifications:', e);
+        }
+    }, []);
+
+    // Mark single notification as read
+    const markAsRead = useCallback(async (id: string) => {
+        try {
+            await fetch(`/api/notifications/${id}`, { method: 'PATCH' });
+            setNotifications(prev => prev.map(n => n._id === id ? { ...n, isRead: true } : n));
+            setUnreadCount(prev => Math.max(0, prev - 1));
+        } catch (e) {
+            console.error('Failed to mark as read:', e);
+        }
+    }, []);
+
+    // Mark all as read (optionally by category)
+    const markAllAsRead = useCallback(async (category?: string) => {
+        try {
+            await fetch('/api/notifications/read-all', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(category ? { category } : {})
+            });
+            setNotifications(prev => prev.map(n =>
+                (!category || n.category === category) ? { ...n, isRead: true } : n
+            ));
+            if (category) {
+                setUnreadByCategory(prev => ({ ...prev, [category]: 0 }));
+                setUnreadCount(prev => Math.max(0, prev - (unreadByCategory[category] || 0)));
+            } else {
+                setUnreadByCategory({});
+                setUnreadCount(0);
+            }
+        } catch (e) {
+            console.error('Failed to mark all as read:', e);
+        }
+    }, [unreadByCategory]);
+
+    // Trigger incremental web orders sync
+    const triggerSync = useCallback(async () => {
+        if (isSyncing) return;
+        setIsSyncing(true);
+        try {
+            const res = await fetch('/api/retail/web-orders/sync', { method: 'POST' });
+            if (res.ok) {
+                setLastSyncAt(new Date().toISOString());
+                // Poll for sync completion, then refresh notifications
+                const checkCompletion = async () => {
+                    try {
+                        const statusRes = await fetch('/api/retail/web-orders/sync');
+                        if (statusRes.ok) {
+                            const status = await statusRes.json();
+                            if (!status.isSyncing) {
+                                setIsSyncing(false);
+                                // Refresh notifications after sync completes
+                                setTimeout(() => fetchNotifications(), 1000);
+                                return;
+                            }
+                        }
+                    } catch { }
+                    // Keep checking every 5 seconds
+                    setTimeout(checkCompletion, 5000);
+                };
+                setTimeout(checkCompletion, 3000);
+            } else {
+                setIsSyncing(false);
+            }
+        } catch (e) {
+            console.error('Failed to trigger sync:', e);
+            setIsSyncing(false);
+        }
+    }, [isSyncing, fetchNotifications]);
+
+    // Initial load
+    useEffect(() => {
+        fetchNotifications();
+    }, [fetchNotifications]);
+
+    // Poll notifications every minute
+    useEffect(() => {
+        pollIntervalRef.current = setInterval(fetchNotifications, NOTIFICATION_POLL_INTERVAL);
+        return () => {
+            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+        };
+    }, [fetchNotifications]);
+
+    // Auto-sync web orders every 30 minutes
+    useEffect(() => {
+        syncIntervalRef.current = setInterval(() => {
+            console.log('🔄 Auto-sync: Triggering incremental web orders sync...');
+            triggerSync();
+        }, AUTO_SYNC_INTERVAL);
+
+        return () => {
+            if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
+        };
+    }, [triggerSync]);
+
+    // Refresh notifications when panel opens
+    useEffect(() => {
+        if (isPanelOpen) fetchNotifications();
+    }, [isPanelOpen, fetchNotifications]);
+
+    return (
+        <NotificationContext.Provider value={{
+            notifications, unreadCount, unreadByCategory,
+            isLoading, isPanelOpen, setIsPanelOpen,
+            activeCategory, setActiveCategory,
+            fetchNotifications, markAsRead, markAllAsRead,
+            lastSyncAt, isSyncing, triggerSync,
+        }}>
+            {children}
+        </NotificationContext.Provider>
+    );
+}
+
+export function useNotifications() {
+    const context = useContext(NotificationContext);
+    if (!context) throw new Error('useNotifications must be used within NotificationProvider');
+    return context;
+}
