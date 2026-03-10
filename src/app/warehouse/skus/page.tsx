@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowUpDown, Plus, Search, X, Loader2, Archive, ArchiveRestore } from 'lucide-react';
+import { ArrowUpDown, Plus, Search, X, Loader2, Archive, ArchiveRestore, FileX2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/components/ThemeProvider';
 import toast from 'react-hot-toast';
@@ -36,6 +36,7 @@ interface CacheEntry {
   search: string;
   category: string;
   showArchived: boolean;
+  noTransactions: boolean;
   timestamp: number;
 }
 
@@ -334,6 +335,7 @@ function SkusContent() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingSku, setEditingSku] = useState<Sku | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  const [noTransactions, setNoTransactions] = useState(false);
 
   const pageRef = useRef(globalCache.current?.page || 0);
   const mountedRef = useRef(true);
@@ -397,6 +399,7 @@ function SkusContent() {
         simple: 'true',
         ignoreDate: 'true',
       });
+      if (noTransactions) params.set('noTransactions', 'true');
       if (showArchived) params.set('showArchived', 'true');
 
       if (activeCategory !== 'All') {
@@ -424,13 +427,13 @@ function SkusContent() {
           setSkus(prev => {
             const ids = new Set(prev.map(s => s._id));
             const merged = [...prev, ...filtered.filter(s => !ids.has(s._id))];
-            globalCache.current = { skus: merged, hasMore: newHasMore, page: pageNum, total: newTotal, sortBy, sortOrder, search: debouncedSearch, category: activeCategory, showArchived, timestamp: Date.now() };
+            globalCache.current = { skus: merged, hasMore: newHasMore, page: pageNum, total: newTotal, sortBy, sortOrder, search: debouncedSearch, category: activeCategory, showArchived, noTransactions, timestamp: Date.now() };
             return merged;
           });
         } else {
           setSkus(filtered);
           setTotal(newTotal);
-          globalCache.current = { skus: filtered, hasMore: newHasMore, page: pageNum, total: newTotal, sortBy, sortOrder, search: debouncedSearch, category: activeCategory, showArchived, timestamp: Date.now() };
+          globalCache.current = { skus: filtered, hasMore: newHasMore, page: pageNum, total: newTotal, sortBy, sortOrder, search: debouncedSearch, category: activeCategory, showArchived, noTransactions, timestamp: Date.now() };
         }
 
         setHasMore(newHasMore);
@@ -446,25 +449,25 @@ function SkusContent() {
       fetchingRef.current = false;
       if (mountedRef.current) { setIsLoading(false); setIsLoadingMore(false); }
     }
-  }, [sortBy, sortOrder, debouncedSearch, activeCategory, showArchived]);
+  }, [sortBy, sortOrder, debouncedSearch, activeCategory, showArchived, noTransactions]);
 
   // ─── Initial load / filter changes ─────────────────────────────────────
 
   const fetchPageRef = useRef(fetchPage);
   fetchPageRef.current = fetchPage;
   const isFirstMount = useRef(true);
-  const prevFiltersRef = useRef({ sortBy, sortOrder, search: debouncedSearch, category: activeCategory, showArchived });
+  const prevFiltersRef = useRef({ sortBy, sortOrder, search: debouncedSearch, category: activeCategory, showArchived, noTransactions });
 
   useEffect(() => {
     const prev = prevFiltersRef.current;
-    const filtersChanged = prev.sortBy !== sortBy || prev.sortOrder !== sortOrder || prev.search !== debouncedSearch || prev.category !== activeCategory || prev.showArchived !== showArchived;
-    prevFiltersRef.current = { sortBy, sortOrder, search: debouncedSearch, category: activeCategory, showArchived };
+    const filtersChanged = prev.sortBy !== sortBy || prev.sortOrder !== sortOrder || prev.search !== debouncedSearch || prev.category !== activeCategory || prev.showArchived !== showArchived || prev.noTransactions !== noTransactions;
+    prevFiltersRef.current = { sortBy, sortOrder, search: debouncedSearch, category: activeCategory, showArchived, noTransactions };
 
     if (isFirstMount.current) {
       isFirstMount.current = false;
       const cache = globalCache.current;
       if (cache && cache.skus.length > 0 && (Date.now() - cache.timestamp) < CACHE_TTL &&
-        cache.sortBy === sortBy && cache.sortOrder === sortOrder && cache.search === debouncedSearch && cache.category === activeCategory && cache.showArchived === showArchived) {
+        cache.sortBy === sortBy && cache.sortOrder === sortOrder && cache.search === debouncedSearch && cache.category === activeCategory && cache.showArchived === showArchived && cache.noTransactions === noTransactions) {
         setSkus(cache.skus); setHasMore(cache.hasMore); setTotal(cache.total); pageRef.current = cache.page; setIsLoading(false); return;
       }
     }
@@ -475,7 +478,7 @@ function SkusContent() {
     setHasMore(true);
     fetchPageRef.current(1, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sortBy, sortOrder, debouncedSearch, activeCategory, showArchived]);
+  }, [sortBy, sortOrder, debouncedSearch, activeCategory, showArchived, noTransactions]);
 
   // ─── Archive Toggle ─────────────────────────────────────────────────────
 
@@ -578,6 +581,16 @@ function SkusContent() {
         </div>
 
         <div className="flex-1" />
+
+        {/* No Transactions filter */}
+        <button
+          onClick={() => { setNoTransactions(p => !p); scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          className={cn('h-8 px-3 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 text-[11px] font-bold uppercase tracking-widest', noTransactions ? 'bg-orange-500/15 text-orange-500 border border-orange-500/25 shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60')}
+          title={noTransactions ? 'Showing SKUs with no transactions' : 'Filter: No Transactions'}
+        >
+          <FileX2 className="w-3.5 h-3.5" />
+          <span>No Transactions</span>
+        </button>
 
         {/* Show Archived toggle */}
         <button

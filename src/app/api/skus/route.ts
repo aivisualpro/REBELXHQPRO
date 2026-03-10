@@ -65,6 +65,47 @@ export async function GET(request: Request) {
             query.isArchived = { $ne: true };
         }
 
+        // No-Transactions filter — only show SKUs with zero ledger activity
+        const noTransactions = searchParams.get('noTransactions') === 'true';
+        if (noTransactions) {
+            // Gather all SKU IDs that appear in ANY transaction collection
+            const [obSkuIds, poSkuIds, soSkuIds, moSkuIds, adjSkuIds, woSkuIds] = await Promise.all([
+                OpeningBalance.distinct('sku'),
+                PurchaseOrder.distinct('lineItems.sku'),
+                SaleOrder.distinct('lineItems.sku'),
+                Manufacturing.aggregate([
+                    { $project: { allSkus: { $concatArrays: [['$sku'], { $ifNull: ['$lineItems.sku', []] }] } } },
+                    { $unwind: '$allSkus' },
+                    { $group: { _id: null, ids: { $addToSet: '$allSkus' } } }
+                ]).then(r => r[0]?.ids || []),
+                AuditAdjustment.distinct('sku'),
+                WebOrder.aggregate([
+                    {
+                        $project: {
+                            allSkus: {
+                                $concatArrays: [
+                                    { $ifNull: ['$lineItems.sku', []] },
+                                    { $ifNull: ['$lineItems.linkedSkuId', []] },
+                                    { $ifNull: ['$lineItems.linkedSkus.skuId', []] }
+                                ]
+                            }
+                        }
+                    },
+                    { $unwind: '$allSkus' },
+                    { $group: { _id: null, ids: { $addToSet: '$allSkus' } } }
+                ]).then(r => r[0]?.ids || [])
+            ]);
+
+            // Merge all IDs into a single Set (convert everything to string for uniform comparison)
+            const allTransactedIds = new Set<string>();
+            [obSkuIds, poSkuIds, soSkuIds, moSkuIds, adjSkuIds, woSkuIds].forEach(arr => {
+                arr.forEach((id: any) => { if (id) allTransactedIds.add(id.toString()); });
+            });
+
+            // Exclude SKUs that have ANY transaction
+            query._id = { ...(query._id || {}), $nin: Array.from(allTransactedIds) };
+        }
+
         const simpleMode = searchParams.get('simple') === 'true';
 
         console.log('SKU API Sort:', { sortBy, sortOrder, simpleMode });
