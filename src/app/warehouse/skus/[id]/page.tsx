@@ -254,9 +254,26 @@ function SkuDetailsPageContent() {
     const fetchSkuDetails = async (background = false) => {
         try {
             if (!background) setLoading(true);
-            const res = await fetch(`/api/warehouse/skus/${id}/ledger`);
-            if (res.ok) {
-                const data = await res.json();
+            if (!background) setLoadingLinkedProducts(true);
+
+            // ⚡ Fire BOTH requests in parallel
+            // When called after mutation (background=true), bust the server cache
+            const cacheBust = background ? '?bust=1' : '';
+            const [ledgerRes, wpRes] = await Promise.all([
+                fetch(`/api/warehouse/skus/${id}/ledger${cacheBust}`),
+                fetch(`/api/warehouse/skus/${id}/linked-web-products`),
+            ]);
+
+            // Process linked web products (independent)
+            if (wpRes.ok) {
+                const wpData = await wpRes.json();
+                setLinkedWebProducts(wpData.linkedProducts || []);
+            }
+            setLoadingLinkedProducts(false);
+
+            // Process ledger data
+            if (ledgerRes.ok) {
+                const data = await ledgerRes.json();
                 setSku(data.sku);
                 setTransactions(data.transactions || []);
                 setFinancials(data.financials || null);
@@ -322,14 +339,6 @@ function SkuDetailsPageContent() {
                         return dateA - dateB;
                     });
                 setLots(derivedLots);
-
-                // Fetch linked web products
-                setLoadingLinkedProducts(true);
-                fetch(`/api/warehouse/skus/${id}/linked-web-products`)
-                    .then(r => r.json())
-                    .then(wpData => setLinkedWebProducts(wpData.linkedProducts || []))
-                    .catch(() => { })
-                    .finally(() => setLoadingLinkedProducts(false));
             } else {
                 if (!background) toast.error("Failed to load SKU details");
             }
@@ -1380,7 +1389,7 @@ function SkuDetailsPageContent() {
                                                                     s;
 
                                             const styleMap: Record<string, { bg: string; color: string; border?: string; darkBg?: string; darkColor?: string }> = {
-                                                'Fulfilled': { bg: '#000000', color: '#ffffff', darkBg: 'rgba(16,185,129,0.2)', darkColor: '#34d399' },
+                                                'Fulfilled': { bg: '#059669', color: '#ffffff', darkBg: 'rgba(5,150,105,0.2)', darkColor: '#34d399' },
                                                 'Completed': { bg: '#059669', color: '#ffffff', darkBg: 'rgba(5,150,105,0.2)', darkColor: '#34d399' },
                                                 'Processing': { bg: '#2563eb', color: '#ffffff', darkBg: 'rgba(59,130,246,0.2)', darkColor: '#60a5fa' },
                                                 'Ready to QC': { bg: '#d97706', color: '#ffffff', darkBg: 'rgba(245,158,11,0.2)', darkColor: '#fbbf24' },

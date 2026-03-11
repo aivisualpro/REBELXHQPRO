@@ -15,7 +15,18 @@ import Setting from '@/models/Setting';
 import { getGlobalStartDate } from '@/lib/global-settings';
 
 export const dynamic = 'force-dynamic';
-// Last updated: 2026-02-06 22:56 - Fixed ObjectId lookup
+
+// ⚡ In-memory cache for SKU ledger responses (30s TTL)
+const CACHE_TTL = 30_000; // 30 seconds
+const ledgerCache = new Map<string, { data: any; timestamp: number }>();
+
+// Periodic cleanup to prevent memory leaks (every 5 min)
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of ledgerCache) {
+        if (now - entry.timestamp > CACHE_TTL * 4) ledgerCache.delete(key);
+    }
+}, 300_000);
 
 // Helper to round to max 8 decimal places for cleaner display
 const round8 = (num: number): number => Math.round(num * 100000000) / 100000000;
@@ -36,14 +47,22 @@ export async function GET(
     context: { params: Promise<{ id: string }> }
 ) {
     try {
+
+        const { id } = await context.params;
+
+        // ⚡ Check in-memory cache first (30s TTL)
+        const bustCache = request.nextUrl.searchParams.get('bust') === '1';
+        const cached = ledgerCache.get(id);
+        if (!bustCache && cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
+            return NextResponse.json(cached.data);
+        }
+
         await dbConnect();
 
         // Ensure models are registered
         void Client;
         void AuditAdjustment;
         void Vendor;
-
-        const { id } = await context.params;
 
         // Try both ObjectId and String _id lookups to handle both storage formats
         let sku: any = null;
@@ -71,9 +90,27 @@ export async function GET(
 
         const varianceIds = sku.variances?.map((v: any) => v._id) || [];
         const dateFilter = startDate ? { createdAt: { $gte: startDate } } : {};
+        // Cast to ObjectId for aggregation $filter (Mongoose .find() auto-casts, aggregation does NOT)
+        const skuOid = mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : id;
 
-        // 1. Parallelize ALL transaction queries with field selection for performance
-        const [openingBalances, purchaseOrders, rawManufacturingJobs, saleOrders, adjustments, webOrders, webProducts] = await Promise.all([
+        // ⚡ ROCKET: Fire ALL queries in a SINGLE parallel batch
+        const [
+            rawManufacturingJobs, webProducts,
+            openingBalances, purchaseOrders, saleOrders, adjustments, webOrders
+        ] = await Promise.all([
+            Manufacturing.find({ $or: [{ sku: id }, { "lineItems.sku": id }], ...dateFilter })
+                .select('_id sku qty qtyDifference uom lotNumber label scheduledStart scheduledFinish createdAt lineItems labor totalCost packagingCost status')
+                .lean(),
+            WebProduct.find({
+                $or: [
+                    { linkedSkuId: id },
+                    { 'variations.linkedSkuId': id },
+                    { 'linkedSkus.skuId': id },
+                    { 'variations.linkedSkus.skuId': id }
+                ]
+            })
+                .select('_id webId website multiplier variations.id variations._id variations.multiplier variations.linkedSkuId variations.linkedSkus linkedSkuId linkedSkus')
+                .lean(),
             OpeningBalance.find({ sku: id, ...dateFilter })
                 .select('_id createdAt lotNumber qty uom cost')
                 .lean(),
@@ -81,13 +118,20 @@ export async function GET(
                 .select('_id label createdAt lineItems status')
                 .populate('vendor', 'name')
                 .lean(),
-            Manufacturing.find({ $or: [{ sku: id }, { "lineItems.sku": id }], ...dateFilter })
-                .select('_id sku qty qtyDifference uom lotNumber label scheduledStart scheduledFinish createdAt lineItems labor totalCost packagingCost status')
-                .lean(),
-            SaleOrder.find({ "lineItems.sku": id, ...dateFilter })
-                .select('_id label createdAt shippedDate lineItems orderStatus')
-                .populate('clientId', 'name')
-                .lean(),
+            // ⚡ SaleOrder: Use aggregation to filter lineItems SERVER-SIDE (784KB → 136KB)
+            SaleOrder.aggregate([
+                { $match: { "lineItems.sku": skuOid, ...dateFilter } },
+                { $project: {
+                    _id: 1, label: 1, createdAt: 1, shippedDate: 1, orderStatus: 1,
+                    lineItems: {
+                        $filter: {
+                            input: '$lineItems',
+                            as: 'li',
+                            cond: { $eq: ['$$li.sku', skuOid] }
+                        }
+                    }
+                }}
+            ]),
             AuditAdjustment.find({ sku: id, ...dateFilter })
                 .select('_id createdAt reference lotNumber qty cost status')
                 .lean(),
@@ -102,19 +146,64 @@ export async function GET(
             })
                 .select('_id createdAt dateCompleted status lineItems website')
                 .lean(),
-            WebProduct.find({
-                $or: [
-                    { linkedSkuId: id },
-                    { 'variations.linkedSkuId': id },
-                    { 'linkedSkus.skuId': id },
-                    { 'variations.linkedSkus.skuId': id }
-                ]
-            })
-                .select('_id webId website multiplier variations.id variations._id variations.multiplier variations.linkedSkuId variations.linkedSkus linkedSkuId linkedSkus')
-                .lean()
         ]);
 
         const manufacturingJobs = rawManufacturingJobs as any[];
+
+        // Extract ingredient SKU IDs + webProduct IDs from first batch results
+        const ingredientSkuIds = new Set<string>();
+        ingredientSkuIds.add(id);
+        manufacturingJobs.forEach((job: any) => {
+            const jobSkuId = job.sku?._id || job.sku;
+            if (jobSkuId?.toString() === id) {
+                job.lineItems?.forEach((li: any) => {
+                    const liSkuId = (li.sku?._id || li.sku)?.toString();
+                    if (liSkuId) ingredientSkuIds.add(liSkuId);
+                });
+            }
+        });
+
+        const wpWebIds = (webProducts as any[]).map((wp: any) => wp.webId).filter(Boolean);
+        const wpWebsites = [...new Set((webProducts as any[]).map((wp: any) => wp.website).filter(Boolean))];
+
+        // ⚡ Second batch: ingredient costs + additional web orders (only if needed)
+        const needsIngredients = ingredientSkuIds.size > 1; // more than just the current SKU
+        const needsAdditionalWO = wpWebIds.length > 0;
+
+        const [ingObs, ingPos, additionalWebOrders] = (needsIngredients || needsAdditionalWO)
+            ? await Promise.all([
+                needsIngredients
+                    ? OpeningBalance.find({ sku: { $in: Array.from(ingredientSkuIds) } }).select('_id sku lotNumber cost').lean()
+                    : Promise.resolve([]),
+                needsIngredients
+                    ? (() => {
+                        const ingOids = Array.from(ingredientSkuIds).map(sid =>
+                            mongoose.Types.ObjectId.isValid(sid) ? new mongoose.Types.ObjectId(sid) : sid
+                        );
+                        return PurchaseOrder.aggregate([
+                            { $match: { "lineItems.sku": { $in: ingOids } } },
+                            { $project: {
+                                _id: 1,
+                                lineItems: {
+                                    $filter: {
+                                        input: '$lineItems',
+                                        as: 'li',
+                                        cond: { $in: ['$$li.sku', ingOids] }
+                                    }
+                                }
+                            }}
+                        ]);
+                    })()
+                    : Promise.resolve([]),
+                needsAdditionalWO
+                    ? WebOrder.find({
+                        "lineItems.productId": { $in: wpWebIds },
+                        website: { $in: wpWebsites },
+                        ...dateFilter
+                    }).select('_id createdAt dateCompleted status lineItems website').lean()
+                    : Promise.resolve([])
+            ])
+            : [[], [], []];
 
         // Build multiplier map
         const multiplierMap = new Map<string, number>();
@@ -127,25 +216,6 @@ export async function GET(
                 });
             }
         });
-
-        // Pass 0: Collect all SKUs involved as ingredients to fetch their definitive costs
-        const ingredientSkuIds = new Set<string>();
-        ingredientSkuIds.add(id); // Always include current SKU
-        manufacturingJobs.forEach((job: any) => {
-            const jobSkuId = job.sku?._id || job.sku;
-            // If this job produces our target SKU, we need its ingredients' costs
-            if (jobSkuId?.toString() === id) {
-                job.lineItems?.forEach((li: any) => {
-                    const liSkuId = (li.sku?._id || li.sku)?.toString();
-                    if (liSkuId) ingredientSkuIds.add(liSkuId);
-                });
-            }
-        });
-
-        const [ingObs, ingPos] = await Promise.all([
-            OpeningBalance.find({ sku: { $in: Array.from(ingredientSkuIds) } }).lean(),
-            PurchaseOrder.find({ "lineItems.sku": { $in: Array.from(ingredientSkuIds) } }).lean()
-        ]);
 
         // Initialize transaction list and definitive lot cost map
         let transactions: any[] = [];
@@ -402,23 +472,10 @@ export async function GET(
             });
         });
 
-        // Also find web orders whose products link to this SKU but weren't caught by the initial query
-        // (because linkedSkus isn't persisted on the WebOrder doc)
-        const wpWebIds = (webProducts as any[]).map((wp: any) => wp.webId).filter(Boolean);
-        const wpWebsites = [...new Set((webProducts as any[]).map((wp: any) => wp.website).filter(Boolean))];
-        let additionalWebOrders: any[] = [];
-        if (wpWebIds.length > 0) {
-            additionalWebOrders = await WebOrder.find({
-                "lineItems.productId": { $in: wpWebIds },
-                website: { $in: wpWebsites },
-                ...dateFilter
-            }).select('_id createdAt dateCompleted status lineItems website').lean();
-        }
-
-        // Merge all web orders (deduplicated by _id)
+        // Merge all web orders (deduplicated by _id) — additionalWebOrders already fetched in parallel above
         const allWebOrderMap = new Map<string, any>();
         (webOrders as any[]).forEach(wo => allWebOrderMap.set(wo._id.toString(), wo));
-        additionalWebOrders.forEach(wo => allWebOrderMap.set(wo._id.toString(), wo));
+        (additionalWebOrders as any[]).forEach(wo => allWebOrderMap.set(wo._id.toString(), wo));
         const allWebOrders = Array.from(allWebOrderMap.values());
 
         allWebOrders.forEach((wo: any) => {
@@ -608,14 +665,20 @@ export async function GET(
         else if (hasSales && hasConsumption) tier = 2;
         else if (!hasSales && hasConsumption) tier = 3;
 
-        return NextResponse.json({
+
+        const responseData = {
             sku: { ...sku, tier },
             transactions: filteredTransactions.reverse(),
             financials,
             totalCount: filteredTransactions.length,
             debugStartDate: startDate,
             settings: { missingSkuImage: settings?.value || '' }
-        });
+        };
+
+        // ⚡ Cache the response
+        ledgerCache.set(id, { data: responseData, timestamp: Date.now() });
+
+        return NextResponse.json(responseData);
 
     } catch (error: any) {
         console.error("Error fetching SKU ledger:", error);
