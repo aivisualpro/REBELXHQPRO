@@ -590,6 +590,7 @@ export default function WebOrderDetailPage() {
                                             <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">Variation</th>
                                             <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">Linked SKU</th>
                                             <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">Lot #</th>
+                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap text-right">multiX</th>
                                             <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap text-right">Qty</th>
                                             {isFieldVisibleCost && <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap text-right">Cost</th>}
                                             <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap text-right">Price</th>
@@ -666,6 +667,7 @@ export default function WebOrderDetailPage() {
                                                             )}
                                                         </div>
                                                     </td>
+                                                    <td className="px-3 py-2 text-right text-xs text-purple-500 font-mono font-bold">{skuRows.length === 1 ? (skuRows[0].multiplier || 1) : 1}</td>
                                                     <td className="px-3 py-2 text-right text-xs text-foreground font-mono font-bold">{item.quantity}</td>
                                                     {isFieldVisibleCost && <td className="px-3 py-2 text-right text-xs text-orange-500 font-mono font-bold whitespace-nowrap">{(skuRows[0]?.cost ?? item.cost ?? 0) > 0 ? formatCurrency(skuRows[0]?.cost ?? item.cost ?? 0) : '-'}</td>}
                                                     <td className="px-3 py-2 text-right text-xs text-foreground font-mono font-bold">{formatCurrency(item.price)}</td>
@@ -744,8 +746,9 @@ export default function WebOrderDetailPage() {
                                                                     </button>
                                                                 </div>
                                                             </td>
-                                                            {/* Qty and Cost on every row; Price/Total only on first row */}
-                                                            <td className="px-3 py-1.5 text-right text-xs text-foreground font-mono font-bold">{sku.multiplier || 1}</td>
+                                                            {/* multiX, Qty and Cost on every row; Price/Total only on first row */}
+                                                            <td className="px-3 py-1.5 text-right text-xs text-purple-500 font-mono font-bold">{sku.multiplier || 1}</td>
+                                                            {skuIdx === 0 && <td className="px-3 py-1.5 text-right text-xs text-foreground font-mono font-bold" rowSpan={rowSpan}>{item.quantity}</td>}
                                                             {isFieldVisibleCost && <td className="px-3 py-1.5 text-right text-xs text-orange-500 font-mono font-bold whitespace-nowrap">{(sku.cost ?? 0) > 0 ? formatCurrency(sku.cost!) : '-'}</td>}
                                                             {skuIdx === 0 && (
                                                                 <>
@@ -769,7 +772,7 @@ export default function WebOrderDetailPage() {
                                     {order.lineItems && order.lineItems.length > 0 && (
                                         <tfoot className="bg-secondary border-t border-border">
                                             <tr>
-                                                <td colSpan={4} className="px-3 py-2 text-xs font-black text-muted-foreground uppercase text-right">Subtotal</td>
+                                                <td colSpan={5} className="px-3 py-2 text-xs font-black text-muted-foreground uppercase text-right">Subtotal</td>
                                                 <td className="px-3 py-2 text-xs font-black text-foreground text-center">
                                                     {order.lineItems.reduce((sum, item) => sum + (item.quantity || 0), 0)}
                                                 </td>
