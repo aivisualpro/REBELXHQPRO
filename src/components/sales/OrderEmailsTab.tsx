@@ -161,36 +161,69 @@ export function OrderEmailsTab({ orderId, orderLabel, client }: OrderEmailsTabPr
     // ⚡ Poll for queued emails to update their status
     const startPolling = useCallback(() => {
         if (pollingRef.current) clearInterval(pollingRef.current);
-        pollingRef.current = setInterval(async () => {
-            const hasQueued = emails.some(e => e.status === 'queued');
-            if (!hasQueued) {
-                if (pollingRef.current) clearInterval(pollingRef.current);
-                pollingRef.current = null;
-                return;
-            }
+        const interval = setInterval(async () => {
             try {
                 const res = await fetch(`/api/sales/orders/${orderId}/emails`);
                 if (res.ok) {
                     const data = await res.json();
                     const serverEmails: EmailRecord[] = data.emails || [];
+                    
+                    let newlyDelivered = 0;
+                    let newlyFailed = 0;
+                    let lastError = '';
+
                     setEmails(prev => {
+                        let hasQueued = false;
+                        newlyDelivered = 0;
+                        newlyFailed = 0;
+                        
                         const updated = prev.map(e => {
                             if (e.status === 'queued') {
-                                const match = serverEmails.find(se => se._id === e._id);
+                                // Try to match by real _id if it was updated, otherwise match fallback by subject and time
+                                const match = serverEmails.find(se => 
+                                    se._id === e._id || 
+                                    (e._id.startsWith('optimistic-') && se.subject === e.subject && Math.abs(new Date(se.sentAt).getTime() - new Date(e.sentAt).getTime()) < 30000)
+                                );
+                                
                                 if (match && match.status !== 'queued') {
-                                    if (match.status === 'sent') toast.success('Email delivered successfully!', { icon: '✅' });
-                                    else if (match.status === 'failed') toast.error(`Email failed: ${match.errorMessage || 'Unknown error'}`);
+                                    if (match.status === 'sent' || match.status === 'delivered') {
+                                        newlyDelivered++;
+                                    } else if (match.status === 'failed' || match.status === 'bounced') {
+                                        newlyFailed++;
+                                        lastError = match.errorMessage || 'Unknown error';
+                                    }
                                     return match;
                                 }
+                                hasQueued = true;
+                                // Return the match if found but still queued, else e
+                                return match || e;
                             }
-                            return e;
+                            
+                            // Also sync any other status changes just in case
+                            const exist = serverEmails.find(se => se._id === e._id);
+                            return exist || e;
                         });
+
+                        if (!hasQueued && pollingRef.current) {
+                            clearInterval(pollingRef.current);
+                            pollingRef.current = null;
+                        }
+                        
                         return updated;
                     });
+
+                    // Trigger side-effects OUTSIDE the state updater
+                    if (newlyDelivered > 0) {
+                        toast.success('Email delivered successfully!', { icon: '✅' });
+                    }
+                    if (newlyFailed > 0) {
+                        toast.error(`Email failed: ${lastError || 'Unknown error'}`);
+                    }
                 }
             } catch { /* silently retry */ }
         }, 3000);
-    }, [emails, orderId]);
+        pollingRef.current = interval;
+    }, [orderId]);
 
     const openCompose = () => {
         const clientEmails = availableEmails();

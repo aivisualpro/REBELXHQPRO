@@ -48,6 +48,33 @@ export function getServiceAccountAuth() {
  * @param tableRows - Array of objects for line item rows
  * @returns Buffer containing the PDF
  */
+class Mutex {
+    private queue: Array<() => void> = [];
+    private locked = false;
+
+    async lock(): Promise<() => void> {
+        return new Promise((resolve) => {
+            if (!this.locked) {
+                this.locked = true;
+                resolve(() => this.unlock());
+            } else {
+                this.queue.push(() => resolve(() => this.unlock()));
+            }
+        });
+    }
+
+    private unlock() {
+        if (this.queue.length > 0) {
+            const next = this.queue.shift();
+            if (next) next();
+        } else {
+            this.locked = false;
+        }
+    }
+}
+
+const pdfMutex = new Mutex();
+
 export async function generatePdfFromTemplate(
     templateId: string,
     replacements: Record<string, string>,
@@ -57,14 +84,19 @@ export async function generatePdfFromTemplate(
     const drive = google.drive({ version: 'v3', auth });
     const docs = google.docs({ version: 'v1', auth });
 
-    // 1. Backup template as DOCX for safe restore after PDF export
-    const backupResponse = await drive.files.export(
-        { fileId: templateId, mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
-        { responseType: 'arraybuffer' }
-    );
-    const backupBuffer = Buffer.from(backupResponse.data as ArrayBuffer);
+    // Acquire lock to prevent concurrent requests from corrupting the single template document
+    const unlock = await pdfMutex.lock();
+
+    let backupBuffer: Buffer | null = null;
 
     try {
+        // 1. Backup template as DOCX for safe restore after PDF export
+        const backupResponse = await drive.files.export(
+            { fileId: templateId, mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+            { responseType: 'arraybuffer' }
+        );
+        backupBuffer = Buffer.from(backupResponse.data as ArrayBuffer);
+
         // 2. Handle line items: insert extra rows if more than 1 row of data
         if (tableRows && tableRows.length > 1) {
             const doc = await docs.documents.get({ documentId: templateId });
@@ -219,20 +251,25 @@ export async function generatePdfFromTemplate(
     } finally {
         // 6. ALWAYS restore template from DOCX backup (even if an error occurred)
         try {
-            const readable = new Readable();
-            readable.push(backupBuffer);
-            readable.push(null);
+            if (backupBuffer) {
+                const readable = new Readable();
+                readable.push(backupBuffer);
+                readable.push(null);
 
-            await drive.files.update({
-                fileId: templateId,
-                media: {
-                    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                    body: readable,
-                },
-            });
+                await drive.files.update({
+                    fileId: templateId,
+                    media: {
+                        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                        body: readable,
+                    },
+                });
+            }
         } catch (restoreErr) {
             console.error('CRITICAL: Failed to restore template from backup:', restoreErr);
         }
+        
+        // Release lock
+        unlock();
     }
 }
 

@@ -1290,8 +1290,7 @@ export default function SaleOrderDetailPage() {
 
                     {/* Tab Content */}
                     <div className="flex-1 overflow-auto">
-                        {activeTab === 'Line Items' && (
-                            <div className="animate-in fade-in duration-300">
+                        <div className={cn("animate-in fade-in duration-300", activeTab === 'Line Items' ? 'block' : 'hidden')}>
                                 <table className="w-full border-collapse text-left">
                                     <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
                                         <tr>
@@ -1389,10 +1388,8 @@ export default function SaleOrderDetailPage() {
                                     )}
                                 </table>
                             </div>
-                        )}
 
-                        {activeTab === 'Payments' && (
-                            <div className="animate-in fade-in duration-300">
+                        <div className={cn("animate-in fade-in duration-300", activeTab === 'Payments' ? 'block' : 'hidden')}>
                                 <table className="w-full border-collapse text-left">
                                     <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
                                         <tr>
@@ -1449,10 +1446,8 @@ export default function SaleOrderDetailPage() {
                                     )}
                                 </table>
                             </div>
-                        )}
 
-                        {activeTab === 'Notes' && (
-                            <div className="animate-in fade-in duration-300 p-4 space-y-3">
+                        <div className={cn("animate-in fade-in duration-300 p-4 space-y-3", activeTab === 'Notes' ? 'block' : 'hidden')}>
                                 {(!order.notes || order.notes.length === 0) ? (
                                     <div className="flex flex-col items-center justify-center py-12 text-center">
                                         <MessageSquare className="w-8 h-8 text-muted-foreground/30 mb-2" />
@@ -1516,15 +1511,14 @@ export default function SaleOrderDetailPage() {
                                     ))
                                 )}
                             </div>
-                        )}
 
-                        {activeTab === 'Emails' && (
+                        <div className={cn("h-full overflow-hidden", activeTab === 'Emails' ? 'block' : 'hidden')}>
                             <OrderEmailsTab
                                 orderId={order._id}
                                 orderLabel={order.label}
                                 client={typeof order.clientId === 'object' && order.clientId ? order.clientId as any : null}
                             />
-                        )}
+                        </div>
                     </div>
                 </div>
             </div>
