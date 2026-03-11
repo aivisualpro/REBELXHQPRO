@@ -27,6 +27,10 @@ const cleanLot = (lot: any): string => {
     return s;
 };
 
+// ⚡ In-memory cache for lot costs (60s TTL)
+const LOT_COST_CACHE_TTL = 60_000;
+const lotCostCache = new Map<string, { data: Map<string, number>; timestamp: number }>();
+
 /**
  * Get a map of lotNumber → cost for a given SKU.
  * Uses the same cost derivation as the SKU ledger:
@@ -37,6 +41,12 @@ const cleanLot = (lot: any): string => {
  */
 export async function getLotsWithCost(skuId: string): Promise<Map<string, number>> {
     if (!skuId) return new Map();
+
+    // Check cache
+    const cached = lotCostCache.get(skuId);
+    if (cached && (Date.now() - cached.timestamp) < LOT_COST_CACHE_TTL) {
+        return cached.data;
+    }
 
     await dbConnect();
 
@@ -164,6 +174,9 @@ export async function getLotsWithCost(skuId: string): Promise<Map<string, number
             lotCosts.set(lot, adj.cost);
         }
     });
+
+    // Cache the result
+    lotCostCache.set(skuId, { data: lotCosts, timestamp: Date.now() });
 
     return lotCosts;
 }

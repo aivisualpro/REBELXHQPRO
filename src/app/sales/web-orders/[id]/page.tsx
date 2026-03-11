@@ -113,8 +113,7 @@ interface WebOrder {
     metaData?: any[];
 }
 
-const TABS = ['Line Items', 'Meta Data', 'Coupons', 'Refunds'] as const;
-type TabType = typeof TABS[number];
+
 
 export default function WebOrderDetailPage() {
     const params = useParams();
@@ -123,7 +122,6 @@ export default function WebOrderDetailPage() {
 
     const [order, setOrder] = useState<WebOrder | null>(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<TabType>('Line Items');
     const [headerPortal, setHeaderPortal] = useState<HTMLElement | null>(null);
 
     const { isFieldVisible } = usePermissions();
@@ -343,13 +341,7 @@ export default function WebOrderDetailPage() {
     const subtotal = order.lineItems?.reduce((sum, item) => sum + (item.total || 0), 0) || 0;
     const totalCost = isFieldVisibleCost ? (order.lineItems?.reduce((sum, item) => sum + ((item.cost || 0) * (item.quantity || 0)), 0) || 0) : 0;
 
-    // Tab counts
-    const tabCounts: Record<TabType, number> = {
-        'Line Items': order.lineItems?.length || 0,
-        'Meta Data': order.metaData?.length || 0,
-        'Coupons': order.couponLines?.length || 0,
-        'Refunds': order.refunds?.length || 0,
-    };
+
 
     return (
         <div className="flex flex-col h-[calc(100vh-48px)] bg-background relative">
@@ -363,11 +355,11 @@ export default function WebOrderDetailPage() {
                         <div className="px-4 pt-4 pb-4">
                             <div className="flex items-stretch border border-border overflow-hidden">
                                 {/* Order # */}
-                                <div className="w-20 bg-amber-500 flex items-center justify-center shrink-0">
+                                <div className="w-20 bg-amber-500 flex items-center justify-center shrink-0 py-2.5">
                                     <span className="text-sm font-black text-white font-mono">#{order.number}</span>
                                 </div>
                                 {/* Customer Name */}
-                                <div className="flex-1 bg-emerald-500 flex items-center justify-center px-3 min-w-0">
+                                <div className="flex-1 bg-emerald-500 flex items-center justify-center px-3 py-2.5 min-w-0">
                                     <span className="text-sm font-black text-white leading-tight text-center line-clamp-2">
                                         {order.billing?.firstName} {order.billing?.lastName}
                                     </span>
@@ -550,42 +542,26 @@ export default function WebOrderDetailPage() {
                     </div>
                 </div>
 
-                {/* Right Content: Tabs (70%) */}
+                {/* Right Content: Line Items (70%) */}
                 <div className="w-[70%] bg-background flex flex-col overflow-hidden">
-                    {/* Tabs & Actions */}
+                    {/* Header */}
                     <div className="px-4 border-b border-border shrink-0 flex items-center justify-between bg-background z-10 h-9">
-                        <div className="flex space-x-1 h-full">
-                            {TABS.map(tab => (
-                                <button
-                                    key={tab}
-                                    onClick={() => setActiveTab(tab)}
-                                    className={cn(
-                                        "px-4 text-[10px] font-black uppercase tracking-widest transition-colors border-b-2 -mb-px outline-none flex items-center space-x-1.5",
-                                        activeTab === tab
-                                            ? "text-foreground border-foreground"
-                                            : "text-muted-foreground border-transparent hover:text-foreground"
-                                    )}
-                                >
-                                    <span>{tab}</span>
-                                    <span className={cn(
-                                        "px-1.5 py-0.5 rounded-none text-[9px] font-bold",
-                                        activeTab === tab ? "bg-foreground text-background" : "bg-secondary text-muted-foreground"
-                                    )}>
-                                        {tabCounts[tab]}
-                                    </span>
-                                </button>
-                            ))}
+                        <div className="flex items-center space-x-2 h-full">
+                            <span className="px-4 text-[10px] font-black uppercase tracking-widest text-foreground border-b-2 border-foreground -mb-px flex items-center space-x-1.5 h-full">
+                                <span>Line Items</span>
+                                <span className="px-1.5 py-0.5 rounded-none text-[9px] font-bold bg-foreground text-background">
+                                    {order.lineItems?.length || 0}
+                                </span>
+                            </span>
                         </div>
                     </div>
 
-                    {/* Tab Content */}
+                    {/* Line Items Content */}
                     <div className="flex-1 overflow-auto">
-                        {/* Line Items Tab */}
-                        {activeTab === 'Line Items' && (
-                            <div className="animate-in fade-in duration-300">
-                                <table className="w-full border-collapse text-left">
-                                    <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
-                                        <tr>
+                        <div>
+                            <table className="w-full border-collapse text-left">
+                                <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
+                                    <tr>
                                             <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">Product</th>
                                             <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">Variation</th>
                                             <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">Linked SKU</th>
@@ -784,118 +760,7 @@ export default function WebOrderDetailPage() {
                                     )}
                                 </table>
                             </div>
-                        )}
 
-                        {/* Meta Data Tab */}
-                        {activeTab === 'Meta Data' && (
-                            <div className="animate-in fade-in duration-300">
-                                <table className="w-full border-collapse text-left">
-                                    <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
-                                        <tr>
-                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest w-[60px]">#</th>
-                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest w-[200px]">Key</th>
-                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Value</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-border">
-                                        {order.metaData?.map((meta: any, idx: number) => (
-                                            <tr key={idx} className="hover:bg-secondary/50 transition-colors">
-                                                <td className="px-3 py-2 text-xs font-mono text-muted-foreground font-bold">{idx + 1}</td>
-                                                <td className="px-3 py-2 text-xs font-mono text-foreground font-bold">{meta.key}</td>
-                                                <td className="px-3 py-2 text-xs text-foreground max-w-[400px] truncate font-bold">
-                                                    {typeof meta.value === 'object' ? JSON.stringify(meta.value) : String(meta.value)}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                        {(!order.metaData || order.metaData.length === 0) && (
-                                            <tr>
-                                                <td colSpan={3} className="px-3 py-6 text-center text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                                                    No meta data found
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-
-                        {/* Coupons Tab */}
-                        {activeTab === 'Coupons' && (
-                            <div className="animate-in fade-in duration-300">
-                                <table className="w-full border-collapse text-left">
-                                    <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
-                                        <tr>
-                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest w-[60px]">#</th>
-                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Code</th>
-                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right w-[120px]">Discount</th>
-                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right w-[120px]">Discount Tax</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-border">
-                                        {order.couponLines?.map((coupon: any, idx: number) => (
-                                            <tr key={idx} className="hover:bg-secondary/50 transition-colors">
-                                                <td className="px-3 py-2 text-xs font-mono text-muted-foreground font-bold">{idx + 1}</td>
-                                                <td className="px-3 py-2">
-                                                    <span className="px-2 py-0.5 bg-purple-500/15 text-purple-400 border border-purple-500/30 text-xs font-bold uppercase">
-                                                        {coupon.code}
-                                                    </span>
-                                                </td>
-                                                <td className="px-3 py-2 text-right text-xs font-mono font-black text-emerald-500">
-                                                    -${parseFloat(coupon.discount || 0).toFixed(2)}
-                                                </td>
-                                                <td className="px-3 py-2 text-right text-xs font-mono font-bold text-foreground">
-                                                    ${parseFloat(coupon.discount_tax || coupon.discountTax || 0).toFixed(2)}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                        {(!order.couponLines || order.couponLines.length === 0) && (
-                                            <tr>
-                                                <td colSpan={4} className="px-3 py-6 text-center text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                                                    No coupons applied
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-
-                        {/* Refunds Tab */}
-                        {activeTab === 'Refunds' && (
-                            <div className="animate-in fade-in duration-300">
-                                <table className="w-full border-collapse text-left">
-                                    <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
-                                        <tr>
-                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest w-[80px]">ID</th>
-                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Reason</th>
-                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest w-[150px]">Date</th>
-                                            <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right w-[120px]">Amount</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-border">
-                                        {order.refunds?.map((refund: any, idx: number) => (
-                                            <tr key={idx} className="hover:bg-rose-500/5 transition-colors">
-                                                <td className="px-3 py-2 text-xs font-mono text-foreground font-bold">#{refund.id}</td>
-                                                <td className="px-3 py-2 text-xs text-foreground font-bold">{refund.reason || '-'}</td>
-                                                <td className="px-3 py-2 text-xs font-mono text-foreground font-bold">
-                                                    {refund.date_created ? new Date(refund.date_created).toLocaleString() : '-'}
-                                                </td>
-                                                <td className="px-3 py-2 text-right text-xs font-mono font-black text-rose-500">
-                                                    -${Math.abs(parseFloat(refund.total || 0)).toFixed(2)}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                        {(!order.refunds || order.refunds.length === 0) && (
-                                            <tr>
-                                                <td colSpan={4} className="px-3 py-6 text-center text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                                                    No refunds found
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
                     </div>
                 </div>
             </div>

@@ -46,6 +46,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     const [isSyncing, setIsSyncing] = useState(false);
     const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const isSyncingRef = useRef(false); // ⚡ Ref to avoid re-creating triggerSync on state change
 
     // Fetch notifications from API
     const fetchNotifications = useCallback(async () => {
@@ -97,8 +98,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     }, [unreadByCategory]);
 
     // Trigger incremental web orders sync
+    // ⚡ Uses ref for isSyncing to keep this callback stable (no re-creation on state change)
     const triggerSync = useCallback(async () => {
-        if (isSyncing) return;
+        if (isSyncingRef.current) return;
+        isSyncingRef.current = true;
         setIsSyncing(true);
         try {
             const res = await fetch('/api/retail/web-orders/sync', { method: 'POST' });
@@ -111,6 +114,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                         if (statusRes.ok) {
                             const status = await statusRes.json();
                             if (!status.isSyncing) {
+                                isSyncingRef.current = false;
                                 setIsSyncing(false);
                                 // Refresh notifications after sync completes
                                 setTimeout(() => fetchNotifications(), 1000);
@@ -123,13 +127,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                 };
                 setTimeout(checkCompletion, 3000);
             } else {
+                isSyncingRef.current = false;
                 setIsSyncing(false);
             }
         } catch (e) {
             console.error('Failed to trigger sync:', e);
+            isSyncingRef.current = false;
             setIsSyncing(false);
         }
-    }, [isSyncing, fetchNotifications]);
+    }, [fetchNotifications]); // ⚡ No dependency on isSyncing — uses ref instead
 
     // Initial load
     useEffect(() => {
@@ -144,14 +150,22 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         };
     }, [fetchNotifications]);
 
-    // Auto-sync web orders every 30 minutes
+    // ⚡ Auto-sync web orders: initial sync 10s after mount + every 30 minutes
     useEffect(() => {
+        // Run an initial sync shortly after app loads
+        const initialSyncTimeout = setTimeout(() => {
+            console.log('🔄 Auto-sync: Initial web orders sync...');
+            triggerSync();
+        }, 10_000); // 10 seconds after mount
+
+        // Then repeat every 30 minutes
         syncIntervalRef.current = setInterval(() => {
-            console.log('🔄 Auto-sync: Triggering incremental web orders sync...');
+            console.log('🔄 Auto-sync: Scheduled 30-min web orders sync...');
             triggerSync();
         }, AUTO_SYNC_INTERVAL);
 
         return () => {
+            clearTimeout(initialSyncTimeout);
             if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
         };
     }, [triggerSync]);

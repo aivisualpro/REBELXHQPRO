@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import WebOrder from '@/models/WebOrder';
 import WebProduct from '@/models/WebProduct';
@@ -6,6 +6,10 @@ import Sku from '@/models/Sku';
 import { getLotsWithCost } from '@/lib/lot-cost';
 
 export const dynamic = 'force-dynamic';
+
+// ⚡ In-memory cache for web order detail responses (30s TTL)
+const CACHE_TTL = 30_000;
+const orderDetailCache = new Map<string, { data: any; timestamp: number }>();
 
 // Helper: get linked SKUs array, normalizing legacy single-link format
 function getLinkedSkusFromDoc(doc: any): { skuId: string; multiplier: number }[] {
@@ -15,18 +19,28 @@ function getLinkedSkusFromDoc(doc: any): { skuId: string; multiplier: number }[]
 }
 
 export async function GET(
-    request: Request,
+    request: NextRequest,
     props: { params: Promise<{ id: string }> }
 ) {
     try {
+        const params = await props.params;
+        const { id } = params;
+
+        // ⚡ Check in-memory cache first
+        const bustCache = new URL(request.url).searchParams.get('bust') === '1';
+        const cached = orderDetailCache.get(id);
+        if (!bustCache && cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
+            return NextResponse.json(cached.data);
+        }
+
         await dbConnect();
         // Ensure models are registered
         void Sku;
 
-        const params = await props.params;
-        const { id } = params;
-
-        const order = await WebOrder.findById(id).lean() as any;
+        // Exclude heavy unused fields (Meta Data, Coupons, Refunds tabs removed)
+        const order = await WebOrder.findById(id)
+            .select('-metaData -couponLines -refunds -feeLines -taxLines')
+            .lean() as any;
 
         if (!order) {
             return NextResponse.json({ error: 'Order not found' }, { status: 404 });
@@ -40,30 +54,31 @@ export async function GET(
                 .filter(Boolean)
         )];
 
-        const productWpMap = new Map<string, any>();
-        if (webProductIds.length > 0) {
-            const webProducts = await WebProduct.find({ _id: { $in: webProductIds } })
-                .select('variations multiplier linkedSkuId linkedSkus webId')
-                .lean();
-            webProducts.forEach((wp: any) => productWpMap.set(wp._id.toString(), wp));
-        }
-
-        // Also collect webProduct by webId (productId on line items) for items without webProductId
-        const productIdToWpMap = new Map<number, any>();
+        // Collect productIds for items without webProductId
         const unmatchedProductIds = [...new Set(
             order.lineItems
                 .filter((item: any) => !item.webProductId && !item.parentProductId && item.productId)
                 .map((item: any) => item.productId)
         )];
-        if (unmatchedProductIds.length > 0) {
-            const moreProd = await WebProduct.find({ webId: { $in: unmatchedProductIds }, website: order.website })
-                .select('variations multiplier linkedSkuId linkedSkus webId')
-                .lean();
-            moreProd.forEach((wp: any) => {
-                productIdToWpMap.set(wp.webId, wp);
-                productWpMap.set(wp._id.toString(), wp);
-            });
-        }
+
+        // ⚡ Fire BOTH WebProduct queries in parallel
+        const wpSelect = 'variations multiplier linkedSkuId linkedSkus webId';
+        const [webProductsById, webProductsByWebId] = await Promise.all([
+            webProductIds.length > 0
+                ? WebProduct.find({ _id: { $in: webProductIds } }).select(wpSelect).lean()
+                : Promise.resolve([]),
+            unmatchedProductIds.length > 0
+                ? WebProduct.find({ webId: { $in: unmatchedProductIds }, website: order.website }).select(wpSelect).lean()
+                : Promise.resolve([]),
+        ]);
+
+        const productWpMap = new Map<string, any>();
+        const productIdToWpMap = new Map<number, any>();
+        (webProductsById as any[]).forEach((wp: any) => productWpMap.set(wp._id.toString(), wp));
+        (webProductsByWebId as any[]).forEach((wp: any) => {
+            productIdToWpMap.set(wp.webId, wp);
+            productWpMap.set(wp._id.toString(), wp);
+        });
 
         // ─── 2. Enrich each line item with linked SKUs from WebProduct ────
         const multiplierMap = new Map<string, number>();
@@ -225,6 +240,9 @@ export async function GET(
             return enriched;
         });
 
+        // ⚡ Cache the response
+        orderDetailCache.set(id, { data: order, timestamp: Date.now() });
+
         return NextResponse.json(order);
 
     } catch (error: any) {
@@ -251,6 +269,9 @@ export async function PATCH(
         if (!updatedOrder) {
             return NextResponse.json({ error: 'Order not found' }, { status: 404 });
         }
+
+        // ⚡ Invalidate cache on mutation
+        orderDetailCache.delete(id);
 
         return NextResponse.json(updatedOrder);
 
