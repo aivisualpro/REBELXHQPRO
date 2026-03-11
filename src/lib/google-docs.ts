@@ -112,7 +112,12 @@ export async function generatePdfFromTemplate(
                     if (rows.length < 2) continue;
 
                     const templateRowIndex = rows.length - 1;
-                    const tableStartIndex = element.startIndex!;
+                    // startIndex can be undefined for the very first body element; skip if missing
+                    const tableStartIndex = element.startIndex ?? element.table.tableRows?.[0]?.tableCells?.[0]?.content?.[0]?.startIndex;
+                    if (tableStartIndex == null) {
+                        console.warn('Could not determine table start index, skipping row insertion');
+                        continue;
+                    }
 
                     // Insert extra empty rows below the template row
                     const insertRequests: any[] = [];
