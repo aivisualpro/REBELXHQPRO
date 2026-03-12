@@ -39,10 +39,11 @@ export async function GET(
 
         const session = await getServerSession(authOptions);
         const isSuperAdmin = (session?.user as any)?.role === 'SuperAdmin';
+        const isOwnProfile = (session?.user as any)?.profileId === id || (session?.user as any)?.id === id || (session?.user as any)?._id === id;
 
-        // SuperAdmin can see password, others cannot
+        // SuperAdmin or the user themselves can see the password
         const { googleRefreshToken, googleAccessToken, ...userData } = user as any;
-        if (!isSuperAdmin) {
+        if (!isSuperAdmin && !isOwnProfile) {
             const { password, ...safeUser } = userData;
             return NextResponse.json(safeUser);
         }

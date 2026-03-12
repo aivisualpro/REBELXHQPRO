@@ -323,8 +323,8 @@ export default function UserProfilePage() {
                                     <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-1", isDark ? "text-slate-500" : "text-slate-400")}>Phone</p>
                                     <p className={cn("text-sm font-semibold", isDark ? "text-white" : "text-slate-900")}>{user.phone || '—'}</p>
                                 </div>
-                                {/* Password (SuperAdmin only) */}
-                                {isSuperAdmin && user.password && (
+                                {/* Password (SuperAdmin or Own Profile) */}
+                                {(isSuperAdmin || isOwnProfile) && user.password && (
                                     <div>
                                         <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-1", isDark ? "text-slate-500" : "text-slate-400")}>Password</p>
                                         <div className="flex items-center gap-2">
