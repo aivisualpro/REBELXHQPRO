@@ -33,7 +33,7 @@ export async function GET(request: Request) {
                 const matchedSkus = await db.collection('skus').find(
                     { name: { $regex: fuzzyRegex, $options: 'i' } },
                     { projection: { _id: 1 } }
-                ).toArray();
+                ).limit(150).toArray();
                 // Include both string and ObjectId forms for cross-type matching
                 matchedSkus.forEach(s => {
                     matchingSkuIds.push(s._id);

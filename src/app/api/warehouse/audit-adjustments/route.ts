@@ -27,34 +27,32 @@ export async function GET(request: Request) {
         if (filterId) {
             query._id = filterId;
         }
-
         if (search) {
             const tokens = search.trim().split(/\s+/).filter(Boolean);
             if (tokens.length > 0) {
-                // For each token, find SKUs matching that specific token
-                // This ensures ALL tokens must match (AND logic), not just any one
-                const escRx = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const { buildFuzzyRegex } = require('@/lib/fuzzy-search');
 
                 const andConditions = await Promise.all(tokens.map(async (token) => {
-                    const escaped = escRx(token);
-                    const patterns: string[] = [escaped];
-                    if (token.length >= 4) patterns.push(escRx(token.slice(0, -1)));
-                    if (token.length >= 6) patterns.push(escRx(token.slice(0, -2)));
-                    const tokenPattern = [...new Set(patterns)].join('|');
+                    const fuzzyPattern = buildFuzzyRegex(token);
 
-                    // Find SKUs matching THIS token only
-                    const tokenSkus = await Sku.find({ name: { $regex: tokenPattern, $options: 'i' } }).select('_id legacyId').lean();
+                    // Fetch skus matching THIS token only, limited to 150
+                    const tokenSkus = await Sku.find(
+                        { name: { $regex: fuzzyPattern, $options: 'i' } },
+                        { _id: 1, legacyId: 1 }
+                    ).limit(150).lean();
+
                     const tokenSkuIds = tokenSkus.map(s => s._id.toString());
                     const tokenLegacyIds = tokenSkus.map((s: any) => s.legacyId).filter(Boolean);
+                    const allTokenSkuIds = [...tokenSkuIds, ...tokenLegacyIds];
 
                     const fieldMatches = ['lotNumber', 'reason', 'createdBy'].map(field => ({
-                        [field]: { $regex: tokenPattern, $options: 'i' }
+                        [field]: { $regex: fuzzyPattern, $options: 'i' }
                     }));
 
                     return {
                         $or: [
                             ...fieldMatches,
-                            ...(tokenSkuIds.length > 0 ? [{ sku: { $in: [...tokenSkuIds, ...tokenLegacyIds] } }] : [])
+                            ...(allTokenSkuIds.length > 0 ? [{ sku: { $in: allTokenSkuIds } }] : [])
                         ]
                     };
                 }));
