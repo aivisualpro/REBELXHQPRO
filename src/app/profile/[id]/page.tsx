@@ -7,12 +7,14 @@ import {
     User, Mail, Phone, Building, Shield, Clock, Globe, Check,
     DollarSign, Activity, ChevronRight, Lock, Eye, EyeOff,
     Briefcase, LayoutDashboard, Zap, ArrowUpRight, Sparkles,
-    Calendar, TrendingUp, Target, Award, Coffee, MapPin
+    Calendar, TrendingUp, Target, Award, Coffee, MapPin,
+    RefreshCw, X, Key
 } from 'lucide-react';
 import Image from 'next/image';
 import { cn, formatDate } from '@/lib/utils';
 import { useTheme } from '@/components/ThemeProvider';
 import { usePermissions } from '@/hooks/usePermissions';
+import toast from 'react-hot-toast';
 
 // ─── Quick Link Card ──────────────────────────────────────────────────────────
 
@@ -60,6 +62,49 @@ export default function UserProfilePage() {
     const [workspaces, setWorkspaces] = useState<{ _id: string; name: string; color: string }[]>([]);
     const [currentTime, setCurrentTime] = useState(new Date());
     const [showPassword, setShowPassword] = useState(false);
+
+    // Password Reset State
+    const [resetModalOpen, setResetModalOpen] = useState(false);
+    const [newPassword, setNewPassword] = useState('');
+    const [isResetting, setIsResetting] = useState(false);
+
+    const generatePassword = () => {
+        const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+';
+        let pass = '';
+        for (let i = 0; i < 12; i++) {
+            pass += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        setNewPassword(pass);
+    };
+
+    const handlePasswordReset = async () => {
+        if (!newPassword.trim()) {
+            toast.error('Password cannot be empty');
+            return;
+        }
+        setIsResetting(true);
+        try {
+            const res = await fetch(`/api/users/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: newPassword })
+            });
+            if (res.ok) {
+                toast.success('Password updated successfully');
+                setResetModalOpen(false);
+                setNewPassword('');
+                const updatedUser = await res.json();
+                setUser(updatedUser);
+            } else {
+                const err = await res.json();
+                toast.error(err.error || 'Failed to update password');
+            }
+        } catch (error) {
+            toast.error('Failed to update password');
+        } finally {
+            setIsResetting(false);
+        }
+    };
 
     const isSuperAdmin = (session?.user as any)?.role === 'SuperAdmin';
     const isOwnProfile = (session?.user as any)?.profileId === id || (session?.user as any)?.id === id;
@@ -292,6 +337,26 @@ export default function UserProfilePage() {
                                         </div>
                                     </div>
                                 )}
+                                
+                                {/* Reset Password Option */}
+                                {(isSuperAdmin || isOwnProfile) && (
+                                    <div className="pt-2 border-t border-slate-200 dark:border-slate-700/50 mt-4">
+                                        <button
+                                            onClick={() => {
+                                                setNewPassword('');
+                                                setResetModalOpen(true);
+                                            }}
+                                            className={cn(
+                                                "w-full py-2 px-4 rounded-xl flex items-center justify-center gap-2 text-sm font-bold transition-all border cursor-pointer",
+                                                isDark
+                                                    ? "bg-slate-700/50 hover:bg-slate-700 border-slate-600 text-white"
+                                                    : "bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-800"
+                                            )}
+                                        >
+                                            <Key className="w-4 h-4" /> Reset Password
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -401,6 +466,82 @@ export default function UserProfilePage() {
                     <div className="h-4" />
                 </div>
             </div>
+
+            {/* Password Reset Modal */}
+            {resetModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !isResetting && setResetModalOpen(false)} />
+                    <div className={cn(
+                        "relative w-full max-w-md rounded-2xl p-6 shadow-2xl overflow-hidden",
+                        isDark ? "bg-slate-800 border border-slate-700" : "bg-white border border-slate-200"
+                    )}>
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className={cn("text-xl font-bold", isDark ? "text-white" : "text-slate-900")}>Reset Password</h2>
+                            <button onClick={() => setResetModalOpen(false)} className="text-muted-foreground hover:text-foreground cursor-pointer">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="space-y-4">
+                            <div>
+                                <label className={cn("block text-xs font-bold uppercase tracking-widest mb-1.5", isDark ? "text-slate-400" : "text-slate-500")}>
+                                    New Password
+                                </label>
+                                <div className="relative">
+                                    <input
+                                        type={showPassword ? "text" : "password"}
+                                        value={newPassword}
+                                        onChange={(e) => setNewPassword(e.target.value)}
+                                        className={cn(
+                                            "w-full px-4 py-2.5 rounded-xl border focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm font-mono",
+                                            isDark
+                                                ? "bg-slate-900/50 border-slate-700 text-white"
+                                                : "bg-slate-50 border-slate-200 text-slate-900"
+                                        )}
+                                        placeholder="Enter new password"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                                    >
+                                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                    </button>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={generatePassword}
+                                className={cn(
+                                    "flex items-center gap-2 text-xs font-bold uppercase tracking-wider cursor-pointer transition-colors",
+                                    isDark ? "text-blue-400 hover:text-blue-300" : "text-blue-600 hover:text-blue-700"
+                                )}
+                            >
+                                <RefreshCw className="w-3.5 h-3.5" /> Generate Secure Password
+                            </button>
+                            <div className="pt-4 flex justify-end gap-3 mt-6">
+                                <button
+                                    onClick={() => setResetModalOpen(false)}
+                                    disabled={isResetting}
+                                    className={cn(
+                                        "px-4 py-2 rounded-xl text-sm font-bold transition-all cursor-pointer",
+                                        isDark ? "hover:bg-slate-700 text-slate-300" : "hover:bg-slate-100 text-slate-600"
+                                    )}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handlePasswordReset}
+                                    disabled={!newPassword.trim() || isResetting}
+                                    className="px-6 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-bold shadow-md hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+                                >
+                                    {isResetting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                                    {isResetting ? 'Saving...' : 'Save Password'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

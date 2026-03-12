@@ -378,6 +378,18 @@ export const MODULE_BLUEPRINTS: ModuleBlueprint[] = [
                     { field: 'forecasts', label: 'Forecasts' },
                 ],
             },
+            {
+                key: 'waiting-on-lot',
+                label: 'Waiting on Lot',
+                route: '/reports/waiting-on-lot',
+                fields: [],
+            },
+            {
+                key: 'missing-cost',
+                label: 'Missing Cost',
+                route: '/reports/missing-cost',
+                fields: [],
+            },
         ],
     },
     {
