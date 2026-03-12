@@ -10,6 +10,7 @@ import Papa from 'papaparse';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { confirmDeleteToast } from '@/lib/confirmToast';
+import { usePermissions } from '@/hooks/usePermissions';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -55,16 +56,20 @@ const COLUMNS = [
 
 // ─── Skeleton Row ────────────────────────────────────────────────────────────
 
-function UserSkeletonRow({ index }: { index: number }) {
+function UserSkeletonRow({ index, visibleColumnKeys = COLUMNS.map(c => c.key) }: { index: number, visibleColumnKeys?: string[] }) {
   return (
     <tr className="border-b border-border/30">
-      {COLUMNS.map(col => (
-        <td key={col.key} className={cn('px-2.5 py-2.5', col.width)}>
-          <div className={cn('h-3.5 rounded-sm bg-secondary/80 animate-pulse',
-            col.key === 'firstName' ? 'w-4/5' : col.key === 'email' ? 'w-3/4' : 'w-3/5'
-          )} style={{ animationDelay: `${index * 30}ms` }} />
-        </td>
-      ))}
+      {visibleColumnKeys.map(key => {
+        const col = COLUMNS.find(c => c.key === key);
+        if (!col) return null;
+        return (
+          <td key={col.key} className={cn('px-2.5 py-2.5', col.width)}>
+            <div className={cn('h-3.5 rounded-sm bg-secondary/80 animate-pulse',
+              col.key === 'firstName' ? 'w-4/5' : col.key === 'email' ? 'w-3/4' : 'w-3/5'
+            )} style={{ animationDelay: `${index * 30}ms` }} />
+          </td>
+        );
+      })}
       <td className="w-[60px] px-2.5 py-2.5"><div className="h-3.5 w-8 mx-auto rounded-sm bg-secondary/80 animate-pulse" style={{ animationDelay: `${index * 30}ms` }} /></td>
     </tr>
   );
@@ -87,8 +92,8 @@ function UserStatusBadge({ status }: { status: string }) {
 // ─── Table Row ───────────────────────────────────────────────────────────────
 
 const UserTableRow = React.memo(function UserTableRow({
-  user, onClick, onEdit, onDelete, highlight, workspaces
-}: { user: User; onClick: () => void; onEdit: () => void; onDelete: () => void; highlight?: boolean; workspaces: { _id: string; name: string }[] }) {
+  user, onClick, onEdit, onDelete, highlight, workspaces, visibleColumnKeys
+}: { user: User; onClick: () => void; onEdit: () => void; onDelete: () => void; highlight?: boolean; workspaces: { _id: string; name: string }[], visibleColumnKeys: string[] }) {
   const wsName = workspaces.find(w => w._id === (user as any).workspaceId)?.name;
   return (
     <tr data-user-id={user._id}
@@ -98,33 +103,35 @@ const UserTableRow = React.memo(function UserTableRow({
       )}
       onClick={onClick}>
       {/* Name + Avatar */}
-      <td className="px-2.5 py-2.5 w-[200px]">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 bg-secondary border border-border rounded flex items-center justify-center overflow-hidden shrink-0">
-            {user.profileImage ? (
-              <img src={user.profileImage} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <span className="text-[9px] font-black text-muted-foreground uppercase">{user.firstName?.[0]}{user.lastName?.[0]}</span>
-            )}
+      {visibleColumnKeys.includes('firstName') && (
+        <td className="px-2.5 py-2.5 w-[200px]">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 bg-secondary border border-border rounded flex items-center justify-center overflow-hidden shrink-0">
+              {user.profileImage ? (
+                <img src={user.profileImage} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-[9px] font-black text-muted-foreground uppercase">{user.firstName?.[0]}{user.lastName?.[0]}</span>
+              )}
+            </div>
+            <span className="text-[12px] font-semibold text-foreground/90 group-hover:text-foreground transition-colors truncate">
+              {user.firstName} {user.lastName}
+            </span>
           </div>
-          <span className="text-[12px] font-semibold text-foreground/90 group-hover:text-foreground transition-colors truncate">
-            {user.firstName} {user.lastName}
-          </span>
-        </div>
-      </td>
-      <td className="px-2.5 py-2.5 w-[140px] text-[11px] uppercase font-bold text-foreground/60">{user.role}</td>
-      <td className="px-2.5 py-2.5 w-[120px] text-[11px] uppercase font-bold text-foreground/50 tracking-tight">{user.department === 'SUPERADMIN' ? 'Admin' : user.department}</td>
-      <td className="px-2.5 py-2.5 w-[120px] text-[11px] font-semibold text-foreground/60 truncate">{wsName || <span className="text-muted-foreground/30">—</span>}</td>
-      <td className="px-2.5 py-2.5 w-[220px] text-[12px] text-foreground/70 truncate">
+        </td>
+      )}
+      {visibleColumnKeys.includes('role') && <td className="px-2.5 py-2.5 w-[140px] text-[11px] uppercase font-bold text-foreground/60">{user.role}</td>}
+      {visibleColumnKeys.includes('department') && <td className="px-2.5 py-2.5 w-[120px] text-[11px] uppercase font-bold text-foreground/50 tracking-tight">{user.department === 'SUPERADMIN' ? 'Admin' : user.department}</td>}
+      {visibleColumnKeys.includes('workspace') && <td className="px-2.5 py-2.5 w-[120px] text-[11px] font-semibold text-foreground/60 truncate">{wsName || <span className="text-muted-foreground/30">—</span>}</td>}
+      {visibleColumnKeys.includes('email') && <td className="px-2.5 py-2.5 w-[220px] text-[12px] text-foreground/70 truncate">
         <div className="flex items-center gap-1.5"><Mail className="w-3 h-3 text-muted-foreground/40 shrink-0" /><span className="truncate">{user.email}</span></div>
-      </td>
-      <td className="px-2.5 py-2.5 w-[120px] text-[12px] text-foreground/70 font-mono">
+      </td>}
+      {visibleColumnKeys.includes('phone') && <td className="px-2.5 py-2.5 w-[120px] text-[12px] text-foreground/70 font-mono">
         <div className="flex items-center gap-1.5"><Phone className="w-3 h-3 text-muted-foreground/40 shrink-0" /><span>{user.phone || '—'}</span></div>
-      </td>
-      <td className="px-2.5 py-2.5 w-[80px] text-[12px] font-mono font-bold text-foreground/90 text-right tabular-nums">
+      </td>}
+      {visibleColumnKeys.includes('hourlyRate') && <td className="px-2.5 py-2.5 w-[80px] text-[12px] font-mono font-bold text-foreground/90 text-right tabular-nums">
         {user.hourlyRate ? `$${user.hourlyRate}` : <span className="text-muted-foreground/30">—</span>}
-      </td>
-      <td className="px-2.5 py-2.5 w-[80px]"><UserStatusBadge status={user.status} /></td>
+      </td>}
+      {visibleColumnKeys.includes('status') && <td className="px-2.5 py-2.5 w-[80px]"><UserStatusBadge status={user.status} /></td>}
       <td className="px-2.5 py-2.5 w-[60px] text-center">
         <div className="flex items-center justify-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
           <button onClick={e => { e.stopPropagation(); onEdit(); }} className="p-1 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors rounded cursor-pointer"><Edit2 className="w-3 h-3" /></button>
@@ -140,6 +147,14 @@ const UserTableRow = React.memo(function UserTableRow({
 function UsersContent() {
   const router = useRouter();
   const { data: session } = useSession();
+  const { isFieldVisibleByKey } = usePermissions();
+
+  const visibleColumnKeys = React.useMemo(() => {
+    return COLUMNS.filter(col => {
+      if (col.key === 'firstName' || col.key === 'workspace') return true;
+      return isFieldVisibleByKey('users', col.key);
+    }).map(c => c.key);
+  }, [isFieldVisibleByKey]);
 
   const [users, setUsers] = useState<User[]>(globalCache.current?.users || []);
   const [isLoading, setIsLoading] = useState(!globalCache.current);
@@ -508,7 +523,7 @@ function UsersContent() {
           <table className="w-full text-left border-separate border-spacing-0 relative z-0 table-fixed">
             <thead className="bg-background border-b border-border sticky top-0 z-10 box-border">
               <tr>
-                {COLUMNS.map(col => (
+                {COLUMNS.filter(c => visibleColumnKeys.includes(c.key)).map(col => (
                   <th key={col.key} onClick={() => handleSort(col.key)}
                     className={cn(
                       'px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary/60 dark:hover:bg-secondary/50 transition-colors border-r border-border/40 last:border-0 select-none shadow-[0_1px_0_0_hsl(var(--border))]',
@@ -525,7 +540,7 @@ function UsersContent() {
             </thead>
             <tbody>
               {isLoading ? (
-                Array.from({ length: 25 }).map((_, i) => <UserSkeletonRow key={i} index={i} />)
+                Array.from({ length: 25 }).map((_, i) => <UserSkeletonRow key={i} index={i} visibleColumnKeys={visibleColumnKeys} />)
               ) : error ? (
                 <tr><td colSpan={8} className="px-2 py-8 text-center text-destructive text-[12px]">{error}</td></tr>
               ) : users.length === 0 ? (
@@ -539,6 +554,7 @@ function UsersContent() {
                 users.map(user => (
                   <UserTableRow key={user._id} user={user} highlight={highlightId === user._id}
                     workspaces={availableWorkspaces}
+                    visibleColumnKeys={visibleColumnKeys}
                     onClick={() => {
                       sessionStorage.setItem('user_scroll_to', user._id);
                       if (scrollRef.current) sessionStorage.setItem('user_scroll_top', String(scrollRef.current.scrollTop));
@@ -548,7 +564,7 @@ function UsersContent() {
                     onDelete={() => handleDelete(user._id)} />
                 ))
               )}
-              {isLoadingMore && Array.from({ length: 8 }).map((_, i) => <UserSkeletonRow key={`m-${i}`} index={i} />)}
+              {isLoadingMore && Array.from({ length: 8 }).map((_, i) => <UserSkeletonRow key={`m-${i}`} index={i} visibleColumnKeys={visibleColumnKeys} />)}
             </tbody>
           </table>
           <div ref={sentinelRef} className="h-1" />
@@ -637,21 +653,25 @@ function UsersContent() {
                 )}
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase">Phone</label>
-                  <input value={formData.phone} onChange={e => {
-                    const input = e.target.value.replace(/\D/g, '').slice(0, 10);
-                    let fmt = input;
-                    if (input.length > 3 && input.length <= 6) fmt = `${input.slice(0, 3)} ${input.slice(3)}`;
-                    else if (input.length > 6) fmt = `${input.slice(0, 3)} ${input.slice(3, 6)} ${input.slice(6)}`;
-                    setFormData({ ...formData, phone: fmt });
-                  }} className="w-full px-3 h-[36px] bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/10 rounded" placeholder="000 000 0000" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase">Hourly Rate ($)</label>
-                  <input type="number" value={formData.hourlyRate} onChange={e => setFormData({ ...formData, hourlyRate: parseFloat(e.target.value) })}
-                    className="w-full px-3 h-[36px] bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/10 rounded" />
-                </div>
+                {isFieldVisibleByKey('users', 'phone') && (
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase">Phone</label>
+                    <input value={formData.phone} onChange={e => {
+                      const input = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      let fmt = input;
+                      if (input.length > 3 && input.length <= 6) fmt = `${input.slice(0, 3)} ${input.slice(3)}`;
+                      else if (input.length > 6) fmt = `${input.slice(0, 3)} ${input.slice(3, 6)} ${input.slice(6)}`;
+                      setFormData({ ...formData, phone: fmt });
+                    }} className="w-full px-3 h-[36px] bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/10 rounded" placeholder="000 000 0000" />
+                  </div>
+                )}
+                {isFieldVisibleByKey('users', 'hourlyRate') && (
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase">Hourly Rate ($)</label>
+                    <input type="number" value={formData.hourlyRate} onChange={e => setFormData({ ...formData, hourlyRate: parseFloat(e.target.value) })}
+                      className="w-full px-3 h-[36px] bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/10 rounded" />
+                  </div>
+                )}
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-muted-foreground uppercase">Status</label>

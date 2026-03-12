@@ -506,24 +506,46 @@ export async function POST(request: Request) {
             // Create notification if there were changes
             if (totalAdded > 0 || totalUpdated > 0) {
                 try {
-                    const parts: string[] = [];
-                    if (totalAdded > 0) parts.push(`${totalAdded} new`);
-                    if (totalUpdated > 0) parts.push(`${totalUpdated} updated`);
-
-                    await Notification.create({
-                        category: 'orders',
-                        title: `Web Orders Synced`,
-                        message: `${parts.join(', ')} order${(totalAdded + totalUpdated) > 1 ? 's' : ''} from WooCommerce (${duration}s)`,
-                        link: '/sales/web-orders',
-                        metadata: {
-                            type: 'web-order-sync',
-                            added: totalAdded,
-                            updated: totalUpdated,
-                            skipped: totalSkipped,
-                            duration: parseFloat(duration),
-                            mode: forceFullSync ? 'full' : 'incremental',
+                    if (!forceFullSync && allWebOrders.length <= 20) {
+                        // For small incremental syncs, generate one notification per order
+                        const notifs = allWebOrders.map(({ site, order }) => ({
+                            category: 'orders',
+                            title: `Web Order Synced`,
+                            message: `Order #${order.number || order.id} synced from ${site.name}`,
+                            link: `/sales/web-orders/WC-${site.name}-${order.id}`,
+                            metadata: {
+                                type: 'web-order-sync',
+                                duration: parseFloat(duration),
+                                mode: 'incremental'
+                            }
+                        }));
+                        if (notifs.length > 0) {
+                            await Notification.insertMany(notifs);
                         }
-                    });
+                    } else {
+                        // For massive bulk/full syncs, generate a single summary notification
+                        const parts: string[] = [];
+                        if (totalAdded > 0) parts.push(`${totalAdded} new`);
+                        if (totalUpdated > 0) parts.push(`${totalUpdated} updated`);
+                        
+                        // Extract unique site names involved
+                        const involvedSites = Array.from(new Set(allWebOrders.map(o => o.site.name))).join(', ');
+
+                        await Notification.create({
+                            category: 'orders',
+                            title: `Bulk Web Orders Synced`,
+                            message: `${parts.join(', ')} order${(totalAdded + totalUpdated) > 1 ? 's' : ''} from ${involvedSites || 'WooCommerce'} (${duration}s)`,
+                            link: '/sales/web-orders',
+                            metadata: {
+                                type: 'web-order-sync',
+                                added: totalAdded,
+                                updated: totalUpdated,
+                                skipped: totalSkipped,
+                                duration: parseFloat(duration),
+                                mode: forceFullSync ? 'full' : 'incremental',
+                            }
+                        });
+                    }
                 } catch (notifErr) {
                     console.error('Failed to create sync notification:', notifErr);
                 }
