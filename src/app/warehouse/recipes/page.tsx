@@ -8,6 +8,7 @@ import { cn, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { confirmDeleteToast } from '@/lib/confirmToast';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { usePermissions } from '@/hooks/usePermissions';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -222,6 +223,8 @@ function RecipesContent() {
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [skus, setSkus] = useState<Sku[]>([]);
   const [highlightId, setHighlightId] = useState<string | null>(null);
+
+  const { canDelete } = usePermissions();
 
   const pageRef = useRef(globalCache.current?.page || 0);
   const mountedRef = useRef(true);
@@ -523,10 +526,12 @@ function RecipesContent() {
                         className="p-1.5 rounded-md text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10 transition-colors cursor-pointer" title="Copy">
                         <Copy className="w-3 h-3" />
                       </button>
-                      <button onClick={e => handleDelete(e, recipe._id)}
-                        className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer" title="Delete">
-                        <Trash2 className="w-3 h-3" />
-                      </button>
+                      {canDelete() && (
+                        <button onClick={e => handleDelete(e, recipe._id)}
+                          className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer" title="Delete">
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

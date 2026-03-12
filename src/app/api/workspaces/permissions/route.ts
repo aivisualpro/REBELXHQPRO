@@ -50,7 +50,10 @@ export async function GET(request: Request) {
         const enabledRoutes: string[] = [];
 
         for (const mod of (workspace as any).modules || []) {
-            if (!mod.enabled) continue;
+            const hasEnabledSubModule = mod.subModules?.some((s: any) => s.enabled);
+            const isModuleEnabled = mod.enabled || hasEnabledSubModule;
+            
+            if (!isModuleEnabled) continue;
             enabledModules.push(mod.key);
 
             for (const sub of mod.subModules || []) {
@@ -80,6 +83,11 @@ export async function GET(request: Request) {
                 if (routePermissions[sub.route]) {
                     // Merge fields from this sub-module into existing route entry
                     Object.assign(routePermissions[sub.route].fields, fieldMap);
+                    // Merge CRUD permissions (additive - if any sub-module allows it, it is allowed for the route)
+                    routePermissions[sub.route].crud.create = routePermissions[sub.route].crud.create || crudPerm.create;
+                    routePermissions[sub.route].crud.read   = routePermissions[sub.route].crud.read || crudPerm.read;
+                    routePermissions[sub.route].crud.update = routePermissions[sub.route].crud.update || crudPerm.update;
+                    routePermissions[sub.route].crud.delete = routePermissions[sub.route].crud.delete || crudPerm.delete;
                 } else {
                     routePermissions[sub.route] = {
                         crud: crudPerm,

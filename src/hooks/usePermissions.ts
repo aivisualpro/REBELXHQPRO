@@ -96,7 +96,7 @@ export function usePermissions(routeOverride?: string) {
     const can = useCallback((op: 'create' | 'read' | 'update' | 'delete', route?: string): boolean => {
         if (isSuperAdmin) return true;
         if (!hasWorkspace) return false; // No workspace = no access
-        if (!perms) return true; // Default open until loaded (graceful degradation)
+        if (!perms) return false; // Fail closed until loaded
 
         const target = route || targetRoute;
         const routePerm = perms.routePermissions[target];
@@ -133,7 +133,7 @@ export function usePermissions(routeOverride?: string) {
     const isModuleEnabled = useCallback((moduleKey: string): boolean => {
         if (isSuperAdmin) return true;
         if (!hasWorkspace) return false; // No workspace = no modules
-        if (!perms) return true; // Loading — default open
+        if (!perms) return false; // Loading — fail closed
         return perms.enabledModules.includes(moduleKey);
     }, [isSuperAdmin, hasWorkspace, perms]);
 
@@ -141,7 +141,7 @@ export function usePermissions(routeOverride?: string) {
     const isRouteEnabled = useCallback((route: string): boolean => {
         if (isSuperAdmin) return true;
         if (!hasWorkspace) return false; // No workspace = no routes
-        if (!perms) return true;
+        if (!perms) return false;
         return perms.enabledRoutes.includes(route);
     }, [isSuperAdmin, hasWorkspace, perms]);
 

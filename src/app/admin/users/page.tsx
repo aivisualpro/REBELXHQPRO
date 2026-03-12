@@ -92,8 +92,8 @@ function UserStatusBadge({ status }: { status: string }) {
 // ─── Table Row ───────────────────────────────────────────────────────────────
 
 const UserTableRow = React.memo(function UserTableRow({
-  user, onClick, onEdit, onDelete, highlight, workspaces, visibleColumnKeys
-}: { user: User; onClick: () => void; onEdit: () => void; onDelete: () => void; highlight?: boolean; workspaces: { _id: string; name: string }[], visibleColumnKeys: string[] }) {
+  user, onClick, onEdit, onDelete, highlight, workspaces, visibleColumnKeys, canDelete
+}: { user: User; onClick: () => void; onEdit: () => void; onDelete: () => void; highlight?: boolean; workspaces: { _id: string; name: string }[], visibleColumnKeys: string[], canDelete?: boolean }) {
   const wsName = workspaces.find(w => w._id === (user as any).workspaceId)?.name;
   return (
     <tr data-user-id={user._id}
@@ -135,7 +135,7 @@ const UserTableRow = React.memo(function UserTableRow({
       <td className="px-2.5 py-2.5 w-[60px] text-center">
         <div className="flex items-center justify-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
           <button onClick={e => { e.stopPropagation(); onEdit(); }} className="p-1 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors rounded cursor-pointer"><Edit2 className="w-3 h-3" /></button>
-          <button onClick={e => { e.stopPropagation(); onDelete(); }} className="p-1 text-muted-foreground hover:text-red-600 hover:bg-red-500/10 transition-colors rounded cursor-pointer"><Trash2 className="w-3 h-3" /></button>
+          {canDelete && <button onClick={e => { e.stopPropagation(); onDelete(); }} className="p-1 text-muted-foreground hover:text-red-600 hover:bg-red-500/10 transition-colors rounded cursor-pointer"><Trash2 className="w-3 h-3" /></button>}
         </div>
       </td>
     </tr>
@@ -147,7 +147,7 @@ const UserTableRow = React.memo(function UserTableRow({
 function UsersContent() {
   const router = useRouter();
   const { data: session } = useSession();
-  const { isFieldVisibleByKey } = usePermissions();
+  const { isFieldVisibleByKey, canDelete } = usePermissions();
 
   const visibleColumnKeys = React.useMemo(() => {
     return COLUMNS.filter(col => {
@@ -555,6 +555,7 @@ function UsersContent() {
                   <UserTableRow key={user._id} user={user} highlight={highlightId === user._id}
                     workspaces={availableWorkspaces}
                     visibleColumnKeys={visibleColumnKeys}
+                    canDelete={canDelete()}
                     onClick={() => {
                       sessionStorage.setItem('user_scroll_to', user._id);
                       if (scrollRef.current) sessionStorage.setItem('user_scroll_top', String(scrollRef.current.scrollTop));

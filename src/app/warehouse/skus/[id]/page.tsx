@@ -32,6 +32,7 @@ import toast from 'react-hot-toast';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface Sku {
     _id: string;
@@ -140,6 +141,8 @@ function SkuDetailsPageContent() {
     const [lots, setLots] = useState<{ lotNumber: string; source: string; date: string | null; cost: number; balance: number }[]>([]);
     const [loading, setLoading] = useState(true);
     const [fallbackImage, setFallbackImage] = useState('/sku-placeholder.png');
+    
+    const { canDelete } = usePermissions();
 
     // Only treat http(s) URLs as valid images; relative paths (e.g. "SKUs_Images/...") cause 404s
     const isValidImageUrl = (url?: string) => !!url && (url.startsWith('http://') || url.startsWith('https://'));
@@ -1098,14 +1101,16 @@ function SkuDetailsPageContent() {
                             {(sku as any).isArchived ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
                             <span>{(sku as any).isArchived ? 'Restore' : 'Archive'}</span>
                         </button>
-                        <button
-                            onClick={handleDeleteSku}
-                            disabled={isDeleting}
-                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-bold uppercase tracking-widest bg-red-600 text-white rounded hover:bg-red-700 transition-colors cursor-pointer disabled:opacity-50 inline-flex shadow-[0_1px_4px_rgba(0,0,0,0.15)]"
-                        >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
-                        </button>
+                        {canDelete() && (
+                            <button
+                                onClick={handleDeleteSku}
+                                disabled={isDeleting}
+                                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-bold uppercase tracking-widest bg-red-600 text-white rounded hover:bg-red-700 transition-colors cursor-pointer disabled:opacity-50 inline-flex shadow-[0_1px_4px_rgba(0,0,0,0.15)]"
+                            >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
+                            </button>
+                        )}
                     </div>
                 </aside>
 

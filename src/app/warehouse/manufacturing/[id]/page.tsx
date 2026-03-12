@@ -12,6 +12,7 @@ import { cn, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { confirmDeleteToast } from '@/lib/confirmToast';
 import { useTimers } from '@/components/TimerContext';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface LineItem {
     _id: string;
@@ -82,6 +83,7 @@ export default function ManufacturingDetailPage() {
     const [order, setOrder] = useState<ManufacturingOrder | null>(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<TabType>('Items');
+    const { canDelete } = usePermissions();
 
     // Lot Editing State
     const [editingLotItemId, setEditingLotItemId] = useState<string | null>(null);
@@ -931,13 +933,15 @@ export default function ManufacturingDetailPage() {
                             <Pencil className="w-3.5 h-3.5" />
                             <span>Edit</span>
                         </button>
-                        <button
-                            onClick={handleDeleteOrder}
-                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-red-500 text-white border border-red-600 hover:bg-red-600 transition-colors"
-                        >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>Delete</span>
-                        </button>
+                        {canDelete() && (
+                            <button
+                                onClick={handleDeleteOrder}
+                                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-red-500 text-white border border-red-600 hover:bg-red-600 transition-colors"
+                            >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Delete</span>
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -1342,49 +1346,51 @@ export default function ManufacturingDetailPage() {
                                                             >
                                                                 <Pencil className="w-3 h-3" />
                                                             </button>
-                                                            <button
-                                                                onClick={() => {
-                                                                    toast((t) => (
-                                                                        <div className="flex flex-col gap-2">
-                                                                            <p className="text-sm font-bold text-white">Delete this labor entry?</p>
-                                                                            <p className="text-xs text-gray-400">This action cannot be undone.</p>
-                                                                            <div className="flex gap-2 mt-1">
-                                                                                <button
-                                                                                    onClick={() => toast.dismiss(t.id)}
-                                                                                    className="flex-1 px-3 py-1.5 text-xs font-bold rounded border border-gray-600 bg-gray-800 text-white hover:bg-gray-700 transition-colors"
-                                                                                >
-                                                                                    Cancel
-                                                                                </button>
-                                                                                <button
-                                                                                    onClick={async () => {
-                                                                                        toast.dismiss(t.id);
-                                                                                        const updatedLabor = order.labor?.filter(l => l._id !== entry._id) || [];
-                                                                                        const res = await fetch(`/api/manufacturing/${order._id}`, {
-                                                                                            method: 'PATCH',
-                                                                                            headers: { 'Content-Type': 'application/json' },
-                                                                                            body: JSON.stringify({ labor: updatedLabor })
-                                                                                        });
-                                                                                        if (res.ok) {
-                                                                                            const data = await res.json();
-                                                                                            setOrder(data);
-                                                                                            toast.success('Labor entry deleted');
-                                                                                        } else {
-                                                                                            toast.error('Failed to delete labor');
-                                                                                        }
-                                                                                    }}
-                                                                                    className="flex-1 px-3 py-1.5 text-xs font-bold rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
-                                                                                >
-                                                                                    Delete
-                                                                                </button>
+                                                            {canDelete() && (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        toast((t) => (
+                                                                            <div className="flex flex-col gap-2">
+                                                                                <p className="text-sm font-bold text-white">Delete this labor entry?</p>
+                                                                                <p className="text-xs text-gray-400">This action cannot be undone.</p>
+                                                                                <div className="flex gap-2 mt-1">
+                                                                                    <button
+                                                                                        onClick={() => toast.dismiss(t.id)}
+                                                                                        className="flex-1 px-3 py-1.5 text-xs font-bold rounded border border-gray-600 bg-gray-800 text-white hover:bg-gray-700 transition-colors"
+                                                                                    >
+                                                                                        Cancel
+                                                                                    </button>
+                                                                                    <button
+                                                                                        onClick={async () => {
+                                                                                            toast.dismiss(t.id);
+                                                                                            const updatedLabor = order.labor?.filter(l => l._id !== entry._id) || [];
+                                                                                            const res = await fetch(`/api/manufacturing/${order._id}`, {
+                                                                                                method: 'PATCH',
+                                                                                                headers: { 'Content-Type': 'application/json' },
+                                                                                                body: JSON.stringify({ labor: updatedLabor })
+                                                                                            });
+                                                                                            if (res.ok) {
+                                                                                                const data = await res.json();
+                                                                                                setOrder(data);
+                                                                                                toast.success('Labor entry deleted');
+                                                                                            } else {
+                                                                                                toast.error('Failed to delete labor');
+                                                                                            }
+                                                                                        }}
+                                                                                        className="flex-1 px-3 py-1.5 text-xs font-bold rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+                                                                                    >
+                                                                                        Delete
+                                                                                    </button>
+                                                                                </div>
                                                                             </div>
-                                                                        </div>
-                                                                    ), { duration: 10000, position: 'top-center', style: { maxWidth: '360px', background: '#1a1a1a', color: '#fff', marginTop: '40vh' } });
-                                                                }}
-                                                                className="p-1 text-muted-foreground hover:text-red-600 transition-colors"
-                                                                title="Delete Labor"
-                                                            >
-                                                                <Trash2 className="w-3 h-3" />
-                                                            </button>
+                                                                        ), { duration: 10000, position: 'top-center', style: { maxWidth: '360px', background: '#1a1a1a', color: '#fff', marginTop: '40vh' } });
+                                                                    }}
+                                                                    className="p-1 text-muted-foreground hover:text-red-600 transition-colors"
+                                                                    title="Delete Labor"
+                                                                >
+                                                                    <Trash2 className="w-3 h-3" />
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -1555,27 +1561,29 @@ export default function ManufacturingDetailPage() {
                                                         >
                                                             <Pencil className="w-3 h-3" />
                                                         </button>
-                                                        <button
-                                                            onClick={() => {
-                                                                confirmDeleteToast('Delete this note?', async () => {
-                                                                    const updatedNotes = order.notes?.filter(n => n._id !== note._id) || [];
-                                                                    const res = await fetch(`/api/manufacturing/${order._id}`, {
-                                                                        method: 'PATCH',
-                                                                        headers: { 'Content-Type': 'application/json' },
-                                                                        body: JSON.stringify({ notes: updatedNotes })
+                                                        {canDelete() && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    confirmDeleteToast('Delete this note?', async () => {
+                                                                        const updatedNotes = order.notes?.filter(n => n._id !== note._id) || [];
+                                                                        const res = await fetch(`/api/manufacturing/${order._id}`, {
+                                                                            method: 'PATCH',
+                                                                            headers: { 'Content-Type': 'application/json' },
+                                                                            body: JSON.stringify({ notes: updatedNotes })
+                                                                        });
+                                                                        if (res.ok) {
+                                                                            const data = await res.json();
+                                                                            setOrder(data);
+                                                                            toast.success('Note deleted');
+                                                                        }
                                                                     });
-                                                                    if (res.ok) {
-                                                                        const data = await res.json();
-                                                                        setOrder(data);
-                                                                        toast.success('Note deleted');
-                                                                    }
-                                                                });
-                                                            }}
-                                                            className="p-1 text-muted-foreground hover:text-red-600 transition-colors"
-                                                            title="Delete Note"
-                                                        >
-                                                            <Trash2 className="w-3 h-3" />
-                                                        </button>
+                                                                }}
+                                                                className="p-1 text-muted-foreground hover:text-red-600 transition-colors"
+                                                                title="Delete Note"
+                                                            >
+                                                                <Trash2 className="w-3 h-3" />
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>
@@ -1620,17 +1628,19 @@ export default function ManufacturingDetailPage() {
                             <Copy className="w-3 h-3" />
                             <span>Duplicate</span>
                         </button>
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setOpenActionMenu(null);
-                                handleDeleteItem(targetItem._id);
-                            }}
-                            className="w-full text-left px-3 py-2 text-[10px] text-foreground/70 hover:bg-red-500/10 hover:text-red-500 flex items-center space-x-1.5 transition-colors"
-                        >
-                            <Trash2 className="w-3 h-3" />
-                            <span>Delete</span>
-                        </button>
+                        {canDelete() && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenActionMenu(null);
+                                    handleDeleteItem(targetItem._id);
+                                }}
+                                className="w-full text-left px-3 py-2 text-[10px] text-foreground/70 hover:bg-red-500/10 hover:text-red-500 flex items-center space-x-1.5 transition-colors"
+                            >
+                                <Trash2 className="w-3 h-3" />
+                                <span>Delete</span>
+                            </button>
+                        )}
                     </div>
                 );
             })()}

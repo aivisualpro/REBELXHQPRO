@@ -8,6 +8,7 @@ import { cn, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { confirmDeleteToast } from '@/lib/confirmToast';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface Recipe {
     _id: string;
@@ -58,6 +59,8 @@ export default function RecipeDetailPage() {
     const [isCopying, setIsCopying] = useState(false);
     const [copyForm, setCopyForm] = useState({ name: '', sku: '' });
     const [copyLoading, setCopyLoading] = useState(false);
+
+    const { canDelete } = usePermissions();
 
     useEffect(() => {
         const target = document.getElementById('header-portal-target');
@@ -427,13 +430,15 @@ export default function RecipeDetailPage() {
                             <Edit2 className="w-3.5 h-3.5" />
                             <span>Edit</span>
                         </button>
-                        <button
-                            onClick={handleDelete}
-                            className="flex-1 flex items-center justify-center space-x-1.5 h-9 text-[10px] font-bold uppercase tracking-widest rounded-md border border-red-500/30 text-red-500 hover:text-white hover:bg-red-600 transition-all cursor-pointer"
-                        >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>Delete</span>
-                        </button>
+                        {canDelete() && (
+                            <button
+                                onClick={handleDelete}
+                                className="flex-1 flex items-center justify-center space-x-1.5 h-9 text-[10px] font-bold uppercase tracking-widest rounded-md border border-red-500/30 text-red-500 hover:text-white hover:bg-red-600 transition-all cursor-pointer"
+                            >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Delete</span>
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -517,7 +522,9 @@ export default function RecipeDetailPage() {
                                                 <td className="px-3 py-2 text-right">
                                                     <div className="flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                         <button onClick={() => openItemModal(item, i)} className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded transition-colors cursor-pointer"><Edit2 className="w-3.5 h-3.5" /></button>
-                                                        <button onClick={() => deleteItem(i)} className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
+                                                        {canDelete() && (
+                                                            <button onClick={() => deleteItem(i)} className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>
@@ -544,7 +551,9 @@ export default function RecipeDetailPage() {
                                         </div>
                                         <div className="absolute top-3 right-3 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <button onClick={() => openStepModal(step, i)} className="p-1.5 bg-secondary rounded text-muted-foreground hover:text-foreground transition-colors cursor-pointer"><Edit2 className="w-3.5 h-3.5" /></button>
-                                            <button onClick={() => deleteStep(i)} className="p-1.5 bg-secondary rounded text-muted-foreground hover:text-destructive transition-colors cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
+                                            {canDelete() && (
+                                                <button onClick={() => deleteStep(i)} className="p-1.5 bg-secondary rounded text-muted-foreground hover:text-destructive transition-colors cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
+                                            )}
                                         </div>
                                     </div>
                                 ))}

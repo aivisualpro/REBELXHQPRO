@@ -31,6 +31,7 @@ const COUNTRY_OPTIONS = ['United States', 'Canada', 'Mexico', 'China', 'Germany'
 const PAYMENT_TERMS_OPTIONS = ['Net 10', 'Net 15', 'Net 30', 'Net 45', 'Net 60', 'Net 90', 'COD', 'Due on Receipt', 'Prepaid', '2/10 Net 30', 'Other'];
 import { cn, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface VendorNote {
     _id?: string;
@@ -108,6 +109,8 @@ export default function VendorDetailPage() {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editForm, setEditForm] = useState<Partial<Vendor>>({});
     const [isSaving, setIsSaving] = useState(false);
+
+    const { canDelete } = usePermissions();
 
     const fetchVendor = useCallback(async () => {
         try {
@@ -506,13 +509,15 @@ export default function VendorDetailPage() {
                             <Pencil className="w-3.5 h-3.5" />
                             <span>Edit</span>
                         </button>
-                        <button
-                            onClick={handleDeleteVendor}
-                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors cursor-pointer"
-                        >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>Delete</span>
-                        </button>
+                        {canDelete() && (
+                            <button
+                                onClick={handleDeleteVendor}
+                                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors cursor-pointer"
+                            >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Delete</span>
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -656,12 +661,14 @@ export default function VendorDetailPage() {
                                                             <span className="text-[10px] text-muted-foreground">{formatDate(note.createdAt)}</span>
                                                         </div>
                                                     </div>
-                                                    <button
-                                                        onClick={() => handleDeleteNote(originalIndex)}
-                                                        className="p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors rounded opacity-0 group-hover:opacity-100 cursor-pointer"
-                                                    >
-                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                    </button>
+                                                    {canDelete() && (
+                                                        <button
+                                                            onClick={() => handleDeleteNote(originalIndex)}
+                                                            className="p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors rounded opacity-0 group-hover:opacity-100 cursor-pointer"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                         );

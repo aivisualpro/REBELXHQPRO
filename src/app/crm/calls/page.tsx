@@ -23,6 +23,7 @@ import toast from 'react-hot-toast';
 import { confirmDeleteToast } from '@/lib/confirmToast';
 import { Pagination } from '@/components/ui/Pagination';
 import { MultiSelectFilter } from '@/components/ui/filters/MultiSelectFilter';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface Activity {
   _id: string;
@@ -34,6 +35,7 @@ interface Activity {
 }
 
 export default function CallsPage() {
+  const { canDelete } = usePermissions();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -371,12 +373,14 @@ export default function CallsPage() {
                     >
                       <Edit2 className="w-3 h-3" />
                     </button>
-                    <button
-                      onClick={() => handleDelete(activity._id)}
-                      className="p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
+                    {canDelete() && (
+                      <button
+                        onClick={() => handleDelete(activity._id)}
+                        className="p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

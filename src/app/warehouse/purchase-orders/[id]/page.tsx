@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
 import { List } from 'lucide-react';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface LineItem {
     _id: string;
@@ -57,6 +58,7 @@ export default function PurchaseOrderDetailPage() {
     const [order, setOrder] = useState<PurchaseOrder | null>(null);
     const [loading, setLoading] = useState(true);
     const [isDeleting, setIsDeleting] = useState(false);
+    const { canDelete } = usePermissions();
 
     // Item Modal State
     const [isItemModalOpen, setIsItemModalOpen] = useState(false);
@@ -519,14 +521,16 @@ export default function PurchaseOrderDetailPage() {
                             <Pencil className="w-3.5 h-3.5" />
                             <span>Edit</span>
                         </button>
-                        <button
-                            onClick={handleDeleteOrder}
-                            disabled={isDeleting}
-                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors cursor-pointer disabled:opacity-50"
-                        >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
-                        </button>
+                        {canDelete() && (
+                            <button
+                                onClick={handleDeleteOrder}
+                                disabled={isDeleting}
+                                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors cursor-pointer disabled:opacity-50"
+                            >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -604,13 +608,15 @@ export default function PurchaseOrderDetailPage() {
                                                         >
                                                             <Pencil className="w-3.5 h-3.5" />
                                                         </button>
-                                                        <button
-                                                            onClick={() => handleDeleteClick(item._id)}
-                                                            className="p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors rounded cursor-pointer"
-                                                            title="Delete"
-                                                        >
-                                                            <Trash2 className="w-3.5 h-3.5" />
-                                                        </button>
+                                                        {canDelete() && (
+                                                            <button
+                                                                onClick={() => handleDeleteClick(item._id)}
+                                                                className="p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors rounded cursor-pointer"
+                                                                title="Delete"
+                                                            >
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>

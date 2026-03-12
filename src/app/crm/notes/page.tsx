@@ -7,6 +7,7 @@ import { Pagination } from '@/components/ui/Pagination';
 import toast from 'react-hot-toast';
 import { confirmDeleteToast } from '@/lib/confirmToast';
 import NoteModal from '@/components/crm/NoteModal';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface Note {
     clientId: string;
@@ -21,6 +22,8 @@ export default function NotesPage() {
     const [notes, setNotes] = useState<Note[]>([]);
     const [loading, setLoading] = useState(true);
     
+    const { canDelete } = usePermissions();
+
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingNote, setEditingNote] = useState<{ clientId: string, noteId: string, text: string } | undefined>(undefined);
@@ -210,12 +213,14 @@ export default function NotesPage() {
                                                         >
                                                             <Pencil className="w-3.5 h-3.5" />
                                                         </button>
-                                                        <button 
-                                                            onClick={() => handleDelete(note.clientId, note.noteId!)}
-                                                            className="p-1 hover:bg-red-500/10 rounded text-muted-foreground hover:text-red-500 transition-colors"
-                                                        >
-                                                            <Trash2 className="w-3.5 h-3.5" />
-                                                        </button>
+                                                        {canDelete() && (
+                                                            <button 
+                                                                onClick={() => handleDelete(note.clientId, note.noteId!)}
+                                                                className="p-1 hover:bg-red-500/10 rounded text-muted-foreground hover:text-red-500 transition-colors"
+                                                            >
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        )}
                                                     </>
                                                 )}
                                             </div>

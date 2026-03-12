@@ -8,6 +8,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
+import { usePermissions } from '@/hooks/usePermissions';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -114,6 +115,8 @@ const TableRow = React.memo(function TableRow({
         ? `${item.createdBy.firstName} ${item.createdBy.lastName}`
         : typeof item.createdBy === 'string' ? item.createdBy : '-';
 
+    const { canDelete } = usePermissions();
+
     return (
         <tr
             data-aa-id={item._id}
@@ -180,13 +183,15 @@ const TableRow = React.memo(function TableRow({
                     >
                         <Pencil className="w-3.5 h-3.5" />
                     </button>
-                    <button
-                        onClick={onDelete}
-                        className="p-1.5 rounded-md hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-colors cursor-pointer"
-                        title="Delete"
-                    >
-                        <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    {canDelete() && (
+                        <button
+                            onClick={onDelete}
+                            className="p-1.5 rounded-md hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-colors cursor-pointer"
+                            title="Delete"
+                        >
+                            <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                    )}
                 </div>
             </td>
         </tr>

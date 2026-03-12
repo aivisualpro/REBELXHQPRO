@@ -53,6 +53,7 @@ import { cn, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import ClientModal from '@/components/crm/ClientModal';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface Client {
     _id: string;
@@ -240,6 +241,7 @@ const TAB_TO_SLUG: Record<string, string> = {
 export default function ClientDashboardPage() {
     const params = useParams();
     const router = useRouter();
+    const { canDelete } = usePermissions();
     const { id, tab: tabSegment } = params;
 
     // Read initial tab from URL, then manage via client state (no DOM reload)
@@ -983,9 +985,11 @@ export default function ClientDashboardPage() {
                                                                 <button onClick={() => openEditContact(idx)} className="p-0.5 rounded hover:bg-blue-100 text-blue-600 transition-colors" title="Edit">
                                                                     <Pencil className="w-3 h-3" />
                                                                 </button>
-                                                                <button onClick={() => handleDeleteContact(idx)} className="p-0.5 rounded hover:bg-red-100 text-red-600 transition-colors" title="Delete">
-                                                                    <Trash2 className="w-3 h-3" />
-                                                                </button>
+                                                                {canDelete() && (
+                                                                    <button onClick={() => handleDeleteContact(idx)} className="p-0.5 rounded hover:bg-red-100 text-red-600 transition-colors" title="Delete">
+                                                                        <Trash2 className="w-3 h-3" />
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -1264,9 +1268,11 @@ export default function ClientDashboardPage() {
                                                         <button onClick={() => openEditContact(idx)} className="p-1 rounded hover:bg-blue-100 text-blue-600 transition-colors" title="Edit">
                                                             <Pencil className="w-3.5 h-3.5" />
                                                         </button>
-                                                        <button onClick={() => handleDeleteContact(idx)} className="p-1 rounded hover:bg-red-100 text-red-600 transition-colors" title="Delete">
-                                                            <Trash2 className="w-3.5 h-3.5" />
-                                                        </button>
+                                                        {canDelete() && (
+                                                            <button onClick={() => handleDeleteContact(idx)} className="p-1 rounded hover:bg-red-100 text-red-600 transition-colors" title="Delete">
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>

@@ -520,17 +520,21 @@ export async function POST(request: Request) {
                     const actualAdded = modifiedOrderDetails.filter(m => m.type === 'added').length;
                     const actualUpdated = modifiedOrderDetails.filter(m => m.type === 'updated').length;
 
-                    if (!forceFullSync && modifiedOrderDetails.length <= 20) {
-                        // For small incremental syncs, generate one notification per order
+                    const totalModified = modifiedOrderDetails.length;
+                    
+                    if (totalModified === 0) {
+                        // do nothing
+                    } else if (totalModified === 1 || (!forceFullSync && totalModified <= 20)) {
+                        // For small incremental syncs (or single order updates), generate one notification per order
                         const notifs = modifiedOrderDetails.map(orderInfo => ({
                             category: 'orders',
-                            title: `Web Order Synced`,
-                            message: `Order #${orderInfo.number || orderInfo.id} synced from ${orderInfo.siteName}`,
+                            title: `Web Order: ${orderInfo.siteName}`,
+                            message: `Order #${orderInfo.number || orderInfo.id.split('-').pop()} synced from ${orderInfo.siteName}`,
                             link: `/sales/web-orders/${orderInfo.id}`,
                             metadata: {
                                 type: 'web-order-sync',
                                 duration: parseFloat(duration),
-                                mode: 'incremental'
+                                mode: forceFullSync ? 'full' : 'incremental'
                             }
                         }));
                         if (notifs.length > 0) {

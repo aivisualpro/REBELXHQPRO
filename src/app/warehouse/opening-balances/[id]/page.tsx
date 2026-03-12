@@ -27,6 +27,7 @@ import toast from 'react-hot-toast';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
 import { cn, formatDate, toDateInputValue } from '@/lib/utils';
 import { confirmDeleteToast } from '@/lib/confirmToast';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface Note {
     _id: string;
@@ -52,6 +53,8 @@ export default function OpeningBalanceDetailPage() {
     const [activeTab, setActiveTab] = useState<TabType>('Notes');
     const [headerPortal, setHeaderPortal] = useState<HTMLElement | null>(null);
     const [globalSettings, setGlobalSettings] = useState<any>(null);
+
+    const { canDelete } = usePermissions();
 
     // Notes state
     const [notes, setNotes] = useState<Note[]>([]);
@@ -527,14 +530,16 @@ export default function OpeningBalanceDetailPage() {
                                     <Pencil className="w-3.5 h-3.5" />
                                     <span>Edit</span>
                                 </button>
-                                <button
-                                    onClick={handleDelete}
-                                    disabled={isDeleting}
-                                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors cursor-pointer disabled:opacity-50"
-                                >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                    <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
-                                </button>
+                                {canDelete() && (
+                                    <button
+                                        onClick={handleDelete}
+                                        disabled={isDeleting}
+                                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors cursor-pointer disabled:opacity-50"
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                        <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
+                                    </button>
+                                )}
                             </>
                         )}
                     </div>
@@ -615,13 +620,15 @@ export default function OpeningBalanceDetailPage() {
                                                             <span className="text-[10px] text-muted-foreground">{formatDateTime(note.createdAt)}</span>
                                                         </div>
                                                     </div>
-                                                    <button
-                                                        onClick={() => handleDeleteNote(note._id)}
-                                                        className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-all cursor-pointer"
-                                                        title="Delete note"
-                                                    >
-                                                        <Trash2 className="w-3 h-3" />
-                                                    </button>
+                                                    {canDelete() && (
+                                                        <button
+                                                            onClick={() => handleDeleteNote(note._id)}
+                                                            className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-all cursor-pointer"
+                                                            title="Delete note"
+                                                        >
+                                                            <Trash2 className="w-3 h-3" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                         ))}

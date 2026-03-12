@@ -11,6 +11,7 @@ import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
 import { cn, formatDate, toDateInputValue } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface LineItem {
     _id: string;
@@ -185,6 +186,7 @@ export default function SaleOrderDetailPage() {
 
     // Delete Order State
     const [isDeleting, setIsDeleting] = useState(false);
+    const { canDelete } = usePermissions();
 
     // PDF Download State
     const [downloadingPdf, setDownloadingPdf] = useState(false);
@@ -1165,54 +1167,56 @@ export default function SaleOrderDetailPage() {
                             <Pencil className="w-3.5 h-3.5" />
                             <span>Edit</span>
                         </button>
-                        <button
-                            onClick={() => {
-                                toast((t) => (
-                                    <div className="flex flex-col gap-2">
-                                        <p className="text-sm font-bold text-white">Delete this order?</p>
-                                        <p className="text-xs text-gray-400">This action cannot be undone.</p>
-                                        <div className="flex gap-2 mt-1">
-                                            <button
-                                                onClick={() => toast.dismiss(t.id)}
-                                                className="flex-1 px-3 py-1.5 text-xs font-bold rounded border border-gray-600 bg-gray-800 text-white hover:bg-gray-700 transition-colors"
-                                            >
-                                                Cancel
-                                            </button>
-                                            <button
-                                                onClick={async () => {
-                                                    toast.dismiss(t.id);
-                                                    setIsDeleting(true);
-                                                    try {
-                                                        const res = await fetch(`/api/wholesale/orders/${order._id}`, {
-                                                            method: 'DELETE'
-                                                        });
-                                                        if (res.ok) {
-                                                            toast.success('Order deleted');
-                                                            router.push('/sales/wholesale-orders');
-                                                        } else {
-                                                            const data = await res.json();
-                                                            toast.error(data.error || 'Failed to delete order');
+                        {canDelete() && (
+                            <button
+                                onClick={() => {
+                                    toast((t) => (
+                                        <div className="flex flex-col gap-2">
+                                            <p className="text-sm font-bold text-white">Delete this order?</p>
+                                            <p className="text-xs text-gray-400">This action cannot be undone.</p>
+                                            <div className="flex gap-2 mt-1">
+                                                <button
+                                                    onClick={() => toast.dismiss(t.id)}
+                                                    className="flex-1 px-3 py-1.5 text-xs font-bold rounded border border-gray-600 bg-gray-800 text-white hover:bg-gray-700 transition-colors"
+                                                >
+                                                    Cancel
+                                                </button>
+                                                <button
+                                                    onClick={async () => {
+                                                        toast.dismiss(t.id);
+                                                        setIsDeleting(true);
+                                                        try {
+                                                            const res = await fetch(`/api/wholesale/orders/${order._id}`, {
+                                                                method: 'DELETE'
+                                                            });
+                                                            if (res.ok) {
+                                                                toast.success('Order deleted');
+                                                                router.push('/sales/wholesale-orders');
+                                                            } else {
+                                                                const data = await res.json();
+                                                                toast.error(data.error || 'Failed to delete order');
+                                                            }
+                                                        } catch (e) {
+                                                            toast.error('Error deleting order');
+                                                        } finally {
+                                                            setIsDeleting(false);
                                                         }
-                                                    } catch (e) {
-                                                        toast.error('Error deleting order');
-                                                    } finally {
-                                                        setIsDeleting(false);
-                                                    }
-                                                }}
-                                                className="flex-1 px-3 py-1.5 text-xs font-bold rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
-                                            >
-                                                Delete
-                                            </button>
+                                                    }}
+                                                    className="flex-1 px-3 py-1.5 text-xs font-bold rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+                                                >
+                                                    Delete
+                                                </button>
+                                            </div>
                                         </div>
-                                    </div>
-                                ), { duration: 10000, position: 'top-center', style: { maxWidth: '360px', background: '#1a1a1a', color: '#fff', marginTop: '40vh' } });
-                            }}
-                            disabled={isDeleting}
-                            className="h-[34px] flex-1 flex items-center justify-center gap-1.5 px-3 text-[10px] font-bold uppercase tracking-widest bg-red-500 text-white border border-red-600 hover:bg-red-600 transition-colors cursor-pointer disabled:opacity-50"
-                        >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
-                        </button>
+                                    ), { duration: 10000, position: 'top-center', style: { maxWidth: '360px', background: '#1a1a1a', color: '#fff', marginTop: '40vh' } });
+                                }}
+                                disabled={isDeleting}
+                                className="h-[34px] flex-1 flex items-center justify-center gap-1.5 px-3 text-[10px] font-bold uppercase tracking-widest bg-red-500 text-white border border-red-600 hover:bg-red-600 transition-colors cursor-pointer disabled:opacity-50"
+                            >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -1362,12 +1366,14 @@ export default function SaleOrderDetailPage() {
                                                             >
                                                                 <Pencil className="w-3 h-3" />
                                                             </button>
-                                                            <button
-                                                                onClick={() => handleDeleteItem(item._id)}
-                                                                className="p-1 text-muted-foreground hover:text-red-600 transition-colors"
-                                                            >
-                                                                <Trash2 className="w-3 h-3" />
-                                                            </button>
+                                                            {canDelete() && (
+                                                                <button
+                                                                    onClick={() => handleDeleteItem(item._id)}
+                                                                    className="p-1 text-muted-foreground hover:text-red-600 transition-colors"
+                                                                >
+                                                                    <Trash2 className="w-3 h-3" />
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -1424,12 +1430,14 @@ export default function SaleOrderDetailPage() {
                                                         >
                                                             <Pencil className="w-3 h-3" />
                                                         </button>
-                                                        <button
-                                                            onClick={() => handleDeletePayment(payment._id)}
-                                                            className="p-1 text-muted-foreground hover:text-red-600 transition-colors"
-                                                        >
-                                                            <Trash2 className="w-3 h-3" />
-                                                        </button>
+                                                        {canDelete() && (
+                                                            <button
+                                                                onClick={() => handleDeletePayment(payment._id)}
+                                                                className="p-1 text-muted-foreground hover:text-red-600 transition-colors"
+                                                            >
+                                                                <Trash2 className="w-3 h-3" />
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>
@@ -1458,50 +1466,52 @@ export default function SaleOrderDetailPage() {
                                         <div key={note._id} className="border border-border rounded-md p-3 bg-secondary/20 hover:bg-secondary/40 transition-colors group">
                                             <div className="flex items-start justify-between">
                                                 <p className="text-sm text-foreground whitespace-pre-wrap flex-1 font-medium">{note.note}</p>
-                                                <button
-                                                    onClick={() => {
-                                                        toast((t) => (
-                                                            <div className="flex flex-col gap-2">
-                                                                <p className="text-sm font-bold text-white">Delete this note?</p>
-                                                                <p className="text-xs text-gray-400">This action cannot be undone.</p>
-                                                                <div className="flex gap-2 mt-1">
-                                                                    <button
-                                                                        onClick={() => toast.dismiss(t.id)}
-                                                                        className="flex-1 px-3 py-1.5 text-xs font-bold rounded border border-gray-600 bg-gray-800 text-white hover:bg-gray-700 transition-colors"
-                                                                    >
-                                                                        Cancel
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={async () => {
-                                                                            toast.dismiss(t.id);
-                                                                            try {
-                                                                                const updatedNotes = order.notes?.filter(n => n._id !== note._id) || [];
-                                                                                const res = await fetch(`/api/wholesale/orders/${order._id}`, {
-                                                                                    method: 'PATCH',
-                                                                                    headers: { 'Content-Type': 'application/json' },
-                                                                                    body: JSON.stringify({ notes: updatedNotes })
-                                                                                });
-                                                                                if (res.ok) {
-                                                                                    const data = await res.json();
-                                                                                    setOrder(data);
-                                                                                    toast.success('Note deleted');
+                                                {canDelete() && (
+                                                    <button
+                                                        onClick={() => {
+                                                            toast((t) => (
+                                                                <div className="flex flex-col gap-2">
+                                                                    <p className="text-sm font-bold text-white">Delete this note?</p>
+                                                                    <p className="text-xs text-gray-400">This action cannot be undone.</p>
+                                                                    <div className="flex gap-2 mt-1">
+                                                                        <button
+                                                                            onClick={() => toast.dismiss(t.id)}
+                                                                            className="flex-1 px-3 py-1.5 text-xs font-bold rounded border border-gray-600 bg-gray-800 text-white hover:bg-gray-700 transition-colors"
+                                                                        >
+                                                                            Cancel
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={async () => {
+                                                                                toast.dismiss(t.id);
+                                                                                try {
+                                                                                    const updatedNotes = order.notes?.filter(n => n._id !== note._id) || [];
+                                                                                    const res = await fetch(`/api/wholesale/orders/${order._id}`, {
+                                                                                        method: 'PATCH',
+                                                                                        headers: { 'Content-Type': 'application/json' },
+                                                                                        body: JSON.stringify({ notes: updatedNotes })
+                                                                                    });
+                                                                                    if (res.ok) {
+                                                                                        const data = await res.json();
+                                                                                        setOrder(data);
+                                                                                        toast.success('Note deleted');
+                                                                                    }
+                                                                                } catch (e) {
+                                                                                    toast.error('Failed to delete note');
                                                                                 }
-                                                                            } catch (e) {
-                                                                                toast.error('Failed to delete note');
-                                                                            }
-                                                                        }}
-                                                                        className="flex-1 px-3 py-1.5 text-xs font-bold rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
-                                                                    >
-                                                                        Delete
-                                                                    </button>
+                                                                            }}
+                                                                            className="flex-1 px-3 py-1.5 text-xs font-bold rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+                                                                        >
+                                                                            Delete
+                                                                        </button>
+                                                                    </div>
                                                                 </div>
-                                                            </div>
-                                                        ), { duration: 10000, position: 'top-center', style: { maxWidth: '360px', background: '#1a1a1a', color: '#fff', marginTop: '40vh' } });
-                                                    }}
-                                                    className="p-1 text-muted-foreground hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100 shrink-0 ml-2"
-                                                >
-                                                    <Trash2 className="w-3 h-3" />
-                                                </button>
+                                                            ), { duration: 10000, position: 'top-center', style: { maxWidth: '360px', background: '#1a1a1a', color: '#fff', marginTop: '40vh' } });
+                                                        }}
+                                                        className="p-1 text-muted-foreground hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100 shrink-0 ml-2"
+                                                    >
+                                                        <Trash2 className="w-3 h-3" />
+                                                    </button>
+                                                )}
                                             </div>
                                             <div className="flex items-center space-x-3 mt-2 pt-2 border-t border-border/50">
                                                 <span className="text-[10px] text-muted-foreground font-mono font-bold">{note.createdAt ? formatDate(note.createdAt) : '-'}</span>

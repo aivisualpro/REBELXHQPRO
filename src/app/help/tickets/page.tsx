@@ -19,6 +19,7 @@ import toast from 'react-hot-toast';
 import { confirmDeleteToast } from '@/lib/confirmToast';
 import { Pagination } from '@/components/ui/Pagination';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface User {
     _id: string;
@@ -68,7 +69,7 @@ export default function TicketsPage() {
     const [formData, setFormData] = useState<Partial<Ticket>>({});
     const [saving, setSaving] = useState(false);
 
-
+    const { canDelete } = usePermissions();
 
     useEffect(() => {
         const timer = setTimeout(() => setDebouncedSearch(search), 500);
@@ -336,9 +337,11 @@ export default function TicketsPage() {
                                         <button onClick={() => openModal(item)} className="p-1 hover:bg-slate-200 rounded text-slate-500 hover:text-slate-900 transition-colors">
                                             <Edit2 className="w-3.5 h-3.5" />
                                         </button>
-                                        <button onClick={() => handleDelete(item._id)} className="p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-600 transition-colors">
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
+                                        {canDelete() && (
+                                            <button onClick={() => handleDelete(item._id)} className="p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-600 transition-colors">
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                        )}
                                     </div>
                                 </td>
                             </tr>

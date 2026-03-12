@@ -7,6 +7,7 @@ import { ArrowLeft, Package, Calendar, Archive, Scale, Pencil, Save, X, FileText
 import toast from 'react-hot-toast';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
 import { cn, formatDate } from '@/lib/utils';
+import { usePermissions } from '@/hooks/usePermissions';
 
 export default function AuditAdjustmentDetailPage() {
     const params = useParams();
@@ -19,6 +20,8 @@ export default function AuditAdjustmentDetailPage() {
     const [isLotModalOpen, setIsLotModalOpen] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [headerPortal, setHeaderPortal] = useState<HTMLElement | null>(null);
+
+    const { canDelete } = usePermissions();
 
     const [formData, setFormData] = useState({
         lotNumber: '',
@@ -289,14 +292,16 @@ export default function AuditAdjustmentDetailPage() {
                                     <Pencil className="w-3.5 h-3.5" />
                                     <span>Edit</span>
                                 </button>
-                                <button
-                                    onClick={handleDelete}
-                                    disabled={isDeleting}
-                                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors cursor-pointer disabled:opacity-50"
-                                >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                    <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
-                                </button>
+                                {canDelete() && (
+                                    <button
+                                        onClick={handleDelete}
+                                        disabled={isDeleting}
+                                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors cursor-pointer disabled:opacity-50"
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                        <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
+                                    </button>
+                                )}
                             </>
                         )}
                     </div>

@@ -290,16 +290,22 @@ function SettingsPageContent() {
     const toggleSubModuleEnabled = (moduleKey: string, subKey: string) => {
         setWsFormData(prev => ({
             ...prev,
-            modules: prev.modules.map(m =>
-                m.key === moduleKey
-                    ? {
-                        ...m,
-                        subModules: m.subModules.map(s =>
-                            s.key === subKey ? { ...s, enabled: !s.enabled } : s
-                        ),
-                    }
-                    : m
-            ),
+            modules: prev.modules.map(m => {
+                if (m.key !== moduleKey) return m;
+
+                const updatedSubModules = m.subModules.map(s =>
+                    s.key === subKey ? { ...s, enabled: !s.enabled } : s
+                );
+                
+                // Enforce that parent module is enabled if any submodule is enabled
+                const hasEnabledSub = updatedSubModules.some(s => s.enabled);
+
+                return {
+                    ...m,
+                    enabled: m.enabled || hasEnabledSub,
+                    subModules: updatedSubModules,
+                };
+            }),
         }));
     };
 
