@@ -2,7 +2,7 @@ import {
     Users, Settings, UsersRound, Activity, ShoppingCart, CreditCard,
     Globe, Package, Clock, Database, Factory, Truck, BookOpen,
     Store, BarChart3, PieChart, LineChart, Scale, LayoutDashboard,
-    HelpCircle, Ticket, ClipboardCheck, Target
+    HelpCircle, Ticket, ClipboardCheck, Target, AlertTriangle, CircleDollarSign
 } from 'lucide-react';
 
 export const MENU_ITEMS = [
@@ -54,6 +54,8 @@ export const MENU_ITEMS = [
             { title: 'Dashboard', href: '/reports/dashboard', icon: LayoutDashboard },
             { title: 'Financials', href: '/reports/financials', icon: LineChart },
             { title: 'Business', href: '/reports/business', icon: PieChart },
+            { title: 'Waiting on Lot', href: '/reports/waiting-on-lot', icon: AlertTriangle },
+            { title: 'Missing Cost', href: '/reports/missing-cost', icon: CircleDollarSign },
         ]
     },
     {
