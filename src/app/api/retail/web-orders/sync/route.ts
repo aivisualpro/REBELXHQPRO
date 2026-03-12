@@ -248,6 +248,7 @@ export async function POST(request: Request) {
         let totalAdded = 0;
         let totalUpdated = 0;
         let totalSkipped = 0;
+        let modifiedOrderDetails: { type: 'added' | 'updated', id: string, number: string, siteName: string }[] = [];
 
         try {
             syncProgress = {
@@ -410,8 +411,18 @@ export async function POST(request: Request) {
                 // Transform all orders in batch
                 const transformedOrders = batch.map(({ site, order }) => transformOrder(order, site, webProductMap, lotMap));
 
-                // Get existing order IDs to determine adds vs updates
-                // Note: transformOrder uses upsert=true, so we rely on bulkWrite return val
+                // Get existing order IDs to determine accurate adds vs updates
+                const existingOrders = await WebOrder.find({ _id: { $in: transformedOrders.map(o => o._id) } }).select('_id dateModified').lean();
+                const existingMap = new Map((existingOrders as any[]).map(o => [o._id, o.dateModified]));
+
+                transformedOrders.forEach(doc => {
+                    const existDate = existingMap.get(doc._id);
+                    if (!existDate) {
+                        modifiedOrderDetails.push({ type: 'added', id: doc._id as string, number: doc.number as string, siteName: doc.website as string });
+                    } else if (doc.dateModified && new Date(existDate).getTime() !== new Date(doc.dateModified as Date).getTime()) {
+                        modifiedOrderDetails.push({ type: 'updated', id: doc._id as string, number: doc.number as string, siteName: doc.website as string });
+                    }
+                });
 
                 // Build bulk operations
                 const bulkOps = transformedOrders.map(doc => ({
@@ -504,15 +515,18 @@ export async function POST(request: Request) {
             syncProgress.logs.push(`⏱️ Duration: ${duration}s (${(allWebOrders.length / parseFloat(duration)).toFixed(0)} orders/sec)`);
 
             // Create notification if there were changes
-            if (totalAdded > 0 || totalUpdated > 0) {
+            if (modifiedOrderDetails.length > 0) {
                 try {
-                    if (!forceFullSync && allWebOrders.length <= 20) {
+                    const actualAdded = modifiedOrderDetails.filter(m => m.type === 'added').length;
+                    const actualUpdated = modifiedOrderDetails.filter(m => m.type === 'updated').length;
+
+                    if (!forceFullSync && modifiedOrderDetails.length <= 20) {
                         // For small incremental syncs, generate one notification per order
-                        const notifs = allWebOrders.map(({ site, order }) => ({
+                        const notifs = modifiedOrderDetails.map(orderInfo => ({
                             category: 'orders',
                             title: `Web Order Synced`,
-                            message: `Order #${order.number || order.id} synced from ${site.name}`,
-                            link: `/sales/web-orders/WC-${site.name}-${order.id}`,
+                            message: `Order #${orderInfo.number || orderInfo.id} synced from ${orderInfo.siteName}`,
+                            link: `/sales/web-orders/${orderInfo.id}`,
                             metadata: {
                                 type: 'web-order-sync',
                                 duration: parseFloat(duration),
@@ -525,21 +539,21 @@ export async function POST(request: Request) {
                     } else {
                         // For massive bulk/full syncs, generate a single summary notification
                         const parts: string[] = [];
-                        if (totalAdded > 0) parts.push(`${totalAdded} new`);
-                        if (totalUpdated > 0) parts.push(`${totalUpdated} updated`);
+                        if (actualAdded > 0) parts.push(`${actualAdded} new`);
+                        if (actualUpdated > 0) parts.push(`${actualUpdated} updated`);
                         
                         // Extract unique site names involved
-                        const involvedSites = Array.from(new Set(allWebOrders.map(o => o.site.name))).join(', ');
+                        const involvedSites = Array.from(new Set(modifiedOrderDetails.map(o => o.siteName))).join(', ');
 
                         await Notification.create({
                             category: 'orders',
                             title: `Bulk Web Orders Synced`,
-                            message: `${parts.join(', ')} order${(totalAdded + totalUpdated) > 1 ? 's' : ''} from ${involvedSites || 'WooCommerce'} (${duration}s)`,
+                            message: `${parts.join(', ')} order${(actualAdded + actualUpdated) > 1 ? 's' : ''} from ${involvedSites || 'WooCommerce'} (${duration}s)`,
                             link: '/sales/web-orders',
                             metadata: {
                                 type: 'web-order-sync',
-                                added: totalAdded,
-                                updated: totalUpdated,
+                                added: actualAdded,
+                                updated: actualUpdated,
                                 skipped: totalSkipped,
                                 duration: parseFloat(duration),
                                 mode: forceFullSync ? 'full' : 'incremental',
