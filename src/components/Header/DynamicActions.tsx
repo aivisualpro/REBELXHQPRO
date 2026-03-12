@@ -10,6 +10,7 @@ import { useTheme } from '@/components/ThemeProvider';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTimers } from '@/components/TimerContext';
 import { useNotifications } from '@/components/NotificationContext';
+import { GlobalRouteSearch } from './GlobalRouteSearch';
 
 const DynamicActionsContent = () => {
     const { data: session } = useSession();
@@ -78,7 +79,12 @@ const DynamicActionsContent = () => {
 
     return (
         <div className="flex items-center justify-end space-x-1 w-full h-full">
-            {/* Search Bar */}
+            {/* Global Route Search (Command Palette) */}
+            <div className="hidden sm:block mr-2">
+                <GlobalRouteSearch />
+            </div>
+
+            {/* Local Data Search Bar */}
             {isSearchable && (
                 <AnimatePresence mode="wait">
                     {isSearchOpen ? (
