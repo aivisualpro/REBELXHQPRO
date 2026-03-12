@@ -38,6 +38,7 @@ export const MODULE_BLUEPRINTS: ModuleBlueprint[] = [
                     { field: 'lastName', label: 'Last Name' },
                     { field: 'email', label: 'Email' },
                     { field: 'phone', label: 'Phone' },
+                    { field: 'password', label: 'Password' },
                     { field: 'role', label: 'Role' },
                     { field: 'department', label: 'Department' },
                     { field: 'hourlyRate', label: 'Hourly Rate' },

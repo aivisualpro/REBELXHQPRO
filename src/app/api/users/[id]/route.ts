@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import User from '@/models/User';
+import Workspace from '@/models/Workspace';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
@@ -41,9 +42,25 @@ export async function GET(
         const isSuperAdmin = (session?.user as any)?.role === 'SuperAdmin';
         const isOwnProfile = (session?.user as any)?.profileId === id || (session?.user as any)?.id === id || (session?.user as any)?._id === id;
 
-        // SuperAdmin or the user themselves can see the password
+        let canSeePassword = isSuperAdmin || isOwnProfile;
+        
+        // Check if the assigned workspace explicitly grants 'password' visibility in the 'users' sub-module
+        if (!canSeePassword && (session?.user as any)?.workspaceId) {
+            const workspace = await Workspace.findById((session?.user as any).workspaceId).lean();
+            if (workspace) {
+                const adminModule = workspace.modules?.find((m: any) => m.key === 'admin');
+                const usersSubModule = adminModule?.subModules?.find((sm: any) => sm.key === 'users');
+                if (usersSubModule && usersSubModule.enabled) {
+                    const pswField = usersSubModule.fields?.find((f: any) => f.field === 'password');
+                    if (!pswField || pswField.visible !== false) {
+                        canSeePassword = true;
+                    }
+                }
+            }
+        }
+
         const { googleRefreshToken, googleAccessToken, ...userData } = user as any;
-        if (!isSuperAdmin && !isOwnProfile) {
+        if (!canSeePassword) {
             const { password, ...safeUser } = userData;
             return NextResponse.json(safeUser);
         }

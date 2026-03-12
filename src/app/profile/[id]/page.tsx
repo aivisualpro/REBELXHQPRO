@@ -55,7 +55,7 @@ export default function UserProfilePage() {
     const { theme } = useTheme();
     const isDark = theme === 'dark';
     const id = params.id as string;
-    const { isModuleEnabled } = usePermissions();
+    const { isModuleEnabled, isFieldVisibleByKey } = usePermissions();
 
     const [user, setUser] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -108,6 +108,7 @@ export default function UserProfilePage() {
 
     const isSuperAdmin = (session?.user as any)?.role === 'SuperAdmin';
     const isOwnProfile = (session?.user as any)?.profileId === id || (session?.user as any)?.id === id;
+    const canSeePassword = isSuperAdmin || isOwnProfile || isFieldVisibleByKey('users', 'password');
 
     useEffect(() => {
         if (!id) return;
@@ -323,8 +324,8 @@ export default function UserProfilePage() {
                                     <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-1", isDark ? "text-slate-500" : "text-slate-400")}>Phone</p>
                                     <p className={cn("text-sm font-semibold", isDark ? "text-white" : "text-slate-900")}>{user.phone || '—'}</p>
                                 </div>
-                                {/* Password (SuperAdmin or Own Profile) */}
-                                {(isSuperAdmin || isOwnProfile) && user.password && (
+                                {/* Password (Controlled by Workspace Permissions) */}
+                                {canSeePassword && user.password && (
                                     <div>
                                         <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-1", isDark ? "text-slate-500" : "text-slate-400")}>Password</p>
                                         <div className="flex items-center gap-2">
@@ -339,7 +340,7 @@ export default function UserProfilePage() {
                                 )}
                                 
                                 {/* Reset Password Option */}
-                                {(isSuperAdmin || isOwnProfile) && (
+                                {canSeePassword && (
                                     <div className="pt-2 border-t border-slate-200 dark:border-slate-700/50 mt-4">
                                         <button
                                             onClick={() => {
