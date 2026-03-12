@@ -190,7 +190,7 @@ function POModal({ editingOrderId, newOrder, setNewOrder, newLineItems, setNewLi
               <div className="space-y-1.5">
                 <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">Vendor *</label>
                 <SearchableSelect triggerClassName="h-9 rounded-lg text-[12px]" options={allVendors.map(v => ({ value: v._id, label: v.name }))}
-                  value={newOrder.vendor} onChange={val => setNewOrder((p: any) => ({ ...p, vendor: val }))} placeholder="Select Vendor..." required />
+                  value={newOrder.vendor} onChange={val => setNewOrder((p: any) => ({ ...p, vendor: val }))} placeholder="Select Vendor..." required creatable />
               </div>
               <div className="space-y-1.5">
                 <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">Status</label>

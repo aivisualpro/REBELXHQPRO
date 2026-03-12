@@ -249,7 +249,7 @@ function ManufacturingContent() {
   const searchParams = useSearchParams();
 
   const [orders, setOrders] = useState<ManufacturingOrder[]>(globalCache.current?.orders || []);
-  const [isLoading, setIsLoading] = useState(!globalCache.current);
+  const [isLoading, setIsLoading] = useState(!globalCache.current || globalCache.current.orders.length === 0);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(globalCache.current?.hasMore ?? true);
   const [error, setError] = useState<string | null>(null);
@@ -427,25 +427,18 @@ function ManufacturingContent() {
 
   // ─── Initial load & filter changes ───────────────────────────────────────
 
-  const fetchPageRef = useRef(fetchPage);
-  fetchPageRef.current = fetchPage;
-
   const isFirstMount = useRef(true);
-  const prevFiltersRef = useRef({ sortBy, sortOrder, search: debouncedSearch, status: activeStatus, priority: activePriority });
 
   useEffect(() => {
-    const prev = prevFiltersRef.current;
-    const filtersChanged = prev.sortBy !== sortBy || prev.sortOrder !== sortOrder || prev.search !== debouncedSearch || prev.status !== activeStatus || prev.priority !== activePriority;
-    prevFiltersRef.current = { sortBy, sortOrder, search: debouncedSearch, status: activeStatus, priority: activePriority };
-
-    // First mount: check cache before fetching
+    // 1. Initial Mount: Check cache
     if (isFirstMount.current) {
       isFirstMount.current = false;
       const cache = globalCache.current;
       if (cache && cache.orders.length > 0 && (Date.now() - cache.timestamp) < CACHE_TTL &&
         cache.sortBy === sortBy && cache.sortOrder === sortOrder && cache.search === debouncedSearch &&
         cache.status === activeStatus && cache.priority === activePriority) {
-        // Instant restore from cache — zero API calls
+        
+        // Instant restore without skeleton flashing
         setOrders(cache.orders);
         setHasMore(cache.hasMore);
         pageRef.current = cache.page;
@@ -454,12 +447,13 @@ function ManufacturingContent() {
       }
     }
 
-    // Filters actually changed OR no cache on first mount — fresh fetch
+    // 2. Not cached / filters changed: fresh fetch
+    // Do NOT call setOrders([]) here; it causes UI to briefly flash "0 items" before isLoading kicks in.
     globalCache.current = null;
     pageRef.current = 0;
-    setOrders([]);
     setHasMore(true);
-    fetchPageRef.current(1, false);
+    setIsLoading(true);
+    fetchPage(1, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sortBy, sortOrder, debouncedSearch, activeStatus, activePriority]);
 

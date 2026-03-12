@@ -113,6 +113,30 @@ export async function PATCH(
         const { id } = await context.params;
         const body = await request.json();
 
+        // Auto-create/resolve vendor if it's a typed name instead of an existing ID
+        if (body.vendor) {
+            const isObjectId = mongoose.Types.ObjectId.isValid(body.vendor);
+            let vendorDoc = isObjectId ? await Vendor.findById(body.vendor) : null;
+            
+            if (!vendorDoc && !isObjectId) {
+                // Try strictly finding by string ID
+                vendorDoc = await Vendor.findById(body.vendor);
+            }
+
+            if (!vendorDoc) {
+                // Find by exact name case-insensitive
+                vendorDoc = await Vendor.findOne({ name: { $regex: new RegExp(`^${body.vendor}$`, 'i') } });
+                
+                if (!vendorDoc) {
+                    // Create it on the fly
+                    const session = await getServerSession(authOptions);
+                    const userEmail = session?.user?.email || '';
+                    vendorDoc = await Vendor.create({ name: body.vendor, createdBy: userEmail || 'Unknown' });
+                }
+                body.vendor = vendorDoc._id.toString();
+            }
+        }
+
         // Check if we need to generate lot numbers
         // We need existing order state to know current status if not provided
         const existing = await PurchaseOrder.findById(id).lean();

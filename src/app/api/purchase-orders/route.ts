@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import mongoose from 'mongoose';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import dbConnect from '@/lib/mongoose';
@@ -107,6 +108,28 @@ export async function POST(request: Request) {
         const userEmail = session?.user?.email || '';
         if (session?.user && (session.user as any).id) {
             body.createdBy = (session.user as any).id;
+        }
+
+        // Auto-create/resolve vendor if it's a typed name instead of an existing ID
+        if (body.vendor) {
+            const isObjectId = mongoose.Types.ObjectId.isValid(body.vendor);
+            let vendorDoc = isObjectId ? await Vendor.findById(body.vendor) : null;
+            
+            if (!vendorDoc && !isObjectId) {
+                // Try strictly finding by string ID
+                vendorDoc = await Vendor.findById(body.vendor);
+            }
+
+            if (!vendorDoc) {
+                // Find by exact name case-insensitive
+                vendorDoc = await Vendor.findOne({ name: { $regex: new RegExp(`^${body.vendor}$`, 'i') } });
+                
+                if (!vendorDoc) {
+                    // Create it on the fly
+                    vendorDoc = await Vendor.create({ name: body.vendor, createdBy: body.createdBy });
+                }
+                body.vendor = vendorDoc._id.toString();
+            }
         }
 
         const newItem = await PurchaseOrder.create(body);
