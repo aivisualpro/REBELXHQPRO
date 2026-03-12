@@ -69,11 +69,21 @@ async function getSummary() {
                     }
                 },
                 {
+                    $sort: { dateCreated: 1 }
+                },
+                {
                     $group: {
-                        _id: '$lineItems.linkedSkuId',
+                        _id: { sku: '$lineItems.linkedSkuId', lot: '$lineItems.lotNumber' },
+                        quantity: { $first: { $ifNull: ['$lineItems.quantity', 0] } },
+                        total: { $first: { $toDouble: { $ifNull: ['$lineItems.total', 0] } } }
+                    }
+                },
+                {
+                    $group: {
+                        _id: '$_id.sku',
                         count: { $sum: 1 },
-                        totalQty: { $sum: { $ifNull: ['$lineItems.quantity', 0] } },
-                        totalValue: { $sum: { $toDouble: { $ifNull: ['$lineItems.total', 0] } } },
+                        totalQty: { $sum: '$quantity' },
+                        totalValue: { $sum: '$total' },
                     }
                 }
             ]).allowDiskUse(true),
@@ -99,15 +109,25 @@ async function getSummary() {
                     }
                 },
                 {
+                    $sort: { createdAt: 1 }
+                },
+                {
                     $group: {
-                        _id: '$lineItems.sku',
+                        _id: { sku: '$lineItems.sku', lot: '$lineItems.lotNumber' },
+                        qty: { $first: { $ifNull: ['$lineItems.qty', 0] } },
+                        price: { $first: { $ifNull: ['$lineItems.price', 0] } }
+                    }
+                },
+                {
+                    $group: {
+                        _id: '$_id.sku',
                         count: { $sum: 1 },
-                        totalQty: { $sum: { $ifNull: ['$lineItems.qty', 0] } },
+                        totalQty: { $sum: '$qty' },
                         totalValue: {
                             $sum: {
                                 $multiply: [
-                                    { $ifNull: ['$lineItems.qty', 0] },
-                                    { $ifNull: ['$lineItems.price', 0] }
+                                    '$qty',
+                                    '$price'
                                 ]
                             }
                         },
@@ -305,10 +325,23 @@ async function getSkuDetail(skuId: string) {
             });
         }
 
-        // Sort by date desc
-        items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        // Sort by date ascending to get the oldest (origin) transaction first
+        items.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-        const result = { items };
+        const uniqueItems: any[] = [];
+        const seenLots = new Set<string>();
+
+        for (const item of items) {
+            if (!seenLots.has(item.lotNumber)) {
+                seenLots.add(item.lotNumber);
+                uniqueItems.push(item);
+            }
+        }
+
+        // Sort by date desc for display
+        uniqueItems.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        const result = { items: uniqueItems };
         detailCache.set(skuId, { data: result, timestamp: Date.now() });
 
         return NextResponse.json(result);
