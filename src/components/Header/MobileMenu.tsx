@@ -6,18 +6,35 @@ import { MENU_ITEMS } from '@/constants/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { useSession, signOut } from 'next-auth/react';
+import { usePermissions } from '@/hooks/usePermissions';
+
+// Map navigation menu titles to workspace module keys
+const MENU_TO_MODULE_KEY: Record<string, string> = {
+    'Admin': 'admin',
+    'CRM': 'crm',
+    'Sales': 'sales',
+    'Warehouse': 'warehouse',
+    'Reports': 'reports',
+    'Help': 'help',
+};
 
 export const MobileMenu = () => {
     const { data: session } = useSession();
+    const { isSuperAdmin, isModuleEnabled, isRouteEnabled } = usePermissions();
     const [isOpen, setIsOpen] = useState(false);
     const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
 
     const visibleMenuItems = MENU_ITEMS.filter(item => {
-        if (item.title === 'Admin') {
-            return (session?.user as any)?.role === 'SuperAdmin';
+        if (isSuperAdmin) return true;
+        const moduleKey = MENU_TO_MODULE_KEY[item.title];
+        if (moduleKey) {
+            return isModuleEnabled(moduleKey);
         }
         return true;
-    });
+    }).map(menu => ({
+        ...menu,
+        items: isSuperAdmin ? menu.items : menu.items.filter(i => isRouteEnabled(i.href))
+    })).filter(menu => menu.items.length > 0 || menu.title === 'CRM');
 
     return (
         <div className="lg:hidden flex items-center">

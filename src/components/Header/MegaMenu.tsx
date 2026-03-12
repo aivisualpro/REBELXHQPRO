@@ -25,10 +25,6 @@ export const MegaMenu = () => {
     const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
     const visibleMenuItems = MENU_ITEMS.filter(item => {
-        // Admin menu: only SuperAdmin
-        if (item.title === 'Admin') {
-            return (session?.user as any)?.role === 'SuperAdmin';
-        }
         // SuperAdmin sees everything
         if (isSuperAdmin) return true;
         // Check workspace module permission
