@@ -7,6 +7,7 @@ import { ArrowLeft, Package, Calendar, Building2, CreditCard, Truck, Plus, X, Tr
 import { cn, formatDate, toDateInputValue } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { CreateVendorModal } from '@/components/warehouse/CreateVendorModal';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
 import { List } from 'lucide-react';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -89,6 +90,8 @@ export default function PurchaseOrderDetailPage() {
     const [isHeaderModalOpen, setIsHeaderModalOpen] = useState(false);
     const [editingHeader, setEditingHeader] = useState<any>(null);
     const [allVendors, setAllVendors] = useState<{ _id: string; name: string }[]>([]);
+    const [isCreateVendorOpen, setIsCreateVendorOpen] = useState(false);
+    const [vendorSearchVal, setVendorSearchVal] = useState('');
 
     const fetchOrder = async () => {
         try {
@@ -780,8 +783,17 @@ export default function PurchaseOrderDetailPage() {
                                         triggerClassName="h-[36px]"
                                         options={allVendors.map(v => ({ value: v._id, label: v.name }))}
                                         value={editingHeader.vendor || ''}
-                                        onChange={(val) => setEditingHeader({ ...editingHeader, vendor: val })}
+                                        onChange={(val) => {
+                                            const existing = allVendors.find(v => v._id === val || v.name.toLowerCase() === val.toLowerCase());
+                                            if (!existing && val) {
+                                                setVendorSearchVal(val);
+                                                setIsCreateVendorOpen(true);
+                                            } else {
+                                                setEditingHeader({ ...editingHeader, vendor: val });
+                                            }
+                                        }}
                                         placeholder="Select Vendor..."
+                                        creatable
                                     />
                                 </div>
                                 <div className="space-y-1.5">
@@ -888,6 +900,17 @@ export default function PurchaseOrderDetailPage() {
                 skuId={formData.sku}
                 currentLotNumber={formData.lotNumber}
             />
+
+            {isCreateVendorOpen && (
+                <CreateVendorModal
+                    initialName={vendorSearchVal}
+                    onClose={() => setIsCreateVendorOpen(false)}
+                    onSuccess={(newVendor) => {
+                        setAllVendors((prev) => [...prev, newVendor]);
+                        setEditingHeader((prev: any) => ({ ...prev, vendor: newVendor._id }));
+                    }}
+                />
+            )}
         </div>
     );
 }

@@ -9,6 +9,7 @@ import Papa from 'papaparse';
 import { cn, formatDate, toDateInputValue } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { CreateVendorModal } from '@/components/warehouse/CreateVendorModal';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -122,16 +123,19 @@ const TAB_COLORS: Record<string, { bg: string; color: string; hoverBg: string }>
 
 // ─── PO Create / Edit Modal ───────────────────────────────────────────────────
 
-function POModal({ editingOrderId, newOrder, setNewOrder, newLineItems, setNewLineItems, allVendors, allSkus, onClose, onSuccess }: {
+function POModal({ editingOrderId, newOrder, setNewOrder, newLineItems, setNewLineItems, allVendors, setAllVendors, allSkus, onClose, onSuccess }: {
   editingOrderId: string | null;
   newOrder: any; setNewOrder: any;
   newLineItems: NewLineItem[]; setNewLineItems: any;
   allVendors: { _id: string; name: string }[];
+  setAllVendors: any;
   allSkus: { _id: string; name: string; cost?: number }[];
   onClose: () => void;
   onSuccess: () => void;
 }) {
   const [saving, setSaving] = useState(false);
+  const [isCreateVendorOpen, setIsCreateVendorOpen] = useState(false);
+  const [vendorSearchVal, setVendorSearchVal] = useState('');
 
   const addLineItem = () => setNewLineItems((p: NewLineItem[]) => [...p, { id: Math.random().toString(), sku: '', qtyOrdered: 1, cost: 0, uom: '', qtyReceived: 0, lotNumber: '' }]);
   const removeLineItem = (id: string) => setNewLineItems((p: NewLineItem[]) => p.filter((i: NewLineItem) => i.id !== id));
@@ -190,7 +194,15 @@ function POModal({ editingOrderId, newOrder, setNewOrder, newLineItems, setNewLi
               <div className="space-y-1.5">
                 <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">Vendor *</label>
                 <SearchableSelect triggerClassName="h-9 rounded-lg text-[12px]" options={allVendors.map(v => ({ value: v._id, label: v.name }))}
-                  value={newOrder.vendor} onChange={val => setNewOrder((p: any) => ({ ...p, vendor: val }))} placeholder="Select Vendor..." required creatable />
+                  value={newOrder.vendor} onChange={val => {
+                    const existing = allVendors.find(v => v._id === val || v.name.toLowerCase() === val.toLowerCase());
+                    if (!existing && val) {
+                      setVendorSearchVal(val);
+                      setIsCreateVendorOpen(true);
+                    } else {
+                      setNewOrder((p: any) => ({ ...p, vendor: val }));
+                    }
+                  }} placeholder="Select Vendor..." required creatable />
               </div>
               <div className="space-y-1.5">
                 <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">Status</label>
@@ -285,6 +297,17 @@ function POModal({ editingOrderId, newOrder, setNewOrder, newLineItems, setNewLi
           </button>
         </div>
       </div>
+
+      {isCreateVendorOpen && (
+        <CreateVendorModal
+          initialName={vendorSearchVal}
+          onClose={() => setIsCreateVendorOpen(false)}
+          onSuccess={(newVendor) => {
+            setAllVendors((prev: any) => [...prev, newVendor]);
+            setNewOrder((p: any) => ({ ...p, vendor: newVendor._id }));
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -746,7 +769,7 @@ function PurchaseOrdersContent() {
           editingOrderId={editingOrderId}
           newOrder={newOrder} setNewOrder={setNewOrder}
           newLineItems={newLineItems} setNewLineItems={setNewLineItems}
-          allVendors={allVendors} allSkus={allSkus}
+          allVendors={allVendors} setAllVendors={setAllVendors} allSkus={allSkus}
           onClose={() => { setIsModalOpen(false); setEditingOrderId(null); }}
           onSuccess={() => { pageRef.current = 0; fetchPageRef.current(1, false); }}
         />

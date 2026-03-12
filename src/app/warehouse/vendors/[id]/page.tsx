@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import {
     ArrowLeft,
@@ -87,6 +87,7 @@ type Tab = 'pos' | 'notes' | 'payments';
 export default function VendorDetailPage() {
     const params = useParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const isNew = params.id === 'new';
 
     const [vendor, setVendor] = useState<Vendor | null>(null);
@@ -148,7 +149,8 @@ export default function VendorDetailPage() {
     useEffect(() => {
         if (isNew) {
             // Open create modal immediately for new vendor
-            setEditForm({ name: '', contactName: '', email: '', phone: '', address: '', city: '', state: '', zipCode: '', country: '', website: '', paymentTerms: '', status: 'Active' });
+            const initialName = searchParams.get('name') || '';
+            setEditForm({ name: initialName, contactName: '', email: '', phone: '', address: '', city: '', state: '', zipCode: '', country: '', website: '', paymentTerms: '', status: 'Active' });
             setIsEditModalOpen(true);
             return;
         }
