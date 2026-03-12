@@ -43,9 +43,10 @@ export async function GET(
         const isOwnProfile = (session?.user as any)?.profileId === id || (session?.user as any)?.id === id || (session?.user as any)?._id === id;
 
         let canSeePassword = isSuperAdmin || isOwnProfile;
+        let canSeeHourlyRate = isSuperAdmin || isOwnProfile;
         
-        // Check if the assigned workspace explicitly grants 'password' visibility in the 'users' sub-module
-        if (!canSeePassword && (session?.user as any)?.workspaceId) {
+        // Check if the assigned workspace explicitly grants field visibility in the 'users' sub-module
+        if ((!canSeePassword || !canSeeHourlyRate) && (session?.user as any)?.workspaceId) {
             const workspace = await Workspace.findById((session?.user as any).workspaceId).lean();
             if (workspace) {
                 const adminModule = workspace.modules?.find((m: any) => m.key === 'admin');
@@ -55,15 +56,18 @@ export async function GET(
                     if (!pswField || pswField.visible !== false) {
                         canSeePassword = true;
                     }
+                    const rateField = usersSubModule.fields?.find((f: any) => f.field === 'hourlyRate');
+                    if (!rateField || rateField.visible !== false) {
+                        canSeeHourlyRate = true;
+                    }
                 }
             }
         }
 
         const { googleRefreshToken, googleAccessToken, ...userData } = user as any;
-        if (!canSeePassword) {
-            const { password, ...safeUser } = userData;
-            return NextResponse.json(safeUser);
-        }
+        if (!canSeePassword) delete userData.password;
+        if (!canSeeHourlyRate) delete userData.hourlyRate;
+        
         return NextResponse.json(userData);
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });

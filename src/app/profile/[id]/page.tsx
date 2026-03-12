@@ -109,6 +109,7 @@ export default function UserProfilePage() {
     const isSuperAdmin = (session?.user as any)?.role === 'SuperAdmin';
     const isOwnProfile = (session?.user as any)?.profileId === id || (session?.user as any)?.id === id;
     const canSeePassword = isSuperAdmin || isOwnProfile || isFieldVisibleByKey('users', 'password');
+    const canSeeHourlyRate = isSuperAdmin || isOwnProfile || isFieldVisibleByKey('users', 'hourlyRate');
 
     useEffect(() => {
         if (!id) return;
@@ -281,15 +282,19 @@ export default function UserProfilePage() {
 
                             {/* Right Stats */}
                             <div className="flex items-center gap-6">
-                                <div className="text-center">
-                                    <div className={cn("text-3xl font-black tabular-nums", isDark ? "text-white" : "text-slate-900")}>
-                                        {user.hourlyRate ? `$${user.hourlyRate}` : '—'}
-                                    </div>
-                                    <div className={cn("text-[10px] font-bold uppercase tracking-widest mt-1", isDark ? "text-slate-400" : "text-slate-500")}>
-                                        Hourly Rate
-                                    </div>
-                                </div>
-                                <div className={cn("h-12 w-px", isDark ? "bg-slate-700" : "bg-slate-200")} />
+                                {canSeeHourlyRate && (
+                                    <>
+                                        <div className="text-center">
+                                            <div className={cn("text-3xl font-black tabular-nums", isDark ? "text-white" : "text-slate-900")}>
+                                                {user.hourlyRate ? `$${user.hourlyRate}` : '—'}
+                                            </div>
+                                            <div className={cn("text-[10px] font-bold uppercase tracking-widest mt-1", isDark ? "text-slate-400" : "text-slate-500")}>
+                                                Hourly Rate
+                                            </div>
+                                        </div>
+                                        <div className={cn("h-12 w-px", isDark ? "bg-slate-700" : "bg-slate-200")} />
+                                    </>
+                                )}
                                 <div className="text-center">
                                     <div className={cn("text-[11px] font-bold", isDark ? "text-slate-300" : "text-slate-700")}>
                                         {memberSince}
@@ -430,12 +435,6 @@ export default function UserProfilePage() {
                                     <p className={cn("text-[10px] font-bold uppercase tracking-widest", isDark ? "text-slate-500" : "text-slate-400")}>Joined</p>
                                     <p className={cn("text-sm font-bold", isDark ? "text-white" : "text-slate-900")}>{memberSince}</p>
                                 </div>
-                                {user.hourlyRate && (
-                                    <div className="flex items-center justify-between">
-                                        <p className={cn("text-[10px] font-bold uppercase tracking-widest", isDark ? "text-slate-500" : "text-slate-400")}>Rate</p>
-                                        <p className={cn("text-sm font-black tabular-nums", isDark ? "text-emerald-400" : "text-emerald-600")}>${user.hourlyRate}/hr</p>
-                                    </div>
-                                )}
                             </div>
                         </div>
                     </section>
