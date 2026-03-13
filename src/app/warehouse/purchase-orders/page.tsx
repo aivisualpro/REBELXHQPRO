@@ -32,6 +32,7 @@ interface PurchaseOrder {
   status: string;
   scheduledDelivery: string;
   receivedDate: string;
+  shippingCost: number;
   createdAt: string;
   lineItems?: LineItem[];
 }
@@ -149,6 +150,7 @@ function POModal({ editingOrderId, newOrder, setNewOrder, newLineItems, setNewLi
     try {
       const payload = {
         ...newOrder,
+        shippingCost: parseFloat(newOrder.shippingCost) || 0,
         lineItems: newLineItems.map((item: NewLineItem) => ({ sku: item.sku, qtyOrdered: item.qtyOrdered, cost: item.cost, uom: item.uom, qtyReceived: item.qtyReceived || 0, lotNumber: item.lotNumber || '' }))
       };
       const res = await fetch(editingOrderId ? `/api/purchase-orders/${editingOrderId}` : '/api/purchase-orders', {
@@ -221,6 +223,15 @@ function POModal({ editingOrderId, newOrder, setNewOrder, newLineItems, setNewLi
               <div className="space-y-1.5">
                 <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">Scheduled Delivery</label>
                 <input type="date" value={newOrder.scheduledDelivery} onChange={e => setNewOrder((p: any) => ({ ...p, scheduledDelivery: e.target.value }))} className={inp} />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">Shipping Cost</label>
+                <div className="relative">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-[12px]">$</span>
+                  <input type="number" min="0" step="0.01" value={newOrder.shippingCost || ''}
+                    onChange={e => setNewOrder((p: any) => ({ ...p, shippingCost: e.target.value }))}
+                    className={cn(inp, 'pl-6 font-mono')} placeholder="0.00" />
+                </div>
               </div>
             </div>
 
@@ -359,7 +370,7 @@ function PurchaseOrdersContent() {
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [allVendors, setAllVendors] = useState<{ _id: string; name: string }[]>([]);
   const [allSkus, setAllSkus] = useState<{ _id: string; name: string }[]>([]);
-  const [newOrder, setNewOrder] = useState({ label: '', vendor: '', paymentTerms: '', status: 'Pending', scheduledDelivery: '' });
+  const [newOrder, setNewOrder] = useState({ label: '', vendor: '', paymentTerms: '', status: 'Pending', scheduledDelivery: '', shippingCost: '' });
   const [newLineItems, setNewLineItems] = useState<NewLineItem[]>([]);
   const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; orderId: string | null }>({ isOpen: false, orderId: null });
   const [highlightId, setHighlightId] = useState<string | null>(null);
@@ -531,7 +542,7 @@ function PurchaseOrdersContent() {
 
   const openCreateModal = () => {
     setEditingOrderId(null);
-    setNewOrder({ label: '', vendor: '', paymentTerms: '', status: 'Pending', scheduledDelivery: '' });
+    setNewOrder({ label: '', vendor: '', paymentTerms: '', status: 'Pending', scheduledDelivery: '', shippingCost: '' });
     setNewLineItems([]);
     setIsModalOpen(true);
   };
@@ -544,7 +555,8 @@ function PurchaseOrdersContent() {
       vendor: typeof order.vendor === 'object' && order.vendor ? order.vendor._id : String(order.vendor || ''),
       paymentTerms: order.paymentTerms || '',
       status: order.status,
-      scheduledDelivery: toDateInputValue(order.scheduledDelivery)
+      scheduledDelivery: toDateInputValue(order.scheduledDelivery),
+      shippingCost: String(order.shippingCost || '')
     });
     setNewLineItems((order.lineItems || []).map(item => ({
       id: Math.random().toString(),

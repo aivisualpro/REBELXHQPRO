@@ -9,7 +9,14 @@ const PurchaseOrderSchema = new mongoose.Schema({
     status: { type: String, default: 'Draft' },
     scheduledDelivery: Date,
     receivedDate: Date,
+    shippingCost: { type: Number, default: 0 },
     createdAt: { type: Date, default: Date.now },
+
+    notes: [{
+        note: { type: String, required: true },
+        createdBy: { type: String, ref: 'RXHQUsers' },
+        createdAt: { type: Date, default: Date.now },
+    }],
 
     lineItems: [{
         legacyId: String, // Legacy support for AppSheet sync

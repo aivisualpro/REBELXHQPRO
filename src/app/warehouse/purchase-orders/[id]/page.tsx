@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, Package, Calendar, Building2, CreditCard, Truck, Plus, X, Trash2, Pencil, ChevronDown, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Package, Calendar, Building2, CreditCard, Truck, Plus, X, Trash2, Pencil, ChevronDown, AlertCircle, StickyNote, Send, Loader2 } from 'lucide-react';
 import { cn, formatDate, toDateInputValue } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
@@ -24,6 +24,13 @@ interface LineItem {
     createdBy?: { firstName: string; lastName: string } | string;
 }
 
+interface Note {
+    _id: string;
+    note: string;
+    createdBy?: { _id: string; firstName: string; lastName: string } | string;
+    createdAt: string;
+}
+
 interface PurchaseOrder {
     _id: string;
     label: string;
@@ -33,8 +40,10 @@ interface PurchaseOrder {
     status: string;
     scheduledDelivery: string;
     receivedDate: string;
+    shippingCost: number;
     createdAt: string;
     lineItems?: LineItem[];
+    notes?: Note[];
 }
 
 const UOM_OPTIONS = [
@@ -93,6 +102,16 @@ export default function PurchaseOrderDetailPage() {
     const [isCreateVendorOpen, setIsCreateVendorOpen] = useState(false);
     const [vendorSearchVal, setVendorSearchVal] = useState('');
 
+    // Tab state
+    const [activeTab, setActiveTab] = useState<'lineItems' | 'notes'>('lineItems');
+
+    // Notes state
+    const [notes, setNotes] = useState<Note[]>([]);
+    const [newNote, setNewNote] = useState('');
+    const [savingNote, setSavingNote] = useState(false);
+    const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+    const [editingNoteText, setEditingNoteText] = useState('');
+
     const fetchOrder = async () => {
         try {
             const res = await fetch(`/api/purchase-orders/${params.id}`);
@@ -109,11 +128,84 @@ export default function PurchaseOrderDetailPage() {
         }
     };
 
+    // ─── Notes CRUD ───────────────────────────────────────────────────────
+
+    const handleAddNote = async () => {
+        if (!order || !newNote.trim()) return;
+        setSavingNote(true);
+        try {
+            const res = await fetch(`/api/purchase-orders/${order._id}/notes`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ note: newNote.trim() }),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setNotes(data.notes || []);
+                setNewNote('');
+                toast.success('Note added');
+            } else {
+                toast.error('Failed to add note');
+            }
+        } catch {
+            toast.error('Error adding note');
+        } finally {
+            setSavingNote(false);
+        }
+    };
+
+    const handleEditNote = async (noteId: string) => {
+        if (!order || !editingNoteText.trim()) return;
+        try {
+            const res = await fetch(`/api/purchase-orders/${order._id}/notes`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ noteId, note: editingNoteText.trim() }),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setNotes(data.notes || []);
+                setEditingNoteId(null);
+                setEditingNoteText('');
+                toast.success('Note updated');
+            } else {
+                toast.error('Failed to update note');
+            }
+        } catch {
+            toast.error('Error updating note');
+        }
+    };
+
+    const handleDeleteNote = async (noteId: string) => {
+        if (!order) return;
+        try {
+            const res = await fetch(`/api/purchase-orders/${order._id}/notes?noteId=${noteId}`, {
+                method: 'DELETE',
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setNotes(data.notes || []);
+                toast.success('Note deleted');
+            } else {
+                toast.error('Failed to delete note');
+            }
+        } catch {
+            toast.error('Error deleting note');
+        }
+    };
+
     useEffect(() => {
         if (params.id) {
             fetchOrder();
         }
     }, [params.id]);
+
+    // Sync notes from order
+    useEffect(() => {
+        if (order?.notes) {
+            setNotes(order.notes);
+        }
+    }, [order]);
 
     useEffect(() => {
         const target = document.getElementById('header-portal-target');
@@ -477,6 +569,10 @@ export default function PurchaseOrderDetailPage() {
                                     <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold italic">Received Date</div>
                                     <div className="text-xs font-medium text-foreground">{formatDate(order.receivedDate)}</div>
                                 </div>
+                                <div className="flex justify-between items-center">
+                                    <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold italic">Shipping Cost</div>
+                                    <div className="text-xs font-medium text-emerald-500 font-mono">{order.shippingCost ? formatCurrency(order.shippingCost) : '-'}</div>
+                                </div>
                             </div>
                         </div>
 
@@ -496,10 +592,20 @@ export default function PurchaseOrderDetailPage() {
                                     <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">Qty Received</span>
                                     <span className="text-sm font-mono font-medium text-emerald-600">{totalQtyReceived.toFixed(2)}</span>
                                 </div>
+                                <div className="flex justify-between items-center group">
+                                    <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">Subtotal</span>
+                                    <span className="text-sm font-mono font-medium text-foreground">{formatCurrency(totalAmount)}</span>
+                                </div>
+                                {(order.shippingCost || 0) > 0 && (
+                                    <div className="flex justify-between items-center group">
+                                        <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">Shipping</span>
+                                        <span className="text-sm font-mono font-medium text-emerald-500">{formatCurrency(order.shippingCost)}</span>
+                                    </div>
+                                )}
                                 <div className="pt-3 mt-3 border-t border-border flex justify-between items-center">
-                                    <span className="text-sm font-bold text-foreground uppercase tracking-wider">Total Amount</span>
+                                    <span className="text-sm font-bold text-foreground uppercase tracking-wider">Grand Total</span>
                                     <span className="text-base font-mono font-bold text-foreground">
-                                        {formatCurrency(totalAmount)}
+                                        {formatCurrency(totalAmount + (order.shippingCost || 0))}
                                     </span>
                                 </div>
                             </div>
@@ -516,6 +622,7 @@ export default function PurchaseOrderDetailPage() {
                                     status: order.status,
                                     scheduledDelivery: toDateInputValue(order.scheduledDelivery),
                                     receivedDate: toDateInputValue(order.receivedDate),
+                                    shippingCost: order.shippingCost || 0,
                                 });
                                 setIsHeaderModalOpen(true);
                             }}
@@ -543,103 +650,233 @@ export default function PurchaseOrderDetailPage() {
                     <div className="px-4 border-b border-border shrink-0 flex items-center justify-between bg-background z-10 h-9">
                         <div className="flex space-x-1 h-full">
                             <button
-                                className="px-4 text-[10px] font-black uppercase tracking-widest transition-colors border-b-2 -mb-px outline-none flex items-center space-x-1.5 text-foreground border-foreground"
+                                onClick={() => setActiveTab('lineItems')}
+                                className={cn(
+                                    'px-4 text-[10px] font-black uppercase tracking-widest transition-colors border-b-2 -mb-px outline-none flex items-center space-x-1.5 cursor-pointer',
+                                    activeTab === 'lineItems' ? 'text-foreground border-foreground' : 'text-muted-foreground border-transparent hover:text-foreground/70'
+                                )}
                             >
                                 <span>Line Items</span>
-                                <span className="px-1.5 py-0.5 rounded-none text-[9px] font-bold bg-foreground text-background">
+                                <span className={cn(
+                                    'px-1.5 py-0.5 rounded-none text-[9px] font-bold',
+                                    activeTab === 'lineItems' ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground'
+                                )}>
                                     {order.lineItems?.length || 0}
                                 </span>
                             </button>
-                        </div>
-
-                        <div className="flex items-center space-x-2">
                             <button
-                                onClick={handleOpenAddModal}
-                                className="px-3 h-9 text-[10px] font-black uppercase tracking-widest bg-[#fe9900] text-black hover:bg-[#d9a318] transition-colors flex items-center space-x-1 shadow-sm cursor-pointer"
+                                onClick={() => setActiveTab('notes')}
+                                className={cn(
+                                    'px-4 text-[10px] font-black uppercase tracking-widest transition-colors border-b-2 -mb-px outline-none flex items-center space-x-1.5 cursor-pointer',
+                                    activeTab === 'notes' ? 'text-foreground border-foreground' : 'text-muted-foreground border-transparent hover:text-foreground/70'
+                                )}
                             >
-                                <Plus className="w-3 h-3" />
-                                <span>Add Item</span>
+                                <StickyNote className="w-3 h-3" />
+                                <span>Notes</span>
+                                {notes.length > 0 && (
+                                    <span className={cn(
+                                        'px-1.5 py-0.5 rounded-none text-[9px] font-bold',
+                                        activeTab === 'notes' ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground'
+                                    )}>
+                                        {notes.length}
+                                    </span>
+                                )}
                             </button>
                         </div>
+
+                        {activeTab === 'lineItems' && (
+                            <div className="flex items-center space-x-2">
+                                <button
+                                    onClick={handleOpenAddModal}
+                                    className="px-3 h-9 text-[10px] font-black uppercase tracking-widest bg-[#fe9900] text-black hover:bg-[#d9a318] transition-colors flex items-center space-x-1 shadow-sm cursor-pointer"
+                                >
+                                    <Plus className="w-3 h-3" />
+                                    <span>Add Item</span>
+                                </button>
+                            </div>
+                        )}
                     </div>
 
-                    {/* Line Items Table */}
+                    {/* Tab Content */}
                     <div className="flex-1 overflow-auto">
-                        <div className="animate-in fade-in duration-300">
-                            <table className="w-full border-collapse text-left">
-                                <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
-                                    <tr>
-                                        {['SKU', 'Lot #', 'UOM', 'Qty Ordered', 'Qty Received', 'Cost', 'Amount', 'Actions'].map(col => (
-                                            <th key={col} className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">
-                                                {col}
-                                            </th>
-                                        ))}
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-border">
-                                    {(!order.lineItems || order.lineItems.length === 0) ? (
+                        {activeTab === 'lineItems' ? (
+                            /* Line Items Table */
+                            <div className="animate-in fade-in duration-300">
+                                <table className="w-full border-collapse text-left">
+                                    <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
                                         <tr>
-                                            <td colSpan={8} className="px-3 py-6 text-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider">No line items</td>
+                                            {['SKU', 'Lot #', 'UOM', 'Qty Ordered', 'Qty Received', 'Cost', 'Amount', 'Actions'].map(col => (
+                                                <th key={col} className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">
+                                                    {col}
+                                                </th>
+                                            ))}
                                         </tr>
-                                    ) : order.lineItems.map(item => {
-                                        const skuName = (typeof item.sku === 'object' && item.sku !== null) ? item.sku?.name : (item.sku || '-');
-                                        const skuId = (typeof item.sku === 'object' && item.sku !== null) ? item.sku._id : item.sku;
-                                        const amount = (item.qtyOrdered || 0) * (item.cost || 0);
+                                    </thead>
+                                    <tbody className="divide-y divide-border">
+                                        {(!order.lineItems || order.lineItems.length === 0) ? (
+                                            <tr>
+                                                <td colSpan={8} className="px-3 py-6 text-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider">No line items</td>
+                                            </tr>
+                                        ) : order.lineItems.map(item => {
+                                            const skuName = (typeof item.sku === 'object' && item.sku !== null) ? item.sku?.name : (item.sku || '-');
+                                            const skuId = (typeof item.sku === 'object' && item.sku !== null) ? item.sku._id : item.sku;
+                                            const amount = (item.qtyOrdered || 0) * (item.cost || 0);
 
-                                        return (
-                                            <tr key={item._id} className="hover:bg-secondary/50 transition-colors">
-                                                <td className="px-3 py-1.5 text-[10px] text-foreground">
-                                                    <span
-                                                        onClick={() => router.push(`/warehouse/skus/${skuId}`)}
-                                                        className="hover:text-blue-600 hover:underline cursor-pointer transition-colors"
-                                                    >
-                                                        {skuName || '-'}
-                                                    </span>
-                                                </td>
-                                                <td className="px-3 py-1.5 text-[10px] text-muted-foreground font-mono">{item.lotNumber || '-'}</td>
-                                                <td className="px-3 py-1.5 text-[10px] uppercase font-bold text-muted-foreground">{item.uom || '-'}</td>
-                                                <td className="px-3 py-1.5 text-[10px] text-muted-foreground font-mono">{item.qtyOrdered?.toFixed(4) ?? '-'}</td>
-                                                <td className="px-3 py-1.5 text-[10px] text-muted-foreground font-mono">{item.qtyReceived?.toFixed(4) ?? '-'}</td>
-                                                <td className="px-3 py-1.5 text-[10px] text-emerald-500 font-mono font-bold">{formatCurrency(item.cost)}</td>
-                                                <td className="px-3 py-1.5 text-[10px] font-bold text-foreground font-mono">{formatCurrency(amount)}</td>
-                                                <td className="px-3 py-1.5">
-                                                    <div className="flex items-center space-x-1">
-                                                        <button
-                                                            onClick={() => handleOpenEditModal(item)}
-                                                            className="p-1 text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10 transition-colors rounded cursor-pointer"
-                                                            title="Edit"
+                                            return (
+                                                <tr key={item._id} className="hover:bg-secondary/50 transition-colors">
+                                                    <td className="px-3 py-1.5 text-[10px] text-foreground">
+                                                        <span
+                                                            onClick={() => router.push(`/warehouse/skus/${skuId}`)}
+                                                            className="hover:text-blue-600 hover:underline cursor-pointer transition-colors"
                                                         >
-                                                            <Pencil className="w-3.5 h-3.5" />
-                                                        </button>
-                                                        {canDelete() && (
+                                                            {skuName || '-'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-3 py-1.5 text-[10px] text-muted-foreground font-mono">{item.lotNumber || '-'}</td>
+                                                    <td className="px-3 py-1.5 text-[10px] uppercase font-bold text-muted-foreground">{item.uom || '-'}</td>
+                                                    <td className="px-3 py-1.5 text-[10px] text-muted-foreground font-mono">{item.qtyOrdered?.toFixed(4) ?? '-'}</td>
+                                                    <td className="px-3 py-1.5 text-[10px] text-muted-foreground font-mono">{item.qtyReceived?.toFixed(4) ?? '-'}</td>
+                                                    <td className="px-3 py-1.5 text-[10px] text-emerald-500 font-mono font-bold">{formatCurrency(item.cost)}</td>
+                                                    <td className="px-3 py-1.5 text-[10px] font-bold text-foreground font-mono">{formatCurrency(amount)}</td>
+                                                    <td className="px-3 py-1.5">
+                                                        <div className="flex items-center space-x-1">
                                                             <button
-                                                                onClick={() => handleDeleteClick(item._id)}
-                                                                className="p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors rounded cursor-pointer"
-                                                                title="Delete"
+                                                                onClick={() => handleOpenEditModal(item)}
+                                                                className="p-1 text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10 transition-colors rounded cursor-pointer"
+                                                                title="Edit"
                                                             >
-                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                                <Pencil className="w-3.5 h-3.5" />
                                                             </button>
+                                                            {canDelete() && (
+                                                                <button
+                                                                    onClick={() => handleDeleteClick(item._id)}
+                                                                    className="p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors rounded cursor-pointer"
+                                                                    title="Delete"
+                                                                >
+                                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                    {order.lineItems && order.lineItems.length > 0 && (
+                                        <tfoot className="bg-secondary/50 border-t border-border">
+                                            <tr>
+                                                <td colSpan={3} className="px-3 py-1.5 text-[9px] font-bold text-muted-foreground uppercase text-right tracking-wider">Subtotal</td>
+                                                <td className="px-3 py-1.5 text-[10px] font-bold text-foreground font-mono">{totalQtyOrdered.toFixed(4)}</td>
+                                                <td className="px-3 py-1.5 text-[10px] font-bold text-foreground font-mono">{totalQtyReceived.toFixed(4)}</td>
+                                                <td className="px-3 py-1.5"></td>
+                                                <td className="px-3 py-1.5 text-[10px] font-black text-foreground font-mono">{formatCurrency(totalAmount)}</td>
+                                                <td className="px-3 py-1.5"></td>
+                                            </tr>
+                                        </tfoot>
+                                    )}
+                                </table>
+                            </div>
+                        ) : (
+                            /* Notes Panel */
+                            <div className="flex flex-col h-full">
+                                {/* Notes List */}
+                                <div className="flex-1 overflow-auto p-4 space-y-3">
+                                    {notes.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground/50">
+                                            <StickyNote className="w-10 h-10 mb-3 opacity-30" />
+                                            <p className="text-[11px] font-bold uppercase tracking-widest">No notes yet</p>
+                                            <p className="text-[10px] mt-1">Add a note below to get started</p>
+                                        </div>
+                                    ) : (
+                                        [...notes].reverse().map((n) => {
+                                            const author = typeof n.createdBy === 'object' && n.createdBy
+                                                ? `${n.createdBy.firstName} ${n.createdBy.lastName}`
+                                                : (n.createdBy || 'Unknown');
+                                            const initials = typeof n.createdBy === 'object' && n.createdBy
+                                                ? `${n.createdBy.firstName?.[0] || ''}${n.createdBy.lastName?.[0] || ''}`
+                                                : '??';
+
+                                            return (
+                                                <div key={n._id} className="group bg-secondary/40 border border-border/60 rounded-lg p-3 hover:border-border transition-colors">
+                                                    <div className="flex items-start gap-3">
+                                                        {/* Avatar */}
+                                                        <div className="w-7 h-7 rounded-full bg-primary/15 text-primary flex items-center justify-center text-[9px] font-black uppercase shrink-0 mt-0.5">
+                                                            {initials}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            {/* Author & Time */}
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                                <span className="text-[10px] font-bold text-foreground">{author}</span>
+                                                                <span className="text-[9px] text-muted-foreground/50">•</span>
+                                                                <span className="text-[9px] text-muted-foreground/60">{formatDate(n.createdAt)}</span>
+                                                            </div>
+                                                            {/* Note Content */}
+                                                            {editingNoteId === n._id ? (
+                                                                <div className="flex gap-2 mt-1">
+                                                                    <input
+                                                                        type="text"
+                                                                        value={editingNoteText}
+                                                                        onChange={(e) => setEditingNoteText(e.target.value)}
+                                                                        onKeyDown={(e) => { if (e.key === 'Enter') handleEditNote(n._id); if (e.key === 'Escape') { setEditingNoteId(null); setEditingNoteText(''); } }}
+                                                                        className="flex-1 px-2 py-1 border border-border rounded text-[11px] bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
+                                                                        autoFocus
+                                                                    />
+                                                                    <button onClick={() => handleEditNote(n._id)} className="px-2 py-1 text-[9px] font-bold uppercase bg-primary text-black rounded hover:opacity-90 cursor-pointer">Save</button>
+                                                                    <button onClick={() => { setEditingNoteId(null); setEditingNoteText(''); }} className="px-2 py-1 text-[9px] font-bold uppercase text-muted-foreground hover:text-foreground border border-border rounded cursor-pointer">Cancel</button>
+                                                                </div>
+                                                            ) : (
+                                                                <p className="text-[11px] text-foreground/80 leading-relaxed whitespace-pre-wrap">{n.note}</p>
+                                                            )}
+                                                        </div>
+                                                        {/* Actions */}
+                                                        {editingNoteId !== n._id && (
+                                                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                                                <button
+                                                                    onClick={() => { setEditingNoteId(n._id); setEditingNoteText(n.note); }}
+                                                                    className="p-1 text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10 rounded transition-colors cursor-pointer"
+                                                                    title="Edit"
+                                                                >
+                                                                    <Pencil className="w-3 h-3" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleDeleteNote(n._id)}
+                                                                    className="p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors cursor-pointer"
+                                                                    title="Delete"
+                                                                >
+                                                                    <Trash2 className="w-3 h-3" />
+                                                                </button>
+                                                            </div>
                                                         )}
                                                     </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                                {order.lineItems && order.lineItems.length > 0 && (
-                                    <tfoot className="bg-secondary/50 border-t border-border">
-                                        <tr>
-                                            <td colSpan={3} className="px-3 py-1.5 text-[9px] font-bold text-muted-foreground uppercase text-right tracking-wider">Subtotal</td>
-                                            <td className="px-3 py-1.5 text-[10px] font-bold text-foreground font-mono">{totalQtyOrdered.toFixed(4)}</td>
-                                            <td className="px-3 py-1.5 text-[10px] font-bold text-foreground font-mono">{totalQtyReceived.toFixed(4)}</td>
-                                            <td className="px-3 py-1.5"></td>
-                                            <td className="px-3 py-1.5 text-[10px] font-black text-foreground font-mono">{formatCurrency(totalAmount)}</td>
-                                            <td className="px-3 py-1.5"></td>
-                                        </tr>
-                                    </tfoot>
-                                )}
-                            </table>
-                        </div>
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+
+                                {/* Add Note Input */}
+                                <div className="border-t border-border px-4 py-3 bg-secondary/30 shrink-0">
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="text"
+                                            value={newNote}
+                                            onChange={(e) => setNewNote(e.target.value)}
+                                            onKeyDown={(e) => { if (e.key === 'Enter' && newNote.trim()) handleAddNote(); }}
+                                            placeholder="Type a note..."
+                                            className="flex-1 px-3 h-9 border border-border rounded-lg text-[12px] bg-background text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/30"
+                                        />
+                                        <button
+                                            onClick={handleAddNote}
+                                            disabled={!newNote.trim() || savingNote}
+                                            className="h-9 px-4 bg-primary text-black text-[10px] font-black uppercase tracking-widest rounded-lg hover:opacity-90 transition-all shadow-sm cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                                        >
+                                            {savingNote ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                                            <span>Add</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -844,6 +1081,21 @@ export default function PurchaseOrderDetailPage() {
                                         onChange={(e) => setEditingHeader({ ...editingHeader, receivedDate: e.target.value })}
                                         className="w-full px-3 h-[36px] border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 bg-background text-foreground"
                                     />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[11px] font-black text-muted-foreground uppercase tracking-wider">Shipping Cost</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">$</span>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={editingHeader.shippingCost || ''}
+                                            onChange={(e) => setEditingHeader({ ...editingHeader, shippingCost: parseFloat(e.target.value) || 0 })}
+                                            className="w-full pl-6 pr-3 h-[36px] border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary/10 bg-background text-foreground font-mono"
+                                            placeholder="0.00"
+                                        />
+                                    </div>
                                 </div>
                             </div>
                             <div className="pt-2">

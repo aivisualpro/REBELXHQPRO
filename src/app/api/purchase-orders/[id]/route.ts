@@ -42,6 +42,7 @@ export async function GET(
             .populate('vendor', 'name')
             .populate('createdBy', 'firstName lastName')
             .populate('lineItems.createdBy', 'firstName lastName')
+            .populate('notes.createdBy', 'firstName lastName')
             .lean();
 
         if (!order) {
