@@ -124,18 +124,9 @@ function transformOrder(
             }
         }
 
-        // Determine Lot # and Cost
-        let lotNumber = null;
-        let cost = null;
-
-        if (linkedSkuId && lotMap.has(linkedSkuId)) {
-            const availableLots = lotMap.get(linkedSkuId) || [];
-            if (availableLots.length > 0) {
-                // Auto-assign oldest available lot (FIFO)
-                lotNumber = availableLots[0].lotNumber;
-                cost = availableLots[0].cost;
-            }
-        }
+        // Lot # and Cost are set manually — not auto-assigned during sync
+        const lotNumber = null;
+        const cost = null;
 
         return {
             id: item.id,
