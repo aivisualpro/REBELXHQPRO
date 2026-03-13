@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
-import { ArrowUpDown, X, Search, Loader2, Plus, ClipboardCheck, Pencil, Trash2 } from 'lucide-react';
+import { ArrowUpDown, X, Search, Loader2, Plus, ClipboardCheck, Pencil, Trash2, Hash, ChevronDown, Check } from 'lucide-react';
 import { cn, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { useSession } from 'next-auth/react';
@@ -31,6 +31,7 @@ interface CacheEntry {
     sortBy: string;
     sortOrder: string;
     search: string;
+    lotNumbers: string[];
     timestamp: number;
 }
 
@@ -375,6 +376,13 @@ function AuditAdjustmentsContent() {
     const [highlightId, setHighlightId] = useState<string | null>(null);
     const [filterId, setFilterId] = useState<string | null>(searchParams.get('id') || null);
 
+    // Lot number filter state
+    const [selectedLots, setSelectedLots] = useState<string[]>([]);
+    const [availableLots, setAvailableLots] = useState<string[]>([]);
+    const [lotDropdownOpen, setLotDropdownOpen] = useState(false);
+    const [lotSearch, setLotSearch] = useState('');
+    const lotDropdownRef = useRef<HTMLDivElement | null>(null);
+
     const pageRef = useRef(globalCache.current?.page || 0);
     const mountedRef = useRef(true);
     const fetchingRef = useRef(false);
@@ -391,6 +399,20 @@ function AuditAdjustmentsContent() {
         fetch('/api/skus?limit=0&ignoreDate=true&simple=true').then(r => r.json())
             .then(d => { if (d.skus) setSkus(d.skus.map((s: any) => ({ label: s.name, value: s._id }))); }).catch(() => { });
         fetch('/api/settings').then(r => r.json()).then(setGlobalSettings).catch(() => { });
+        // Fetch distinct lot numbers for filter
+        fetch('/api/warehouse/audit-adjustments?limit=0&distinctLots=true').then(r => r.json()).then(d => {
+            // Extract unique lot numbers from all adjustments
+            const lotSet = new Set<string>();
+            (d.adjustments || []).forEach((a: any) => { if (a.lotNumber && a.lotNumber.trim()) lotSet.add(a.lotNumber.trim()); });
+            setAvailableLots(Array.from(lotSet).sort());
+        }).catch(() => {
+            // Fallback: fetch a large page to get distinct lots
+            fetch('/api/warehouse/audit-adjustments?limit=5000&page=1').then(r => r.json()).then(d => {
+                const lotSet = new Set<string>();
+                (d.adjustments || []).forEach((a: any) => { if (a.lotNumber && a.lotNumber.trim()) lotSet.add(a.lotNumber.trim()); });
+                setAvailableLots(Array.from(lotSet).sort());
+            }).catch(() => {});
+        });
     }, []);
 
     // Handle createNew URL param
@@ -409,6 +431,17 @@ function AuditAdjustmentsContent() {
         const t = setTimeout(() => setDebouncedSearch(search), 250);
         return () => clearTimeout(t);
     }, [search]);
+
+    // Close lot dropdown on outside click
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (lotDropdownRef.current && !lotDropdownRef.current.contains(e.target as Node)) {
+                setLotDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
 
     // ─── Sync search to URL ─────────────────────────────────────────────────
 
@@ -473,6 +506,7 @@ function AuditAdjustmentsContent() {
                 search: debouncedSearch, sortBy, sortOrder,
             });
             if (filterId) params.set('id', filterId);
+            if (selectedLots.length > 0) params.set('lotNumber', selectedLots.join(','));
 
             const res = await fetch(`/api/warehouse/audit-adjustments?${params}`, { signal: controller.signal });
             const data = await res.json();
@@ -487,13 +521,13 @@ function AuditAdjustmentsContent() {
                     setAdjustments(prev => {
                         const ids = new Set(prev.map(a => a._id));
                         const merged = [...prev, ...newItems.filter(a => !ids.has(a._id))];
-                        globalCache.current = { adjustments: merged, hasMore: newHasMore, page: pageNum, total: newTotal, sortBy, sortOrder, search: debouncedSearch, timestamp: Date.now() };
+                        globalCache.current = { adjustments: merged, hasMore: newHasMore, page: pageNum, total: newTotal, sortBy, sortOrder, search: debouncedSearch, lotNumbers: selectedLots, timestamp: Date.now() };
                         return merged;
                     });
                 } else {
                     setAdjustments(newItems);
                     setTotal(newTotal);
-                    globalCache.current = { adjustments: newItems, hasMore: newHasMore, page: pageNum, total: newTotal, sortBy, sortOrder, search: debouncedSearch, timestamp: Date.now() };
+                    globalCache.current = { adjustments: newItems, hasMore: newHasMore, page: pageNum, total: newTotal, sortBy, sortOrder, search: debouncedSearch, lotNumbers: selectedLots, timestamp: Date.now() };
                 }
                 setHasMore(newHasMore);
                 pageRef.current = pageNum;
@@ -508,7 +542,7 @@ function AuditAdjustmentsContent() {
             fetchingRef.current = false;
             if (mountedRef.current) { setIsLoading(false); setIsLoadingMore(false); }
         }
-    }, [sortBy, sortOrder, debouncedSearch, filterId]);
+    }, [sortBy, sortOrder, debouncedSearch, filterId, selectedLots]);
 
     // ─── Initial load / filter changes ──────────────────────────────────────
 
@@ -523,7 +557,7 @@ function AuditAdjustmentsContent() {
             if (!filterId) {
                 const cache = globalCache.current;
                 if (cache && cache.adjustments.length > 0 && (Date.now() - cache.timestamp) < CACHE_TTL &&
-                    cache.sortBy === sortBy && cache.sortOrder === sortOrder && cache.search === debouncedSearch) {
+                    cache.sortBy === sortBy && cache.sortOrder === sortOrder && cache.search === debouncedSearch && JSON.stringify(cache.lotNumbers) === JSON.stringify(selectedLots)) {
                     setAdjustments(cache.adjustments); setHasMore(cache.hasMore); setTotal(cache.total);
                     pageRef.current = cache.page; setIsLoading(false); return;
                 }
@@ -535,7 +569,7 @@ function AuditAdjustmentsContent() {
         setHasMore(true);
         fetchPageRef.current(1, false);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [sortBy, sortOrder, debouncedSearch, filterId]);
+    }, [sortBy, sortOrder, debouncedSearch, filterId, selectedLots]);
 
     // ─── Infinite scroll ────────────────────────────────────────────────────
 
@@ -640,6 +674,109 @@ function AuditAdjustmentsContent() {
 
                     {/* Spacer */}
                     <div className="flex-1" />
+
+                    {/* Lot Number Filter */}
+                    <div ref={lotDropdownRef} className="relative shrink-0">
+                        <button
+                            onClick={() => setLotDropdownOpen(p => !p)}
+                            className={cn(
+                                'flex items-center gap-1.5 px-3 h-8 rounded-lg text-[11px] font-semibold transition-all cursor-pointer border',
+                                selectedLots.length > 0
+                                    ? 'bg-primary/10 border-primary/30 text-primary'
+                                    : 'bg-secondary/60 border-border text-muted-foreground hover:text-foreground hover:bg-secondary'
+                            )}
+                        >
+                            <Hash className="w-3.5 h-3.5" />
+                            <span className="uppercase tracking-wider">
+                                {selectedLots.length === 0 ? 'Lot #' : selectedLots.length === 1 ? selectedLots[0] : `${selectedLots.length} Lots`}
+                            </span>
+                            <ChevronDown className={cn('w-3 h-3 transition-transform', lotDropdownOpen && 'rotate-180')} />
+                        </button>
+
+                        {lotDropdownOpen && (
+                            <div className="absolute top-full mt-1.5 right-0 z-50 bg-background border border-border rounded-xl shadow-2xl min-w-[240px] max-w-[300px] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                                <div className="px-3 py-2 border-b border-border bg-secondary/30">
+                                    <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Filter by Lot Number</span>
+                                </div>
+
+                                {/* Search within lots */}
+                                <div className="px-2.5 py-2 border-b border-border">
+                                    <div className="relative">
+                                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground/50" />
+                                        <input
+                                            type="text"
+                                            placeholder="Search lots..."
+                                            value={lotSearch}
+                                            onChange={e => setLotSearch(e.target.value)}
+                                            className="w-full pl-7 pr-3 h-7 bg-secondary/50 border border-border rounded-md text-[11px] outline-none focus:border-primary/50 text-foreground placeholder:text-muted-foreground/50 transition-colors"
+                                            autoFocus
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="py-1 max-h-[280px] overflow-y-auto scrollbar-custom">
+                                    {/* All option */}
+                                    <button
+                                        onClick={() => { setSelectedLots([]); setLotDropdownOpen(false); setLotSearch(''); }}
+                                        className={cn(
+                                            'w-full flex items-center gap-2.5 px-3 py-2 text-[12px] font-semibold hover:bg-secondary/60 transition-colors cursor-pointer text-left',
+                                            selectedLots.length === 0 && 'text-primary'
+                                        )}
+                                    >
+                                        <div className={cn(
+                                            'w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors',
+                                            selectedLots.length === 0 ? 'bg-primary border-primary' : 'border-border'
+                                        )}>
+                                            {selectedLots.length === 0 && <Check className="w-2.5 h-2.5 text-white" />}
+                                        </div>
+                                        <span>All Lots</span>
+                                    </button>
+
+                                    {availableLots
+                                        .filter(l => !lotSearch || l.toLowerCase().includes(lotSearch.toLowerCase()))
+                                        .map(lot => {
+                                            const isSelected = selectedLots.includes(lot);
+                                            return (
+                                                <button
+                                                    key={lot}
+                                                    onClick={() => {
+                                                        setSelectedLots(prev =>
+                                                            isSelected ? prev.filter(l => l !== lot) : [...prev, lot]
+                                                        );
+                                                    }}
+                                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-[12px] font-semibold hover:bg-secondary/60 transition-colors cursor-pointer text-left"
+                                                >
+                                                    <div className={cn(
+                                                        'w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors',
+                                                        isSelected ? 'bg-primary border-primary' : 'border-border'
+                                                    )}>
+                                                        {isSelected && <Check className="w-2.5 h-2.5 text-white" />}
+                                                    </div>
+                                                    <span className="font-mono text-[11px] tracking-tight truncate">{lot}</span>
+                                                </button>
+                                            );
+                                        })}
+
+                                    {availableLots.filter(l => !lotSearch || l.toLowerCase().includes(lotSearch.toLowerCase())).length === 0 && (
+                                        <div className="px-3 py-4 text-center text-[11px] text-muted-foreground/50 uppercase tracking-widest">
+                                            No matching lots
+                                        </div>
+                                    )}
+                                </div>
+
+                                {selectedLots.length > 0 && (
+                                    <div className="px-3 py-2 border-t border-border bg-secondary/20">
+                                        <button
+                                            onClick={() => { setSelectedLots([]); setLotDropdownOpen(false); setLotSearch(''); }}
+                                            className="text-[10px] font-bold text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors cursor-pointer"
+                                        >
+                                            Clear All
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
 
                     {/* Search */}
                     <div className="relative shrink-0">

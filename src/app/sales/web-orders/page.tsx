@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  ArrowUpDown, Search, Loader2, CreditCard, Truck, X, Download, Upload, ShoppingBag,
+  ArrowUpDown, Search, Loader2, CreditCard, Truck, X, Download, Upload, ShoppingBag, Globe, ChevronDown, Check,
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { cn, formatDate } from '@/lib/utils';
@@ -37,7 +37,7 @@ interface WebOrder {
 
 interface CacheEntry {
   orders: WebOrder[]; hasMore: boolean; page: number;
-  sortBy: string; sortOrder: string; search: string; status: string; timestamp: number;
+  sortBy: string; sortOrder: string; search: string; status: string; websites: string[]; timestamp: number;
 }
 const globalCache: { current: CacheEntry | null } = { current: null };
 const CACHE_TTL = 120_000;
@@ -182,6 +182,10 @@ function WebOrdersContent() {
   const [sortBy, setSortBy] = useState('dateCreated');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [activeStatus, setActiveStatus] = useState<string>('All');
+  const [selectedWebsites, setSelectedWebsites] = useState<string[]>([]);
+  const [availableWebsites, setAvailableWebsites] = useState<string[]>([]);
+  const [websiteDropdownOpen, setWebsiteDropdownOpen] = useState(false);
+  const websiteDropdownRef = useRef<HTMLDivElement | null>(null);
 
   // Product filter (from web-products page link)
   const productIdFilter = searchParams.get('productId') || '';
@@ -196,6 +200,24 @@ function WebOrdersContent() {
 
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
   useEffect(() => { const t = setTimeout(() => setDebouncedSearch(search), 250); return () => clearTimeout(t); }, [search]);
+
+  // Fetch available websites
+  useEffect(() => {
+    fetch('/api/retail/web-orders/websites').then(r => r.json()).then(d => {
+      if (d.websites) setAvailableWebsites(d.websites.sort());
+    }).catch(() => {});
+  }, []);
+
+  // Close website dropdown on click outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (websiteDropdownRef.current && !websiteDropdownRef.current.contains(e.target as Node)) {
+        setWebsiteDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   // Sync search to URL
   useEffect(() => {
@@ -290,7 +312,9 @@ function WebOrdersContent() {
       if (activeStatus !== 'All') params.set('status', activeStatus);
       if (productIdFilter) params.set('productId', productIdFilter);
       if (variationIdFilter) params.set('variationId', variationIdFilter);
-      if (websiteFilter) params.set('website', websiteFilter);
+      // Website filter: URL param takes priority, else use interactive selection
+      const effectiveWebsites = websiteFilter || selectedWebsites.join(',');
+      if (effectiveWebsites) params.set('website', effectiveWebsites);
       const res = await fetch(`/api/retail/web-orders?${params}`, { signal: ctrl.signal });
       const data = await res.json();
       if (seq !== seqRef.current || !mountedRef.current) return;
@@ -300,18 +324,18 @@ function WebOrdersContent() {
           setOrders(prev => {
             const ids = new Set(prev.map(o => o._id));
             const merged = [...prev, ...newOrders.filter((o: WebOrder) => !ids.has(o._id))];
-            globalCache.current = { orders: merged, hasMore: newHasMore, page: pageNum, sortBy, sortOrder, search: debouncedSearch, status: activeStatus, timestamp: Date.now() };
+            globalCache.current = { orders: merged, hasMore: newHasMore, page: pageNum, sortBy, sortOrder, search: debouncedSearch, status: activeStatus, websites: selectedWebsites, timestamp: Date.now() };
             return merged;
           });
         } else {
           setOrders(newOrders);
-          globalCache.current = { orders: newOrders, hasMore: newHasMore, page: pageNum, sortBy, sortOrder, search: debouncedSearch, status: activeStatus, timestamp: Date.now() };
+          globalCache.current = { orders: newOrders, hasMore: newHasMore, page: pageNum, sortBy, sortOrder, search: debouncedSearch, status: activeStatus, websites: selectedWebsites, timestamp: Date.now() };
         }
         setHasMore(newHasMore); pageRef.current = pageNum; setError(null);
       } else { setError(data.error || 'Failed to fetch'); }
     } catch (e: any) { if (e?.name === 'AbortError') return; if (mountedRef.current) setError(e.message); }
     finally { fetchingRef.current = false; if (mountedRef.current) { setIsLoading(false); setIsLoadingMore(false); } }
-  }, [sortBy, sortOrder, debouncedSearch, activeStatus, productIdFilter, variationIdFilter, websiteFilter]);
+  }, [sortBy, sortOrder, debouncedSearch, activeStatus, productIdFilter, variationIdFilter, websiteFilter, selectedWebsites]);
 
   const fetchPageRef = useRef(fetchPage); fetchPageRef.current = fetchPage;
   const isFirstMount = useRef(true);
@@ -320,13 +344,13 @@ function WebOrdersContent() {
     if (isFirstMount.current) {
       isFirstMount.current = false;
       const c = globalCache.current;
-      if (c && c.orders.length > 0 && (Date.now() - c.timestamp) < CACHE_TTL && c.sortBy === sortBy && c.sortOrder === sortOrder && c.search === debouncedSearch && c.status === activeStatus) {
+      if (c && c.orders.length > 0 && (Date.now() - c.timestamp) < CACHE_TTL && c.sortBy === sortBy && c.sortOrder === sortOrder && c.search === debouncedSearch && c.status === activeStatus && JSON.stringify(c.websites) === JSON.stringify(selectedWebsites)) {
         setOrders(c.orders); setHasMore(c.hasMore); pageRef.current = c.page; setIsLoading(false); return;
       }
     }
     globalCache.current = null; pageRef.current = 0; setOrders([]); setHasMore(true);
     fetchPageRef.current(1, false);
-  }, [sortBy, sortOrder, debouncedSearch, activeStatus]);
+  }, [sortBy, sortOrder, debouncedSearch, activeStatus, selectedWebsites]);
 
   useEffect(() => {
     const sentinel = sentinelRef.current; const container = scrollRef.current;
@@ -401,7 +425,88 @@ function WebOrdersContent() {
               );
             })}
           </div>
+          <div className="h-5 w-px bg-border shrink-0" />
+
+          {/* Website Filter Dropdown */}
+          <div ref={websiteDropdownRef} className="relative shrink-0">
+            <button
+              onClick={() => setWebsiteDropdownOpen(p => !p)}
+              className={cn(
+                'flex items-center gap-1.5 px-3 h-8 rounded-lg text-[11px] font-semibold transition-all cursor-pointer border',
+                selectedWebsites.length > 0
+                  ? 'bg-primary/10 border-primary/30 text-primary'
+                  : 'bg-secondary/60 border-border text-muted-foreground hover:text-foreground hover:bg-secondary'
+              )}
+            >
+              <Globe className="w-3.5 h-3.5" />
+              <span className="uppercase tracking-wider">
+                {selectedWebsites.length === 0 ? 'All Sites' : selectedWebsites.length === 1 ? selectedWebsites[0] : `${selectedWebsites.length} Sites`}
+              </span>
+              <ChevronDown className={cn('w-3 h-3 transition-transform', websiteDropdownOpen && 'rotate-180')} />
+            </button>
+
+            {websiteDropdownOpen && (
+              <div className="absolute top-full mt-1.5 right-0 z-50 bg-background border border-border rounded-xl shadow-2xl min-w-[220px] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="px-3 py-2 border-b border-border bg-secondary/30">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Filter by Website</span>
+                </div>
+                <div className="py-1 max-h-[280px] overflow-y-auto scrollbar-custom">
+                  {/* All option */}
+                  <button
+                    onClick={() => { setSelectedWebsites([]); setWebsiteDropdownOpen(false); }}
+                    className={cn(
+                      'w-full flex items-center gap-2.5 px-3 py-2 text-[12px] font-semibold hover:bg-secondary/60 transition-colors cursor-pointer text-left',
+                      selectedWebsites.length === 0 && 'text-primary'
+                    )}
+                  >
+                    <div className={cn(
+                      'w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors',
+                      selectedWebsites.length === 0 ? 'bg-primary border-primary' : 'border-border'
+                    )}>
+                      {selectedWebsites.length === 0 && <Check className="w-2.5 h-2.5 text-white" />}
+                    </div>
+                    <span>All Websites</span>
+                  </button>
+
+                  {availableWebsites.map(ws => {
+                    const isSelected = selectedWebsites.includes(ws);
+                    return (
+                      <button
+                        key={ws}
+                        onClick={() => {
+                          setSelectedWebsites(prev =>
+                            isSelected ? prev.filter(w => w !== ws) : [...prev, ws]
+                          );
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-[12px] font-semibold hover:bg-secondary/60 transition-colors cursor-pointer text-left"
+                      >
+                        <div className={cn(
+                          'w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors',
+                          isSelected ? 'bg-primary border-primary' : 'border-border'
+                        )}>
+                          {isSelected && <Check className="w-2.5 h-2.5 text-white" />}
+                        </div>
+                        <WebsiteBadge website={ws} />
+                      </button>
+                    );
+                  })}
+                </div>
+                {selectedWebsites.length > 0 && (
+                  <div className="px-3 py-2 border-t border-border bg-secondary/20">
+                    <button
+                      onClick={() => { setSelectedWebsites([]); setWebsiteDropdownOpen(false); }}
+                      className="text-[10px] font-bold text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors cursor-pointer"
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="flex-1" />
+
           {/* Search */}
           <div className="relative shrink-0">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />

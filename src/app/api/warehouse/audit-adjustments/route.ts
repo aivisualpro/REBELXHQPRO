@@ -27,6 +27,17 @@ export async function GET(request: Request) {
         if (filterId) {
             query._id = filterId;
         }
+
+        // Filter by lot number(s)
+        const lotNumberFilter = searchParams.get('lotNumber');
+        if (lotNumberFilter) {
+            const lots = lotNumberFilter.split(',').map(l => l.trim()).filter(Boolean);
+            if (lots.length === 1) {
+                query.lotNumber = lots[0];
+            } else if (lots.length > 1) {
+                query.lotNumber = { $in: lots };
+            }
+        }
         if (search) {
             const tokens = search.trim().split(/\s+/).filter(Boolean);
             if (tokens.length > 0) {

@@ -102,7 +102,7 @@ function StatusBadge({ status }: { status: string }) {
 const SkeletonRow = React.memo(function SkeletonRow({ index }: { index: number }) {
   return (
     <tr className="border-b border-border/60" style={{ opacity: 1 - index * 0.04 }}>
-      {[12, 18, 14, 10, 12, 12, 12, 14, 10, 8].map((w, i) => (
+      {[12, 18, 14, 10, 12, 12, 12, 14, 10, 10, 10, 8].map((w, i) => (
         <td key={i} className="px-2.5 py-2.5">
           <div className="h-3 rounded bg-muted-foreground/10 animate-pulse" style={{ width: `${w * 5}px` }} />
         </td>
@@ -168,7 +168,9 @@ function POModal({ editingOrderId, newOrder, setNewOrder, newLineItems, setNewLi
     finally { setSaving(false); }
   };
 
-  const totalCost = newLineItems.reduce((s: number, i: NewLineItem) => s + (i.qtyOrdered * i.cost), 0);
+  const subTotalCost = newLineItems.reduce((s: number, i: NewLineItem) => s + (i.qtyOrdered * i.cost), 0);
+  const shippingCostNum = parseFloat(newOrder.shippingCost) || 0;
+  const totalCost = subTotalCost + shippingCostNum;
 
   const inp = 'w-full px-3 h-9 border border-border rounded-lg text-[12px] focus:outline-none focus:ring-1 focus:ring-primary/20 bg-background text-foreground';
 
@@ -179,7 +181,7 @@ function POModal({ editingOrderId, newOrder, setNewOrder, newLineItems, setNewLi
         <div className="flex items-center justify-between px-6 h-12 border-b border-border bg-secondary/40 shrink-0 rounded-t-xl">
           <h2 className="text-[11px] font-black uppercase tracking-widest">{editingOrderId ? 'Edit Purchase Order' : 'Create Purchase Order'}</h2>
           <div className="flex items-center gap-3">
-            {totalCost > 0 && <span className="text-[10px] font-black text-primary font-mono">Total: ${totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>}
+            {totalCost > 0 && <span className="text-[10px] font-black text-primary font-mono">Sub: ${subTotalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} + Ship: ${shippingCostNum.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} = ${totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>}
             <button onClick={onClose} className="p-1.5 hover:bg-secondary rounded-full transition-colors cursor-pointer"><X className="w-4 h-4 text-muted-foreground" /></button>
           </div>
         </div>
@@ -578,7 +580,8 @@ function PurchaseOrdersContent() {
   };
 
   const renderVendor = (order: PurchaseOrder) => (typeof order.vendor === 'object' && order.vendor ? order.vendor.name : order.vendor || '-');
-  const calcTotal = (order: PurchaseOrder) => order.lineItems?.reduce((s, i) => s + ((i.qtyOrdered || 0) * (i.cost || 0)), 0) || 0;
+  const calcSubTotal = (order: PurchaseOrder) => order.lineItems?.reduce((s, i) => s + ((i.qtyOrdered || 0) * (i.cost || 0)), 0) || 0;
+  const calcTotal = (order: PurchaseOrder) => calcSubTotal(order) + (order.shippingCost || 0);
   const fmtDate = (d: string) => d ? formatDate(d) : '—';
   const fmtCurrency = (v: number) => '$' + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -591,7 +594,9 @@ function PurchaseOrdersContent() {
     { key: 'receivedDate', label: 'Received', sortable: true, width: 'w-[100px]' },
     { key: 'createdAt', label: 'Created', sortable: true, width: 'w-[100px]' },
     { key: 'createdBy', label: 'Created By', sortable: false, width: 'w-[130px]' },
-    { key: 'totalAmount', label: 'Total', sortable: false, width: 'w-[100px]', align: 'text-right' },
+    { key: 'subTotal', label: 'Sub Total', sortable: false, width: 'w-[110px]', align: 'text-right' },
+    { key: 'shippingCost', label: 'Shipping', sortable: true, width: 'w-[100px]', align: 'text-right' },
+    { key: 'totalAmount', label: 'Total', sortable: false, width: 'w-[110px]', align: 'text-right' },
     { key: 'itemCount', label: 'Items', sortable: false, width: 'w-[60px]', align: 'text-center' },
   ];
 
@@ -680,9 +685,9 @@ function PurchaseOrdersContent() {
               {isLoading ? (
                 Array.from({ length: 20 }).map((_, i) => <SkeletonRow key={i} index={i} />)
               ) : error ? (
-                <tr><td colSpan={10} className="px-4 py-12 text-center text-[12px] text-destructive">{error}</td></tr>
+                <tr><td colSpan={12} className="px-4 py-12 text-center text-[12px] text-destructive">{error}</td></tr>
               ) : orders.length === 0 ? (
-                <tr><td colSpan={10} className="px-4 py-16 text-center text-[12px] text-muted-foreground/50 uppercase tracking-widest">No orders found</td></tr>
+                <tr><td colSpan={12} className="px-4 py-16 text-center text-[12px] text-muted-foreground/50 uppercase tracking-widest">No orders found</td></tr>
               ) : orders.map(order => (
                 <tr
                   key={order._id}
@@ -737,8 +742,18 @@ function PurchaseOrdersContent() {
                     {order.createdBy ? `${order.createdBy.firstName} ${order.createdBy.lastName}` : '—'}
                   </td>
 
-                  {/* Total */}
-                  <td className="px-2.5 py-2.5 w-[100px] text-[11px] font-mono font-bold text-foreground/80 text-right border-r border-border/40">
+                  {/* Sub Total */}
+                  <td className="px-2.5 py-2.5 w-[110px] text-[11px] font-mono text-foreground/60 text-right border-r border-border/40">
+                    {fmtCurrency(calcSubTotal(order))}
+                  </td>
+
+                  {/* Shipping Cost */}
+                  <td className="px-2.5 py-2.5 w-[100px] text-[11px] font-mono text-foreground/60 text-right border-r border-border/40">
+                    {fmtCurrency(order.shippingCost || 0)}
+                  </td>
+
+                  {/* Total (SubTotal + Shipping) */}
+                  <td className="px-2.5 py-2.5 w-[110px] text-[11px] font-mono font-bold text-foreground/80 text-right border-r border-border/40">
                     {fmtCurrency(calcTotal(order))}
                   </td>
 

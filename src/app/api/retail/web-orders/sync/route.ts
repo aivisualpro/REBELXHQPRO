@@ -295,7 +295,7 @@ export async function POST(request: Request) {
                 {
                     name: process.env.GRASSROOTSHARVESTTITLE || 'GRASSROOTSHARVEST',
                     baseUrl: process.env.GRASSROOTSHARVESTAPI || '',
-                    key: process.env.GRASSROOTSHARVESTONSUMERKEY || '',
+                    key: process.env.GRASSROOTSHARVESTCONSUMERKEY || '',
                     secret: process.env.GRASSROOTSHARVESTCONSUMERSECRET || ''
                 },
                 {
@@ -423,16 +423,45 @@ export async function POST(request: Request) {
                 // Transform all orders in batch
                 const transformedOrders = batch.map(({ site, order }) => transformOrder(order, site, webProductMap, lotMap));
 
-                // Get existing order IDs to determine accurate adds vs updates
-                const existingOrders = await WebOrder.find({ _id: { $in: transformedOrders.map(o => o._id) } }).select('_id dateModified').lean();
-                const existingMap = new Map((existingOrders as any[]).map(o => [o._id, o.dateModified]));
+                // Get existing orders WITH their line items to preserve manual enrichment data
+                const existingOrders = await WebOrder.find(
+                    { _id: { $in: transformedOrders.map(o => o._id) } }
+                ).select('_id dateModified lineItems').lean();
+                const existingMap = new Map((existingOrders as any[]).map(o => [o._id, o]));
 
                 transformedOrders.forEach(doc => {
-                    const existDate = existingMap.get(doc._id);
-                    if (!existDate) {
+                    const existing = existingMap.get(doc._id);
+                    if (!existing) {
                         modifiedOrderDetails.push({ type: 'added', id: doc._id as string, number: doc.number as string, siteName: doc.website as string });
-                    } else if (doc.dateModified && new Date(existDate).getTime() !== new Date(doc.dateModified as Date).getTime()) {
+                    } else if (doc.dateModified && new Date(existing.dateModified).getTime() !== new Date(doc.dateModified as Date).getTime()) {
                         modifiedOrderDetails.push({ type: 'updated', id: doc._id as string, number: doc.number as string, siteName: doc.website as string });
+                    }
+
+                    // ⚡ PRESERVE existing enrichment data on line items
+                    // If the order already exists, keep manually-set lotNumber, cost,
+                    // linkedSkuId, and linkedSkus from the existing line items
+                    if (existing?.lineItems && Array.isArray(existing.lineItems)) {
+                        const existingItemMap = new Map(
+                            existing.lineItems.map((li: any) => [li.id, li])
+                        );
+
+                        doc.lineItems = doc.lineItems.map((newItem: any) => {
+                            const existingItem: any = existingItemMap.get(newItem.id);
+                            if (existingItem) {
+                                // Keep existing enrichment if it was manually set
+                                // (i.e., only overwrite if the existing value is empty/null)
+                                return {
+                                    ...newItem,
+                                    lotNumber: existingItem.lotNumber || newItem.lotNumber,
+                                    cost: (existingItem.cost != null && existingItem.cost > 0) ? existingItem.cost : newItem.cost,
+                                    linkedSkuId: existingItem.linkedSkuId || newItem.linkedSkuId,
+                                    linkedSkus: (existingItem.linkedSkus && existingItem.linkedSkus.length > 0)
+                                        ? existingItem.linkedSkus
+                                        : newItem.linkedSkus || [],
+                                };
+                            }
+                            return newItem;
+                        });
                     }
                 });
 

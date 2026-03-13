@@ -9,12 +9,8 @@ export async function GET() {
     try {
         await dbConnect();
         
-        // Find distinct websites from line items
-        // Since website is nested in lineItems array, this is the standard mongo way
-        const websites = await WebOrder.distinct("lineItems.website");
-        
-        // Also check if there's a top-level website field (legacy or alternative schema)
-        // Adjust based on your schema. Based on the file view, line items have 'website'.
+        // Find distinct websites from the top-level website field
+        const websites = await WebOrder.distinct("website");
         
         // Filter out null/empty
         const cleanWebsites = websites.filter((w: any) => w && w !== '');
