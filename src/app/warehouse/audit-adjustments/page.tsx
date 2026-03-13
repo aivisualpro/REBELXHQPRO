@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
-import { ArrowUpDown, X, Search, Loader2, Plus, ClipboardCheck, Pencil, Trash2, Hash, ChevronDown, Check } from 'lucide-react';
+import { ArrowUpDown, X, Search, Loader2, Plus, ClipboardCheck, Pencil, Trash2, Hash, ChevronDown, Check, Package } from 'lucide-react';
 import { cn, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { useSession } from 'next-auth/react';
@@ -102,10 +102,11 @@ function SkeletonRow({ index }: { index: number }) {
 // ─── Table Row ────────────────────────────────────────────────────────────────
 
 const TableRow = React.memo(function TableRow({
-    item, highlight, onEdit, onDelete
+    item, highlight, onEdit, onDelete, onPickLot
 }: {
     item: AuditAdjustment; highlight?: boolean;
     onEdit: (e: React.MouseEvent) => void; onDelete: (e: React.MouseEvent) => void;
+    onPickLot: (e: React.MouseEvent) => void;
 }) {
     const skuData = typeof item.sku === 'object' && item.sku?.name
         ? item.sku
@@ -149,7 +150,18 @@ const TableRow = React.memo(function TableRow({
 
             {/* Lot Number */}
             <td className="px-2.5 py-2.5 text-[12px] font-mono text-foreground/80 tracking-tight cursor-pointer">
-                {item.lotNumber || <span className="text-muted-foreground/30">—</span>}
+                <div className="flex items-center gap-1.5">
+                    <span className="truncate">{item.lotNumber || <span className="text-muted-foreground/30">—</span>}</span>
+                    {skuId && (
+                        <button
+                            onClick={onPickLot}
+                            className="p-1 rounded-md hover:bg-primary/10 text-muted-foreground/40 hover:text-primary transition-colors cursor-pointer opacity-0 group-hover:opacity-100 shrink-0"
+                            title="Pick Lot Number"
+                        >
+                            <Package className="w-3.5 h-3.5" />
+                        </button>
+                    )}
+                </div>
             </td>
 
             {/* Qty */}
@@ -375,6 +387,9 @@ function AuditAdjustmentsContent() {
     const [globalSettings, setGlobalSettings] = useState<any>(null);
     const [highlightId, setHighlightId] = useState<string | null>(null);
     const [filterId, setFilterId] = useState<string | null>(searchParams.get('id') || null);
+
+    // Inline lot picker state
+    const [lotPickerItem, setLotPickerItem] = useState<AuditAdjustment | null>(null);
 
     // Lot number filter state
     const [selectedLots, setSelectedLots] = useState<string[]>([]);
@@ -871,6 +886,10 @@ function AuditAdjustmentsContent() {
                                             e.stopPropagation();
                                             handleDeleteAdjustment(item._id);
                                         }}
+                                        onPickLot={(e) => {
+                                            e.stopPropagation();
+                                            setLotPickerItem(item);
+                                        }}
                                     />
                                 ))
                             )}
@@ -908,6 +927,49 @@ function AuditAdjustmentsContent() {
                     onSuccess={() => { pageRef.current = 0; fetchPageRef.current(1, false); }}
                 />
             )}
+
+            {/* ─── Inline Lot Picker Modal ────────────────────────── */}
+            {lotPickerItem && (() => {
+                const skuId = typeof lotPickerItem.sku === 'object' && lotPickerItem.sku !== null
+                    ? (lotPickerItem.sku as any)._id
+                    : '';
+                if (!skuId) return null;
+                return (
+                    <LotSelectionModal
+                        isOpen={true}
+                        onClose={() => setLotPickerItem(null)}
+                        onSelect={async (lotNumber, cost) => {
+                            try {
+                                const res = await fetch(`/api/warehouse/audit-adjustments/${lotPickerItem._id}`, {
+                                    method: 'PUT',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        lotNumber,
+                                        qty: lotPickerItem.qty,
+                                        reason: lotPickerItem.reason,
+                                    }),
+                                });
+                                if (res.ok) {
+                                    toast.success(`Lot updated to ${lotNumber || '(cleared)'}`);
+                                    // Update local state immediately
+                                    setAdjustments(prev => prev.map(a =>
+                                        a._id === lotPickerItem._id ? { ...a, lotNumber: lotNumber || '' } : a
+                                    ));
+                                    globalCache.current = null;
+                                } else {
+                                    toast.error('Failed to update lot');
+                                }
+                            } catch {
+                                toast.error('Error updating lot');
+                            }
+                            setLotPickerItem(null);
+                        }}
+                        skuId={skuId}
+                        currentLotNumber={lotPickerItem.lotNumber}
+                        title="Select Lot Number"
+                    />
+                );
+            })()}
         </div>
     );
 }
