@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { POST as runOrderSync } from '../../retail/web-orders/sync/route';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 300; // 5 minutes — match the sync route's timeout
 
 export async function GET(request: Request) {
     try {

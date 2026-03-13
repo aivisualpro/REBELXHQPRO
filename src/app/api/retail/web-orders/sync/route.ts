@@ -11,6 +11,7 @@ export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
 
 const BATCH_SIZE = 500; // Process orders in batches
+const STALE_LOCK_TIMEOUT = 10 * 60 * 1000; // 10 minutes – auto-reset if sync hangs beyond this
 
 let syncProgress = {
     isSyncing: false,
@@ -236,6 +237,17 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+    // ⚡ Stale-lock safeguard: if a previous sync hung or the function was killed mid-sync,
+    //    auto-release the lock after STALE_LOCK_TIMEOUT so future syncs aren't permanently blocked.
+    if (syncProgress.isSyncing && syncProgress.startTime) {
+        const elapsed = Date.now() - syncProgress.startTime;
+        if (elapsed > STALE_LOCK_TIMEOUT) {
+            console.warn(`⚠️ Stale sync lock detected (${(elapsed / 1000).toFixed(0)}s old). Resetting...`);
+            syncProgress.isSyncing = false;
+            syncProgress.currentStep = 'Reset (stale lock)';
+        }
+    }
+
     if (syncProgress.isSyncing) {
         return NextResponse.json({ error: 'Sync already in progress' }, { status: 409 });
     }
@@ -287,10 +299,10 @@ export async function POST(request: Request) {
                     secret: process.env.GRASSROOTSHARVESTCONSUMERSECRET || ''
                 },
                 {
-                    name: process.env.REBELXHQPRODUCERTITLE || 'GRHKTATOM',
-                    baseUrl: process.env.REBELXHQPRODUCERAPI || '',
-                    key: process.env.REBELXHQPRODUCERCONSUMERKEY || '',
-                    secret: process.env.REBELXHQPRODUCERCONSUMERSECRET || ''
+                    name: process.env.GRHKTATOMTITLE || 'GRHKTATOM',
+                    baseUrl: process.env.GRHKTATOMAPI || '',
+                    key: process.env.GRHKTATOMCONSUMERKEY || '',
+                    secret: process.env.GRHKTATOMCONSUMERSECRET || ''
                 },
                 {
                     name: process.env.REBELXBRANDSRODUCERTITLE || 'REBELXBRANDS',

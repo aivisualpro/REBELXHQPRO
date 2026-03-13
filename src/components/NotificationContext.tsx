@@ -108,7 +108,17 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             if (res.ok) {
                 setLastSyncAt(new Date().toISOString());
                 // Poll for sync completion, then refresh notifications
+                let pollCount = 0;
+                const MAX_POLLS = 60; // 60 × 5s = 5 minutes max wait
                 const checkCompletion = async () => {
+                    pollCount++;
+                    if (pollCount > MAX_POLLS) {
+                        console.warn('⚠️ Sync poll timeout — releasing client lock');
+                        isSyncingRef.current = false;
+                        setIsSyncing(false);
+                        setTimeout(() => fetchNotifications(), 1000);
+                        return;
+                    }
                     try {
                         const statusRes = await fetch('/api/retail/web-orders/sync');
                         if (statusRes.ok) {

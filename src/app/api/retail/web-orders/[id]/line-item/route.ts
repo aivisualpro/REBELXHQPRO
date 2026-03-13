@@ -114,41 +114,84 @@ export async function PATCH(
         }
 
         // ─── Multi-SKU: update specific linkedSkus entry ─────────────────
-        if (skuIndex != null && lineItem.linkedSkus && lineItem.linkedSkus[skuIndex]) {
-            const entry = lineItem.linkedSkus[skuIndex];
-            const skuId = entry.skuId;
+        if (skuIndex != null) {
+            // If linkedSkus is empty/missing in DB, hydrate it from the WebProduct first
+            if (!lineItem.linkedSkus || lineItem.linkedSkus.length === 0) {
+                const webProductId = lineItem.webProductId || lineItem.parentProductId;
+                if (webProductId) {
+                    try {
+                        const wp = await WebProduct.findById(webProductId).select('variations linkedSkus linkedSkuId multiplier').lean() as any;
+                        if (wp) {
+                            let target = wp;
+                            if (lineItem.variationId && wp.variations) {
+                                const variation = wp.variations.find(
+                                    (v: any) => v.id == lineItem.variationId || v._id == String(lineItem.variationId)
+                                );
+                                if (variation) target = variation;
+                            }
+                            // Resolve linkedSkus from the WebProduct target
+                            const wpLinkedSkus = target.linkedSkus?.length > 0
+                                ? target.linkedSkus
+                                : target.linkedSkuId
+                                    ? [{ skuId: target.linkedSkuId, multiplier: target.multiplier || 1 }]
+                                    : [];
 
-            // Calculate cost from lot
-            let finalCost = cost;
-            if (skuId && lotNumber && (cost === undefined || cost === null)) {
-                const lotCosts = await getLotsWithCost(skuId);
-                const baseCost = lotCosts.get(lotNumber) || 0;
-                finalCost = baseCost * (entry.multiplier || 1);
+                            if (wpLinkedSkus.length > 0) {
+                                const hydratedSkus = wpLinkedSkus.map((ls: any) => ({
+                                    skuId: ls.skuId,
+                                    multiplier: ls.multiplier || 1,
+                                    // Preserve existing lot/cost for legacy single-link match
+                                    lotNumber: ls.skuId === lineItem.linkedSkuId ? (lineItem.lotNumber || null) : null,
+                                    cost: ls.skuId === lineItem.linkedSkuId ? (lineItem.cost || 0) : 0,
+                                }));
+                                order.set(`lineItems.${lineItemIdx}.linkedSkus`, hydratedSkus);
+                                // Re-read the line item after hydration
+                                lineItem.linkedSkus = hydratedSkus;
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Error hydrating linkedSkus from WebProduct:', e);
+                    }
+                }
             }
 
-            // Use set() with explicit path for reliable Mongoose persistence
-            order.set(`lineItems.${lineItemIdx}.linkedSkus.${skuIndex}.lotNumber`, lotNumber || null);
-            order.set(`lineItems.${lineItemIdx}.linkedSkus.${skuIndex}.cost`, finalCost || 0);
+            // Now proceed with the update if linkedSkus exists
+            if (lineItem.linkedSkus && lineItem.linkedSkus[skuIndex]) {
+                const entry = lineItem.linkedSkus[skuIndex];
+                const skuId = entry.skuId;
 
-            // Also keep legacy fields in sync with the first entry
-            if (skuIndex === 0) {
-                order.set(`lineItems.${lineItemIdx}.lotNumber`, lotNumber || null);
-                order.set(`lineItems.${lineItemIdx}.cost`, finalCost || 0);
+                // Calculate cost from lot
+                let finalCost = cost;
+                if (skuId && lotNumber && (cost === undefined || cost === null)) {
+                    const lotCosts = await getLotsWithCost(skuId);
+                    const baseCost = lotCosts.get(lotNumber) || 0;
+                    finalCost = baseCost * (entry.multiplier || 1);
+                }
+
+                // Use set() with explicit path for reliable Mongoose persistence
+                order.set(`lineItems.${lineItemIdx}.linkedSkus.${skuIndex}.lotNumber`, lotNumber || null);
+                order.set(`lineItems.${lineItemIdx}.linkedSkus.${skuIndex}.cost`, finalCost || 0);
+
+                // Also keep legacy fields in sync with the first entry
+                if (skuIndex === 0) {
+                    order.set(`lineItems.${lineItemIdx}.lotNumber`, lotNumber || null);
+                    order.set(`lineItems.${lineItemIdx}.cost`, finalCost || 0);
+                }
+
+                order.updatedAt = new Date();
+                await order.save();
+
+                return NextResponse.json({
+                    success: true,
+                    lineItemId,
+                    skuIndex,
+                    lotNumber: lotNumber || null,
+                    cost: finalCost || 0,
+                    message: lotNumber
+                        ? `Updated lot to ${lotNumber}${finalCost > 0 ? ` (cost: $${finalCost.toFixed(2)})` : ''}`
+                        : 'Lot cleared'
+                });
             }
-
-            order.updatedAt = new Date();
-            await order.save();
-
-            return NextResponse.json({
-                success: true,
-                lineItemId,
-                skuIndex,
-                lotNumber: lotNumber || null,
-                cost: finalCost || 0,
-                message: lotNumber
-                    ? `Updated lot to ${lotNumber}${finalCost > 0 ? ` (cost: $${finalCost.toFixed(2)})` : ''}`
-                    : 'Lot cleared'
-            });
         }
 
         // ─── Legacy: single linkedSkuId lot update ───────────────────────

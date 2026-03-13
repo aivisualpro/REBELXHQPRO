@@ -142,6 +142,7 @@ export async function GET(
                             cost: 0,
                         };
                     });
+                    enriched._enrichedLinkedSkus = true; // Flag for background persist
                 }
             }
 
@@ -239,6 +240,34 @@ export async function GET(
             }
             return enriched;
         });
+
+        // ─── 5. Persist newly-enriched linkedSkus to DB (background, fire-and-forget) ──
+        // If any line item got linkedSkus from WebProduct enrichment but didn't have them stored,
+        // persist them so future PATCH calls can find them.
+        const bulkOps: any[] = [];
+        order.lineItems.forEach((item: any, idx: number) => {
+            if (item.linkedSkus && item.linkedSkus.length > 0 && item._enrichedLinkedSkus) {
+                bulkOps.push({
+                    updateOne: {
+                        filter: { _id: id, [`lineItems.${idx}.id`]: item.id },
+                        update: {
+                            $set: {
+                                [`lineItems.${idx}.linkedSkus`]: item.linkedSkus.map((ls: any) => ({
+                                    skuId: ls.skuId,
+                                    multiplier: ls.multiplier || 1,
+                                    lotNumber: ls.lotNumber || null,
+                                    cost: ls.cost || 0,
+                                })),
+                            }
+                        }
+                    }
+                });
+            }
+        });
+        if (bulkOps.length > 0) {
+            // Fire-and-forget: don't await to keep response fast
+            WebOrder.bulkWrite(bulkOps).catch((e: any) => console.error('Background linkedSkus persist error:', e));
+        }
 
         // ⚡ Cache the response
         orderDetailCache.set(id, { data: order, timestamp: Date.now() });
