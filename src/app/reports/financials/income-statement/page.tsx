@@ -13,7 +13,10 @@ import {
     PieChart,
     BarChart3,
     Minus,
-    ChevronRight
+    ChevronRight,
+    Globe,
+    ShoppingCart,
+    Layers
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -43,15 +46,22 @@ interface IncomeData {
 export default function IncomeStatementPage() {
     const [data, setData] = useState<IncomeData | null>(null);
     const [loading, setLoading] = useState(true);
+    const [source, setSource] = useState<'total' | 'web' | 'wholesale'>('total');
+
+    // Timezone-safe date initialization
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const firstOfMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+
     const [dateRange, setDateRange] = useState({
-        startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0], // 1st of current month
-        endDate: new Date().toISOString().split('T')[0] // Today
+        startDate: firstOfMonthStr,
+        endDate: todayStr
     });
 
     const fetchData = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`/api/reports/income-statement?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
+            const res = await fetch(`/api/reports/income-statement?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&source=${source}`);
             const json = await res.json();
             setData(json);
         } catch (e) {
@@ -63,7 +73,7 @@ export default function IncomeStatementPage() {
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [source]);
 
     const formatCurrency = (val: number) => {
         if (!val) return '$0.00';
@@ -91,6 +101,46 @@ export default function IncomeStatementPage() {
                                 <h1 className="text-xl font-black tracking-tight uppercase">Income Statement</h1>
                                 <p className="text-slate-400 text-xs">Profit & Loss Report</p>
                             </div>
+                        </div>
+
+                        {/* Source Filter Tabs */}
+                        <div className="flex items-center bg-slate-800/60 border border-slate-700/50 rounded-lg p-0.5">
+                            <button
+                                onClick={() => setSource('total')}
+                                className={cn(
+                                    'flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all cursor-pointer',
+                                    source === 'total'
+                                        ? 'bg-emerald-600 text-white shadow-md'
+                                        : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                                )}
+                            >
+                                <Layers className="w-3.5 h-3.5" />
+                                Total
+                            </button>
+                            <button
+                                onClick={() => setSource('web')}
+                                className={cn(
+                                    'flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all cursor-pointer',
+                                    source === 'web'
+                                        ? 'bg-blue-600 text-white shadow-md'
+                                        : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                                )}
+                            >
+                                <Globe className="w-3.5 h-3.5" />
+                                Web Orders
+                            </button>
+                            <button
+                                onClick={() => setSource('wholesale')}
+                                className={cn(
+                                    'flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all cursor-pointer',
+                                    source === 'wholesale'
+                                        ? 'bg-orange-600 text-white shadow-md'
+                                        : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                                )}
+                            >
+                                <ShoppingCart className="w-3.5 h-3.5" />
+                                Wholesale
+                            </button>
                         </div>
 
                         {/* Date Range Picker */}
@@ -133,7 +183,11 @@ export default function IncomeStatementPage() {
                         value={loading ? '...' : formatCompact(data?.revenue?.total || 0)}
                         icon={TrendingUp}
                         color="emerald"
-                        subtext={`${data?.revenue?.webOrders || 0} Web + ${data?.revenue?.wholesaleOrders || 0} Wholesale`}
+                        subtext={
+                            source === 'web' ? `${data?.revenue?.webOrders || 0} Web Orders` :
+                            source === 'wholesale' ? `${data?.revenue?.wholesaleOrders || 0} Wholesale Orders` :
+                            `${data?.revenue?.webOrders || 0} Web + ${data?.revenue?.wholesaleOrders || 0} Wholesale`
+                        }
                     />
                     <SummaryCard 
                         label="Gross Profit"

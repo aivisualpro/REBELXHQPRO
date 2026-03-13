@@ -18,7 +18,9 @@ import {
   ShoppingCart,
   Save,
   Check,
-  SquarePen
+  SquarePen,
+  Calendar,
+  ChevronDown
 } from 'lucide-react';
 import { cn, formatDate, toDateInputValue } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -118,6 +120,50 @@ const SHIPPING_METHODS = [
 
 // ─── In-Memory Cache ─────────────────────────────────────────────────────────
 
+type DatePreset = 'all' | 'today' | 'yesterday' | 'thisMonth' | 'lastMonth' | 'thisYear' | 'lastYear';
+
+const DATE_PRESET_LABELS: Record<DatePreset, string> = {
+  all: 'All',
+  today: 'Today',
+  yesterday: 'Yesterday',
+  thisMonth: 'This Month',
+  lastMonth: 'Last Month',
+  thisYear: 'This Year',
+  lastYear: 'Last Year',
+};
+
+function getDateRange(preset: DatePreset): { fromDate: string; toDate: string } | null {
+  if (preset === 'all') return null;
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  const d = now.getDate();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const fmt = (dt: Date) => `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+
+  switch (preset) {
+    case 'today':
+      return { fromDate: fmt(now), toDate: fmt(now) };
+    case 'yesterday': {
+      const yd = new Date(y, m, d - 1);
+      return { fromDate: fmt(yd), toDate: fmt(yd) };
+    }
+    case 'thisMonth':
+      return { fromDate: `${y}-${pad(m + 1)}-01`, toDate: fmt(now) };
+    case 'lastMonth': {
+      const firstLM = new Date(y, m - 1, 1);
+      const lastLM = new Date(y, m, 0);
+      return { fromDate: fmt(firstLM), toDate: fmt(lastLM) };
+    }
+    case 'thisYear':
+      return { fromDate: `${y}-01-01`, toDate: fmt(now) };
+    case 'lastYear':
+      return { fromDate: `${y - 1}-01-01`, toDate: `${y - 1}-12-31` };
+    default:
+      return null;
+  }
+}
+
 interface CacheEntry {
   orders: SaleOrder[];
   hasMore: boolean;
@@ -126,6 +172,7 @@ interface CacheEntry {
   sortOrder: string;
   search: string;
   status: string;
+  datePreset: string;
   timestamp: number;
 }
 
@@ -368,6 +415,33 @@ function SaleOrdersContent() {
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [activeStatus, setActiveStatus] = useState<string>('All');
+  const [datePreset, setDatePreset] = useState<DatePreset>('thisYear');
+  const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
+  const dateDropdownRef = useRef<HTMLDivElement>(null);
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const statusDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close date dropdown on click outside
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (dateDropdownRef.current && !dateDropdownRef.current.contains(e.target as Node)) {
+        setIsDateDropdownOpen(false);
+      }
+    };
+    if (isDateDropdownOpen) document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [isDateDropdownOpen]);
+
+  // Close status dropdown on click outside
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(e.target as Node)) {
+        setIsStatusDropdownOpen(false);
+      }
+    };
+    if (isStatusDropdownOpen) document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [isStatusDropdownOpen]);
 
   const pageRef = useRef(globalCache.current?.page || 0);
   const mountedRef = useRef(true);
@@ -430,6 +504,47 @@ function SaleOrdersContent() {
   });
   const [countsLoaded, setCountsLoaded] = useState(false);
 
+  // Aggregated stats (server-side pipeline)
+  interface AggStats {
+    count: number;
+    totalRevenue: number;
+    totalCost: number;
+    totalBalance: number;
+    totalMargin: number;
+    totalShipping: number;
+    totalDiscount: number;
+    totalTax: number;
+  }
+  const [aggStats, setAggStats] = useState<AggStats | null>(null);
+  const [aggStatsLoading, setAggStatsLoading] = useState(false);
+  const statsAbortRef = useRef<AbortController | null>(null);
+
+  const fetchAggStats = useCallback(async () => {
+    if (statsAbortRef.current) statsAbortRef.current.abort();
+    const controller = new AbortController();
+    statsAbortRef.current = controller;
+    setAggStatsLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (activeStatus !== 'All') params.set('status', activeStatus);
+      if (debouncedSearch) params.set('search', debouncedSearch);
+      const dateRange = getDateRange(datePreset);
+      if (dateRange) {
+        params.set('fromDate', dateRange.fromDate + 'T00:00:00.000Z');
+        params.set('toDate', dateRange.toDate + 'T23:59:59.999Z');
+      }
+      const res = await fetch(`/api/wholesale/orders/stats?${params}`, { signal: controller.signal });
+      if (res.ok) {
+        const data = await res.json();
+        setAggStats(data);
+      }
+    } catch (e: any) {
+      if (e?.name !== 'AbortError') console.error('Stats fetch error:', e);
+    } finally {
+      setAggStatsLoading(false);
+    }
+  }, [activeStatus, debouncedSearch, datePreset]);
+
   const fetchStatusCounts = useCallback(async () => {
     try {
       const res = await fetch('/api/wholesale/orders/counts');
@@ -442,6 +557,7 @@ function SaleOrdersContent() {
 
   useEffect(() => { fetchStatusCounts(); }, [fetchStatusCounts]);
   useEffect(() => { if (orders.length > 0) fetchStatusCounts(); }, [orders.length, fetchStatusCounts]);
+  useEffect(() => { fetchAggStats(); }, [fetchAggStats]);
 
   // Header portal
   const [headerPortalTarget, setHeaderPortalTarget] = useState<HTMLElement | null>(null);
@@ -736,6 +852,13 @@ function SaleOrdersContent() {
       });
       if (activeStatus !== 'All') params.set('status', activeStatus);
 
+      // Date preset filter
+      const dateRange = getDateRange(datePreset);
+      if (dateRange) {
+        params.set('fromDate', dateRange.fromDate + 'T00:00:00.000Z');
+        params.set('toDate', dateRange.toDate + 'T23:59:59.999Z');
+      }
+
       const res = await fetch(`/api/wholesale/orders?${params}`, { signal: controller.signal });
       const data = await res.json();
       if (seq !== reqSeqRef.current) return;
@@ -749,12 +872,12 @@ function SaleOrdersContent() {
             const existingIds = new Set(prev.map(o => o._id));
             const filtered = newOrders.filter((o: SaleOrder) => !existingIds.has(o._id));
             const merged = [...prev, ...filtered];
-            globalCache.current = { orders: merged, hasMore: newHasMore, page: pageNum, sortBy, sortOrder, search: debouncedSearch, status: activeStatus, timestamp: Date.now() };
+            globalCache.current = { orders: merged, hasMore: newHasMore, page: pageNum, sortBy, sortOrder, search: debouncedSearch, status: activeStatus, datePreset, timestamp: Date.now() };
             return merged;
           });
         } else {
           setOrders(newOrders);
-          globalCache.current = { orders: newOrders, hasMore: newHasMore, page: pageNum, sortBy, sortOrder, search: debouncedSearch, status: activeStatus, timestamp: Date.now() };
+          globalCache.current = { orders: newOrders, hasMore: newHasMore, page: pageNum, sortBy, sortOrder, search: debouncedSearch, status: activeStatus, datePreset, timestamp: Date.now() };
         }
         setHasMore(newHasMore);
         pageRef.current = pageNum;
@@ -769,30 +892,30 @@ function SaleOrdersContent() {
       fetchingRef.current = false;
       if (mountedRef.current) { setIsLoading(false); setIsLoadingMore(false); }
     }
-  }, [sortBy, sortOrder, debouncedSearch, activeStatus]);
+  }, [sortBy, sortOrder, debouncedSearch, activeStatus, datePreset]);
 
   // ─── Initial load & filter changes ────────────────────────────────────────
   const fetchPageRef = useRef(fetchPage);
   fetchPageRef.current = fetchPage;
   const isFirstMount = useRef(true);
-  const prevFiltersRef = useRef({ sortBy, sortOrder, search: debouncedSearch, status: activeStatus });
+  const prevFiltersRef = useRef({ sortBy, sortOrder, search: debouncedSearch, status: activeStatus, datePreset });
 
   useEffect(() => {
     const prev = prevFiltersRef.current;
-    prevFiltersRef.current = { sortBy, sortOrder, search: debouncedSearch, status: activeStatus };
+    prevFiltersRef.current = { sortBy, sortOrder, search: debouncedSearch, status: activeStatus, datePreset };
 
     if (isFirstMount.current) {
       isFirstMount.current = false;
       const cache = globalCache.current;
       if (cache && cache.orders.length > 0 && (Date.now() - cache.timestamp) < CACHE_TTL &&
-        cache.sortBy === sortBy && cache.sortOrder === sortOrder && cache.search === debouncedSearch && cache.status === activeStatus) {
+        cache.sortBy === sortBy && cache.sortOrder === sortOrder && cache.search === debouncedSearch && cache.status === activeStatus && cache.datePreset === datePreset) {
         setOrders(cache.orders); setHasMore(cache.hasMore); pageRef.current = cache.page; setIsLoading(false);
         return;
       }
     }
     globalCache.current = null; pageRef.current = 0; setOrders([]); setHasMore(true);
     fetchPageRef.current(1, false);
-  }, [sortBy, sortOrder, debouncedSearch, activeStatus]);
+  }, [sortBy, sortOrder, debouncedSearch, activeStatus, datePreset]);
 
   // ─── Scroll to load more ──────────────────────────────────────────────────
   useEffect(() => {
@@ -827,6 +950,7 @@ function SaleOrdersContent() {
   const refreshOrders = () => {
     globalCache.current = null; pageRef.current = 0; setOrders([]); setHasMore(true);
     fetchPageRef.current(1, false);
+    fetchAggStats();
   };
 
   const handleDeleteClick = (e: React.MouseEvent, id: string) => {
@@ -1191,26 +1315,140 @@ function SaleOrdersContent() {
             <h1 className="text-[14px] font-black uppercase tracking-widest text-foreground">Wholesale Orders</h1>
           </div>
           <div className="h-5 w-px bg-border shrink-0" />
-          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-thin">
-            {STATUS_TABS.map((tab) => {
-              const sc = statusColors[tab];
-              const isActive = activeStatus === tab;
-              return (
-                <button key={tab} onClick={() => handleTabChange(tab)}
-                  className="px-3 py-1.5 rounded-lg text-[12px] font-semibold whitespace-nowrap transition-all cursor-pointer"
-                  style={isActive ? { backgroundColor: sc?.bg, color: sc?.color, boxShadow: '0 1px 4px rgba(0,0,0,0.15)' } : { color: 'inherit', backgroundColor: 'transparent' }}
-                  onMouseEnter={e => { if (!isActive && sc) (e.currentTarget as HTMLButtonElement).style.backgroundColor = sc.hoverBg; }}
-                  onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'; }}
-                >
-                  {tab}
-                  <span className="ml-1.5 text-[11px] tabular-nums" style={{ opacity: isActive ? 0.75 : 0.5 }}>
-                    {countsLoaded ? statusCounts[tab]?.toLocaleString() || 0 : <span className="inline-block w-4 h-3 rounded-sm bg-muted-foreground/10 animate-pulse align-middle" />}
-                  </span>
-                </button>
-              );
-            })}
+
+          {/* Status Filter Dropdown */}
+          <div className="relative shrink-0" ref={statusDropdownRef}>
+            <button
+              onClick={() => setIsStatusDropdownOpen(p => !p)}
+              className={cn(
+                'h-8 px-3 rounded border flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0',
+                activeStatus !== 'All'
+                  ? 'border-primary/30'
+                  : 'bg-secondary text-foreground border-border hover:bg-secondary/80'
+              )}
+              style={activeStatus !== 'All' && statusColors[activeStatus]
+                ? { backgroundColor: statusColors[activeStatus].bg + '22', color: statusColors[activeStatus].bg, borderColor: statusColors[activeStatus].bg + '55' }
+                : undefined}
+            >
+              <span>{activeStatus === 'All' ? 'All Status' : activeStatus}</span>
+              <ChevronDown className={cn('w-3 h-3 transition-transform', isStatusDropdownOpen && 'rotate-180')} />
+            </button>
+            {isStatusDropdownOpen && (
+              <div className="absolute left-0 top-full mt-1 z-50 w-52 bg-background border border-border rounded-lg shadow-xl overflow-hidden">
+                <div className="py-1">
+                  {STATUS_TABS.map((tab) => {
+                    const sc = statusColors[tab];
+                    const isActive = activeStatus === tab;
+                    return (
+                      <button
+                        key={tab}
+                        onClick={() => { handleTabChange(tab); setIsStatusDropdownOpen(false); }}
+                        className={cn(
+                          'w-full text-left px-4 py-2 text-[12px] font-medium transition-colors cursor-pointer flex items-center justify-between',
+                          isActive
+                            ? 'bg-primary/10 font-bold'
+                            : 'text-foreground/80 hover:bg-muted/50'
+                        )}
+                        style={isActive && sc ? { color: sc.bg } : undefined}
+                      >
+                        <div className="flex items-center gap-2">
+                          {tab !== 'All' && (
+                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: sc?.bg }} />
+                          )}
+                          <span>{tab}</span>
+                        </div>
+                        <span className="text-[10px] tabular-nums text-muted-foreground">
+                          {countsLoaded ? (statusCounts[tab]?.toLocaleString() || 0) : '...'}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
+
           <div className="flex-1" />
+
+          {/* Aggregated Stats — server-side pipeline */}
+          <div className="flex items-center gap-3 shrink-0">
+            {aggStatsLoading ? (
+              <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                <span>Loading...</span>
+              </div>
+            ) : aggStats ? (
+              <>
+                <div className="flex items-center gap-1.5 text-[11px] font-mono">
+                  <span className="font-black text-foreground text-[13px] tabular-nums">{aggStats.count.toLocaleString()}</span>
+                  <span className="text-muted-foreground/60 uppercase text-[9px] font-bold tracking-wider">orders</span>
+                </div>
+                <div className="h-4 w-px bg-border/50" />
+                <div className="flex items-center gap-1 text-[11px] font-mono">
+                  <span className="text-muted-foreground/50 text-[9px] font-bold uppercase tracking-wider">Rev</span>
+                  <span className="font-bold text-emerald-500 tabular-nums">
+                    ${aggStats.totalRevenue >= 1000000
+                      ? (aggStats.totalRevenue / 1000000).toFixed(2) + 'M'
+                      : aggStats.totalRevenue >= 1000
+                        ? (aggStats.totalRevenue / 1000).toFixed(1) + 'K'
+                        : aggStats.totalRevenue.toFixed(0)}
+                  </span>
+                </div>
+                {aggStats.totalBalance > 0.01 && (
+                  <>
+                    <div className="h-4 w-px bg-border/50" />
+                    <div className="flex items-center gap-1 text-[11px] font-mono">
+                      <span className="text-muted-foreground/50 text-[9px] font-bold uppercase tracking-wider">Bal</span>
+                      <span className="font-bold text-red-400 tabular-nums">
+                        ${aggStats.totalBalance >= 1000
+                          ? (aggStats.totalBalance / 1000).toFixed(1) + 'K'
+                          : aggStats.totalBalance.toFixed(0)}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </>
+            ) : null}
+          </div>
+
+          {/* Date Preset Dropdown */}
+          <div className="relative shrink-0" ref={dateDropdownRef}>
+            <button
+              onClick={() => setIsDateDropdownOpen(p => !p)}
+              className={cn(
+                'h-8 px-3 rounded border flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0',
+                datePreset !== 'all'
+                  ? 'bg-primary/10 border-primary/30 text-primary'
+                  : 'bg-secondary text-foreground border-border hover:bg-secondary/80'
+              )}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>{DATE_PRESET_LABELS[datePreset]}</span>
+              <ChevronDown className={cn('w-3 h-3 transition-transform', isDateDropdownOpen && 'rotate-180')} />
+            </button>
+            {isDateDropdownOpen && (
+              <div className="absolute right-0 top-full mt-1 z-50 w-44 bg-background border border-border rounded-lg shadow-xl overflow-hidden">
+                <div className="py-1">
+                  {(Object.keys(DATE_PRESET_LABELS) as DatePreset[]).map((key) => (
+                    <button
+                      key={key}
+                      onClick={() => { setDatePreset(key); setIsDateDropdownOpen(false); }}
+                      className={cn(
+                        'w-full text-left px-4 py-2 text-[12px] font-medium transition-colors cursor-pointer flex items-center justify-between',
+                        datePreset === key
+                          ? 'bg-primary/10 text-primary font-bold'
+                          : 'text-foreground/80 hover:bg-muted/50'
+                      )}
+                    >
+                      <span>{DATE_PRESET_LABELS[key]}</span>
+                      {datePreset === key && <Check className="w-3.5 h-3.5 text-primary" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="relative shrink-0">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <input type="text" placeholder="Search orders..." value={search} onChange={(e) => setSearch(e.target.value)}

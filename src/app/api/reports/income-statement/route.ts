@@ -14,60 +14,65 @@ export async function GET(req: Request) {
         const { searchParams } = new URL(req.url);
         const startDate = searchParams.get('startDate');
         const endDate = searchParams.get('endDate');
+        const source = searchParams.get('source') || 'total'; // 'web', 'wholesale', 'total'
 
-        // Build date filter - WebOrders use dateCreated, others use createdAt
+        // Build date filters — timezone-safe using explicit UTC boundaries
         let webDateFilter: any = {};
         let defaultDateFilter: any = {};
         if (startDate && endDate) {
+            // Parse as plain dates without timezone offset
+            // e.g. "2026-03-01" → midnight UTC on that day
+            const start = new Date(startDate + 'T00:00:00.000Z');
+            const end = new Date(endDate + 'T23:59:59.999Z');
+
             webDateFilter = {
-                dateCreated: {
-                    $gte: new Date(startDate),
-                    $lte: new Date(endDate + 'T23:59:59.999Z')
-                }
+                dateCreated: { $gte: start, $lte: end }
             };
             defaultDateFilter = {
-                createdAt: {
-                    $gte: new Date(startDate),
-                    $lte: new Date(endDate + 'T23:59:59.999Z')
-                }
+                createdAt: { $gte: start, $lte: end }
             };
         }
 
         // 1. REVENUE
-        // Web Orders Revenue
-        const webRevenueAgg = await WebOrder.aggregate([
-            { $match: { 
-                status: { $in: ['completed', 'shipped', 'Completed', 'Shipped', 'processing', 'Processing'] },
-                ...webDateFilter
-            }},
-            { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }
-        ]);
-        const webRevenue = webRevenueAgg[0]?.total || 0;
-        const webOrdersCount = webRevenueAgg[0]?.count || 0;
+        let webRevenue = 0;
+        let webOrdersCount = 0;
+        let saleRevenue = 0;
+        let salesCount = 0;
 
-        // Sales Orders (Manual/Wholesale)
-        // Sales Orders (Manual/Wholesale) - Calculate Grand Total (Subtotal + Shipping - Discount)
-        const saleRevenueAgg = await SaleOrder.aggregate([
-            { $match: { orderStatus: { $ne: 'Cancelled' }, ...defaultDateFilter } },
-            // Add fields to calculate total per order first
-            { $addFields: {
-                lineItemsTotal: { $sum: "$lineItems.total" },
-                shipping: { $ifNull: ["$shippingCost", 0] },
-                discountVal: { $ifNull: ["$discount", 0] }
-            }},
-            // Calculate adjustments
-            { $project: {
-                grandTotal: { $subtract: [{ $add: ["$lineItemsTotal", "$shipping"] }, "$discountVal"] }
-            }},
-            { $group: { _id: null, total: { $sum: "$grandTotal" }, count: { $sum: 1 } } }
-        ]);
-        const saleRevenue = saleRevenueAgg[0]?.total || 0;
-        const salesCount = saleRevenueAgg[0]?.count || 0;
+        // Web Orders Revenue (skip if source is 'wholesale')
+        if (source !== 'wholesale') {
+            const webRevenueAgg = await WebOrder.aggregate([
+                { $match: { 
+                    status: { $in: ['completed', 'shipped', 'Completed', 'Shipped', 'processing', 'Processing'] },
+                    ...webDateFilter
+                }},
+                { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }
+            ]);
+            webRevenue = webRevenueAgg[0]?.total || 0;
+            webOrdersCount = webRevenueAgg[0]?.count || 0;
+        }
+
+        // Sales Orders (Manual/Wholesale) - skip if source is 'web'
+        if (source !== 'web') {
+            const saleRevenueAgg = await SaleOrder.aggregate([
+                { $match: { orderStatus: { $ne: 'Cancelled' }, ...defaultDateFilter } },
+                { $addFields: {
+                    lineItemsTotal: { $sum: "$lineItems.total" },
+                    shipping: { $ifNull: ["$shippingCost", 0] },
+                    discountVal: { $ifNull: ["$discount", 0] }
+                }},
+                { $project: {
+                    grandTotal: { $subtract: [{ $add: ["$lineItemsTotal", "$shipping"] }, "$discountVal"] }
+                }},
+                { $group: { _id: null, total: { $sum: "$grandTotal" }, count: { $sum: 1 } } }
+            ]);
+            saleRevenue = saleRevenueAgg[0]?.total || 0;
+            salesCount = saleRevenueAgg[0]?.count || 0;
+        }
 
         const totalRevenue = webRevenue + saleRevenue;
 
         // 2. COST OF GOODS SOLD (COGS)
-        // For simplicity, we'll use purchase order costs as a proxy
         const cogsAgg = await PurchaseOrder.aggregate([
             { $match: defaultDateFilter },
             { $unwind: "$lineItems" },
@@ -92,44 +97,94 @@ export async function GET(req: Request) {
         const netIncome = grossProfit - operatingExpenses.total;
         const netMargin = totalRevenue > 0 ? (netIncome / totalRevenue) * 100 : 0;
 
-        // Revenue Breakdown by Month (for charts) - using dateCreated for WebOrders
-        const monthlyRevenue = await WebOrder.aggregate([
-            { $match: { 
-                status: { $in: ['completed', 'shipped', 'Completed', 'Shipped', 'processing', 'Processing'] },
-                total: { $gt: 0 }, // Only orders with revenue
-                ...webDateFilter
-            }},
-            { $project: {
-                total: 1,
-                // Use dateCreated for grouping
-                yearMonth: {
-                    $cond: {
-                        if: { $eq: [{ $type: "$dateCreated" }, "date"] },
-                        then: { $dateToString: { format: "%Y-%m", date: "$dateCreated" } },
-                        else: {
-                            $cond: {
-                                if: { $eq: [{ $type: "$dateCreated" }, "string"] },
-                                then: { $substr: ["$dateCreated", 0, 7] }, // Take first 7 chars (YYYY-MM)
-                                else: "Unknown"
+        // Monthly Revenue Trend
+        // Build based on the source filter
+        let monthlyRevenue: any[] = [];
+
+        if (source !== 'wholesale') {
+            // Web Orders monthly
+            const webMonthly = await WebOrder.aggregate([
+                { $match: { 
+                    status: { $in: ['completed', 'shipped', 'Completed', 'Shipped', 'processing', 'Processing'] },
+                    total: { $gt: 0 },
+                    ...webDateFilter
+                }},
+                { $project: {
+                    total: 1,
+                    yearMonth: {
+                        $cond: {
+                            if: { $eq: [{ $type: "$dateCreated" }, "date"] },
+                            then: { $dateToString: { format: "%Y-%m", date: "$dateCreated" } },
+                            else: {
+                                $cond: {
+                                    if: { $eq: [{ $type: "$dateCreated" }, "string"] },
+                                    then: { $substr: ["$dateCreated", 0, 7] },
+                                    else: "Unknown"
+                                }
                             }
                         }
                     }
-                }
-            }},
-            { $group: {
-                _id: "$yearMonth",
-                revenue: { $sum: "$total" },
-                orders: { $sum: 1 }
-            }},
-            { $match: { _id: { $ne: "Unknown" } } }, // Filter out unknowns
-            { $sort: { _id: -1 } }, // Sort descending to get latest months
-            { $limit: 12 }
-        ]);
+                }},
+                { $group: {
+                    _id: "$yearMonth",
+                    revenue: { $sum: "$total" },
+                    orders: { $sum: 1 }
+                }},
+                { $match: { _id: { $ne: "Unknown" } } },
+                { $sort: { _id: -1 } },
+                { $limit: 12 }
+            ]);
+            monthlyRevenue = webMonthly;
+        }
 
-        // Reverse to show oldest to newest
-        monthlyRevenue.reverse();
+        if (source !== 'web') {
+            // Wholesale monthly
+            const saleMonthly = await SaleOrder.aggregate([
+                { $match: { orderStatus: { $ne: 'Cancelled' }, ...defaultDateFilter } },
+                { $addFields: {
+                    lineItemsTotal: { $sum: "$lineItems.total" },
+                    shipping: { $ifNull: ["$shippingCost", 0] },
+                    discountVal: { $ifNull: ["$discount", 0] }
+                }},
+                { $project: {
+                    grandTotal: { $subtract: [{ $add: ["$lineItemsTotal", "$shipping"] }, "$discountVal"] },
+                    yearMonth: { $dateToString: { format: "%Y-%m", date: "$createdAt" } }
+                }},
+                { $group: {
+                    _id: "$yearMonth",
+                    revenue: { $sum: "$grandTotal" },
+                    orders: { $sum: 1 }
+                }},
+                { $sort: { _id: -1 } },
+                { $limit: 12 }
+            ]);
 
-        console.log("Monthly Revenue Data:", JSON.stringify(monthlyRevenue, null, 2));
+            if (source === 'wholesale') {
+                monthlyRevenue = saleMonthly;
+            } else {
+                // Merge web + wholesale monthly data for 'total' view
+                const mergedMap = new Map<string, { revenue: number; orders: number }>();
+                monthlyRevenue.forEach(m => {
+                    mergedMap.set(m._id, { revenue: m.revenue, orders: m.orders });
+                });
+                saleMonthly.forEach((m: any) => {
+                    const existing = mergedMap.get(m._id);
+                    if (existing) {
+                        existing.revenue += m.revenue;
+                        existing.orders += m.orders;
+                    } else {
+                        mergedMap.set(m._id, { revenue: m.revenue, orders: m.orders });
+                    }
+                });
+                monthlyRevenue = Array.from(mergedMap.entries())
+                    .map(([_id, data]) => ({ _id, ...data }))
+                    .sort((a, b) => a._id.localeCompare(b._id))
+                    .slice(-12);
+            }
+        }
+
+        // Sort oldest to newest
+        monthlyRevenue.sort((a: any, b: any) => (a._id || '').localeCompare(b._id || ''));
 
         return NextResponse.json({
             revenue: {
