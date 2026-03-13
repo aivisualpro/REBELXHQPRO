@@ -234,50 +234,79 @@ export default function WebOrderDetailPage() {
     const handleLotSelect = async (lotNumber: string, cost?: number) => {
         if (!order || editingLineItemId === null) return;
 
+        // Capture editing state before the finally block clears it
+        const targetLineItemId = editingLineItemId;
+        const targetSkuIndex = editingSkuIndex;
+
+        // Close modal immediately for snappy feel
+        setIsLotModalOpen(false);
+        setEditingLineItemId(null);
+        setEditingSkuId(null);
+        setEditingSkuIndex(-1);
+        setEditingCurrentLot(undefined);
+
         try {
-            // Optimistic UI: update lot number immediately
-            const updatedLineItems = order.lineItems.map(item => {
-                if (item.id !== editingLineItemId) return item;
-                if (editingSkuIndex >= 0 && item.linkedSkus) {
-                    // Multi-SKU: update specific entry
-                    return {
-                        ...item,
-                        linkedSkus: item.linkedSkus.map((ls, idx) =>
-                            idx === editingSkuIndex ? { ...ls, lotNumber: lotNumber || undefined } : ls
-                        )
-                    };
-                }
-                // Legacy: single linkedSkuId
-                return { ...item, lotNumber: lotNumber || undefined };
+            // Optimistic UI: update lot number + initial cost immediately
+            setOrder(prev => {
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    lineItems: prev.lineItems.map(item => {
+                        if (item.id !== targetLineItemId) return item;
+                        if (targetSkuIndex >= 0 && item.linkedSkus) {
+                            return {
+                                ...item,
+                                linkedSkus: item.linkedSkus.map((ls, idx) =>
+                                    idx === targetSkuIndex
+                                        ? { ...ls, lotNumber: lotNumber || undefined, cost: cost || 0 }
+                                        : ls
+                                )
+                            };
+                        }
+                        return { ...item, lotNumber: lotNumber || undefined, cost: cost || 0 };
+                    })
+                };
             });
-            setOrder({ ...order, lineItems: updatedLineItems });
 
             const res = await fetch(`/api/retail/web-orders/${order._id}/line-item`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    lineItemId: editingLineItemId,
-                    skuIndex: editingSkuIndex >= 0 ? editingSkuIndex : undefined,
+                    lineItemId: targetLineItemId,
+                    skuIndex: targetSkuIndex >= 0 ? targetSkuIndex : undefined,
                     lotNumber: lotNumber || null,
                 })
             });
 
             if (res.ok) {
+                const data = await res.json();
+                // Refine cost from server-calculated value (no full refetch)
+                setOrder(prev => {
+                    if (!prev) return prev;
+                    return {
+                        ...prev,
+                        lineItems: prev.lineItems.map(item => {
+                            if (item.id !== targetLineItemId) return item;
+                            if (targetSkuIndex >= 0 && item.linkedSkus) {
+                                return {
+                                    ...item,
+                                    linkedSkus: item.linkedSkus.map((ls, idx) =>
+                                        idx === targetSkuIndex ? { ...ls, cost: data.cost || 0 } : ls
+                                    )
+                                };
+                            }
+                            return { ...item, cost: data.cost || 0 };
+                        })
+                    };
+                });
                 toast.success(lotNumber ? `Lot updated to ${lotNumber}` : 'Lot cleared');
-                fetchOrder();
             } else {
-                fetchOrder();
                 toast.error('Failed to update lot number');
+                fetchOrder(); // Revert on failure
             }
         } catch (e) {
-            fetchOrder();
             toast.error('Error updating lot number');
-        } finally {
-            setIsLotModalOpen(false);
-            setEditingLineItemId(null);
-            setEditingSkuId(null);
-            setEditingSkuIndex(-1);
-            setEditingCurrentLot(undefined);
+            fetchOrder(); // Revert on error
         }
     };
 
