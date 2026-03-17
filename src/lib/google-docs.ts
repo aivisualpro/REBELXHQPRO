@@ -32,22 +32,7 @@ export function getServiceAccountAuth() {
     return auth;
 }
 
-/**
- * Generate a PDF from a Google Docs template by replacing {{variables}} with data.
- *
- * Strategy:
- * 1. Backup the template as DOCX (for safe restore)
- * 2. If multiple line items, insert extra table rows
- * 3. Populate extra rows using insertText at cell indices
- * 4. Replace all placeholders using replaceAllText (handles split text runs)
- * 5. Export as PDF
- * 6. Restore template from DOCX backup
- *
- * @param templateId - The Google Docs template file ID
- * @param replacements - Key-value pairs for header replacements
- * @param tableRows - Array of objects for line item rows
- * @returns Buffer containing the PDF
- */
+// ─── Mutex to serialise in-process PDF requests ─────────────────────────────
 class Mutex {
     private queue: Array<() => void> = [];
     private locked = false;
@@ -75,6 +60,23 @@ class Mutex {
 
 const pdfMutex = new Mutex();
 
+/**
+ * Generate a PDF from a Google Docs template by replacing {{variables}} with data.
+ *
+ * Strategy (MODIFY-IN-PLACE with verified restore):
+ * 1. Acquire mutex (serialise concurrent callers in this process)
+ * 2. Backup the template as DOCX
+ * 3. Modify the template in-place (insert rows, replace placeholders)
+ * 4. Export as PDF
+ * 5. Restore template from DOCX backup
+ * 6. Verify restore succeeded (poll until {{placeholders}} reappear)
+ * 7. Release mutex
+ *
+ * The verification step (6) is critical — the DOCX→Docs conversion that
+ * Drive performs after the upload is *asynchronous*. Without verification,
+ * a subsequent request could see a template with static values instead of
+ * placeholders, permanently corrupting it.
+ */
 export async function generatePdfFromTemplate(
     templateId: string,
     replacements: Record<string, string>,
@@ -84,12 +86,33 @@ export async function generatePdfFromTemplate(
     const drive = google.drive({ version: 'v3', auth });
     const docs = google.docs({ version: 'v1', auth });
 
-    // Acquire lock to prevent concurrent requests from corrupting the single template document
+    // Serialise — only one PDF generation at a time per process
     const unlock = await pdfMutex.lock();
 
     let backupBuffer: Buffer | null = null;
 
     try {
+        // ── Cleanup: delete any orphaned _tmp_pdf_* files from previous runs ──
+        try {
+            const orphans = await drive.files.list({
+                q: "name contains '_tmp_pdf_' and trashed = false",
+                fields: 'files(id, name)',
+                pageSize: 50,
+            });
+            const files = orphans.data.files || [];
+            if (files.length > 0) {
+                console.log(`Cleaning up ${files.length} orphaned _tmp_pdf_ files...`);
+                for (const f of files) {
+                    try {
+                        await drive.files.delete({ fileId: f.id! });
+                    } catch { /* ignore individual delete failures */ }
+                }
+            }
+        } catch (cleanupErr) {
+            // Non-critical — continue with PDF generation
+            console.warn('Temp file cleanup failed (non-critical):', cleanupErr);
+        }
+
         // 1. Backup template as DOCX for safe restore after PDF export
         const backupResponse = await drive.files.export(
             { fileId: templateId, mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
@@ -112,7 +135,6 @@ export async function generatePdfFromTemplate(
                     if (rows.length < 2) continue;
 
                     const templateRowIndex = rows.length - 1;
-                    // startIndex can be undefined for the very first body element; skip if missing
                     const tableStartIndex = element.startIndex ?? element.table.tableRows?.[0]?.tableCells?.[0]?.content?.[0]?.startIndex;
                     if (tableStartIndex == null) {
                         console.warn('Could not determine table start index, skipping row insertion');
@@ -154,11 +176,9 @@ export async function generatePdfFromTemplate(
 
                     if (!hasLineItemPlaceholders(rows)) continue;
 
-                    // Find the template row and extract column→placeholder mapping
                     const { templateRowIdx, columnPlaceholders } = findTemplateRow(rows);
                     if (templateRowIdx < 0) continue;
 
-                    // Build insertText requests for rows 2+ (processed in reverse index order)
                     const insertTextRequests: any[] = [];
 
                     for (let dataIdx = 1; dataIdx < tableRows.length; dataIdx++) {
@@ -176,7 +196,6 @@ export async function generatePdfFromTemplate(
                             const value = tableRows[dataIdx][placeholder] || '';
                             if (!value) continue;
 
-                            // Find the insertion point in the empty cell
                             const cell = cells[c];
                             const firstParagraph = cell.content?.[0];
                             const firstElement = firstParagraph?.paragraph?.elements?.[0];
@@ -191,7 +210,6 @@ export async function generatePdfFromTemplate(
                         }
                     }
 
-                    // Sort by descending index to avoid index shifting
                     insertTextRequests.sort((a: any, b: any) =>
                         b.insertText.location.index - a.insertText.location.index
                     );
@@ -203,17 +221,14 @@ export async function generatePdfFromTemplate(
                         });
                     }
 
-                    break; // Only handle the first matching table
+                    break;
                 }
             }
         }
 
         // 4. Apply all text replacements using replaceAllText
-        //    This handles both header fields AND the template row's line item placeholders.
-        //    replaceAllText works across text run boundaries, so split placeholders are fine.
         const allReplaceRequests: any[] = [];
 
-        // Header replacements (e.g., {{label}}, {{date}}, {{clientId.name}}, etc.)
         for (const [placeholder, value] of Object.entries(replacements)) {
             allReplaceRequests.push({
                 replaceAllText: {
@@ -223,9 +238,6 @@ export async function generatePdfFromTemplate(
             });
         }
 
-        // Line item placeholders in the template row (first data row)
-        // replaceAllText matches only in the template row since extra rows were empty
-        // and populated with actual values (not placeholders)
         if (tableRows && tableRows.length > 0) {
             const firstRow = tableRows[0];
             for (const [placeholder, value] of Object.entries(firstRow)) {
@@ -254,28 +266,95 @@ export async function generatePdfFromTemplate(
         return Buffer.from(pdfResponse.data as ArrayBuffer);
 
     } finally {
-        // 6. ALWAYS restore template from DOCX backup (even if an error occurred)
-        try {
-            if (backupBuffer) {
-                const readable = new Readable();
-                readable.push(backupBuffer);
-                readable.push(null);
-
-                await drive.files.update({
-                    fileId: templateId,
-                    media: {
-                        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                        body: readable,
-                    },
-                });
-            }
-        } catch (restoreErr) {
-            console.error('CRITICAL: Failed to restore template from backup:', restoreErr);
+        // 6. ALWAYS restore template from DOCX backup
+        if (backupBuffer) {
+            await restoreAndVerify(drive, docs, templateId, backupBuffer);
         }
-        
-        // Release lock
+
+        // 7. Release lock
         unlock();
     }
+}
+
+/**
+ * Restore the template from a DOCX backup and verify that the placeholders
+ * are back. The DOCX→Docs conversion is asynchronous on Google's side, so
+ * we poll until we see `{{` in the document body (up to ~8 seconds).
+ */
+async function restoreAndVerify(
+    drive: ReturnType<typeof google.drive>,
+    docs: ReturnType<typeof google.docs>,
+    templateId: string,
+    backupBuffer: Buffer,
+    maxRetries = 4
+) {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            // Upload the DOCX backup to overwrite the modified template
+            const readable = new Readable();
+            readable.push(backupBuffer);
+            readable.push(null);
+
+            await drive.files.update({
+                fileId: templateId,
+                media: {
+                    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    body: readable,
+                },
+            });
+
+            // Wait for the async DOCX→Docs conversion to complete
+            // Increasing delay: 2s, 3s, 4s, 5s
+            const delayMs = (attempt + 2) * 1000;
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+
+            // Verify the placeholders are back
+            const doc = await docs.documents.get({ documentId: templateId });
+            const bodyText = extractAllText(doc.data.body);
+
+            if (bodyText.includes('{{')) {
+                // Placeholders are restored — success
+                if (attempt > 0) {
+                    console.log(`Template restored after ${attempt + 1} attempts`);
+                }
+                return;
+            }
+
+            console.warn(`Restore attempt ${attempt + 1}: placeholders not found yet, retrying...`);
+        } catch (restoreErr) {
+            console.error(`Restore attempt ${attempt + 1} failed:`, restoreErr);
+        }
+    }
+
+    console.error('CRITICAL: Template restore verification failed after all retries. ' +
+        'The template may need manual restoration from Google Docs version history.');
+}
+
+/**
+ * Extract all text content from a Google Docs body (for verification).
+ */
+function extractAllText(body: any): string {
+    if (!body?.content) return '';
+    const parts: string[] = [];
+    for (const el of body.content) {
+        if (el.paragraph) {
+            for (const pe of (el.paragraph.elements || [])) {
+                if (pe.textRun?.content) parts.push(pe.textRun.content);
+            }
+        }
+        if (el.table) {
+            for (const row of (el.table.tableRows || [])) {
+                for (const cell of (row.tableCells || [])) {
+                    for (const p of (cell.content || [])) {
+                        for (const pe of (p.paragraph?.elements || [])) {
+                            if (pe.textRun?.content) parts.push(pe.textRun.content);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return parts.join('');
 }
 
 // ─── Helper Functions ───────────────────────────────────────────────────────
