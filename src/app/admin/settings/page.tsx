@@ -702,6 +702,22 @@ function SettingsPageContent() {
         }
     };
 
+    // Web Orders Sync — Missing Only
+    const handleWebOrderSyncMissing = async () => {
+        try {
+            const res = await fetch('/api/retail/web-orders/sync?missing=true', { method: 'POST' });
+            if (res.ok) {
+                toast.success('Missing orders sync started — fetching orders not yet in the system');
+                pollWebOrderSyncProgress();
+            } else {
+                const err = await res.json();
+                toast.error('Failed to start sync: ' + err.error);
+            }
+        } catch (e) {
+            toast.error('Sync start error');
+        }
+    };
+
     const pollWebOrderSyncProgress = useCallback(async () => {
         const timer = setInterval(async () => {
             try {
@@ -2030,12 +2046,12 @@ function SettingsPageContent() {
                                                 <div>
                                                     <h4 className="text-sm font-bold text-purple-600 dark:text-purple-400">WooCommerce Orders Sync</h4>
                                                     <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">
-                                                        Sync web orders from all connected WooCommerce stores. <strong>Incremental</strong> only syncs recently changed orders. <strong>Full</strong> re-syncs everything from scratch.
+                                                        Sync web orders from all connected WooCommerce stores. <strong>Incremental</strong> only syncs recently changed orders. <strong>Full</strong> re-syncs everything from scratch. <strong>Missing Only</strong> fetches all orders but only imports ones not yet in the system — perfect for catching any orders that slipped through.
                                                     </p>
                                                 </div>
                                             </div>
 
-                                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                                 {/* Incremental Sync */}
                                                 <button
                                                     onClick={() => handleWebOrderSync(false)}
@@ -2064,6 +2080,36 @@ function SettingsPageContent() {
                                                     <p className="text-[10px] text-muted-foreground mt-1 text-center">
                                                         All orders from scratch
                                                     </p>
+                                                </button>
+
+                                                {/* ─── Sync Missing Orders Only ─── */}
+                                                <button
+                                                    onClick={() => handleWebOrderSyncMissing()}
+                                                    disabled={woSyncStatus.isSyncing}
+                                                    className="relative flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-lg hover:border-cyan-400 hover:bg-gradient-to-br hover:from-cyan-500/10 hover:to-teal-500/10 transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden"
+                                                >
+                                                    {/* Subtle animated background glow */}
+                                                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
+                                                        <div className="absolute -top-10 -right-10 w-32 h-32 bg-cyan-400/10 rounded-full blur-2xl" />
+                                                        <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-teal-400/10 rounded-full blur-2xl" />
+                                                    </div>
+                                                    <div className="relative">
+                                                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-500/20 to-teal-500/20 flex items-center justify-center mb-3 group-hover:from-cyan-500/30 group-hover:to-teal-500/30 transition-all duration-300 group-hover:shadow-[0_0_20px_rgba(6,182,212,0.15)]">
+                                                            {woSyncStatus.isSyncing ? (
+                                                                <Loader2 className="w-6 h-6 text-cyan-500 animate-spin" />
+                                                            ) : (
+                                                                <Search className="w-5 h-5 text-cyan-500 group-hover:scale-110 transition-transform duration-300" />
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <h4 className="relative text-sm font-bold text-muted-foreground group-hover:text-cyan-600 dark:group-hover:text-cyan-400 transition-colors duration-300">Sync Missing Only</h4>
+                                                    <p className="relative text-[10px] text-muted-foreground mt-1 text-center group-hover:text-cyan-600/70 dark:group-hover:text-cyan-400/70 transition-colors duration-300">
+                                                        Import orders not yet in your system
+                                                    </p>
+                                                    {/* "NEW" micro-badge */}
+                                                    <span className="absolute top-2 right-2 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-widest rounded-full bg-gradient-to-r from-cyan-500 to-teal-500 text-white shadow-sm">
+                                                        New
+                                                    </span>
                                                 </button>
                                             </div>
                                         </div>

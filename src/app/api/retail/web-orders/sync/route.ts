@@ -245,6 +245,7 @@ export async function POST(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const forceFullSync = searchParams.get('full') === 'true';
+    const missingOnly = searchParams.get('missing') === 'true';
 
     (async () => {
         const startTime = Date.now();
@@ -270,7 +271,7 @@ export async function POST(request: Request) {
                 fetchingPage: 0,
                 fetchingFound: 0,
                 fetchingSite: '',
-                isFullSync: forceFullSync,
+                isFullSync: forceFullSync || missingOnly,
                 stats: { added: 0, updated: 0, skipped: 0 }
             };
 
@@ -330,9 +331,13 @@ export async function POST(request: Request) {
 
                 const syncMetaId = `web-orders-${site.name}`;
                 const syncMeta = await SyncMeta.findById(syncMetaId).lean();
-                const lastSyncAt = forceFullSync ? null : (syncMeta as any)?.lastSyncAt;
+                // For missingOnly mode, always fetch all orders (like full sync)
+                const lastSyncAt = (forceFullSync || missingOnly) ? null : (syncMeta as any)?.lastSyncAt;
 
-                if (lastSyncAt) {
+                if (missingOnly) {
+                    syncProgress.currentStep = `Fetching ALL orders from ${site.name} (missing-only mode)...`;
+                    syncProgress.logs.push(`🔍 ${site.name}: Missing-only sync — fetching all, will skip existing`);
+                } else if (lastSyncAt) {
                     syncProgress.currentStep = `Fetching order changes from ${site.name}...`;
                     syncProgress.logs.push(`📅 ${site.name}: Incremental since ${new Date(lastSyncAt).toLocaleString()}`);
                 } else {
@@ -359,12 +364,44 @@ export async function POST(request: Request) {
                 }
             }
 
+            // ─── Missing-Only Mode: filter out orders that already exist in DB ───
+            if (missingOnly && allWebOrders.length > 0) {
+                syncProgress.currentStep = 'Checking for missing orders...';
+                syncProgress.logs.push(`🔍 Checking ${allWebOrders.length} fetched orders against database...`);
+
+                // Build all candidate _id values
+                const candidateIds = allWebOrders.map(({ site, order }) => `WC-${site.name}-${order.id}`);
+
+                // Query DB in batches to find which already exist
+                const LOOKUP_BATCH = 5000;
+                const existingIdSet = new Set<string>();
+                for (let i = 0; i < candidateIds.length; i += LOOKUP_BATCH) {
+                    const batch = candidateIds.slice(i, i + LOOKUP_BATCH);
+                    const existing = await WebOrder.find({ _id: { $in: batch } }).select('_id').lean();
+                    existing.forEach((doc: any) => existingIdSet.add(doc._id));
+                }
+
+                const beforeCount = allWebOrders.length;
+                allWebOrders = allWebOrders.filter(({ site, order }) => {
+                    const id = `WC-${site.name}-${order.id}`;
+                    return !existingIdSet.has(id);
+                });
+
+                const skippedCount = beforeCount - allWebOrders.length;
+                syncProgress.logs.push(`✅ Found ${allWebOrders.length} missing orders (${skippedCount} already in system)`);
+                totalSkipped += skippedCount;
+            }
+
             syncProgress.total = allWebOrders.length;
 
             if (allWebOrders.length === 0) {
-                syncProgress.currentStep = 'Complete - No changes detected';
+                syncProgress.currentStep = missingOnly
+                    ? 'Complete - All orders are already synced!'
+                    : 'Complete - No changes detected';
                 syncProgress.isSyncing = false;
-                syncProgress.logs.push('✅ All orders are up to date!');
+                syncProgress.logs.push(missingOnly
+                    ? '🎉 All orders from your websites are already in the system!'
+                    : '✅ All orders are up to date!');
                 return;
             }
 
@@ -608,5 +645,5 @@ export async function POST(request: Request) {
         }
     })();
 
-    return NextResponse.json({ message: 'Sync started', mode: forceFullSync ? 'full' : 'incremental' });
+    return NextResponse.json({ message: 'Sync started', mode: missingOnly ? 'missing-only' : forceFullSync ? 'full' : 'incremental' });
 }
