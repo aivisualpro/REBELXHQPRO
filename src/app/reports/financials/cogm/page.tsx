@@ -11,16 +11,17 @@ import {
     FileText,
     RefreshCw,
     ChevronRight,
+    Search,
     Layers,
     Filter,
-    Loader2
+    Loader2,
+    ArrowLeft
 } from 'lucide-react';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { cn, formatDate } from '@/lib/utils';
 import { MultiSelectFilter } from '@/components/ui/filters/MultiSelectFilter';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 interface ManufacturingRecord {
     _id: string;
@@ -56,8 +57,28 @@ interface Summary {
     draftBatches: number;
 }
 
-export default function COGMPage() {
+export default function COGMPageWrapper() {
+    return (
+        <Suspense fallback={
+            <div className="h-full flex items-center justify-center bg-background">
+                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground/50" />
+            </div>
+        }>
+            <COGMPage />
+        </Suspense>
+    );
+}
+
+function COGMPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+
+    // Init from URL Params
+    const urlStart = searchParams.get('startDate');
+    const urlEnd = searchParams.get('endDate');
+    const urlSku = searchParams.get('sku');
+    const urlSearch = searchParams.get('search');
+
     const [records, setRecords] = useState<ManufacturingRecord[]>([]);
     const [loading, setLoading] = useState(false);
     const [summary, setSummary] = useState<Summary | null>(null);
@@ -70,32 +91,59 @@ export default function COGMPage() {
 
     // Filters
     const [dateRange, setDateRange] = useState({
-        startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-        endDate: new Date().toISOString().split('T')[0]
+        startDate: urlStart !== null ? urlStart : new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
+        endDate: urlEnd !== null ? urlEnd : new Date().toISOString().split('T')[0]
     });
-    const [selectedSkus, setSelectedSkus] = useState<string[]>([]);
+    const [datePreset, setDatePreset] = useState(!urlStart && !urlEnd ? 'all' : 'custom');
+    const [selectedSkus, setSelectedSkus] = useState<string[]>(urlSku ? urlSku.split(',') : []);
     const [skuOptions, setSkuOptions] = useState<{ label: string; value: string }[]>([]);
+    const [search, setSearch] = useState(urlSearch || '');
+    const [debouncedSearch, setDebouncedSearch] = useState(search);
 
-    // Fetch SKU options (only those used in manufacturing)
+    // Debounce search
+    useEffect(() => {
+        const t = setTimeout(() => setDebouncedSearch(search), 350);
+        return () => clearTimeout(t);
+    }, [search]);
+
+    // URL Sync
+    useEffect(() => {
+        const params = new URLSearchParams(searchParams.toString());
+        
+        if (dateRange.startDate) params.set('startDate', dateRange.startDate);
+        else params.delete('startDate');
+        
+        if (dateRange.endDate) params.set('endDate', dateRange.endDate);
+        else params.delete('endDate');
+
+        if (selectedSkus.length > 0) params.set('sku', selectedSkus.join(','));
+        else params.delete('sku');
+
+        if (debouncedSearch) params.set('search', debouncedSearch);
+        else params.delete('search');
+
+        const currentQs = searchParams.toString();
+        const newQs = params.toString();
+        
+        if (currentQs !== newQs) {
+            router.push(`${window.location.pathname}?${newQs}`, { scroll: false });
+        }
+    }, [dateRange, selectedSkus, debouncedSearch, router, searchParams]);
+
     useEffect(() => {
         fetch('/api/reports/cogm/skus')
             .then(res => res.json())
             .then(data => {
-                if (data.skus) {
-                    setSkuOptions(data.skus.map((s: any) => ({ label: s.name, value: s._id })));
-                }
+                if (data.skus) setSkuOptions(data.skus.map((s: any) => ({ label: s.name, value: s._id })));
             })
             .catch(console.error);
     }, []);
 
-    // Reset pagination when filters change
     useEffect(() => {
         setPage(1);
         setHasMore(true);
-        // Don't clear records immediately to avoid flicker, fetch will handle replacement
-    }, [dateRange, selectedSkus]);
+    }, [dateRange, selectedSkus, debouncedSearch]);
 
-    // Data Fetching
     const fetchData = useCallback(async () => {
         if (!hasMore && page > 1) return;
 
@@ -103,14 +151,13 @@ export default function COGMPage() {
         try {
             const params = new URLSearchParams({
                 page: page.toString(),
-                limit: '20',
-                startDate: dateRange.startDate,
-                endDate: dateRange.endDate
+                limit: '20'
             });
 
-            if (selectedSkus.length > 0) {
-                params.append('sku', selectedSkus.join(','));
-            }
+            if (dateRange.startDate) params.append('startDate', dateRange.startDate);
+            if (dateRange.endDate) params.append('endDate', dateRange.endDate);
+            if (selectedSkus.length > 0) params.append('sku', selectedSkus.join(','));
+            if (debouncedSearch) params.append('search', debouncedSearch);
 
             const res = await fetch(`/api/reports/cogm?${params.toString()}`);
             const data = await res.json();
@@ -118,21 +165,17 @@ export default function COGMPage() {
             if (res.ok) {
                 if (page === 1) {
                     setRecords(data.records || []);
-                    // Update summaries only on initial load/filter change to keep context
                     setSummary(data.summary);
                     setTopMaterials(data.topMaterials || []);
                     setProductionBySku(data.productionBySku || []);
                     setTotal(data.total || 0);
                 } else {
                     setRecords(prev => {
-                        // Avoid duplicates if strict mode causes double fetch
                         const newIds = new Set(data.records.map((r: any) => r._id));
                         const filteredPrev = prev.filter(r => !newIds.has(r._id));
                         return [...filteredPrev, ...data.records];
                     });
                 }
-
-                // Determine if there are more records
                 setHasMore((data.records || []).length === 20);
             }
         } catch (e) {
@@ -140,13 +183,12 @@ export default function COGMPage() {
         } finally {
             setLoading(false);
         }
-    }, [page, dateRange, selectedSkus]); // hasMore excluded from deps to allow fetch on filter change reset
+    }, [page, dateRange, selectedSkus, debouncedSearch]);
 
     useEffect(() => {
         fetchData();
     }, [fetchData]);
 
-    // Infinite Scroll Observer
     useEffect(() => {
         const observer = new IntersectionObserver((entries) => {
             if (entries[0].isIntersecting && hasMore && !loading) {
@@ -154,40 +196,50 @@ export default function COGMPage() {
             }
         }, { threshold: 0.1 });
 
-        if (loadMoreRef.current) {
-            observer.observe(loadMoreRef.current);
-        }
-
+        if (loadMoreRef.current) observer.observe(loadMoreRef.current);
         return () => observer.disconnect();
     }, [hasMore, loading]);
 
-    // Shell Viewport Lock: Prevents window-level scrolling
-    useEffect(() => {
-        const originalStyle = window.getComputedStyle(document.body).overflow;
-        document.body.style.overflow = 'hidden';
-        return () => {
-            document.body.style.overflow = originalStyle;
-        };
-    }, []);
+    const handlePresetChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const val = e.target.value;
+        setDatePreset(val);
+        const today = new Date();
 
-
-
+        if (val === 'all') {
+            setDateRange({ startDate: '', endDate: '' });
+        } else if (val === 'this_year') {
+            setDateRange({
+                startDate: new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0],
+                endDate: new Date(today.getFullYear(), 11, 31).toISOString().split('T')[0]
+            });
+        } else if (val === 'last_year') {
+            setDateRange({
+                startDate: new Date(today.getFullYear() - 1, 0, 1).toISOString().split('T')[0],
+                endDate: new Date(today.getFullYear() - 1, 11, 31).toISOString().split('T')[0]
+            });
+        } else if (val === 'this_month') {
+            setDateRange({
+                startDate: new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0],
+                endDate: new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0]
+            });
+        }
+    };
 
     const getStatusColor = (status: string) => {
         switch (status) {
-            case 'Completed': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
-            case 'In Progress': return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
-            case 'Draft': return 'bg-slate-500/20 text-slate-400 border-slate-500/30';
-            default: return 'bg-slate-500/20 text-slate-400 border-slate-500/30';
+            case 'Completed': return 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30';
+            case 'In Progress': return 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30';
+            case 'Draft': return 'bg-slate-500/20 text-muted-foreground border-border';
+            default: return 'bg-secondary/50 text-muted-foreground border-border';
         }
     };
 
     const getPriorityColor = (priority: string) => {
         switch (priority) {
-            case 'High': return 'text-red-400';
-            case 'Medium': return 'text-amber-400';
-            case 'Low': return 'text-slate-400';
-            default: return 'text-slate-400';
+            case 'High': return 'text-red-500 dark:text-red-400';
+            case 'Medium': return 'text-amber-500 dark:text-amber-400';
+            case 'Low': return 'text-muted-foreground';
+            default: return 'text-muted-foreground';
         }
     };
 
@@ -196,115 +248,147 @@ export default function COGMPage() {
     };
 
     return (
-        <div className="h-full flex flex-col overflow-hidden bg-slate-50 text-slate-900">
-            {/* Sticky Page Header */}
-            <div className="shrink-0 h-10 border-b border-slate-200 bg-white/80 backdrop-blur-md px-4 flex items-center justify-between z-10 shadow-sm">
+        <div className="h-full flex flex-col overflow-hidden bg-background text-foreground transition-colors duration-200">
+            {/* Top Header */}
+            <div className="relative shrink-0 h-14 border-b border-border bg-background/80 backdrop-blur-xl px-4 flex items-center justify-between z-50 shadow-sm transition-colors duration-200">
                 <div className="flex items-center space-x-3">
-                    <button onClick={() => router.back()} className="hover:bg-slate-100 transition-colors p-1">
-                        <ArrowLeft className="w-4 h-4 text-slate-500" />
+                    <button onClick={() => router.back()} className="hover:bg-secondary rounded-full transition-colors p-2 text-muted-foreground cursor-pointer">
+                        <ArrowLeft className="w-5 h-5" />
                     </button>
-                    <div className="h-4 w-px bg-slate-200 mx-1" />
-                    <div className="flex items-center gap-2 text-slate-500 text-xs">
-                        <Link href="/" className="hover:text-slate-900 transition-colors">Dashboard</Link>
-                        <ChevronRight className="w-3 h-3 text-slate-400" />
-                        <Link href="/reports/financials" className="hover:text-slate-900 transition-colors">Financials</Link>
-                        <ChevronRight className="w-3 h-3 text-slate-400" />
-                        <span className="text-slate-900 font-medium">Cost of Goods Manufactured</span>
-                        <span className="text-slate-300 mx-1">|</span>
-                        <span className="text-slate-900 font-bold">{summary?.totalBatches || 0} Batches</span>
+                    <div className="h-5 w-px bg-border mx-1" />
+                    <div className="flex items-center gap-2 text-muted-foreground text-[11px]">
+                        <Link href="/" className="hover:text-foreground transition-colors">Dashboard</Link>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground/50" />
+                        <Link href="/reports/financials" className="hover:text-foreground transition-colors">Financials</Link>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground/50" />
+                        <span className="text-foreground font-semibold">Cost of Goods Mfg</span>
+                        <span className="text-muted-foreground/30 mx-1">|</span>
+                        <span className="text-primary font-bold bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">{summary?.totalBatches || 0} Batches</span>
                     </div>
                 </div>
 
                 {/* Inline Filters */}
-                <div className="flex items-center gap-2">
-                    {/* Date Range */}
-                    <div className="flex items-center gap-2 bg-white border border-slate-200 px-2 h-[30px] shadow-sm transition-colors hover:border-slate-300">
-                        <Calendar className="w-3 h-3 text-slate-400" />
+                <div className="flex items-center gap-3 relative z-50">
+                    {/* Visual Search */}
+                    <div className="relative w-48">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                         <input
-                            type="date"
-                            value={dateRange.startDate}
-                            onChange={e => setDateRange({ ...dateRange, startDate: e.target.value })}
-                            className="bg-transparent text-[10px] font-medium text-slate-600 outline-none w-20"
-                        />
-                        <span className="text-slate-300 text-[10px]">-</span>
-                        <input
-                            type="date"
-                            value={dateRange.endDate}
-                            onChange={e => setDateRange({ ...dateRange, endDate: e.target.value })}
-                            className="bg-transparent text-[10px] font-medium text-slate-600 outline-none w-20"
+                            type="text"
+                            placeholder="Search WO#..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="w-full pl-8 pr-3 h-9 bg-background border border-border rounded-lg text-[11px] outline-none focus:border-primary text-foreground placeholder:text-muted-foreground transition-colors shadow-sm"
                         />
                     </div>
 
-                    {/* SKU Filter */}
-                    <MultiSelectFilter
-                        label="SKU"
-                        icon={Package}
-                        options={skuOptions}
-                        selectedValues={selectedSkus}
-                        onChange={setSelectedSkus}
-                        className="h-[30px] border-slate-200 bg-white hover:border-slate-300 text-slate-600 shadow-sm rounded-none"
-                    />
+                    <div className="flex items-center gap-2 bg-background border border-border rounded-lg px-2 py-0.5 h-9 shadow-sm transition-all hover:border-border/80">
+                        <Calendar className="w-4 h-4 text-primary ml-1" />
+                        <select 
+                            value={datePreset}
+                            onChange={handlePresetChange}
+                            className="bg-transparent text-[11px] font-bold text-foreground outline-none cursor-pointer border-none pl-1 pr-1"
+                        >
+                            <option value="custom">Custom Date</option>
+                            <option value="all">All Time</option>
+                            <option value="this_month">This Month</option>
+                            <option value="this_year">This Year</option>
+                            <option value="last_year">Last Year</option>
+                        </select>
+                        <div className="w-px h-4 bg-border mx-1" />
+                        <input
+                            type="date"
+                            value={dateRange.startDate}
+                            onChange={e => { setDateRange({ ...dateRange, startDate: e.target.value }); setDatePreset('custom'); }}
+                            className="bg-transparent text-[11px] font-medium text-foreground outline-none w-26 cursor-pointer color-scheme-auto"
+                        />
+                        <span className="text-muted-foreground/50 text-[11px] font-bold">-</span>
+                        <input
+                            type="date"
+                            value={dateRange.endDate}
+                            onChange={e => { setDateRange({ ...dateRange, endDate: e.target.value }); setDatePreset('custom'); }}
+                            className="bg-transparent text-[11px] font-medium text-foreground outline-none w-26 cursor-pointer color-scheme-auto"
+                        />
+                    </div>
+
+                    <div className="w-[180px]">
+                        <MultiSelectFilter
+                            label="SKU"
+                            icon={Package}
+                            options={skuOptions}
+                            selectedValues={selectedSkus}
+                            onChange={setSelectedSkus}
+                            className="h-9 border-border bg-background hover:bg-secondary text-foreground shadow-sm text-[11px] rounded-lg w-full justify-between"
+                        />
+                    </div>
                 </div>
             </div>
 
             {/* Split Content View */}
             <div className="flex-1 flex overflow-hidden">
                 {/* Left Column: Ledger Table */}
-                <div className="flex-1 overflow-y-auto bg-white min-w-0 relative scrollbar-custom">
+                <div className="flex-1 overflow-y-auto bg-background min-w-0 relative scrollbar-custom transition-colors duration-200">
                     <table className="w-full text-left border-collapse">
-                        <thead className="sticky top-0 z-20 bg-slate-50/90 backdrop-blur-sm border-b border-slate-100">
+                        <thead className="sticky top-0 z-20 bg-secondary/95 backdrop-blur-md border-b border-border shadow-sm">
                             <tr>
-                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100/50">WO#</th>
-                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100/50">Date</th>
-                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100/50">SKU</th>
-                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100/50">Qty Mfg.</th>
-                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100/50">Priority</th>
-                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100/50">Status</th>
-                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100/50">Created By</th>
-                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right border-r border-slate-100/50">Mat. Cost</th>
-                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right border-r border-slate-100/50">Pack. Cost</th>
-                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right border-r border-slate-100/50">Labor Cost</th>
-                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right border-r border-slate-100/50">Total Cost</th>
-                                <th className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-right">Unit Cost</th>
+                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[100px]">WO#</th>
+                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[100px]">Date</th>
+                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border">SKU</th>
+                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[100px]">Qty Mfg.</th>
+                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[100px]">Priority</th>
+                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[120px]">Status</th>
+                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[120px]">Created By</th>
+                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest text-right border-r border-border min-w-[110px]">Mat. Cost</th>
+                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest text-right border-r border-border min-w-[110px]">Pack. Cost</th>
+                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest text-right border-r border-border min-w-[110px]">Labor Cost</th>
+                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest text-right border-r border-border min-w-[110px]">Total Cost</th>
+                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest text-right min-w-[110px]">Unit Cost</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-50">
+                        <tbody className="divide-y divide-border">
                             {records.length === 0 && !loading ? (
-                                <tr><td colSpan={12} className="px-3 py-12 text-center text-[10px] text-slate-500">No records found</td></tr>
+                                <tr><td colSpan={12} className="px-4 py-16 text-center text-[11px] font-medium text-muted-foreground">No records found matching your filters</td></tr>
                             ) : records.map(record => (
                                 <tr
                                     key={record._id}
                                     onClick={() => router.push(`/warehouse/manufacturing/${record._id}`)}
-                                    className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
+                                    className="hover:bg-muted/30 dark:hover:bg-muted/10 transition-colors duration-150 cursor-pointer group"
                                 >
-                                    <td className="px-3 py-2 text-[10px] font-bold text-slate-900 border-r border-slate-50">{record.label || record._id.slice(-6)}</td>
-                                    <td className="px-3 py-2 text-[10px] text-slate-500 border-r border-slate-50">{formatDate(record.createdAt)}</td>
-                                    <td className="px-3 py-2 text-[10px] text-slate-600 border-r border-slate-50 max-w-[150px] truncate" title={getSkuName(record.sku)}>{getSkuName(record.sku)}</td>
-                                    <td className="px-3 py-2 text-[10px] font-bold text-purple-600 border-r border-slate-50">{record.qty?.toLocaleString() || 0} {record.uom}</td>
-                                    <td className={cn("px-3 py-2 text-[10px] font-bold border-r border-slate-50", getPriorityColor(record.priority))}>
+                                    <td className="px-4 py-3 text-[11px] font-bold text-foreground border-r border-border group-hover:text-primary transition-colors">
+                                        {record.label || record._id.slice(-6)}
+                                    </td>
+                                    <td className="px-4 py-3 text-[11px] font-medium text-muted-foreground border-r border-border">
+                                        {formatDate(record.createdAt)}
+                                    </td>
+                                    <td className="px-4 py-3 text-[11px] font-medium text-foreground/80 border-r border-border max-w-[200px] truncate" title={getSkuName(record.sku)}>
+                                        {getSkuName(record.sku)}
+                                    </td>
+                                    <td className="px-4 py-3 text-[11px] font-bold text-primary border-r border-border">
+                                        {record.qty?.toLocaleString() || 0} <span className="text-primary/70 font-medium">{record.uom}</span>
+                                    </td>
+                                    <td className={cn("px-4 py-3 text-[11px] font-bold border-r border-border", getPriorityColor(record.priority))}>
                                         {record.priority}
                                     </td>
-                                    <td className="px-3 py-2 border-r border-slate-50">
-                                        <span className={cn("px-1.5 py-0.5 text-[9px] font-bold uppercase rounded-none border", getStatusColor(record.status))}>
+                                    <td className="px-4 py-3 border-r border-border">
+                                        <span className={cn("px-2 py-1 text-[11px] font-bold uppercase rounded-md border", getStatusColor(record.status))}>
                                             {record.status}
                                         </span>
                                     </td>
-                                    <td className="px-3 py-2 text-[10px] text-slate-600 border-r border-slate-50 whitespace-nowrap">
+                                    <td className="px-4 py-3 text-[11px] font-medium text-muted-foreground border-r border-border whitespace-nowrap">
                                         {record.createdBy ? `${record.createdBy.firstName} ${record.createdBy.lastName?.charAt(0)}.` : '-'}
                                     </td>
-                                    <td className="px-3 py-2 text-[10px] text-slate-600 text-right border-r border-slate-50 font-mono">
+                                    <td className="px-4 py-3 text-[11px] text-foreground/80 text-right border-r border-border font-mono tracking-tight">
                                         {(record.materialCost || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
                                     </td>
-                                    <td className="px-3 py-2 text-[10px] text-slate-600 text-right border-r border-slate-50 font-mono">
+                                    <td className="px-4 py-3 text-[11px] text-foreground/80 text-right border-r border-border font-mono tracking-tight">
                                         {(record.packagingCost || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
                                     </td>
-                                    <td className="px-3 py-2 text-[10px] text-slate-600 text-right border-r border-slate-50 font-mono">
+                                    <td className="px-4 py-3 text-[11px] text-foreground/80 text-right border-r border-border font-mono tracking-tight">
                                         {(record.laborCost || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
                                     </td>
-                                    <td className="px-3 py-2 text-[10px] font-bold text-slate-900 text-right border-r border-slate-50 font-mono">
+                                    <td className="px-4 py-3 text-[11px] font-bold text-foreground text-right border-r border-border font-mono tracking-tight">
                                         {(record.totalCost || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
                                     </td>
-                                    <td className="px-3 py-2 text-[10px] font-bold text-emerald-600 text-right font-mono">
+                                    <td className="px-4 py-3 text-[11px] font-bold text-primary text-right font-mono tracking-tight group-hover:bg-primary/5 transition-colors">
                                         {(record.unitCost || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
                                     </td>
                                 </tr>
@@ -313,90 +397,117 @@ export default function COGMPage() {
                     </table>
 
                     {/* Load More Sentinel */}
-                    <div ref={loadMoreRef} className="h-10 flex items-center justify-center border-t border-slate-50 mt-auto shrink-0">
+                    <div ref={loadMoreRef} className="h-16 flex items-center justify-center border-t border-border mt-auto shrink-0 bg-transparent">
                         {loading && hasMore && (
-                            <div className="flex items-center gap-2 text-slate-400 text-[10px]">
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                                <span>Loading more...</span>
+                            <div className="flex items-center gap-2 text-primary text-[11px] font-medium bg-primary/10 px-4 py-2 rounded-full">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>Loading more records...</span>
                             </div>
                         )}
                         {!hasMore && records.length > 0 && (
-                            <span className="text-slate-300 text-[9px] uppercase tracking-widest py-2">End of List</span>
+                            <span className="text-muted-foreground text-[11px] font-bold uppercase tracking-widest py-2 flex items-center gap-2">
+                                <div className="w-8 h-px bg-border"></div>
+                                End of List
+                                <div className="w-8 h-px bg-border"></div>
+                            </span>
                         )}
                     </div>
                 </div>
 
                 {/* Right Column: Side Panels */}
-                <div className="w-[300px] shrink-0 overflow-y-auto bg-slate-50 border-l border-slate-200 scrollbar-custom">
-                    <div className="p-4 space-y-6">
-                        {/* Production by SKU */}
-                        <div className="bg-white border border-slate-100 shadow-sm rounded-none p-4">
-                            <h3 className="font-bold flex items-center gap-2 mb-4 text-[10px] uppercase tracking-wider text-slate-900">
-                                <TrendingUp className="w-3 h-3 text-emerald-600" />
-                                Top Production
-                            </h3>
-                            <div className="space-y-2">
-                                {productionBySku.length === 0 ? (
-                                    <p className="text-slate-400 text-[10px]">No data</p>
-                                ) : productionBySku.map((item, idx) => (
-                                    <div key={idx} className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2 overflow-hidden">
-                                            <span className="w-4 h-4 rounded-none bg-emerald-50 text-emerald-600 text-[9px] font-bold flex items-center justify-center shrink-0">
-                                                {idx + 1}
-                                            </span>
-                                            <span className="text-[10px] text-slate-600 truncate">{item.name}</span>
-                                        </div>
-                                        <span className="text-emerald-600 font-bold text-[10px] shrink-0 ml-2">{item.totalQty?.toLocaleString()}</span>
-                                    </div>
-                                ))}
+                <div className="w-[340px] shrink-0 overflow-y-auto bg-secondary/30 border-l border-border scrollbar-custom p-5 space-y-5 transition-colors duration-200">
+                    
+                    {/* Top Production Card */}
+                    <div className="bg-background border border-border shadow-sm hover:shadow-md transition-shadow duration-300 rounded-2xl p-5 overflow-hidden relative">
+                        <div className="absolute top-0 right-0 p-8 opacity-[0.03] pointer-events-none">
+                            <TrendingUp className="w-32 h-32 text-primary" />
+                        </div>
+                        
+                        <h3 className="font-bold flex items-center gap-2 mb-5 text-[11px] uppercase tracking-widest text-foreground relative z-10">
+                            <div className="w-6 h-6 rounded-md bg-primary/10 flex items-center justify-center">
+                                <TrendingUp className="w-3.5 h-3.5 text-primary" />
                             </div>
+                            Top Production
+                        </h3>
+                        <div className="space-y-3 relative z-10">
+                            {productionBySku.length === 0 ? (
+                                <p className="text-muted-foreground text-[11px] font-medium italic">Data generating...</p>
+                            ) : productionBySku.map((item, idx) => (
+                                <div key={idx} className="flex items-center justify-between p-2 rounded-lg hover:bg-secondary/60 transition-colors border border-transparent hover:border-border">
+                                    <div className="flex items-center gap-3 overflow-hidden">
+                                        <span className={cn(
+                                            "w-6 h-6 rounded-full text-[11px] font-black flex items-center justify-center shrink-0 shadow-sm",
+                                            idx === 0 ? "bg-amber-500/20 text-amber-500 border border-amber-500/30" : 
+                                            idx === 1 ? "bg-slate-500/20 text-slate-500 border border-slate-500/30" :
+                                            idx === 2 ? "bg-orange-500/20 text-orange-500 border border-orange-500/30" :
+                                            "bg-secondary text-muted-foreground"
+                                        )}>
+                                            {idx + 1}
+                                        </span>
+                                        <span className="text-[11px] font-medium text-foreground/80 truncate" title={item.name}>{item.name}</span>
+                                    </div>
+                                    <span className="text-primary font-extrabold text-[11px] shrink-0 ml-3 bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
+                                        {item.totalQty?.toLocaleString()}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Top Materials Used */}
+                    <div className="bg-background border border-border shadow-sm hover:shadow-md transition-shadow duration-300 rounded-2xl p-5 overflow-hidden relative">
+                        <div className="absolute top-0 right-0 p-8 opacity-[0.03] pointer-events-none">
+                            <Package className="w-32 h-32 text-blue-500" />
                         </div>
 
-                        {/* Top Materials Used */}
-                        <div className="bg-white border border-slate-100 shadow-sm rounded-none p-4">
-                            <h3 className="font-bold flex items-center gap-2 mb-4 text-[10px] uppercase tracking-wider text-slate-900">
-                                <Package className="w-3 h-3 text-blue-600" />
-                                Top Materials
-                            </h3>
-                            <div className="space-y-2">
-                                {topMaterials.length === 0 ? (
-                                    <p className="text-slate-400 text-[10px]">No data</p>
-                                ) : topMaterials.map((item, idx) => (
-                                    <div key={idx} className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2 overflow-hidden">
-                                            <span className="w-4 h-4 rounded-none bg-blue-50 text-blue-600 text-[9px] font-bold flex items-center justify-center shrink-0">
-                                                {idx + 1}
-                                            </span>
-                                            <div className="flex flex-col overflow-hidden">
-                                                <span className="text-[10px] text-slate-600 truncate">{item.name}</span>
-                                                {item.totalScrapped > 0 && (
-                                                    <span className="text-[9px] text-red-500 flex items-center">
-                                                        <AlertTriangle className="w-2 h-2 mr-1" />
-                                                        {item.totalScrapped}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <span className="text-blue-600 font-bold text-[10px] shrink-0 ml-2">{item.totalQty?.toLocaleString()}</span>
-                                    </div>
-                                ))}
+                        <h3 className="font-bold flex items-center gap-2 mb-5 text-[11px] uppercase tracking-widest text-foreground relative z-10">
+                            <div className="w-6 h-6 rounded-md bg-blue-500/10 flex items-center justify-center">
+                                <Package className="w-3.5 h-3.5 text-blue-500" />
                             </div>
+                            Top Materials
+                        </h3>
+                        <div className="space-y-3 relative z-10">
+                            {topMaterials.length === 0 ? (
+                                <p className="text-muted-foreground text-[11px] font-medium italic">Data generating...</p>
+                            ) : topMaterials.map((item, idx) => (
+                                <div key={idx} className="flex items-center justify-between p-2 rounded-lg hover:bg-secondary/60 transition-colors border border-transparent hover:border-border">
+                                    <div className="flex items-center gap-3 overflow-hidden">
+                                        <span className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 border border-blue-500/20 text-[11px] font-black flex items-center justify-center shrink-0 shadow-sm">
+                                            {idx + 1}
+                                        </span>
+                                        <div className="flex flex-col overflow-hidden">
+                                            <span className="text-[11px] font-medium text-foreground/80 truncate" title={item.name}>{item.name}</span>
+                                            {item.totalScrapped > 0 && (
+                                                <span className="text-[11px] font-bold text-red-500 flex items-center mt-0.5">
+                                                    <AlertTriangle className="w-3 h-3 mr-1" />
+                                                    {item.totalScrapped} Scrapped
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <span className="text-blue-500 font-extrabold text-[11px] shrink-0 ml-3 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20">
+                                        {item.totalQty?.toLocaleString()}
+                                    </span>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Tiny Footer */}
-            <div className="h-[24px] border-t border-slate-200 bg-slate-100/50 shrink-0 flex items-center justify-between px-4 z-[50]">
+            {/* Premium Mini Footer */}
+            <div className="h-[28px] border-t border-border bg-background/50 backdrop-blur-sm shrink-0 flex items-center justify-between px-5 z-[50] transition-colors duration-200">
                 <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-1.5">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">System Ready</span>
+                    <div className="flex items-center space-x-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" />
+                        <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">System Ready</span>
                     </div>
                 </div>
-                <div className="flex items-center space-x-4">
-                    <span className="text-[9px] text-slate-400 font-mono uppercase tracking-tighter">COGM Report Shell v1.0</span>
-                    <span className="text-[9px] text-slate-400 font-mono uppercase tracking-tighter">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span>
+                <div className="flex items-center space-x-5">
+                    <span className="text-[11px] text-muted-foreground/80 font-mono font-bold uppercase tracking-tighter">COGM Ledger v2.1</span>
+                    <span className="text-[11px] text-muted-foreground/80 font-mono font-bold uppercase tracking-widest">
+                        {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
+                    </span>
                 </div>
             </div>
         </div>
@@ -409,18 +520,19 @@ function SummaryCard({ label, value, icon: Icon, color }: { label: string; value
         emerald: 'from-emerald-500 to-emerald-600 shadow-emerald-500/20',
         amber: 'from-amber-500 to-amber-600 shadow-amber-500/20',
         slate: 'from-slate-500 to-slate-600 shadow-slate-500/20',
-        purple: 'from-purple-500 to-purple-600 shadow-purple-500/20'
+        purple: 'from-primary/80 to-primary shadow-primary/20'
     };
 
     return (
-        <div className="bg-white border border-slate-100 shadow-sm rounded-xl p-4">
-            <div className="flex items-center gap-3">
-                <div className={cn("w-10 h-10 rounded-lg bg-gradient-to-br flex items-center justify-center shadow-lg", colorClasses[color as keyof typeof colorClasses])}>
-                    <Icon className="w-5 h-5 text-white" />
+        <div className="bg-background border border-border shadow-sm hover:shadow-md transition-shadow duration-300 rounded-2xl p-4 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-white/5 to-transparent rounded-full -mr-10 -mt-10 pointer-events-none transition-transform duration-500 group-hover:scale-110"></div>
+            <div className="flex items-center gap-4 relative z-10">
+                <div className={cn("w-12 h-12 rounded-xl bg-gradient-to-br flex items-center justify-center shadow-lg", colorClasses[color as keyof typeof colorClasses])}>
+                    <Icon className="w-6 h-6 text-white drop-shadow-sm" />
                 </div>
                 <div>
-                    <p className="text-2xl font-black text-slate-900">{value}</p>
-                    <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">{label}</p>
+                    <p className="text-2xl font-black text-foreground tracking-tight">{value}</p>
+                    <p className="text-[11px] text-muted-foreground uppercase font-bold tracking-widest mt-0.5">{label}</p>
                 </div>
             </div>
         </div>

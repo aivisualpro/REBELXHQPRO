@@ -14,6 +14,7 @@ export async function GET(req: Request) {
         const startDate = searchParams.get('startDate');
         const endDate = searchParams.get('endDate');
         const skuFilter = searchParams.get('sku');
+        const search = searchParams.get('search');
         const page = parseInt(searchParams.get('page') || '1');
         const limit = parseInt(searchParams.get('limit') || '50');
 
@@ -35,6 +36,23 @@ export async function GET(req: Request) {
                 { sku: { $in: skus } },
                 { 'lineItems.sku': { $in: skus } }
             ];
+        }
+
+        // Text Search
+        if (search) {
+            const searchRegex = { $regex: search, $options: 'i' };
+            const searchConditions = [
+                { label: searchRegex },
+                { status: searchRegex },
+                { priority: searchRegex }
+            ];
+            
+            if (query.$or) {
+                query.$and = [{ $or: query.$or }, { $or: searchConditions }];
+                delete query.$or;
+            } else {
+                query.$or = searchConditions;
+            }
         }
 
         // Fetch manufacturing records with populated fields
