@@ -282,8 +282,45 @@ export async function GET(
             }
         });
 
-        // Use cached costs from previous enrichment (already stored on lineItems)
-        // Don't wait for enrichLineItemsWithCost — it's slow (4 parallel DB queries)
+        // Enrich Line Items with Costs SYNCHRONOUSLY so the frontend renders correctly instantly
+        let enrichedItems = order.lineItems;
+        let materialCost = 0, packagingCost = 0, laborCost = 0, totalCost = 0;
+
+        if (enrichedItems && Array.isArray(enrichedItems)) {
+            enrichedItems = await enrichLineItemsWithCost(enrichedItems) as any;
+            order.lineItems = enrichedItems;
+
+            for (const li of enrichedItems as any[]) {
+                const bomQty = (li.recipeQty || 0) * (order.qty || 0);
+                const sa = li.sa ? li.sa / 100 : 0;
+                const qtyExtra = sa > 0 ? (bomQty / sa) - bomQty : 0;
+                const totalQty = bomQty + qtyExtra + (li.qtyScrapped || 0);
+                const unitCost = li.cost || 0;
+                const lineCost = totalQty * unitCost;
+                const category = li.sku?.category || '';
+                
+                if (typeof category === 'string' && category.toLowerCase().includes('packaging')) {
+                    packagingCost += lineCost;
+                } else {
+                    materialCost += lineCost;
+                }
+            }
+        }
+
+        if (order.labor && Array.isArray(order.labor)) {
+            for (const l of order.labor) {
+                const dur = l.duration || '';
+                const parts = dur.split(':').map((v: string) => parseFloat(v) || 0);
+                const hours = parts.length === 3 ? parts[0] + parts[1] / 60 + parts[2] / 3600 : parts.length === 2 ? parts[0] + parts[1] / 60 : 0;
+                laborCost += hours * (l.hourlyRate || 0);
+            }
+        }
+
+        totalCost = materialCost + packagingCost + laborCost;
+        order.materialCost = materialCost;
+        order.packagingCost = packagingCost;
+        order.laborCost = laborCost;
+        order.totalCost = totalCost;
 
         // Enrich with Tiers (fast: single lookup from cache)
         const allSkuIds = new Set<string>();
@@ -306,46 +343,11 @@ export async function GET(
             }
         });
 
-        // ─── Background: Enrich costs & persist ──────────────────────────────
-        // This runs AFTER the response is sent — making the initial load instant.
+        // ─── Background: Persist costs ──────────────────────────────
+        // Syncs the newly computed costs to the DB asynchronously so page response isn't blocked by writes
         after(async () => {
             try {
                 await dbConnect();
-
-                // Enrich line items with fresh costs
-                let enrichedItems = order.lineItems;
-                if (enrichedItems && Array.isArray(enrichedItems)) {
-                    enrichedItems = await enrichLineItemsWithCost(enrichedItems) as any;
-                }
-
-                let materialCost = 0, packagingCost = 0, laborCost = 0;
-
-                if (enrichedItems && Array.isArray(enrichedItems)) {
-                    for (const li of enrichedItems as any[]) {
-                        const bomQty = (li.recipeQty || 0) * ((order as any).qty || 0);
-                        const sa = li.sa ? li.sa / 100 : 0;
-                        const qtyExtra = sa > 0 ? (bomQty / sa) - bomQty : 0;
-                        const totalQty = bomQty + qtyExtra + (li.qtyScrapped || 0);
-                        const unitCost = li.cost || 0;
-                        const lineCost = totalQty * unitCost;
-                        const category = li.sku?.category || '';
-                        if (category === 'Packaging') packagingCost += lineCost;
-                        else materialCost += lineCost;
-                    }
-                }
-
-                if ((order as any).labor && Array.isArray((order as any).labor)) {
-                    for (const l of (order as any).labor) {
-                        const dur = l.duration || '';
-                        const parts = dur.split(':').map((v: string) => parseFloat(v) || 0);
-                        const hours = parts.length === 3 ? parts[0] + parts[1] / 60 + parts[2] / 3600 : parts.length === 2 ? parts[0] + parts[1] / 60 : 0;
-                        laborCost += hours * (l.hourlyRate || 0);
-                    }
-                }
-
-                const totalCost = materialCost + packagingCost + laborCost;
-
-                // Persist enriched line items + computed costs
                 await Manufacturing.updateOne(
                     { _id: id },
                     { $set: { materialCost, packagingCost, laborCost, totalCost, lineItems: enrichedItems } }

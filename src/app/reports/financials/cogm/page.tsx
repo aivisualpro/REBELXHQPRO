@@ -15,7 +15,9 @@ import {
     Layers,
     Filter,
     Loader2,
-    ArrowLeft
+    ArrowLeft,
+    DollarSign,
+    X
 } from 'lucide-react';
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { cn, formatDate } from '@/lib/utils';
@@ -55,6 +57,10 @@ interface Summary {
     completedBatches: number;
     inProgressBatches: number;
     draftBatches: number;
+    totalMaterialCost: number;
+    totalPackagingCost: number;
+    totalLaborCost: number;
+    totalCost: number;
 }
 
 export default function COGMPageWrapper() {
@@ -89,12 +95,20 @@ function COGMPage() {
     const [hasMore, setHasMore] = useState(true);
     const loadMoreRef = useRef<HTMLDivElement>(null);
 
+    // Date Utils (Bypassing UTC Timezone shift on standard Date.toISOString)
+    const getLocalDateString = (year: number, month: number, day: number) => 
+        `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+    const today = new Date();
+    const defaultStart = getLocalDateString(today.getFullYear(), 0, 1); // Jan 1st
+    const defaultEnd = getLocalDateString(today.getFullYear(), 11, 31); // Dec 31st
+
     // Filters
     const [dateRange, setDateRange] = useState({
-        startDate: urlStart !== null ? urlStart : new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-        endDate: urlEnd !== null ? urlEnd : new Date().toISOString().split('T')[0]
+        startDate: urlStart !== null ? urlStart : defaultStart,
+        endDate: urlEnd !== null ? urlEnd : defaultEnd
     });
-    const [datePreset, setDatePreset] = useState(!urlStart && !urlEnd ? 'all' : 'custom');
+    const [datePreset, setDatePreset] = useState(!urlStart && !urlEnd ? 'this_year' : 'custom');
     const [selectedSkus, setSelectedSkus] = useState<string[]>(urlSku ? urlSku.split(',') : []);
     const [skuOptions, setSkuOptions] = useState<{ label: string; value: string }[]>([]);
     const [search, setSearch] = useState(urlSearch || '');
@@ -209,18 +223,18 @@ function COGMPage() {
             setDateRange({ startDate: '', endDate: '' });
         } else if (val === 'this_year') {
             setDateRange({
-                startDate: new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0],
-                endDate: new Date(today.getFullYear(), 11, 31).toISOString().split('T')[0]
+                startDate: getLocalDateString(today.getFullYear(), 0, 1),
+                endDate: getLocalDateString(today.getFullYear(), 11, 31)
             });
         } else if (val === 'last_year') {
             setDateRange({
-                startDate: new Date(today.getFullYear() - 1, 0, 1).toISOString().split('T')[0],
-                endDate: new Date(today.getFullYear() - 1, 11, 31).toISOString().split('T')[0]
+                startDate: getLocalDateString(today.getFullYear() - 1, 0, 1),
+                endDate: getLocalDateString(today.getFullYear() - 1, 11, 31)
             });
         } else if (val === 'this_month') {
             setDateRange({
-                startDate: new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0],
-                endDate: new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0]
+                startDate: getLocalDateString(today.getFullYear(), today.getMonth(), 1),
+                endDate: getLocalDateString(today.getFullYear(), today.getMonth() + 1, 0)
             });
         }
     };
@@ -320,6 +334,25 @@ function COGMPage() {
                             className="h-9 border-border bg-background hover:bg-secondary text-foreground shadow-sm text-[11px] rounded-lg w-full justify-between"
                         />
                     </div>
+
+                    {(search || selectedSkus.length > 0 || datePreset !== 'this_year') && (
+                        <button 
+                            onClick={() => {
+                                const today = new Date();
+                                setSearch('');
+                                setSelectedSkus([]);
+                                setDatePreset('this_year');
+                                setDateRange({
+                                    startDate: getLocalDateString(today.getFullYear(), 0, 1),
+                                    endDate: getLocalDateString(today.getFullYear(), 11, 31)
+                                });
+                            }} 
+                            className="h-9 px-3 flex items-center gap-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider text-red-500 hover:text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-transparent hover:border-red-500/30 transition-all ml-1 shadow-sm shrink-0"
+                        >
+                            <X className="w-3.5 h-3.5" />
+                            Clear
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -333,7 +366,8 @@ function COGMPage() {
                                 <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[100px]">WO#</th>
                                 <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[100px]">Date</th>
                                 <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border">SKU</th>
-                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[100px]">Qty Mfg.</th>
+                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[100px] text-right">Qty Mfg.</th>
+                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[80px]">UOM</th>
                                 <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[100px]">Priority</th>
                                 <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[120px]">Status</th>
                                 <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[120px]">Created By</th>
@@ -362,8 +396,11 @@ function COGMPage() {
                                     <td className="px-4 py-3 text-[11px] font-medium text-foreground/80 border-r border-border max-w-[200px] truncate" title={getSkuName(record.sku)}>
                                         {getSkuName(record.sku)}
                                     </td>
-                                    <td className="px-4 py-3 text-[11px] font-bold text-primary border-r border-border">
-                                        {record.qty?.toLocaleString() || 0} <span className="text-primary/70 font-medium">{record.uom}</span>
+                                    <td className="px-4 py-3 text-[11px] font-bold text-primary border-r border-border text-right font-mono">
+                                        {record.qty?.toLocaleString() || 0}
+                                    </td>
+                                    <td className="px-4 py-3 text-[10px] font-black text-muted-foreground uppercase tracking-widest border-r border-border">
+                                        {record.uom || '-'}
                                     </td>
                                     <td className={cn("px-4 py-3 text-[11px] font-bold border-r border-border", getPriorityColor(record.priority))}>
                                         {record.priority}
@@ -389,7 +426,7 @@ function COGMPage() {
                                         {(record.totalCost || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
                                     </td>
                                     <td className="px-4 py-3 text-[11px] font-bold text-primary text-right font-mono tracking-tight group-hover:bg-primary/5 transition-colors">
-                                        {(record.unitCost || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+                                        {(record.qty > 0 ? (record.totalCost || 0) / record.qty : 0).toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 6 })}
                                     </td>
                                 </tr>
                             ))}
@@ -417,6 +454,72 @@ function COGMPage() {
                 {/* Right Column: Side Panels */}
                 <div className="w-[340px] shrink-0 overflow-y-auto bg-secondary/30 border-l border-border scrollbar-custom p-5 space-y-5 transition-colors duration-200">
                     
+                    {/* COGM Summary Card */}
+                    {summary && (
+                        <div className="bg-background border border-border shadow-sm hover:shadow-md transition-shadow duration-300 rounded-2xl p-5 overflow-hidden relative">
+                            <h3 className="font-bold flex items-center gap-2 mb-4 text-[11px] uppercase tracking-widest text-foreground relative z-10">
+                                <div className="w-6 h-6 rounded-md bg-teal-500/10 flex items-center justify-center border border-teal-500/20">
+                                    <DollarSign className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+                                </div>
+                                COGM Summary
+                            </h3>
+                            <div className="space-y-2 relative z-10 w-full mb-1">
+                                {(() => {
+                                    const tCost = summary.totalCost || 0;
+                                    const mCost = summary.totalMaterialCost || 0;
+                                    const pCost = summary.totalPackagingCost || 0;
+                                    const lCost = summary.totalLaborCost || 0;
+                                    const qProd = summary.totalQtyProduced || 0;
+                                    
+                                    const unitC = qProd > 0 ? (tCost / qProd) : 0;
+                                    const mPerc = tCost > 0 ? (mCost / tCost) * 100 : 0;
+                                    const pPerc = tCost > 0 ? (pCost / tCost) * 100 : 0;
+                                    const lPerc = tCost > 0 ? (lCost / tCost) * 100 : 0;
+
+                                    const formatDollars = (val: number) => val.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+                                    
+                                    return (
+                                        <>
+                                            {/* Cost Per Unit */}
+                                            <div className="relative overflow-hidden rounded-md border border-slate-800 dark:border-slate-700 bg-slate-900 dark:bg-slate-800 px-3 py-2.5 flex items-center justify-between shadow-md group transition-all duration-300 hover:border-teal-500">
+                                                <span className="relative z-10 text-[11px] font-black text-white uppercase tracking-tight drop-shadow-sm">Cost Per Unit</span>
+                                                <span className="relative z-10 text-[12px] font-black text-teal-400 font-mono tracking-tight cursor-default drop-shadow-sm" title={unitC.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 6 })}>{unitC.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 6 })}</span>
+                                            </div>
+
+                                            {/* Material Cost */}
+                                            <div className="relative overflow-hidden rounded-md border border-slate-800 dark:border-slate-700 bg-slate-900 dark:bg-slate-800 px-3 py-2.5 flex items-center justify-between shadow-md transition-all duration-300 hover:border-teal-500">
+                                                <div className="absolute left-0 top-0 bottom-0 bg-teal-600 dark:bg-teal-500 transition-all duration-1000" style={{ width: `${mPerc}%` }} />
+                                                <span className="relative z-10 text-[11px] font-black text-white uppercase tracking-tight drop-shadow-sm">Material Cost <span className="font-mono ml-1 text-[12px] text-teal-100">{formatDollars(mCost)}</span></span>
+                                                <span className="relative z-10 text-[11px] font-black text-white drop-shadow-sm">{Math.round(mPerc)}%</span>
+                                            </div>
+
+                                            {/* Packaging Cost */}
+                                            <div className="relative overflow-hidden rounded-md border border-slate-800 dark:border-slate-700 bg-slate-900 dark:bg-slate-800 px-3 py-2.5 flex items-center justify-between shadow-md transition-all duration-300 hover:border-teal-500">
+                                                <div className="absolute left-0 top-0 bottom-0 bg-teal-600 dark:bg-teal-500 transition-all duration-1000" style={{ width: `${pPerc}%` }} />
+                                                <span className="relative z-10 text-[11px] font-black text-white uppercase tracking-tight drop-shadow-sm">Packaging Cost <span className="font-mono ml-1 text-[12px] text-teal-100">{formatDollars(pCost)}</span></span>
+                                                <span className="relative z-10 text-[11px] font-black text-white drop-shadow-sm">{Math.round(pPerc)}%</span>
+                                            </div>
+
+                                            {/* Labor Cost */}
+                                            <div className="relative overflow-hidden rounded-md border border-slate-800 dark:border-slate-700 bg-slate-900 dark:bg-slate-800 px-3 py-2.5 flex items-center justify-between shadow-md transition-all duration-300 hover:border-teal-500">
+                                                <div className="absolute left-0 top-0 bottom-0 bg-teal-600 dark:bg-teal-500 transition-all duration-1000" style={{ width: `${lPerc}%` }} />
+                                                <span className="relative z-10 text-[11px] font-black text-white uppercase tracking-tight drop-shadow-sm">Labor Cost <span className="font-mono ml-1 text-[12px] text-teal-100">{formatDollars(lCost)}</span></span>
+                                                <span className="relative z-10 text-[11px] font-black text-white drop-shadow-sm">{Math.round(lPerc)}%</span>
+                                            </div>
+
+                                            {/* Total Cost */}
+                                            <div className="relative overflow-hidden rounded-md border border-slate-800 dark:border-slate-700 bg-slate-900 dark:bg-slate-800 px-3 py-2.5 flex items-center justify-between shadow-md mt-1 mb-1 transition-all duration-300 hover:border-emerald-500">
+                                                <div className="absolute inset-0 bg-gradient-to-r from-emerald-600/20 to-transparent pointer-events-none" />
+                                                <span className="relative z-10 text-[11px] font-black text-white uppercase tracking-tight drop-shadow-sm">Total Cost</span>
+                                                <span className="relative z-10 text-[13px] font-black text-white font-mono tracking-tight drop-shadow-sm">{formatDollars(tCost)}</span>
+                                            </div>
+                                        </>
+                                    );
+                                })()}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Top Production Card */}
                     <div className="bg-background border border-border shadow-sm hover:shadow-md transition-shadow duration-300 rounded-2xl p-5 overflow-hidden relative">
                         <div className="absolute top-0 right-0 p-8 opacity-[0.03] pointer-events-none">

@@ -29,13 +29,10 @@ export async function GET(req: Request) {
             };
         }
 
-        // SKU filter (search in main product OR component materials)
+        // SKU filter (filter specifically for the produced SKU, not raw materials)
         if (skuFilter) {
             const skus = skuFilter.split(',');
-            query.$or = [
-                { sku: { $in: skus } },
-                { 'lineItems.sku': { $in: skus } }
-            ];
+            query.sku = { $in: skus };
         }
 
         // Text Search
@@ -84,7 +81,11 @@ export async function GET(req: Request) {
                 },
                 draftBatches: { 
                     $sum: { $cond: [{ $eq: ["$status", "Draft"] }, 1, 0] } 
-                }
+                },
+                totalMaterialCost: { $sum: { $ifNull: ["$materialCost", 0] } },
+                totalPackagingCost: { $sum: { $ifNull: ["$packagingCost", 0] } },
+                totalLaborCost: { $sum: { $ifNull: ["$laborCost", 0] } },
+                totalCost: { $sum: { $ifNull: ["$totalCost", 0] } }
             }}
         ]);
 
@@ -144,7 +145,11 @@ export async function GET(req: Request) {
             totalQtyProduced: 0,
             completedBatches: 0,
             inProgressBatches: 0,
-            draftBatches: 0
+            draftBatches: 0,
+            totalMaterialCost: 0,
+            totalPackagingCost: 0,
+            totalLaborCost: 0,
+            totalCost: 0
         };
 
         return NextResponse.json({
