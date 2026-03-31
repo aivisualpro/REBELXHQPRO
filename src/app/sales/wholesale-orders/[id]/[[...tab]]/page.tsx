@@ -272,13 +272,19 @@ export default function SaleOrderDetailPage() {
     }, []);
 
     // Helper to get user name from email
-    const getUserName = (emailOrId: string) => {
+    const getUserName = (emailOrId: any) => {
         if (!emailOrId) return '-';
+        if (typeof emailOrId === 'object') {
+            if (emailOrId.firstName || emailOrId.lastName) return `${emailOrId.firstName || ''} ${emailOrId.lastName || ''}`.trim();
+            if (emailOrId.name) return emailOrId.name;
+            if (emailOrId.email) return emailOrId.email;
+            return emailOrId._id || '-';
+        }
         const user = allUsers.find(u => u.email === emailOrId || u._id === emailOrId);
         if (user && (user.firstName || user.lastName)) {
             return `${user.firstName || ''} ${user.lastName || ''}`.trim();
         }
-        return emailOrId;
+        return String(emailOrId);
     };
 
     // Calculations

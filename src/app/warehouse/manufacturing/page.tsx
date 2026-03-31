@@ -87,7 +87,7 @@ function formatCurrency(v: number) {
 
 function StatusBadge({ status }: { status: string }) {
   const styleMap: Record<string, { bg: string; color: string; border?: string; darkBg?: string; darkColor?: string }> = {
-    'Fulfilled': { bg: '#000000', color: '#ffffff', darkBg: 'rgba(16,185,129,0.2)', darkColor: '#34d399' },
+    'Fulfilled': { bg: '#10b981', color: '#ffffff', darkBg: 'rgba(16,185,129,0.2)', darkColor: '#34d399' },
     'Processing': { bg: '#2563eb', color: '#ffffff', darkBg: 'rgba(59,130,246,0.2)', darkColor: '#60a5fa' },
     'Ready to QC': { bg: '#d97706', color: '#ffffff', darkBg: 'rgba(245,158,11,0.2)', darkColor: '#fbbf24' },
     'Pending': { bg: '#e2e8f0', color: '#000000', border: '1px solid #cbd5e1', darkBg: 'rgba(100,116,139,0.2)', darkColor: '#cbd5e1' },
@@ -256,10 +256,10 @@ function ManufacturingContent() {
 
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('search') || '');
-  const [sortBy, setSortBy] = useState('createdAt');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [activeStatus, setActiveStatus] = useState<string>('All');
-  const [activePriority, setActivePriority] = useState<string>('All');
+  const [sortBy, setSortBy] = useState(globalCache.current?.sortBy || 'createdAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(globalCache.current?.sortOrder as 'asc' | 'desc' || 'desc');
+  const [activeStatus, setActiveStatus] = useState<string>(globalCache.current?.status || 'All');
+  const [activePriority, setActivePriority] = useState<string>(globalCache.current?.priority || 'All');
 
   const pageRef = useRef(globalCache.current?.page || 0);
   const mountedRef = useRef(true);
@@ -558,7 +558,7 @@ function ManufacturingContent() {
             {STATUS_TABS.map((tab) => {
               const statusColors: Record<string, { bg: string; color: string; hoverBg: string }> = {
                 'All': { bg: '#fe9900', color: '#ffffff', hoverBg: 'rgba(254,153,0,0.08)' },
-                'Fulfilled': { bg: '#000000', color: '#ffffff', hoverBg: 'rgba(0,0,0,0.06)' },
+                'Fulfilled': { bg: '#10b981', color: '#ffffff', hoverBg: 'rgba(16,185,129,0.08)' },
                 'Processing': { bg: '#2563eb', color: '#ffffff', hoverBg: 'rgba(37,99,235,0.08)' },
                 'Ready to QC': { bg: '#d97706', color: '#ffffff', hoverBg: 'rgba(217,119,6,0.08)' },
                 'Pending': { bg: '#64748b', color: '#ffffff', hoverBg: 'rgba(100,116,139,0.08)' },

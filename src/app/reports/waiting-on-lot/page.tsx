@@ -446,6 +446,7 @@ export default function WaitingOnLotPage() {
                                             <tr>
                                                 <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[110px]">Date</th>
                                                 <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[90px]">Type</th>
+                                                <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[110px]">Source</th>
                                                 <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">Reference</th>
                                                 <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[140px]">Lot #</th>
                                                 <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap text-center w-[80px]">Qty</th>
@@ -468,18 +469,28 @@ export default function WaitingOnLotPage() {
                                                             {formatDate(item.date)}
                                                         </td>
                                                         <td className="px-3 py-2">
-                                                            {item.source === 'Web Order' && websiteColor ? (
+                                                            {item.website ? (
                                                                 <span className={cn(
                                                                     "px-2 py-0.5 text-[9px] font-black uppercase tracking-wider border",
-                                                                    websiteColor.bg, websiteColor.text, websiteColor.border
+                                                                    websiteColor?.bg || 'bg-secondary', websiteColor?.text || 'text-muted-foreground', websiteColor?.border || 'border-border'
                                                                 )}>
                                                                     {item.website}
                                                                 </span>
                                                             ) : (
                                                                 <span className="px-2 py-0.5 text-[9px] font-black uppercase tracking-wider bg-secondary text-muted-foreground border border-border">
-                                                                    {item.source === 'Sale Order' ? 'ORDERS' : item.source}
+                                                                    N/A
                                                                 </span>
                                                             )}
+                                                        </td>
+                                                        <td className="px-3 py-2">
+                                                            <span className={cn(
+                                                                "px-2 py-0.5 text-[9px] font-black uppercase tracking-wider border",
+                                                                item.source === 'Web Order' 
+                                                                    ? 'bg-purple-500/10 text-purple-500 border-purple-500/20' 
+                                                                    : 'bg-blue-500/10 text-blue-500 border-blue-500/20'
+                                                            )}>
+                                                                {item.source}
+                                                            </span>
                                                         </td>
                                                         <td
                                                             className="px-3 py-2 text-xs font-bold text-foreground cursor-pointer hover:underline"
@@ -528,7 +539,7 @@ export default function WaitingOnLotPage() {
                                         {filteredDetailItems.length > 0 && (
                                             <tfoot className="border-t-2 border-border bg-secondary sticky bottom-0 z-10">
                                                 <tr>
-                                                    <td className="px-3 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground" colSpan={4}>
+                                                    <td className="px-3 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground" colSpan={5}>
                                                         Total ({filteredDetailItems.length} records)
                                                     </td>
                                                     <td className="px-3 py-2 text-center text-xs font-black text-rose-500">
