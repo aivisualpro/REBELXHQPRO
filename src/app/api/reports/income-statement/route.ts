@@ -36,8 +36,12 @@ export async function GET(req: Request) {
         // 1. REVENUE
         let webRevenue = 0;
         let webOrdersCount = 0;
+        let webShipping = 0;
+        let webTax = 0;
         let saleRevenue = 0;
         let salesCount = 0;
+        let saleShipping = 0;
+        let saleTax = 0;
 
         // Web Orders Revenue (skip if source is 'wholesale')
         if (source !== 'wholesale') {
@@ -46,9 +50,17 @@ export async function GET(req: Request) {
                     status: { $in: ['completed', 'shipped', 'Completed', 'Shipped', 'processing', 'Processing'] },
                     ...webDateFilter
                 }},
-                { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }
+                { $group: { 
+                    _id: null, 
+                    total: { $sum: '$total' }, 
+                    shipping: { $sum: { $ifNull: ["$shippingTotal", 0] } },
+                    tax: { $sum: { $ifNull: ["$totalTax", 0] } },
+                    count: { $sum: 1 } 
+                } }
             ]);
             webRevenue = webRevenueAgg[0]?.total || 0;
+            webShipping = webRevenueAgg[0]?.shipping || 0;
+            webTax = webRevenueAgg[0]?.tax || 0;
             webOrdersCount = webRevenueAgg[0]?.count || 0;
         }
 
@@ -62,15 +74,27 @@ export async function GET(req: Request) {
                     discountVal: { $ifNull: ["$discount", 0] }
                 }},
                 { $project: {
-                    grandTotal: { $subtract: [{ $add: ["$lineItemsTotal", "$shipping"] }, "$discountVal"] }
+                    grandTotal: { $subtract: [{ $add: ["$lineItemsTotal", "$shipping"] }, "$discountVal"] },
+                    shipping: 1,
+                    tax: { $ifNull: ["$tax", 0] }
                 }},
-                { $group: { _id: null, total: { $sum: "$grandTotal" }, count: { $sum: 1 } } }
+                { $group: { 
+                    _id: null, 
+                    total: { $sum: "$grandTotal" }, 
+                    shipping: { $sum: "$shipping" },
+                    tax: { $sum: "$tax" },
+                    count: { $sum: 1 } 
+                } }
             ]);
             saleRevenue = saleRevenueAgg[0]?.total || 0;
+            saleShipping = saleRevenueAgg[0]?.shipping || 0;
+            saleTax = saleRevenueAgg[0]?.tax || 0;
             salesCount = saleRevenueAgg[0]?.count || 0;
         }
 
         const totalRevenue = webRevenue + saleRevenue;
+        const totalShipping = webShipping + saleShipping;
+        const totalTax = webTax + saleTax;
 
         // 2. COST OF GOODS SOLD (COGS)
         const cogsAgg = await PurchaseOrder.aggregate([
@@ -94,7 +118,8 @@ export async function GET(req: Request) {
         };
 
         // 5. NET INCOME
-        const netIncome = grossProfit - operatingExpenses.total;
+        // Removing shipping and tax from net income as requested
+        const netIncome = grossProfit - operatingExpenses.total - totalShipping - totalTax;
         const netMargin = totalRevenue > 0 ? (netIncome / totalRevenue) * 100 : 0;
 
         // Monthly Revenue Trend
@@ -198,6 +223,8 @@ export async function GET(req: Request) {
             grossProfit,
             grossMargin,
             operatingExpenses,
+            totalShipping,
+            totalTax,
             netIncome,
             netMargin,
             monthlyRevenue

@@ -19,6 +19,7 @@ import {
     Layers
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 interface IncomeData {
     revenue: {
@@ -38,25 +39,42 @@ interface IncomeData {
         other: number;
         total: number;
     };
+    totalShipping: number;
+    totalTax: number;
     netIncome: number;
     netMargin: number;
     monthlyRevenue: Array<{ _id: string; revenue: number; orders: number }>;
 }
 
-export default function IncomeStatementPage() {
-    const [data, setData] = useState<IncomeData | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [source, setSource] = useState<'total' | 'web' | 'wholesale'>('total');
+export default function IncomeStatementWrapper() {
+    return (
+        <React.Suspense fallback={<div className="h-[calc(100vh-40px)] flex items-center justify-center bg-slate-900"><RefreshCw className="w-8 h-8 text-emerald-500 animate-spin" /></div>}>
+            <IncomeStatementPage />
+        </React.Suspense>
+    );
+}
+
+function IncomeStatementPage() {
+    const r = useRouter();
+    const s = useSearchParams();
 
     // Timezone-safe date initialization
     const now = new Date();
     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const firstOfMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
 
+    const urlStart = s.get('startDate');
+    const urlEnd = s.get('endDate');
+    const urlSource = s.get('source') as 'total' | 'web' | 'wholesale';
+
+    const [source, setSource] = useState<'total' | 'web' | 'wholesale'>(urlSource || 'total');
     const [dateRange, setDateRange] = useState({
-        startDate: firstOfMonthStr,
-        endDate: todayStr
+        startDate: urlStart || firstOfMonthStr,
+        endDate: urlEnd || todayStr
     });
+
+    const [data, setData] = useState<IncomeData | null>(null);
+    const [loading, setLoading] = useState(true);
 
     const fetchData = async () => {
         setLoading(true);
@@ -64,6 +82,16 @@ export default function IncomeStatementPage() {
             const res = await fetch(`/api/reports/income-statement?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&source=${source}`);
             const json = await res.json();
             setData(json);
+
+            // Sync with URL
+            const params = new URLSearchParams();
+            if (dateRange.startDate) params.set('startDate', dateRange.startDate);
+            if (dateRange.endDate) params.set('endDate', dateRange.endDate);
+            if (source && source !== 'total') params.set('source', source);
+
+            const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname;
+            r.push(newUrl, { scroll: false });
+
         } catch (e) {
             console.error(e);
         } finally {
@@ -76,8 +104,8 @@ export default function IncomeStatementPage() {
     }, [source]);
 
     const formatCurrency = (val: number) => {
-        if (!val) return '$0.00';
-        return '$' + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 });
+        if (!val) return '$0';
+        return '$' + val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     };
 
     const formatCompact = (val: number) => {
@@ -281,6 +309,21 @@ export default function IncomeStatementPage() {
                             label="Total Operating Expenses" 
                             value={`(${formatCurrency(data?.operatingExpenses?.total || 0)})`} 
                             isTotal
+                            negative
+                        />
+
+                        {/* TAXES & FEES DEDUCTIONS */}
+                        <StatementSection title="Taxes & Allowances" isHeader />
+                        <StatementRow 
+                            label="Shipping Income Ded." 
+                            value={`(${formatCurrency(data?.totalShipping || 0)})`} 
+                            indent 
+                            negative
+                        />
+                        <StatementRow 
+                            label="Tax Collected Ded." 
+                            value={`(${formatCurrency(data?.totalTax || 0)})`} 
+                            indent 
                             negative
                         />
 

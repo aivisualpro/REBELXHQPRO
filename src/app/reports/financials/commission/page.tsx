@@ -38,11 +38,7 @@ interface CommissionOrder {
         price: number;
         cost?: number;
     }>;
-    shippingCost?: number;
-    discount?: number;
-    tax?: number;
     _subtotal: number;
-    _grandTotal: number;
     _commission: number;
 }
 
@@ -245,7 +241,7 @@ function generateCommissionPDF(
     </table>
 
     <!-- Detailed Orders Table -->
-    <div class="section-title">Detailed Order Breakdown</div>
+    <div class="section-title">Detailed Order Breakdown (Completed Orders Only)</div>
     <table>
         <thead>
             <tr>
@@ -253,10 +249,8 @@ function generateCommissionPDF(
                 <th>Date</th>
                 <th>Client</th>
                 <th>Sales Rep</th>
-                <th>Status</th>
                 <th class="right">Subtotal</th>
-                <th class="right">Total</th>
-                <th class="right">Commission</th>
+                <th class="right">Commission (5%)</th>
             </tr>
         </thead>
         <tbody>
@@ -266,15 +260,12 @@ function generateCommissionPDF(
                     <td>${formatDatePdf(o.createdAt)}</td>
                     <td>${getClientName(o)}</td>
                     <td>${getSalesRepName(o.salesRep)}</td>
-                    <td>${o.orderStatus || '-'}</td>
                     <td class="right">${fmtCurrency(o._subtotal)}</td>
-                    <td class="right bold">${fmtCurrency(o._grandTotal)}</td>
                     <td class="right bold" style="color: #fe9900;">${fmtCurrency(o._commission)}</td>
                 </tr>
             `).join('')}
             <tr class="total-row">
-                <td colspan="5">GRAND TOTAL</td>
-                <td class="right">—</td>
+                <td colspan="4">GRAND TOTAL</td>
                 <td class="right">${fmtCurrency(grandTotal.totalRevenue)}</td>
                 <td class="right" style="color: #fe9900;">${fmtCurrency(grandTotal.totalCommission)}</td>
             </tr>
@@ -342,6 +333,35 @@ function CommissionPage() {
     const [grandTotal, setGrandTotal] = useState<GrandTotal>({ totalOrders: 0, totalRevenue: 0, totalCommission: 0 });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    // Highlight and scroll restoration
+    const [highlightId, setHighlightId] = useState<string | null>(null);
+    const scrollRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const savedId = sessionStorage.getItem('cr_scroll_to');
+        const savedScroll = sessionStorage.getItem('cr_scroll_top');
+        if (savedId) {
+            sessionStorage.removeItem('cr_scroll_to');
+            sessionStorage.removeItem('cr_scroll_top');
+            setHighlightId(savedId);
+
+            if (savedScroll && scrollRef.current) {
+                scrollRef.current.scrollTop = parseInt(savedScroll, 10);
+            }
+
+            const tryScroll = (attempts = 0) => {
+                const row = document.querySelector(`[data-order-id="${savedId}"]`);
+                if (row) {
+                    setTimeout(() => row.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
+                    setTimeout(() => setHighlightId(null), 3000);
+                } else if (attempts < 30) {
+                    setTimeout(() => tryScroll(attempts + 1), 200);
+                }
+            };
+            setTimeout(() => tryScroll(), 100);
+        }
+    }, []);
 
     // Sales rep options for the dropdown
     const [salesRepOptions, setSalesRepOptions] = useState<{ label: string; value: string }[]>([]);
@@ -619,21 +639,22 @@ function CommissionPage() {
             <div className="flex-1 flex overflow-hidden">
 
                 {/* Left Column: Orders Table */}
-                <div className="flex-1 overflow-y-auto bg-background min-w-0 relative scrollbar-custom transition-colors duration-200">
+                <div 
+                    ref={scrollRef}
+                    className="flex-1 overflow-y-auto bg-background min-w-0 relative scrollbar-custom transition-colors duration-200"
+                >
                     <table className="w-full text-left border-collapse">
                         <thead className="sticky top-0 z-20 bg-secondary/95 backdrop-blur-md border-b border-border shadow-sm">
                             <tr>
                                 <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[80px]">Order#</th>
                                 <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[90px]">Date</th>
-                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[180px]">Client</th>
-                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[130px]">Sales Rep</th>
-                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[100px]">Status</th>
-                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[100px] text-right">Subtotal</th>
-                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[100px] text-right">Total</th>
-                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest min-w-[110px] text-right">
+                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[200px]">Client</th>
+                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[140px]">Sales Rep</th>
+                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[120px] text-right">Subtotal</th>
+                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest min-w-[130px] text-right">
                                     <span className="flex items-center justify-end gap-1">
                                         <Percent className="w-3 h-3 text-primary" />
-                                        Commission
+                                        Commission (5%)
                                     </span>
                                 </th>
                             </tr>
@@ -642,7 +663,7 @@ function CommissionPage() {
                             {loading ? (
                                 Array.from({ length: 12 }).map((_, i) => (
                                     <tr key={i} className="border-b border-border/30">
-                                        {Array.from({ length: 8 }).map((_, j) => (
+                                        {Array.from({ length: 6 }).map((_, j) => (
                                             <td key={j} className="px-4 py-3">
                                                 <div
                                                     className="h-3.5 rounded-sm bg-secondary/80 animate-pulse"
@@ -654,10 +675,10 @@ function CommissionPage() {
                                 ))
                             ) : filteredOrders.length === 0 ? (
                                 <tr>
-                                    <td colSpan={8} className="px-4 py-16 text-center text-[11px] font-medium text-muted-foreground">
+                                    <td colSpan={6} className="px-4 py-16 text-center text-[11px] font-medium text-muted-foreground">
                                         <div className="flex flex-col items-center gap-3">
                                             <FileText className="w-10 h-10 text-muted-foreground/30" />
-                                            <span>No orders found for the selected period</span>
+                                            <span>No completed orders found for the selected period</span>
                                         </div>
                                     </td>
                                 </tr>
@@ -666,8 +687,18 @@ function CommissionPage() {
                                     {filteredOrders.map(order => (
                                         <tr
                                             key={order._id}
-                                            onClick={() => router.push(`/sales/wholesale-orders/${order._id}`)}
-                                            className="hover:bg-muted/30 dark:hover:bg-muted/10 transition-colors duration-150 cursor-pointer group"
+                                            data-order-id={order._id}
+                                            onClick={() => {
+                                                sessionStorage.setItem('cr_scroll_to', order._id);
+                                                if (scrollRef.current) {
+                                                    sessionStorage.setItem('cr_scroll_top', String(scrollRef.current.scrollTop));
+                                                }
+                                                router.push(`/sales/wholesale-orders/${order._id}`);
+                                            }}
+                                            className={cn(
+                                                "hover:bg-muted/30 dark:hover:bg-muted/10 transition-colors duration-150 cursor-pointer group",
+                                                highlightId === order._id ? "animate-[rowGlow_0.75s_ease-in-out_4] ring-1 ring-primary/40 bg-primary/[0.06]" : ""
+                                            )}
                                         >
                                             <td className="px-4 py-3 text-[11px] font-bold text-foreground border-r border-border group-hover:text-primary transition-colors">
                                                 {order.label || '-'}
@@ -681,14 +712,8 @@ function CommissionPage() {
                                             <td className="px-4 py-3 text-[11px] font-medium text-foreground/70 border-r border-border whitespace-nowrap">
                                                 {getSalesRepName(order.salesRep)}
                                             </td>
-                                            <td className="px-4 py-3 border-r border-border">
-                                                <OrderStatusBadge status={order.orderStatus} />
-                                            </td>
-                                            <td className="px-4 py-3 text-[11px] text-foreground/70 text-right border-r border-border font-mono tracking-tight">
-                                                {fmtCurrency(order._subtotal)}
-                                            </td>
                                             <td className="px-4 py-3 text-[11px] font-bold text-foreground text-right border-r border-border font-mono tracking-tight">
-                                                {fmtCurrency(order._grandTotal)}
+                                                {fmtCurrency(order._subtotal)}
                                             </td>
                                             <td className="px-4 py-3 text-[11px] font-bold text-primary text-right font-mono tracking-tight group-hover:bg-primary/5 transition-colors">
                                                 {fmtCurrency(order._commission)}
@@ -697,14 +722,11 @@ function CommissionPage() {
                                     ))}
                                     {/* Footer totals row */}
                                     <tr className="bg-secondary/60 border-t-2 border-primary/30 sticky bottom-0">
-                                        <td colSpan={5} className="px-4 py-3 text-[11px] font-black text-foreground uppercase tracking-widest">
+                                        <td colSpan={4} className="px-4 py-3 text-[11px] font-black text-foreground uppercase tracking-widest">
                                             Totals ({filteredOrders.length} Orders)
                                         </td>
-                                        <td className="px-4 py-3 text-[11px] font-bold text-foreground text-right font-mono tracking-tight">
-                                            {fmtCurrency(filteredOrders.reduce((s, o) => s + (o._subtotal || 0), 0))}
-                                        </td>
                                         <td className="px-4 py-3 text-[11px] font-black text-foreground text-right font-mono tracking-tight">
-                                            {fmtCurrency(filteredOrders.reduce((s, o) => s + (o._grandTotal || 0), 0))}
+                                            {fmtCurrency(filteredOrders.reduce((s, o) => s + (o._subtotal || 0), 0))}
                                         </td>
                                         <td className="px-4 py-3 text-[12px] font-black text-primary text-right font-mono tracking-tight">
                                             {fmtCurrency(filteredOrders.reduce((s, o) => s + (o._commission || 0), 0))}
@@ -877,21 +899,6 @@ function CommissionPage() {
                 </div>
             </div>
 
-            {/* ─── Mini Footer ──────────────────────────────────────────────── */}
-            <div className="h-[28px] border-t border-border bg-background/50 backdrop-blur-sm shrink-0 flex items-center justify-between px-5 z-[50] transition-colors duration-200">
-                <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" />
-                        <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">System Ready</span>
-                    </div>
-                </div>
-                <div className="flex items-center space-x-5">
-                    <span className="text-[11px] text-muted-foreground/80 font-mono font-bold uppercase tracking-tighter">Commission Report v1.0</span>
-                    <span className="text-[11px] text-muted-foreground/80 font-mono font-bold uppercase tracking-widest">
-                        {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
-                    </span>
-                </div>
-            </div>
         </div>
     );
 }

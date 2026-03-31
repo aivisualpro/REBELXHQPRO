@@ -27,7 +27,9 @@ export async function GET(request: Request) {
         const endDate = searchParams.get('endDate');
 
         // ─── Build Match Query ──────────────────────────────────────────
-        const query: any = {};
+        const query: any = {
+            orderStatus: 'Completed'
+        };
 
         if (salesRep) {
             query.salesRep = { $in: salesRep.split(',') };
@@ -65,19 +67,12 @@ export async function GET(request: Request) {
                     }
                 }
             },
+            // Only include orders where subtotal > 0
+            { $match: { _subtotal: { $gt: 0 } } },
             {
                 $addFields: {
-                    _grandTotal: {
-                        $subtract: [
-                            { $add: ['$_subtotal', { $ifNull: ['$shippingCost', 0] }, { $ifNull: ['$tax', 0] }] },
-                            { $ifNull: ['$discount', 0] }
-                        ]
-                    }
-                }
-            },
-            {
-                $addFields: {
-                    _commission: { $multiply: ['$_grandTotal', COMMISSION_RATE] }
+                    // Commission is always on subtotal
+                    _commission: { $multiply: ['$_subtotal', COMMISSION_RATE] }
                 }
             }
         ];
@@ -113,7 +108,7 @@ export async function GET(request: Request) {
                 $group: {
                     _id: '$salesRep',
                     totalOrders: { $sum: 1 },
-                    totalRevenue: { $sum: '$_grandTotal' },
+                    totalRevenue: { $sum: '$_subtotal' },
                     totalCommission: { $sum: '$_commission' },
                 }
             },
@@ -127,7 +122,7 @@ export async function GET(request: Request) {
                 $group: {
                     _id: null,
                     totalOrders: { $sum: 1 },
-                    totalRevenue: { $sum: '$_grandTotal' },
+                    totalRevenue: { $sum: '$_subtotal' },
                     totalCommission: { $sum: '$_commission' },
                 }
             }
