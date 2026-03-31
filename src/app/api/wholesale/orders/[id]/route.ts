@@ -9,8 +9,9 @@ import PurchaseOrder from '@/models/PurchaseOrder';
 import Manufacturing from '@/models/Manufacturing';
 import AuditAdjustment from '@/models/AuditAdjustment';
 import Client from '@/models/Client';
+import OrderEmail from '@/models/OrderEmail';
 import { deleteOrderFromAppSheet, syncPaymentToAppSheet, syncOrderLineItemToAppSheet } from '@/lib/appsheet';
-
+import { processEmailInBackground } from '@/app/api/sales/orders/[id]/emails/route';
 
 export const dynamic = 'force-dynamic';
 
@@ -281,9 +282,9 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         let existingLineItems: any[] = [];
         let existingOrderData: any = null;
 
-        const needsSnapshot = (body.payments && Array.isArray(body.payments)) || (body.lineItems && Array.isArray(body.lineItems));
+        const needsSnapshot = (body.payments && Array.isArray(body.payments)) || (body.lineItems && Array.isArray(body.lineItems)) || ('orderStatus' in body);
         if (needsSnapshot) {
-            const existingOrder = await SaleOrder.findById(id).select('payments lineItems label legacyId').lean();
+            const existingOrder = await SaleOrder.findById(id).select('payments lineItems label legacyId orderStatus').lean() as any;
             if (existingOrder) {
                 existingOrderData = existingOrder;
                 if (existingOrder.payments) {
@@ -330,7 +331,8 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
             { new: true, runValidators: true }
         )
         .populate('clientId', 'name addresses phones emails contacts salesPerson description website facebookPage industry forecastedAmount defaultPaymentMethod defaultShippingTerms contactStatus contactType billing')
-        .lean();
+        .populate('salesRep', 'firstName lastName email')
+        .lean() as any;
 
         // Manual SKU populate (bypasses Mongoose's String vs ObjectId type mismatch)
         updatedOrder = await manualPopulateSkus(updatedOrder);
@@ -486,6 +488,56 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
                     }
                 });
             }
+        }
+
+        // ─── Auto-email on Completed status ───
+        const clientEmails = updatedOrder.clientId?.emails?.map((e: any) => e.value).filter(Boolean) || [];
+        const contactEmails = updatedOrder.clientId?.contacts?.map((c: any) => c.email).filter(Boolean) || [];
+        const allClientEmails = Array.from(new Set([...clientEmails, ...contactEmails]));
+
+        if (
+            body.orderStatus === 'Completed' && 
+            existingOrderData && 
+            existingOrderData.orderStatus !== 'Completed' &&
+            allClientEmails.length > 0
+        ) {
+            const salesRepEmail = updatedOrder.salesRep?.email;
+            const ccList = salesRepEmail ? [salesRepEmail] : [];
+            const toList = allClientEmails;
+            const clientName = updatedOrder.clientId?.name || 'Valued Customer';
+            
+            // Step 1: Create email record instantly
+            const emailRecord = await OrderEmail.create({
+                orderId: id,
+                from: process.env.RESEND_FROM_EMAIL || 'info@rebelxbrandscrm.com',
+                to: toList,
+                cc: ccList,
+                bcc: [],
+                subject: `Order ${updatedOrder.label || 'Details'} Completed`,
+                body: `<p>Dear ${clientName},</p><p>Your wholesale order <strong>${updatedOrder.label}</strong> has been marked as Completed and is ready.</p><p>Please find the attached PDF snapshot of your order details.</p><p>Thank you for your business!</p>`,
+                bodyText: `Dear ${clientName},\n\nYour wholesale order ${updatedOrder.label} has been marked as Completed and is ready.\nPlease find the attached PDF snapshot of your order details.\n\nThank you for your business!`,
+                hasAttachment: true,
+                attachmentName: `${updatedOrder.label || 'SaleOrder'}.pdf`,
+                status: 'queued',
+                sentBy: 'system',
+            });
+
+            // Step 2: Kick off background processing
+            after(async () => {
+                try {
+                    await processEmailInBackground(emailRecord._id.toString(), id, {
+                        to: toList,
+                        cc: ccList,
+                        subject: `Order ${updatedOrder.label || 'Details'} Completed`,
+                        htmlBody: `<p>Dear ${clientName},</p><p>Your wholesale order <strong>${updatedOrder.label}</strong> has been marked as Completed and is ready.</p><p>Please find the attached PDF snapshot of your order details.</p><p>Thank you for your business!</p>`,
+                        textBody: `Dear ${clientName},\n\nYour wholesale order ${updatedOrder.label} has been marked as Completed and is ready.\nPlease find the attached PDF snapshot of your order details.\n\nThank you for your business!`,
+                        attachPdf: true,
+                        orderLabel: updatedOrder.label,
+                    });
+                } catch (err) {
+                    console.error('Background auto-email error:', err);
+                }
+            });
         }
 
         return NextResponse.json(updatedOrder);

@@ -34,7 +34,7 @@ export async function GET(
 }
 
 // ─── Background processor: generates PDF, sends via Resend, updates the record ───
-async function processEmailInBackground(emailRecordId: string, orderId: string, payload: {
+export async function processEmailInBackground(emailRecordId: string, orderId: string, payload: {
     to: string[];
     cc?: string[];
     bcc?: string[];
