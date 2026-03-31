@@ -9,7 +9,8 @@ import {
     PiggyBank,
     ArrowRight,
     BarChart3,
-    Percent
+    Percent,
+    PackageSearch
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -20,6 +21,14 @@ const financialReports = [
         href: '/reports/financials/income-statement',
         icon: TrendingUp,
         color: 'emerald',
+        available: true
+    },
+    {
+        title: 'Cost of Goods Sold',
+        description: 'SKU level profitability and historical COGS analysis',
+        href: '/reports/financials/cogs',
+        icon: PackageSearch,
+        color: 'rose',
         available: true
     },
     {
@@ -69,7 +78,8 @@ const colorClasses = {
     blue: 'from-blue-500 to-blue-600 shadow-blue-500/30',
     purple: 'from-purple-500 to-purple-600 shadow-purple-500/30',
     amber: 'from-amber-500 to-amber-600 shadow-amber-500/30',
-    orange: 'from-orange-500 to-orange-600 shadow-orange-500/30'
+    orange: 'from-orange-500 to-orange-600 shadow-orange-500/30',
+    rose: 'from-rose-500 to-rose-600 shadow-rose-500/30'
 };
 
 export default function FinancialsPage() {
