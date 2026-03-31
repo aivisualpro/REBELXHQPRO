@@ -136,6 +136,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                     setTimeout(checkCompletion, 5000);
                 };
                 setTimeout(checkCompletion, 3000);
+            } else if (res.status === 409) {
+                // A sync is already running (common during dev hot-reloads) — release lock silently
+                isSyncingRef.current = false;
+                setIsSyncing(false);
             } else {
                 isSyncingRef.current = false;
                 setIsSyncing(false);

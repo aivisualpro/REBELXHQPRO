@@ -41,141 +41,141 @@ export async function GET(req: Request) {
             ...strSkuIds.filter((id: string) => ObjectId.isValid(id)).map((id: string) => new ObjectId(id))
         ];
 
-        // Fetch Aggregations
+        // Optimization: Do NOT pass an array of 5,000+ SKUs to the database if we are pulling all active inventory.
+        // It massively throttles Mongo. Let Mongo group over the entire collection naturally.
+        const obMatch = skuFilter ? { sku: { $in: dualSkuIds }, ...transactionQuery } : { ...transactionQuery };
+        const poMatch = skuFilter ? { "lineItems.sku": { $in: skuIds }, status: "Received", ...transactionQuery } : { status: "Received", ...transactionQuery };
+        const poLineMatch = skuFilter ? { "lineItems.sku": { $in: skuIds } } : {};
+        const soMatch = skuFilter ? { "lineItems.sku": { $in: dualSkuIds }, ...transactionQuery } : { ...transactionQuery };
+        const soLineMatch = skuFilter ? { "lineItems.sku": { $in: dualSkuIds } } : {};
+        const moProdMatch = skuFilter ? { sku: { $in: skuIds }, status: { $ne: 'Pending' }, ...transactionQuery } : { status: { $ne: 'Pending' }, ...transactionQuery };
+        const moConsMatch = skuFilter ? { "lineItems.sku": { $in: skuIds }, status: 'Fulfilled', ...transactionQuery } : { status: 'Fulfilled', ...transactionQuery };
+        const adjMatch = skuFilter ? { sku: { $in: dualSkuIds }, ...transactionQuery } : { ...transactionQuery };
+        
+        const woMatchBase = {
+            status: { $in: ['completed', 'shipped', 'Completed', 'Shipped', 'processing', 'Processing', 'pending', 'Pending', 'on-hold', 'On Hold'] },
+            ...(tillDateParam ? { dateCreated: { $lte: new Date(tillDateParam + 'T23:59:59.999Z') } } : {})
+        };
+        const woMatch = skuFilter ? {
+            $or: [
+                { "lineItems.sku": { $in: skuIds } },
+                { "lineItems.linkedSkuId": { $in: strSkuIds } },
+                { "lineItems.linkedSkus.skuId": { $in: strSkuIds } }
+            ], ...woMatchBase
+        } : woMatchBase;
+
+        const woLineMatch = skuFilter ? {
+            $or: [
+                { "lineItems.sku": { $in: skuIds } },
+                { "lineItems.linkedSkuId": { $in: strSkuIds } },
+                { "lineItems.linkedSkus.skuId": { $in: strSkuIds } }
+            ]
+        } : {};
+
+        const woMultiSkuMatch = skuFilter ? { "lineItems.linkedSkus.skuId": { $in: strSkuIds } } : {};
+        
+        const woVarMatch = skuFilter ? { "lineItems.varianceId": { $in: allVariances }, ...woMatchBase } : woMatchBase;
+        const woVarLineMatch = skuFilter ? { "lineItems.varianceId": { $in: allVariances } } : {};
+
+        // Fetch Collections fast via find().lean() rather than heavy Mongo disk $unwind
         const [
-            obsAgg,
-            posAgg,
-            sosAgg,
+            obsRaw,
+            posRaw,
+            sosRaw,
             mosProdAgg,
             mosConsAgg,
-            adjsAgg,
-            wosSkuAgg,
-            wosVarAgg
+            adjsRaw,
+            wosRaw
         ] = await Promise.all([
-            // 1. OBs
-            OpeningBalance.aggregate([
-                { $match: { sku: { $in: dualSkuIds }, ...transactionQuery } },
-                { $addFields: { skuStr: { $toString: "$sku" } } },
-                {
-                    $group: {
-                        _id: "$skuStr",
-                        qty: { $sum: "$qty" },
-                        costVal: { $sum: { $multiply: ["$qty", "$cost"] } }
-                    }
-                }
-            ]),
-            // 2. POs
-            PurchaseOrder.aggregate([
-                { $match: { "lineItems.sku": { $in: skuIds }, status: "Received", ...transactionQuery } },
-                { $unwind: "$lineItems" },
-                { $match: { "lineItems.sku": { $in: skuIds } } },
-                {
-                    $group: {
-                        _id: "$lineItems.sku",
-                        qty: { $sum: "$lineItems.qtyReceived" },
-                        costVal: { $sum: { $multiply: ["$lineItems.qtyReceived", "$lineItems.cost"] } }
-                    }
-                }
-            ]),
-            // 3. SOs
-            SaleOrder.aggregate([
-                { $match: { "lineItems.sku": { $in: dualSkuIds }, ...transactionQuery } },
-                { $unwind: "$lineItems" },
-                { $match: { "lineItems.sku": { $in: dualSkuIds } } },
-                { $match: { orderStatus: { $in: ['Shipped', 'Completed'] } } },
-                { $addFields: { "lineItems.skuStr": { $toString: "$lineItems.sku" } } },
-                {
-                    $group: {
-                        _id: "$lineItems.skuStr",
-                        qty: { $sum: "$lineItems.qtyShipped" }
-                    }
-                }
-            ]),
-            // 4. MOs Prod
-            Manufacturing.find({ sku: { $in: skuIds }, status: { $ne: 'Pending' }, ...transactionQuery })
-                .select('sku qty qtyDifference lineItems labor status')
-                .lean(),
-            // 5. MOs Cons
-            Manufacturing.find({ "lineItems.sku": { $in: skuIds }, status: 'Fulfilled', ...transactionQuery })
-                .select('lineItems qty status')
-                .lean(),
-            // 6. Adjs
-            AuditAdjustment.aggregate([
-                { $match: { sku: { $in: dualSkuIds }, ...transactionQuery } },
-                { $addFields: { skuStr: { $toString: "$sku" } } },
-                {
-                    $group: {
-                        _id: "$skuStr",
-                        netQty: { $sum: "$qty" },
-                        costVal: { $sum: { $multiply: ["$qty", "$cost"] } }
-                    }
-                }
-            ]),
-            // 7. WebOrders Sku
-            WebOrder.aggregate([
-                {
-                    $match: {
-                        $or: [
-                            { "lineItems.sku": { $in: skuIds } },
-                            { "lineItems.linkedSkuId": { $in: strSkuIds } },
-                            { "lineItems.linkedSkus.skuId": { $in: strSkuIds } }
-                        ],
-                        status: { $in: ['completed', 'shipped', 'Completed', 'Shipped', 'processing', 'Processing', 'pending', 'Pending', 'on-hold', 'On Hold'] },
-                        // WebOrder uses dateCreated for filtering generally
-                        ...(tillDateParam ? { dateCreated: { $lte: new Date(tillDateParam + 'T23:59:59.999Z') } } : {})
-                    }
-                },
-                { $unwind: "$lineItems" },
-                {
-                    $match: {
-                        $or: [
-                            { "lineItems.sku": { $in: skuIds } },
-                            { "lineItems.linkedSkuId": { $in: strSkuIds } },
-                            { "lineItems.linkedSkus.skuId": { $in: strSkuIds } }
-                        ]
-                    }
-                },
-                {
-                    $facet: {
-                        multiSku: [
-                            { $match: { "lineItems.linkedSkus": { $exists: true, $ne: [] } } },
-                            { $unwind: "$lineItems.linkedSkus" },
-                            { $match: { "lineItems.linkedSkus.skuId": { $in: strSkuIds } } },
-                            { $group: { _id: "$lineItems.linkedSkus.skuId", qty: { $sum: { $multiply: ["$lineItems.quantity", { $ifNull: ["$lineItems.linkedSkus.multiplier", 1] }] } } } }
-                        ],
-                        singleSku: [
-                            { $match: { $or: [{ "lineItems.linkedSkus": { $exists: false } }, { "lineItems.linkedSkus": { $size: 0 } }] } },
-                            { $addFields: { resolvedSkuId: { $ifNull: ["$lineItems.linkedSkuId", { $ifNull: ["$lineItems.sku", null] }] } } },
-                            { $group: { _id: "$resolvedSkuId", qty: { $sum: "$lineItems.quantity" } } }
-                        ]
-                    }
-                },
-                { $project: { combined: { $concatArrays: ["$multiSku", "$singleSku"] } } },
-                { $unwind: "$combined" },
-                { $replaceRoot: { newRoot: "$combined" } },
-                { $group: { _id: "$_id", qty: { $sum: "$qty" } } }
-            ]),
-            // 8. WebOrders Var
-            WebOrder.aggregate([
-                {
-                    $match: {
-                        "lineItems.varianceId": { $in: allVariances },
-                        status: { $in: ['completed', 'shipped', 'Completed', 'Shipped', 'processing', 'Processing', 'pending', 'Pending', 'on-hold', 'On Hold'] },
-                        ...(tillDateParam ? { dateCreated: { $lte: new Date(tillDateParam + 'T23:59:59.999Z') } } : {})
-                    }
-                },
-                { $unwind: "$lineItems" },
-                { $match: { "lineItems.varianceId": { $in: allVariances } } },
-                { $group: { _id: "$lineItems.varianceId", qty: { $sum: "$lineItems.quantity" } } }
-            ])
+            OpeningBalance.find(obMatch).select('sku qty cost').lean(),
+            PurchaseOrder.find(poMatch).select('lineItems').lean(),
+            SaleOrder.find(soMatch).select('lineItems orderStatus').lean(),
+            Manufacturing.find(moProdMatch).select('sku qty qtyDifference lineItems labor status').lean(),
+            Manufacturing.find(moConsMatch).select('lineItems qty status').lean(),
+            AuditAdjustment.find(adjMatch).select('sku qty cost').lean(),
+            WebOrder.find(woMatchBase).select('lineItems status dateCreated').lean()
         ]);
 
-        const obsMap = new Map(); obsAgg.forEach((r: any) => obsMap.set(r._id, r));
-        const posMap = new Map(); posAgg.forEach((r: any) => posMap.set(r._id, r));
-        const sosMap = new Map(); sosAgg.forEach((r: any) => sosMap.set(r._id, r));
-        const adjsMap = new Map(); adjsAgg.forEach((r: any) => adjsMap.set(r._id, r));
-        const wosSkuMap = new Map(); wosSkuAgg.forEach((r: any) => wosSkuMap.set(r._id, r));
-        const wosVarMap = new Map(); wosVarAgg.forEach((r: any) => wosVarMap.set(r._id, r));
+        const obsMap = new Map(); 
+        obsRaw.forEach((r: any) => {
+            if(!r.sku) return;
+            const id = r.sku.toString();
+            const ex = obsMap.get(id) || { qty: 0, costVal: 0 };
+            ex.qty += (r.qty || 0);
+            ex.costVal += (r.qty || 0) * (r.cost || 0);
+            obsMap.set(id, ex);
+        });
+        
+        const posMap = new Map(); 
+        posRaw.forEach((po: any) => {
+            po.lineItems?.forEach((li: any) => {
+                if(!li.sku) return;
+                const id = li.sku.toString();
+                const ex = posMap.get(id) || { qty: 0, costVal: 0 };
+                ex.qty += (li.qtyReceived || 0);
+                ex.costVal += (li.qtyReceived || 0) * (li.cost || 0);
+                posMap.set(id, ex);
+            });
+        });
+
+        const sosMap = new Map(); 
+        sosRaw.forEach((so: any) => {
+            if(so.orderStatus !== 'Shipped' && so.orderStatus !== 'Completed') return;
+            so.lineItems?.forEach((li: any) => {
+                if(!li.sku) return;
+                const id = li.sku.toString();
+                const ex = sosMap.get(id) || { qty: 0 };
+                ex.qty += (li.qtyShipped || 0);
+                sosMap.set(id, ex);
+            });
+        });
+
+        const adjsMap = new Map(); 
+        adjsRaw.forEach((r: any) => {
+            if(!r.sku) return;
+            const id = r.sku.toString();
+            const ex = adjsMap.get(id) || { netQty: 0, costVal: 0 };
+            ex.netQty += (r.qty || 0);
+            ex.costVal += (r.qty || 0) * (r.cost || 0);
+            adjsMap.set(id, ex);
+        });
+
+        const wosSkuMap = new Map(); 
+        const wosVarMap = new Map(); 
+        
+        wosRaw.forEach((wo: any) => {
+            wo.lineItems?.forEach((li: any) => {
+                let qty = li.quantity || 0;
+                
+                // Track by variance (for variances loop later)
+                if (li.varianceId) {
+                    const vid = li.varianceId.toString();
+                    const exV = wosVarMap.get(vid) || { qty: 0 };
+                    exV.qty += qty;
+                    wosVarMap.set(vid, exV);
+                }
+
+                // Track by SKU (multi-link vs single-link)
+                if (li.linkedSkus && li.linkedSkus.length > 0) {
+                    li.linkedSkus.forEach((ls: any) => {
+                        if (ls.skuId) {
+                            const sid = ls.skuId.toString();
+                            const lsQty = qty * (ls.multiplier || 1);
+                            const ex = wosSkuMap.get(sid) || { qty: 0 };
+                            ex.qty += lsQty;
+                            wosSkuMap.set(sid, ex);
+                        }
+                    });
+                } else {
+                    const sid = (li.linkedSkuId || li.sku)?.toString();
+                    if (sid) {
+                        const ex = wosSkuMap.get(sid) || { qty: 0 };
+                        ex.qty += qty;
+                        wosSkuMap.set(sid, ex);
+                    }
+                }
+            });
+        });
 
         // Manufacturing Ingredient cost mapping
         const ingredientKeys: Set<string> = new Set();
@@ -189,31 +189,64 @@ export async function GET(req: Request) {
         let ingObs: any[] = [];
         let ingPos: any[] = [];
 
-        if (ingredientKeys.size > 0) {
+        if (ingredientKeys.size > 0 || !skuFilter) {
+            const obIngMatch = skuFilter ? {
+                sku: { $in: Array.from(ingredientKeys).map(k => k.split(':')[0]) },
+                lotNumber: { $in: Array.from(ingredientKeys).map(k => k.split(':')[1]) }
+            } : {};
+            
+            const poIngMatch = skuFilter ? {
+                "lineItems": { $elemMatch: { sku: { $in: Array.from(ingredientKeys).map(k => k.split(':')[0]) }, lotNumber: { $in: Array.from(ingredientKeys).map(k => k.split(':')[1]) } } },
+                status: 'Received'
+            } : { status: 'Received' };
+
             [ingObs, ingPos] = await Promise.all([
-                OpeningBalance.find({
-                    sku: { $in: Array.from(ingredientKeys).map(k => k.split(':')[0]) },
-                    lotNumber: { $in: Array.from(ingredientKeys).map(k => k.split(':')[1]) }
-                }).select('sku lotNumber cost').lean(),
-                PurchaseOrder.find({
-                    "lineItems": { $elemMatch: { sku: { $in: Array.from(ingredientKeys).map(k => k.split(':')[0]) }, lotNumber: { $in: Array.from(ingredientKeys).map(k => k.split(':')[1]) } } },
-                    status: 'Received'
-                }).select('lineItems status').lean()
+                OpeningBalance.find(obIngMatch).select('sku lotNumber cost').lean(),
+                PurchaseOrder.find(poIngMatch).select('lineItems status').lean()
             ]);
         }
 
+        const obCostMap = new Map();
+        ingObs.forEach(ob => {
+            if(ob.sku && ob.lotNumber) obCostMap.set(`${ob.sku.toString()}:${ob.lotNumber}`, ob.cost || 0);
+        });
+
+        const poCostMap = new Map();
+        ingPos.forEach(po => {
+            po.lineItems?.forEach((li: any) => {
+                const lSku = li.sku?._id || li.sku;
+                if(lSku && li.lotNumber && !poCostMap.has(`${lSku.toString()}:${li.lotNumber}`)) {
+                    poCostMap.set(`${lSku.toString()}:${li.lotNumber}`, li.cost || 0);
+                }
+            });
+        });
+
         const getLotCostBulk = (skuId: string, lot: string) => {
-            const ob = ingObs.find(o => o.sku.toString() === skuId && o.lotNumber === lot);
-            if (ob) return ob.cost || 0;
-            for (const po of ingPos) {
-                const line = (po as any).lineItems.find((l: any) => {
-                    const lSku = l.sku?._id || l.sku;
-                    return lSku?.toString() === skuId && l.lotNumber === lot;
-                });
-                if (line) return line.cost || 0;
-            }
+            const key = `${skuId}:${lot}`;
+            if (obCostMap.has(key)) return obCostMap.get(key);
+            if (poCostMap.has(key)) return poCostMap.get(key);
             return 0;
         };
+
+        const moProdMap = new Map();
+        (mosProdAgg as any[]).forEach(m => {
+            const SkuIdStr = m.sku?.toString();
+            if (SkuIdStr) {
+                if (!moProdMap.has(SkuIdStr)) moProdMap.set(SkuIdStr, []);
+                moProdMap.get(SkuIdStr).push(m);
+            }
+        });
+
+        const moConsMap = new Map();
+        (mosConsAgg as any[]).forEach(m => {
+            m.lineItems?.forEach((li: any) => {
+                const liSkuIdStr = (li.sku?._id || li.sku)?.toString();
+                if (liSkuIdStr) {
+                    if (!moConsMap.has(liSkuIdStr)) moConsMap.set(liSkuIdStr, []);
+                    moConsMap.get(liSkuIdStr).push({ mo: m, li });
+                }
+            });
+        });
 
         const resultSkus = skusRaw.map((sku: any) => {
             const id = sku._id.toString();
@@ -235,7 +268,7 @@ export async function GET(req: Request) {
                 totalCostIn += poData.costVal || 0;
             }
 
-            const myMos = (mosProdAgg as any[]).filter((m: any) => m.sku?.toString() === id);
+            const myMos = moProdMap.get(id) || [];
             myMos.forEach((mo: any) => {
                 const qty = (mo.qty || 0) + (mo.qtyDifference || 0);
                 qtyIn += qty;
@@ -261,17 +294,14 @@ export async function GET(req: Request) {
                 if (qty > 0) totalCostIn += moCost;
             });
 
-            const myConsMos = (mosConsAgg as any[]).filter((m: any) => m.lineItems.some((li: any) => (li.sku?._id || li.sku)?.toString() === id));
-            myConsMos.forEach((mo: any) => {
-                const matchingLines = mo.lineItems.filter((l: any) => (l.sku?._id || l.sku)?.toString() === id);
-                matchingLines.forEach((li: any) => {
-                    const bomQty = (mo.qty || 0) * (li.recipeQty || 0);
-                    const saPercent = li.sa || 0;
-                    const sa = saPercent / 100;
-                    const qtyExtra = sa > 0 ? (bomQty / sa) - bomQty : 0;
-                    const qtyScrapped = li.qtyScrapped || 0;
-                    qtyOut += bomQty + qtyScrapped + qtyExtra;
-                });
+            const myConsMosItems = moConsMap.get(id) || [];
+            myConsMosItems.forEach(({ mo, li }: any) => {
+                const bomQty = (mo.qty || 0) * (li.recipeQty || 0);
+                const saPercent = li.sa || 0;
+                const sa = saPercent / 100;
+                const qtyExtra = sa > 0 ? (bomQty / sa) - bomQty : 0;
+                const qtyScrapped = li.qtyScrapped || 0;
+                qtyOut += bomQty + qtyScrapped + qtyExtra;
             });
 
             const adjData = adjsMap.get(id);

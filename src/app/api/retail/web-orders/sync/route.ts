@@ -11,7 +11,7 @@ export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
 
 const BATCH_SIZE = 500; // Process orders in batches
-const STALE_LOCK_TIMEOUT = 10 * 60 * 1000; // 10 minutes – auto-reset if sync hangs beyond this
+const STALE_LOCK_TIMEOUT = 2 * 60 * 1000; // 2 minutes – auto-reset if sync hangs
 
 let syncProgress = {
     isSyncing: false,

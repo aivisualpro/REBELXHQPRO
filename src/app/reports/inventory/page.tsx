@@ -36,24 +36,13 @@ export default function InventoryIndexPage() {
         <div className="flex flex-col h-[calc(100vh-40px)] bg-background text-foreground overflow-y-auto overflow-x-hidden scrollbar-custom">
             <div className="max-w-6xl mx-auto w-full p-8 pb-20">
                 {/* Header */}
-                <div className="mb-10">
-                    <div className="flex items-center gap-2 text-muted-foreground text-sm mb-4 font-semibold uppercase tracking-widest">
+                <div className="mb-6">
+                    <div className="flex items-center gap-2 text-muted-foreground text-sm font-semibold uppercase tracking-widest">
                         <Link href="/" className="hover:text-foreground transition-colors">Dashboard</Link>
                         <span>/</span>
                         <span>Reports</span>
                         <span>/</span>
                         <span className="text-foreground">Inventory</span>
-                    </div>
-                    <div className="flex flex-col gap-4">
-                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center shadow-xl shadow-indigo-500/30 border border-white/10 dark:border-indigo-400/20">
-                            <Package className="w-8 h-8 text-white" />
-                        </div>
-                        <div>
-                            <h1 className="text-3xl font-black tracking-tight text-foreground">Inventory Reports</h1>
-                            <p className="text-muted-foreground mt-2 text-base max-w-xl">
-                                Access detailed inventory metrics, valuation, and low stock warnings to keep operations running smoothly.
-                            </p>
-                        </div>
                     </div>
                 </div>
 
