@@ -8,7 +8,8 @@ import {
     Wallet, 
     PiggyBank,
     ArrowRight,
-    BarChart3
+    BarChart3,
+    Percent
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -27,6 +28,14 @@ const financialReports = [
         href: '/reports/financials/cogm',
         icon: FileText,
         color: 'purple',
+        available: true
+    },
+    {
+        title: 'Commission Report',
+        description: 'Sales rep commissions from wholesale orders at 5% rate',
+        href: '/reports/financials/commission',
+        icon: Percent,
+        color: 'orange',
         available: true
     },
     {
@@ -59,7 +68,8 @@ const colorClasses = {
     emerald: 'from-emerald-500 to-emerald-600 shadow-emerald-500/30',
     blue: 'from-blue-500 to-blue-600 shadow-blue-500/30',
     purple: 'from-purple-500 to-purple-600 shadow-purple-500/30',
-    amber: 'from-amber-500 to-amber-600 shadow-amber-500/30'
+    amber: 'from-amber-500 to-amber-600 shadow-amber-500/30',
+    orange: 'from-orange-500 to-orange-600 shadow-orange-500/30'
 };
 
 export default function FinancialsPage() {
