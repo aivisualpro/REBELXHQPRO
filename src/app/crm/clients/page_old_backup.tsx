@@ -330,7 +330,7 @@ export default function ClientsPage() {
                     placeholder="Search clients..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="pl-9 pr-4 h-8 w-64 bg-secondary/50 hover:bg-secondary focus:bg-background border border-transparent focus:border-primary rounded text-sm transition-all focus:outline-none placeholder:text-muted-foreground text-foreground"
+                    className="pl-9 pr-4 h-8 w-64 bg-secondary hover:bg-secondary focus:bg-background border border-transparent focus:border-primary rounded text-sm transition-all focus:outline-none placeholder:text-muted-foreground text-foreground"
                 />
             </div>
         </div>
@@ -384,7 +384,7 @@ export default function ClientsPage() {
       <div className="flex-1 overflow-x-hidden overflow-y-auto bg-background transition-colors duration-300 relative scrollbar-custom">
         <div className="min-w-full px-2 py-2 flex flex-col">
             <table className="w-full border-separate border-spacing-0 text-left relative z-0">
-                <thead className="bg-secondary/50 border-b border-border sticky top-0 z-10 backdrop-blur-sm transition-colors">
+                <thead className="bg-secondary border-b border-border sticky top-0 z-10 transition-colors">
                     <tr>
                         {[
                             { key: 'name', label: 'name' },
@@ -563,7 +563,7 @@ export default function ClientsPage() {
       </div>
 
        {/* Pagination */}
-       <div className="border-t border-border bg-secondary/30 transition-colors duration-300">
+       <div className="border-t border-border bg-secondary transition-colors duration-300">
             <Pagination
                 currentPage={page}
                 totalPages={totalPages}
@@ -634,7 +634,7 @@ export default function ClientsPage() {
                                 </button>
                                 
                                 <div className="flex items-center space-x-0.5 text-slate-500">
-                                    <button className="p-2 hover:bg-secondary/50 hover:text-foreground transition-all rounded-sm cursor-pointer" title="Attach files">
+                                    <button className="p-2 hover:bg-secondary hover:text-foreground transition-all rounded-sm cursor-pointer" title="Attach files">
                                         <Paperclip className="w-4 h-4" />
                                     </button>
                                 </div>

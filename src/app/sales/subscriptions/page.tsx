@@ -83,10 +83,10 @@ export default function SubscriptionsPage() {
       )}
 
       {/* Table */}
-      <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
+      <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background relative">
         <div className="min-w-full px-2 py-2">
           <table className="w-full text-left border-separate border-spacing-0 relative z-0">
-            <thead className="sticky top-0 bg-secondary/80 z-10 border-b border-border backdrop-blur-md transition-colors">
+            <thead className="sticky top-0 bg-secondary z-10 border-b border-border transition-colors">
               <tr>
                 {columns.map(col => (
                   <th
@@ -102,7 +102,7 @@ export default function SubscriptionsPage() {
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-border bg-background/50">
+            <tbody className="divide-y divide-border bg-background">
               <tr>
                 <td colSpan={columns.length} className="px-4 py-20 text-center">
                   <div className="flex flex-col items-center space-y-3">

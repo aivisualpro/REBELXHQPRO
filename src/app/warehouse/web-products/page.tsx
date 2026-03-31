@@ -593,7 +593,7 @@ function WebProductsContent() {
           triggerClassName={cn(
             'h-7 text-[11px] font-bold rounded border border-dashed transition-all',
             linked.length > 0
-              ? 'bg-secondary/30 border-border/40 text-muted-foreground hover:bg-secondary/50'
+              ? 'bg-secondary border-border/40 text-muted-foreground hover:bg-secondary'
               : 'bg-rose-500/5 border-rose-500/20 text-rose-500 hover:bg-rose-500/10'
           )}
           onOpenChange={open => setActiveDropdownRow(open ? cellKey : null)}
@@ -698,7 +698,7 @@ function WebProductsContent() {
             placeholder="Search products..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="pl-8 pr-3 h-8 w-52 bg-secondary/60 border border-border text-[12px] rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50 placeholder:text-muted-foreground/50 text-foreground transition-all"
+            className="pl-8 pr-3 h-8 w-52 bg-secondary border border-border text-[12px] rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50 placeholder:text-muted-foreground/50 text-foreground transition-all"
           />
         </div>
 
@@ -707,7 +707,7 @@ function WebProductsContent() {
         {/* Hide zero orders toggle */}
         <button
           onClick={() => { setHideZeroOrders(p => !p); }}
-          className={cn('p-2 rounded-lg transition-colors cursor-pointer shrink-0', hideZeroOrders ? 'bg-primary/10 text-primary border border-primary/20' : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60')}
+          className={cn('p-2 rounded-lg transition-colors cursor-pointer shrink-0', hideZeroOrders ? 'bg-primary/10 text-primary border border-primary/20' : 'text-muted-foreground hover:text-foreground hover:bg-secondary')}
           title={hideZeroOrders ? 'Showing products with orders only' : 'Show all products'}
         >
           {hideZeroOrders ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -716,7 +716,7 @@ function WebProductsContent() {
         {/* Show Archived filter */}
         <button
           onClick={() => { setShowArchived(p => !p); }}
-          className={cn('h-8 px-3 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 text-[11px] font-bold uppercase tracking-widest', showArchived ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20 shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60')}
+          className={cn('h-8 px-3 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 text-[11px] font-bold uppercase tracking-widest', showArchived ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20 shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-secondary')}
           title={showArchived ? 'Viewing Archived Products' : 'Show Archived Products'}
         >
           <Layers className="w-3.5 h-3.5" />
@@ -725,10 +725,10 @@ function WebProductsContent() {
 
         {/* Expand / Collapse All */}
         <div className="flex items-center gap-0.5 shrink-0">
-          <button onClick={expandAll} className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary/60 rounded-lg transition-colors cursor-pointer" title="Expand All">
+          <button onClick={expandAll} className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors cursor-pointer" title="Expand All">
             <ChevronsUpDown className="w-3.5 h-3.5" />
           </button>
-          <button onClick={collapseAll} className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary/60 rounded-lg transition-colors cursor-pointer" title="Collapse All">
+          <button onClick={collapseAll} className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors cursor-pointer" title="Collapse All">
             <ChevronsDownUp className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -741,29 +741,29 @@ function WebProductsContent() {
             <thead className="bg-background border-b border-border sticky top-0 z-10">
               <tr>
                 {/* Name */}
-                <th className="px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary/60 transition-colors border-r border-border/40 select-none shadow-[0_1px_0_0_hsl(var(--border))] w-[320px]"
+                <th className="px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary transition-colors border-r border-border/40 select-none shadow-[0_1px_0_0_hsl(var(--border))] w-[320px]"
                   onClick={() => handleSort('name', sortBy === 'name' && sortOrder === 'asc' ? 'desc' : 'asc')}>
                   <div className="flex items-center gap-1"><span>Name</span></div>
                 </th>
-                <th className="px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary/60 transition-colors border-r border-border/40 select-none shadow-[0_1px_0_0_hsl(var(--border))] w-[120px]"
+                <th className="px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary transition-colors border-r border-border/40 select-none shadow-[0_1px_0_0_hsl(var(--border))] w-[120px]"
                   onClick={() => handleSort('website', sortBy === 'website' && sortOrder === 'asc' ? 'desc' : 'asc')}>
                   <span>Website</span>
                 </th>
-                <th className="px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary/60 transition-colors border-r border-border/40 select-none shadow-[0_1px_0_0_hsl(var(--border))] w-[90px]"
+                <th className="px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary transition-colors border-r border-border/40 select-none shadow-[0_1px_0_0_hsl(var(--border))] w-[90px]"
                   onClick={() => handleSort('salePrice', sortBy === 'salePrice' && sortOrder === 'asc' ? 'desc' : 'asc')}>
                   <span>Price</span>
                 </th>
                 <th className="px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest border-r border-border/40 select-none shadow-[0_1px_0_0_hsl(var(--border))] w-[280px]">
                   <span>Linked SKUs</span>
                 </th>
-                <th className="px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary/60 transition-colors border-r border-border/40 select-none shadow-[0_1px_0_0_hsl(var(--border))] w-[80px]"
+                <th className="px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary transition-colors border-r border-border/40 select-none shadow-[0_1px_0_0_hsl(var(--border))] w-[80px]"
                   onClick={() => handleSort('totalWebOrders', sortBy === 'totalWebOrders' && sortOrder === 'asc' ? 'desc' : 'asc')}>
                   <span>Orders</span>
                 </th>
                 <th className="px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest border-r border-border/40 select-none shadow-[0_1px_0_0_hsl(var(--border))] w-[80px] text-center">
                   <span>Archive</span>
                 </th>
-                <th className="px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary/60 transition-colors select-none shadow-[0_1px_0_0_hsl(var(--border))] w-[80px]"
+                <th className="px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary transition-colors select-none shadow-[0_1px_0_0_hsl(var(--border))] w-[80px]"
                   onClick={() => handleSort('webId', sortBy === 'webId' && sortOrder === 'asc' ? 'desc' : 'asc')}>
                   <span>Web ID</span>
                 </th>
@@ -791,7 +791,7 @@ function WebProductsContent() {
                     <tr
                       className={cn(
                         'group transition-colors duration-150 cursor-pointer border-b border-border/60',
-                        isExpanded ? 'bg-secondary/10' : 'hover:bg-muted/30 dark:hover:bg-muted/10',
+                        isExpanded ? 'bg-secondary' : 'hover:bg-muted/30 dark:hover:bg-muted/10',
                         allLinked && 'border-l-2 border-l-emerald-500',
                         someLinked && !allLinked && 'border-l-2 border-l-amber-500',
                         !someLinked && !allLinked && 'border-l-2 border-l-rose-500/30',
@@ -878,8 +878,8 @@ function WebProductsContent() {
                         <tr
                           key={`${product._id}-v-${vid || vIdx}`}
                           className={cn(
-                            'group bg-secondary/5 border-b border-border/40 transition-colors duration-150 animate-in fade-in slide-in-from-top-1 duration-200',
-                            'hover:bg-secondary/20',
+                            'group bg-secondary border-b border-border/40 transition-colors duration-150 animate-in fade-in slide-in-from-top-1 duration-200',
+                            'hover:bg-secondary',
                             vLinked ? 'border-l-2 border-l-emerald-500/50' : 'border-l-2 border-l-rose-500/20',
                             activeDropdownRow === `${product._id}-${vid}` && '!bg-primary/5 ring-1 ring-inset ring-primary/20'
                           )}

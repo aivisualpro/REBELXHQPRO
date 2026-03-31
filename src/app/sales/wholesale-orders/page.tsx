@@ -265,7 +265,7 @@ function WholesaleSkeletonRow({ index, visibleColumns }: { index: number; visibl
         <td key={col.key} className={cn('px-2 py-2.5', col.width)}>
           <div
             className={cn(
-              'h-3.5 rounded-sm bg-secondary/80 animate-pulse',
+              'h-3.5 rounded-sm bg-secondary animate-pulse',
               col.key === 'clientId' ? 'w-4/5' :
                 col.key === 'orderStatus' ? 'w-14' :
                   col.key === 'salesRep' ? 'w-16' :
@@ -1324,7 +1324,7 @@ function SaleOrdersContent() {
                 'h-8 px-3 rounded border flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0',
                 activeStatus !== 'All'
                   ? 'border-primary/30'
-                  : 'bg-secondary text-foreground border-border hover:bg-secondary/80'
+                  : 'bg-secondary text-foreground border-border hover:bg-secondary'
               )}
               style={activeStatus !== 'All' && statusColors[activeStatus]
                 ? { backgroundColor: statusColors[activeStatus].bg + '22', color: statusColors[activeStatus].bg, borderColor: statusColors[activeStatus].bg + '55' }
@@ -1419,7 +1419,7 @@ function SaleOrdersContent() {
                 'h-8 px-3 rounded border flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0',
                 datePreset !== 'all'
                   ? 'bg-primary/10 border-primary/30 text-primary'
-                  : 'bg-secondary text-foreground border-border hover:bg-secondary/80'
+                  : 'bg-secondary text-foreground border-border hover:bg-secondary'
               )}
             >
               <Calendar className="w-3.5 h-3.5" />
@@ -1464,7 +1464,7 @@ function SaleOrdersContent() {
               'h-8 px-3 transition-all rounded shadow-md flex items-center space-x-1.5 cursor-pointer shrink-0 border',
               isQuickEditMode
                 ? 'bg-amber-500 text-black border-amber-600 hover:bg-amber-400'
-                : 'bg-secondary text-foreground border-border hover:bg-secondary/80'
+                : 'bg-secondary text-foreground border-border hover:bg-secondary'
             )}>
             <SquarePen className="w-3 h-3" />
             <span className="hidden sm:inline text-[12px] font-black uppercase tracking-widest">
@@ -1488,7 +1488,7 @@ function SaleOrdersContent() {
                 {visibleColumns.map((col) => (
                   <th key={col.key} onClick={() => handleSort(col.key)}
                     className={cn(
-                      'px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary/60 dark:hover:bg-secondary/50 transition-colors border-r border-border/40 last:border-0 select-none shadow-[0_1px_0_0_hsl(var(--border))]',
+                      'px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary dark:hover:bg-secondary transition-colors border-r border-border/40 last:border-0 select-none shadow-[0_1px_0_0_hsl(var(--border))]',
                       col.width, col.align || 'text-left'
                     )}>
                     <div className={cn('flex items-center gap-1', col.align === 'text-right' && 'justify-end')}>
@@ -1540,7 +1540,7 @@ function SaleOrdersContent() {
 
         {/* Quick Edit Floating Save Bar */}
         {isQuickEditMode && (
-          <div className="sticky bottom-0 left-0 right-0 z-30 border-t border-border bg-background/95 backdrop-blur-md shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
+          <div className="sticky bottom-0 left-0 right-0 z-30 border-t border-border bg-background backdrop-blur-md shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
             <div className="px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <SquarePen className="w-4 h-4 text-amber-500" />
@@ -1584,8 +1584,8 @@ function SaleOrdersContent() {
 
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-md p-4">
-          <div className="bg-background/95 backdrop-blur-xl rounded-xl shadow-[0_0_40px_rgba(0,0,0,0.15)] ring-1 ring-white/5 w-full max-w-7xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[95vh] border border-border/40">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border/40 bg-secondary/10 shrink-0">
+          <div className="bg-background backdrop-blur-xl rounded-xl shadow-[0_0_40px_rgba(0,0,0,0.15)] ring-1 ring-white/5 w-full max-w-7xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[95vh] border border-border/40">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border/40 bg-secondary shrink-0">
               <h2 className="text-sm font-bold uppercase text-foreground tracking-wider flex items-center gap-2">
                 {editingOrderId ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
                 {editingOrderId ? 'Edit Sale Order' : 'Create Sale Order'}
@@ -1609,7 +1609,7 @@ function SaleOrdersContent() {
                           value={newOrder.clientId}
                           onChange={handleClientChange}
                           placeholder="Select Client..."
-                          className="w-full h-9 bg-secondary/50 border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
+                          className="w-full h-9 bg-secondary border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
                         />
                       </div>
                       <div className="space-y-1.5">
@@ -1619,7 +1619,7 @@ function SaleOrdersContent() {
                           value={newOrder.salesRep}
                           onChange={(val) => setNewOrder({ ...newOrder, salesRep: val })}
                           placeholder="Select Rep..."
-                          className="w-full h-9 bg-secondary/50 border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
+                          className="w-full h-9 bg-secondary border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
                         />
                       </div>
                     </div>
@@ -1632,7 +1632,7 @@ function SaleOrdersContent() {
                           value={newOrder.paymentMethod}
                           onChange={(val) => setNewOrder({ ...newOrder, paymentMethod: val })}
                           placeholder="Select Method..."
-                          className="w-full h-9 bg-secondary/50 border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
+                          className="w-full h-9 bg-secondary border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
                         />
                       </div>
                       <div className="space-y-1.5">
@@ -1648,7 +1648,7 @@ function SaleOrdersContent() {
                           ]}
                           value={newOrder.orderStatus}
                           onChange={(val) => setNewOrder({ ...newOrder, orderStatus: val })}
-                          className="w-full h-9 bg-secondary/50 border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
+                          className="w-full h-9 bg-secondary border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
                         />
                       </div>
                       <div className="space-y-1.5">
@@ -1656,7 +1656,7 @@ function SaleOrdersContent() {
                         <input
                           type="date"
                           disabled
-                          className="w-full h-9 px-3 bg-secondary/30 border border-border rounded text-xs text-muted-foreground cursor-not-allowed"
+                          className="w-full h-9 px-3 bg-secondary border border-border rounded text-xs text-muted-foreground cursor-not-allowed"
                           value={new Date().toISOString().split('T')[0]}
                         />
                       </div>
@@ -1664,7 +1664,7 @@ function SaleOrdersContent() {
                   </div>
 
                   {/* Right Column (Label/Meta) */}
-                  <div className="col-span-4 bg-secondary/10 border border-border rounded p-4 space-y-4">
+                  <div className="col-span-4 bg-secondary border border-border rounded p-4 space-y-4">
                     <div className="flex flex-col items-center justify-center h-full space-y-2">
                       <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Order Number (Auto)</div>
                       <div className="text-3xl font-black text-primary">{newOrder.label || '---'}</div>
@@ -1693,7 +1693,7 @@ function SaleOrdersContent() {
                         onChange={(val) => setNewOrder({ ...newOrder, shippingMethod: val })}
                         creatable
                         placeholder="Select Method..."
-                        className="w-full h-9 bg-secondary/50 border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
+                        className="w-full h-9 bg-secondary border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
                       />
                     </div>
                     <div className="col-span-2 space-y-1.5">
@@ -1702,7 +1702,7 @@ function SaleOrdersContent() {
                         type="text"
                         value={newOrder.trackingNumber}
                         onChange={e => setNewOrder({ ...newOrder, trackingNumber: e.target.value })}
-                        className="w-full h-9 px-3 bg-secondary/50 border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
+                        className="w-full h-9 px-3 bg-secondary border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
                       />
                     </div>
                     <div className="space-y-1.5">
@@ -1711,7 +1711,7 @@ function SaleOrdersContent() {
                         type="date"
                         value={toDateInputValue(newOrder.shippedDate)}
                         onChange={e => setNewOrder({ ...newOrder, shippedDate: e.target.value })}
-                        className="w-full h-9 px-3 bg-secondary/50 border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
+                        className="w-full h-9 px-3 bg-secondary border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
                       />
                     </div>
                     <div className="col-span-3">
@@ -1721,7 +1721,7 @@ function SaleOrdersContent() {
                           type="text"
                           value={newOrder.shippingAddress}
                           onChange={e => setNewOrder({ ...newOrder, shippingAddress: e.target.value })}
-                          className="w-full h-9 px-3 bg-secondary/50 border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
+                          className="w-full h-9 px-3 bg-secondary border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
                           placeholder="Street Address, City, State, Zip"
                         />
                       </div>
@@ -1744,7 +1744,7 @@ function SaleOrdersContent() {
                           value={newOrder.shippingCost}
                           onWheel={(e) => e.currentTarget.blur()}
                           onChange={e => setNewOrder({ ...newOrder, shippingCost: e.target.value })}
-                          className="w-full h-9 pl-5 pr-2 bg-secondary/50 border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
+                          className="w-full h-9 pl-5 pr-2 bg-secondary border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
                           placeholder="0.00"
                         />
                       </div>
@@ -1760,7 +1760,7 @@ function SaleOrdersContent() {
                           value={newOrder.discount}
                           onWheel={(e) => e.currentTarget.blur()}
                           onChange={e => setNewOrder({ ...newOrder, discount: e.target.value })}
-                          className="w-full h-9 pl-5 pr-2 bg-secondary/50 border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
+                          className="w-full h-9 pl-5 pr-2 bg-secondary border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
                           placeholder="0.00"
                         />
                       </div>
@@ -1776,7 +1776,7 @@ function SaleOrdersContent() {
                           value={newOrder.tax}
                           onWheel={(e) => e.currentTarget.blur()}
                           onChange={e => setNewOrder({ ...newOrder, tax: e.target.value })}
-                          className="w-full h-9 pl-5 pr-2 bg-secondary/50 border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
+                          className="w-full h-9 pl-5 pr-2 bg-secondary border border-border rounded text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-foreground"
                           placeholder="0.00"
                         />
                       </div>
@@ -1805,7 +1805,7 @@ function SaleOrdersContent() {
                       <button
                         type="button"
                         onClick={addLineItem}
-                        className="flex items-center space-x-1 px-3 py-1.5 bg-secondary hover:bg-secondary/80 text-foreground rounded-none text-[10px] font-bold uppercase transition-colors"
+                        className="flex items-center space-x-1 px-3 py-1.5 bg-secondary hover:bg-secondary text-foreground rounded-none text-[10px] font-bold uppercase transition-colors"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         <span>Add Item</span>
@@ -1814,7 +1814,7 @@ function SaleOrdersContent() {
                   </div>
 
                   {newLineItems.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 bg-secondary/10 rounded-none border border-dashed border-border text-muted-foreground">
+                    <div className="flex flex-col items-center justify-center py-12 bg-secondary rounded-none border border-dashed border-border text-muted-foreground">
                       <div className="w-12 h-12 bg-card rounded-full flex items-center justify-center shadow-sm mb-3">
                         <Package className="w-6 h-6 text-muted-foreground" />
                       </div>
@@ -1830,7 +1830,7 @@ function SaleOrdersContent() {
                   ) : (
                     <div className="border border-border/40 rounded-none">
                       <table className="w-full text-left border-collapse border-b border-border/40">
-                        <thead className="bg-secondary/20 text-muted-foreground">
+                        <thead className="bg-secondary text-muted-foreground">
                           <tr>
                             <th className="px-3 py-2.5 text-[9px] uppercase font-bold tracking-widest w-[25%] border-r border-border/40">Item / SKU</th>
                             <th className="px-3 py-2.5 text-[9px] uppercase font-bold tracking-widest w-[20%] border-r border-border/40">Description</th>
@@ -1887,7 +1887,7 @@ function SaleOrdersContent() {
                               </td>
                               <td className="p-0 border-r border-border/40">
                                 <div
-                                  className="w-full h-[32px] px-2 flex items-center cursor-pointer hover:bg-secondary/30 transition-colors"
+                                  className="w-full h-[32px] px-2 flex items-center cursor-pointer hover:bg-secondary transition-colors"
                                   onClick={() => {
                                     // Allow lot selection if SKU is set (valid ObjectId or string)
                                     if (!item.sku) {
@@ -1939,7 +1939,7 @@ function SaleOrdersContent() {
                                   />
                                 </div>
                               </td>
-                              <td className="px-2 py-0 align-middle text-right border-r border-border/40 bg-secondary/10">
+                              <td className="px-2 py-0 align-middle text-right border-r border-border/40 bg-secondary">
                                 <span className="text-xs font-bold text-foreground font-mono">
                                   {formatCurrency((item.qtyShipped || 0) * (item.price || 0))}
                                 </span>
@@ -1957,7 +1957,7 @@ function SaleOrdersContent() {
                             </tr>
                           ))}
                         </tbody>
-                        <tfoot className="bg-secondary/20">
+                        <tfoot className="bg-secondary">
                           <tr>
                             <td colSpan={6} className="px-3 py-3 text-[10px] font-black text-muted-foreground uppercase text-right tracking-widest border-r border-border/40 bg-muted/20">Subtotal</td>
                             <td className="px-3 py-3 text-sm font-black text-primary font-mono text-right border-r border-border/40 bg-muted/20">
@@ -1973,7 +1973,7 @@ function SaleOrdersContent() {
               </form>
             </div>
 
-            <div className="px-6 py-4 border-t border-border/40 bg-card/80 backdrop-blur-md flex items-center justify-end shrink-0">
+            <div className="px-6 py-4 border-t border-border/40 bg-card backdrop-blur-md flex items-center justify-end shrink-0">
               <button
                 type="submit"
                 form="create-so-form"
@@ -2016,7 +2016,7 @@ function SaleOrdersContent() {
                 <div className="flex space-x-3">
                   <button
                     onClick={() => setDeleteConfirm({ isOpen: false, orderId: null })}
-                    className="flex-1 px-4 py-2 bg-secondary text-foreground text-xs font-bold uppercase rounded hover:bg-secondary/80 transition-colors"
+                    className="flex-1 px-4 py-2 bg-secondary text-foreground text-xs font-bold uppercase rounded hover:bg-secondary transition-colors"
                   >
                     Cancel
                   </button>

@@ -679,8 +679,8 @@ function SkuDetailsPageContent() {
                             <div className={cn(
                                 "relative rounded-lg px-4 py-5 flex flex-col items-center overflow-hidden border",
                                 currentStock > (sku.reOrderPoint || 0)
-                                    ? "bg-secondary/30 border-emerald-900/40"
-                                    : "bg-secondary/30 border-orange-900/40"
+                                    ? "bg-secondary border-emerald-900/40"
+                                    : "bg-secondary border-orange-900/40"
                             )}>
                                 {/* Subtle glow behind number */}
                                 <div className={cn(
@@ -790,7 +790,7 @@ function SkuDetailsPageContent() {
                                 </div>
                                 <div className="overflow-hidden">
                                     <table className="w-full text-left border-collapse">
-                                        <thead className="bg-secondary/50 border-y border-border">
+                                        <thead className="bg-secondary border-y border-border">
                                             <tr>
                                                 <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">Lot #</th>
                                                 <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">Type</th>
@@ -804,7 +804,7 @@ function SkuDetailsPageContent() {
                                                 <tr
                                                     key={lot.lotNumber}
                                                     className={cn(
-                                                        "hover:bg-secondary/50 cursor-pointer transition-colors",
+                                                        "hover:bg-secondary cursor-pointer transition-colors",
                                                         selectedLot === lot.lotNumber && "bg-primary/10 hover:bg-primary/15"
                                                     )}
                                                     onClick={() => setSelectedLot(selectedLot === lot.lotNumber ? 'All' : lot.lotNumber)}
@@ -867,7 +867,7 @@ function SkuDetailsPageContent() {
                                 ) : (
                                     <div className="overflow-hidden">
                                         <table className="w-full text-left border-collapse">
-                                            <thead className="bg-secondary/50 border-y border-border">
+                                            <thead className="bg-secondary border-y border-border">
                                                 <tr>
                                                     <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[40px]"></th>
                                                     <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">Website</th>
@@ -879,7 +879,7 @@ function SkuDetailsPageContent() {
                                                 {linkedWebProducts.map((wp) => (
                                                     <tr
                                                         key={wp._id}
-                                                        className="hover:bg-secondary/50 cursor-pointer transition-colors group"
+                                                        className="hover:bg-secondary cursor-pointer transition-colors group"
                                                         onClick={() => router.push(`/warehouse/web-products?search=${encodeURIComponent(wp.name)}`)}
                                                     >
                                                         <td className="px-3 py-2">
@@ -1067,7 +1067,7 @@ function SkuDetailsPageContent() {
                     <div className="border-t border-border px-4 py-4 shrink-0 flex items-center gap-2">
                         <button
                             onClick={handleEditSku}
-                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-foreground transition-colors cursor-pointer rounded bg-secondary hover:bg-secondary/80 border border-border shadow-[0_1px_4px_rgba(0,0,0,0.15)]"
+                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-foreground transition-colors cursor-pointer rounded bg-secondary hover:bg-secondary border border-border shadow-[0_1px_4px_rgba(0,0,0,0.15)]"
                         >
                             <Pencil className="w-3.5 h-3.5" />
                             <span>Edit</span>
@@ -1168,7 +1168,7 @@ function SkuDetailsPageContent() {
                                                                 key={opt.value}
                                                                 onClick={() => { setSelectedLot(opt.value); setLotSearch(''); }}
                                                                 className={cn(
-                                                                    'w-full text-left px-3 py-1.5 text-xs font-medium hover:bg-secondary/80 transition-colors cursor-pointer',
+                                                                    'w-full text-left px-3 py-1.5 text-xs font-medium hover:bg-secondary transition-colors cursor-pointer',
                                                                     selectedLot === opt.value ? 'bg-primary/10 text-primary font-bold' : 'text-foreground'
                                                                 )}
                                                             >
@@ -1299,7 +1299,7 @@ function SkuDetailsPageContent() {
 
                     {/* Nested Sticky Layer 2: Table Header (Pinned exactly below toolbar) */}
                     <table className="w-full text-left border-collapse">
-                        <thead className="sticky top-10 z-[20] bg-secondary/50 border-y border-border">
+                        <thead className="sticky top-10 z-[20] bg-secondary border-y border-border">
                             <tr>
                                 <th className="px-3 py-2.5 text-[10px] font-black text-muted-foreground uppercase tracking-widest border-r border-border">Date</th>
                                 <th className="px-3 py-2.5 text-[10px] font-black text-muted-foreground uppercase tracking-widest border-r border-border">Type</th>
@@ -1313,7 +1313,7 @@ function SkuDetailsPageContent() {
                         </thead>
                         <tbody className="divide-y divide-border">
                             {paginatedTransactions.map((tx) => (
-                                <tr key={tx._id} data-tx-id={tx._id} className={cn("hover:bg-secondary/50 transition-colors group cursor-pointer", (isPendingProduction(tx) || isUnfulfilledConsumption(tx)) && "!bg-red-500/10 hover:!bg-red-500/15 border-l-2 border-l-red-500", highlightedTxIds.has(tx._id) && "ledger-row-flash")} onClick={() => router.push(tx.link)}>
+                                <tr key={tx._id} data-tx-id={tx._id} className={cn("hover:bg-secondary transition-colors group cursor-pointer", (isPendingProduction(tx) || isUnfulfilledConsumption(tx)) && "!bg-red-500/10 hover:!bg-red-500/15 border-l-2 border-l-red-500", highlightedTxIds.has(tx._id) && "ledger-row-flash")} onClick={() => router.push(tx.link)}>
                                     <td className="px-3 py-3 text-xs text-foreground/80 font-mono font-medium">{formatDate(tx.date)}</td>
                                     <td className="px-3 py-3">
                                         {tx.type === 'Web Order' && tx.reference ? (() => {
@@ -1471,7 +1471,7 @@ function SkuDetailsPageContent() {
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsEditModalOpen(false)} />
                     <div className="relative z-10 w-full max-w-2xl mx-4 bg-background border border-border shadow-2xl rounded-lg overflow-hidden max-h-[90vh] flex flex-col">
                         {/* Modal Header */}
-                        <div className="flex items-center justify-between px-5 h-10 border-b border-border bg-secondary/30 shrink-0">
+                        <div className="flex items-center justify-between px-5 h-10 border-b border-border bg-secondary shrink-0">
                             <h2 className="text-sm font-bold text-foreground uppercase tracking-tight">Edit SKU</h2>
                             <button onClick={() => setIsEditModalOpen(false)} className="p-1.5 hover:bg-secondary rounded-full transition-colors cursor-pointer">
                                 <X className="w-4 h-4 text-muted-foreground" />
@@ -1577,7 +1577,7 @@ function SkuDetailsPageContent() {
                         </div>
 
                         {/* Modal Footer */}
-                        <div className="flex items-center justify-end space-x-3 px-5 h-10 border-t border-border bg-secondary/30 shrink-0">
+                        <div className="flex items-center justify-end space-x-3 px-5 h-10 border-t border-border bg-secondary shrink-0">
                             <button onClick={() => setIsEditModalOpen(false)} className="px-4 py-1.5 text-[10px] font-bold text-muted-foreground hover:text-foreground uppercase tracking-widest transition-colors cursor-pointer">Cancel</button>
                             <button
                                 form="edit-sku-form"

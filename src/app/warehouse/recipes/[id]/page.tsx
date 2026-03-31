@@ -347,7 +347,7 @@ export default function RecipeDetailPage() {
 
             <div className="flex flex-1 overflow-hidden">
                 {/* Left Sidebar: Recipe Info (30%) */}
-                <div className="w-[30%] border-r border-border bg-secondary/30 overflow-y-auto p-4 space-y-4">
+                <div className="w-[30%] border-r border-border bg-secondary overflow-y-auto p-4 space-y-4">
                     {/* Recipe Name */}
                     <div className="border border-border rounded-md p-4 bg-background">
                         <div className="flex items-center space-x-2 mb-3">
@@ -498,7 +498,7 @@ export default function RecipeDetailPage() {
                         {activeTab === 'Ingredients' && (
                             <div className="animate-in fade-in duration-300">
                                 <table className="w-full border-collapse text-left">
-                                    <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
+                                    <thead className="bg-secondary border-y border-border sticky top-0 z-20">
                                         <tr>
                                             {['SKU', 'Qty', 'UOM', 'Actions'].map(col => (
                                                 <th key={col} className={cn(
@@ -515,7 +515,7 @@ export default function RecipeDetailPage() {
                                             <tr><td colSpan={4} className="p-8 text-center text-xs text-muted-foreground">No ingredients added yet.</td></tr>
                                         )}
                                         {recipe.lineItems?.map((item: any, i: number) => (
-                                            <tr key={i} className="hover:bg-secondary/30 group transition-colors">
+                                            <tr key={i} className="hover:bg-secondary group transition-colors">
                                                 <td className="px-3 py-2 text-xs font-medium text-muted-foreground">{renderSku(item.sku)}</td>
                                                 <td className="px-3 py-2 text-xs text-muted-foreground font-mono">{item.qty}</td>
                                                 <td className="px-3 py-2 text-[10px] font-bold uppercase text-muted-foreground tracking-wider">{item.uom}</td>
@@ -564,7 +564,7 @@ export default function RecipeDetailPage() {
                         {activeTab === 'Notes' && (
                             <div className="p-4 space-y-4 animate-in fade-in duration-300">
                                 <textarea
-                                    className="w-full px-4 py-3 bg-secondary/30 border border-border rounded-md text-xs text-muted-foreground focus:outline-none focus:bg-background focus:border-primary/30 transition-all min-h-[200px] leading-relaxed placeholder:text-muted-foreground/50"
+                                    className="w-full px-4 py-3 bg-secondary border border-border rounded-md text-xs text-muted-foreground focus:outline-none focus:bg-background focus:border-primary/30 transition-all min-h-[200px] leading-relaxed placeholder:text-muted-foreground/50"
                                     placeholder="Add general recipe notes here..."
                                     value={recipe.notes || ''}
                                     onChange={(e) => setRecipe({ ...recipe, notes: e.target.value })}
@@ -589,7 +589,7 @@ export default function RecipeDetailPage() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsEditingItem(false)} />
                     <div className="relative bg-background border border-border shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 rounded-md">
-                        <div className="px-4 h-10 border-b border-border flex justify-between items-center bg-secondary/50">
+                        <div className="px-4 h-10 border-b border-border flex justify-between items-center bg-secondary">
                             <h3 className="font-bold text-xs text-foreground uppercase tracking-widest">{itemMode === 'add' ? 'Add Ingredient' : 'Edit Ingredient'}</h3>
                             <button onClick={() => setIsEditingItem(false)} className="text-muted-foreground hover:text-foreground cursor-pointer"><X className="w-4 h-4" /></button>
                         </div>
@@ -625,7 +625,7 @@ export default function RecipeDetailPage() {
                                 </div>
                             </div>
                         </div>
-                        <div className="px-4 h-10 bg-secondary/50 border-t border-border flex items-center justify-end">
+                        <div className="px-4 h-10 bg-secondary border-t border-border flex items-center justify-end">
                             <button onClick={saveItem} className="px-5 py-1.5 bg-primary text-black text-[10px] font-bold uppercase tracking-widest rounded-md hover:bg-primary/90 transition-colors cursor-pointer">
                                 Save Item
                             </button>
@@ -639,7 +639,7 @@ export default function RecipeDetailPage() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsEditingStep(false)} />
                     <div className="relative bg-background border border-border shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 rounded-md">
-                        <div className="px-4 h-10 border-b border-border flex justify-between items-center bg-secondary/50">
+                        <div className="px-4 h-10 border-b border-border flex justify-between items-center bg-secondary">
                             <h3 className="font-bold text-xs text-foreground uppercase tracking-widest">{stepMode === 'add' ? 'Add Step' : 'Edit Step'}</h3>
                             <button onClick={() => setIsEditingStep(false)} className="text-muted-foreground hover:text-foreground cursor-pointer"><X className="w-4 h-4" /></button>
                         </div>
@@ -673,7 +673,7 @@ export default function RecipeDetailPage() {
                                 />
                             </div>
                         </div>
-                        <div className="px-4 h-10 bg-secondary/50 border-t border-border flex items-center justify-end">
+                        <div className="px-4 h-10 bg-secondary border-t border-border flex items-center justify-end">
                             <button onClick={saveStep} className="px-5 py-1.5 bg-primary text-black text-[10px] font-bold uppercase tracking-widest rounded-md hover:bg-primary/90 transition-colors cursor-pointer">
                                 Save Step
                             </button>
@@ -687,7 +687,7 @@ export default function RecipeDetailPage() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsHeaderEditing(false)} />
                     <div className="relative bg-background border border-border shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 rounded-md">
-                        <div className="px-4 h-10 border-b border-border flex justify-between items-center bg-secondary/50">
+                        <div className="px-4 h-10 border-b border-border flex justify-between items-center bg-secondary">
                             <h3 className="font-bold text-xs text-foreground uppercase tracking-widest">Edit Recipe</h3>
                             <button onClick={() => setIsHeaderEditing(false)} className="text-muted-foreground hover:text-foreground cursor-pointer"><X className="w-4 h-4" /></button>
                         </div>
@@ -732,7 +732,7 @@ export default function RecipeDetailPage() {
                                 </div>
                             </div>
                         </div>
-                        <div className="px-4 h-10 bg-secondary/50 border-t border-border flex items-center justify-end">
+                        <div className="px-4 h-10 bg-secondary border-t border-border flex items-center justify-end">
                             <button onClick={saveHeaderEdit} className="px-5 py-1.5 bg-primary text-black text-[10px] font-bold uppercase tracking-widest rounded-md hover:bg-primary/90 transition-colors cursor-pointer">
                                 Save Changes
                             </button>
@@ -746,7 +746,7 @@ export default function RecipeDetailPage() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsCopying(false)} />
                     <div className="relative bg-background border border-border shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 rounded-md">
-                        <div className="px-4 h-10 border-b border-border flex justify-between items-center bg-secondary/50">
+                        <div className="px-4 h-10 border-b border-border flex justify-between items-center bg-secondary">
                             <h3 className="font-bold text-xs text-muted-foreground uppercase tracking-widest">Copy Recipe</h3>
                             <button onClick={() => setIsCopying(false)} className="text-muted-foreground hover:text-foreground cursor-pointer"><X className="w-4 h-4" /></button>
                         </div>
@@ -774,7 +774,7 @@ export default function RecipeDetailPage() {
                                 This will create a new recipe with the same ingredients ({recipe?.lineItems?.length || 0} items), steps ({recipe?.steps?.length || 0}), and notes.
                             </div>
                         </div>
-                        <div className="px-4 h-10 bg-secondary/50 border-t border-border flex items-center justify-end">
+                        <div className="px-4 h-10 bg-secondary border-t border-border flex items-center justify-end">
                             <button
                                 onClick={handleCopy}
                                 disabled={copyLoading}

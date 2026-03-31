@@ -244,7 +244,7 @@ function COGMPage() {
             case 'Completed': return 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30';
             case 'In Progress': return 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30';
             case 'Draft': return 'bg-slate-500/20 text-muted-foreground border-border';
-            default: return 'bg-secondary/50 text-muted-foreground border-border';
+            default: return 'bg-secondary text-muted-foreground border-border';
         }
     };
 
@@ -264,7 +264,7 @@ function COGMPage() {
     return (
         <div className="h-full flex flex-col overflow-hidden bg-background text-foreground transition-colors duration-200">
             {/* Top Header */}
-            <div className="relative shrink-0 h-14 border-b border-border bg-background/80 backdrop-blur-xl px-4 flex items-center justify-between z-50 shadow-sm transition-colors duration-200">
+            <div className="relative shrink-0 h-14 border-b border-border bg-background backdrop-blur-xl px-4 flex items-center justify-between z-50 shadow-sm transition-colors duration-200">
                 <div className="flex items-center space-x-3">
                     <button onClick={() => router.back()} className="hover:bg-secondary rounded-full transition-colors p-2 text-muted-foreground cursor-pointer">
                         <ArrowLeft className="w-5 h-5" />
@@ -361,7 +361,7 @@ function COGMPage() {
                 {/* Left Column: Ledger Table */}
                 <div className="flex-1 overflow-y-auto bg-background min-w-0 relative scrollbar-custom transition-colors duration-200">
                     <table className="w-full text-left border-collapse">
-                        <thead className="sticky top-0 z-20 bg-secondary/95 backdrop-blur-md border-b border-border shadow-sm">
+                        <thead className="sticky top-0 z-20 bg-secondary border-b border-border shadow-sm">
                             <tr>
                                 <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[100px]">WO#</th>
                                 <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[100px]">Date</th>
@@ -452,7 +452,7 @@ function COGMPage() {
                 </div>
 
                 {/* Right Column: Side Panels */}
-                <div className="w-[340px] shrink-0 overflow-y-auto bg-secondary/30 border-l border-border scrollbar-custom p-5 space-y-5 transition-colors duration-200">
+                <div className="w-[340px] shrink-0 overflow-y-auto bg-secondary border-l border-border scrollbar-custom p-5 space-y-5 transition-colors duration-200">
                     
                     {/* COGM Summary Card */}
                     {summary && (
@@ -536,7 +536,7 @@ function COGMPage() {
                             {productionBySku.length === 0 ? (
                                 <p className="text-muted-foreground text-[11px] font-medium italic">Data generating...</p>
                             ) : productionBySku.map((item, idx) => (
-                                <div key={idx} className="flex items-center justify-between p-2 rounded-lg hover:bg-secondary/60 transition-colors border border-transparent hover:border-border">
+                                <div key={idx} className="flex items-center justify-between p-2 rounded-lg hover:bg-secondary transition-colors border border-transparent hover:border-border">
                                     <div className="flex items-center gap-3 overflow-hidden">
                                         <span className={cn(
                                             "w-6 h-6 rounded-full text-[11px] font-black flex items-center justify-center shrink-0 shadow-sm",
@@ -573,7 +573,7 @@ function COGMPage() {
                             {topMaterials.length === 0 ? (
                                 <p className="text-muted-foreground text-[11px] font-medium italic">Data generating...</p>
                             ) : topMaterials.map((item, idx) => (
-                                <div key={idx} className="flex items-center justify-between p-2 rounded-lg hover:bg-secondary/60 transition-colors border border-transparent hover:border-border">
+                                <div key={idx} className="flex items-center justify-between p-2 rounded-lg hover:bg-secondary transition-colors border border-transparent hover:border-border">
                                     <div className="flex items-center gap-3 overflow-hidden">
                                         <span className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 border border-blue-500/20 text-[11px] font-black flex items-center justify-center shrink-0 shadow-sm">
                                             {idx + 1}
@@ -599,7 +599,7 @@ function COGMPage() {
             </div>
 
             {/* Premium Mini Footer */}
-            <div className="h-[28px] border-t border-border bg-background/50 backdrop-blur-sm shrink-0 flex items-center justify-between px-5 z-[50] transition-colors duration-200">
+            <div className="h-[28px] border-t border-border bg-background backdrop-blur-sm shrink-0 flex items-center justify-between px-5 z-[50] transition-colors duration-200">
                 <div className="flex items-center space-x-4">
                     <div className="flex items-center space-x-2">
                         <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" />

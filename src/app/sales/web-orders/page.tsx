@@ -116,7 +116,7 @@ function WebSkeletonRow({ index }: { index: number }) {
     <tr className="border-b border-border/30">
       {COLUMNS.map((col) => (
         <td key={col.key} className={cn('px-2 py-2.5', col.width)}>
-          <div className={cn('h-3.5 rounded-sm bg-secondary/80 animate-pulse',
+          <div className={cn('h-3.5 rounded-sm bg-secondary animate-pulse',
             col.key === 'billing.firstName' ? 'w-4/5' : col.key === 'status' ? 'w-14' : col.key === 'number' ? 'w-10' : 'w-8'
           )} style={{ animationDelay: `${index * 30}ms` }} />
         </td>
@@ -435,7 +435,7 @@ function WebOrdersContent() {
                 'flex items-center gap-1.5 px-3 h-8 rounded-lg text-[11px] font-semibold transition-all cursor-pointer border',
                 selectedWebsites.length > 0
                   ? 'bg-primary/10 border-primary/30 text-primary'
-                  : 'bg-secondary/60 border-border text-muted-foreground hover:text-foreground hover:bg-secondary'
+                  : 'bg-secondary border-border text-muted-foreground hover:text-foreground hover:bg-secondary'
               )}
             >
               <Globe className="w-3.5 h-3.5" />
@@ -447,7 +447,7 @@ function WebOrdersContent() {
 
             {websiteDropdownOpen && (
               <div className="absolute top-full mt-1.5 right-0 z-50 bg-background border border-border rounded-xl shadow-2xl min-w-[220px] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
-                <div className="px-3 py-2 border-b border-border bg-secondary/30">
+                <div className="px-3 py-2 border-b border-border bg-secondary">
                   <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Filter by Website</span>
                 </div>
                 <div className="py-1 max-h-[280px] overflow-y-auto scrollbar-custom">
@@ -455,7 +455,7 @@ function WebOrdersContent() {
                   <button
                     onClick={() => { setSelectedWebsites([]); setWebsiteDropdownOpen(false); }}
                     className={cn(
-                      'w-full flex items-center gap-2.5 px-3 py-2 text-[12px] font-semibold hover:bg-secondary/60 transition-colors cursor-pointer text-left',
+                      'w-full flex items-center gap-2.5 px-3 py-2 text-[12px] font-semibold hover:bg-secondary transition-colors cursor-pointer text-left',
                       selectedWebsites.length === 0 && 'text-primary'
                     )}
                   >
@@ -478,7 +478,7 @@ function WebOrdersContent() {
                             isSelected ? prev.filter(w => w !== ws) : [...prev, ws]
                           );
                         }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-[12px] font-semibold hover:bg-secondary/60 transition-colors cursor-pointer text-left"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-[12px] font-semibold hover:bg-secondary transition-colors cursor-pointer text-left"
                       >
                         <div className={cn(
                           'w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors',
@@ -492,7 +492,7 @@ function WebOrdersContent() {
                   })}
                 </div>
                 {selectedWebsites.length > 0 && (
-                  <div className="px-3 py-2 border-t border-border bg-secondary/20">
+                  <div className="px-3 py-2 border-t border-border bg-secondary">
                     <button
                       onClick={() => { setSelectedWebsites([]); setWebsiteDropdownOpen(false); }}
                       className="text-[10px] font-bold text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors cursor-pointer"
@@ -537,7 +537,7 @@ function WebOrdersContent() {
                 {COLUMNS.map(col => (
                   <th key={col.key} onClick={() => handleSort(col.key)}
                     className={cn(
-                      'px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary/60 dark:hover:bg-secondary/50 transition-colors border-r border-border/40 last:border-0 select-none shadow-[0_1px_0_0_hsl(var(--border))]',
+                      'px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary dark:hover:bg-secondary transition-colors border-r border-border/40 last:border-0 select-none shadow-[0_1px_0_0_hsl(var(--border))]',
                       col.width, col.align || 'text-left'
                     )}>
                     <div className={cn('flex items-center gap-1', col.align === 'text-right' && 'justify-end')}>

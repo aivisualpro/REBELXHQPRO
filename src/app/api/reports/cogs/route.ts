@@ -40,7 +40,6 @@ export async function GET(req: Request) {
         let totalRevenue = 0;
 
         let skuMap = new Map<string, { totalQty: number; totalCost: number; revenue: number }>();
-        let monthlyCogsMap = new Map<string, { cogs: number }>();
 
         // 1. Process Wholesale (SaleOrder)
         if (source === 'wholesale' || source === 'total') {
@@ -49,8 +48,7 @@ export async function GET(req: Request) {
                 { $project: {
                     createdAt: 1,
                     lineItems: 1,
-                    total: 1,
-                    yearMonth: { $dateToString: { format: "%Y-%m", date: "$createdAt" } }
+                    total: 1
                 }}
             ]);
 
@@ -83,12 +81,6 @@ export async function GET(req: Request) {
 
                 totalCogs += orderCogs;
                 totalRevenue += orderRevenue;
-
-                if (order.yearMonth) {
-                    const curr = monthlyCogsMap.get(order.yearMonth) || { cogs: 0 };
-                    curr.cogs += orderCogs;
-                    monthlyCogsMap.set(order.yearMonth, curr);
-                }
             });
         }
 
@@ -102,20 +94,7 @@ export async function GET(req: Request) {
                 { $project: {
                     dateCreated: 1,
                     lineItems: 1,
-                    total: 1,
-                    yearMonth: {
-                        $cond: {
-                            if: { $eq: [{ $type: "$dateCreated" }, "date"] },
-                            then: { $dateToString: { format: "%Y-%m", date: "$dateCreated" } },
-                            else: {
-                                $cond: {
-                                    if: { $eq: [{ $type: "$dateCreated" }, "string"] },
-                                    then: { $substr: ["$dateCreated", 0, 7] },
-                                    else: "Unknown"
-                                }
-                            }
-                        }
-                    }
+                    total: 1
                 }}
             ]);
 
@@ -162,12 +141,6 @@ export async function GET(req: Request) {
 
                 totalCogs += orderCogs;
                 totalRevenue += orderRevenue;
-
-                if (order.yearMonth && order.yearMonth !== 'Unknown') {
-                    const curr = monthlyCogsMap.get(order.yearMonth) || { cogs: 0 };
-                    curr.cogs += orderCogs;
-                    monthlyCogsMap.set(order.yearMonth, curr);
-                }
             });
         }
 
@@ -194,12 +167,6 @@ export async function GET(req: Request) {
             };
         });
 
-        // Format Monthly Trend for charts
-        let monthlyCogs = Array.from(monthlyCogsMap.entries()).map(([month, data]) => ({
-            _id: month,
-            cogs: data.cogs
-        })).sort((a, b) => a._id.localeCompare(b._id)).slice(-12);
-
         const summary = {
             totalCogs,
             totalOrders,
@@ -212,8 +179,7 @@ export async function GET(req: Request) {
 
         return NextResponse.json({
             summary,
-            topSkus,
-            monthlyCogs
+            topSkus
         });
 
     } catch (error: any) {

@@ -788,7 +788,7 @@ export default function ClientDashboardPage() {
                         <input
                             type="text"
                             placeholder={`Search ${activeTab.toLowerCase()}...`}
-                            className="w-full h-full pl-9 pr-4 bg-secondary/50 border border-transparent text-[11px] focus:outline-none focus:ring-1 focus:ring-[#fe9900] focus:bg-background focus:border-[#fe9900] transition-all rounded placeholder:text-muted-foreground font-medium text-foreground"
+                            className="w-full h-full pl-9 pr-4 bg-secondary border border-transparent text-[11px] focus:outline-none focus:ring-1 focus:ring-[#fe9900] focus:bg-background focus:border-[#fe9900] transition-all rounded placeholder:text-muted-foreground font-medium text-foreground"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                         />

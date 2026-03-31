@@ -243,7 +243,7 @@ export default function ActivitiesPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-48px)] bg-background transition-colors duration-300">
-      <div className="flex items-center justify-between px-4 h-11 border-b border-border bg-secondary/50 transition-colors">
+      <div className="flex items-center justify-between px-4 h-11 border-b border-border bg-secondary transition-colors">
         <div className="flex items-center space-x-4">
           <h1 className="text-sm font-bold text-foreground uppercase tracking-tighter">Activities</h1>
           <div className="relative">
@@ -312,10 +312,10 @@ export default function ActivitiesPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
+      <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background relative">
         <div className="min-w-full px-2 py-2">
             <table className="w-full text-left border-separate border-spacing-0 relative z-0">
-          <thead className="sticky top-0 bg-secondary/80 z-10 border-b border-border backdrop-blur-md transition-colors">
+          <thead className="sticky top-0 bg-secondary z-10 border-b border-border transition-colors">
             <tr>
               {[
                 { key: 'type', label: 'Type' },
@@ -338,7 +338,7 @@ export default function ActivitiesPage() {
               <th className="px-4 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-border bg-background/50">
+          <tbody className="divide-y divide-border bg-background">
             {loading ? (
               <tr><td colSpan={6} className="px-4 py-12 text-center text-xs text-slate-400">Loading activities...</td></tr>
             ) : error ? (
@@ -346,7 +346,7 @@ export default function ActivitiesPage() {
             ) : activities.length === 0 ? (
               <tr><td colSpan={6} className="px-4 py-12 text-center text-xs text-slate-400 uppercase font-bold tracking-tighter opacity-50">No activities found</td></tr>
             ) : activities.map(activity => (
-              <tr key={activity._id} className="hover:bg-secondary/40 hover:scale-[1.002] hover:shadow-md transition-all duration-200 group relative z-0 hover:z-10 bg-background">
+              <tr key={activity._id} className="hover:bg-secondary hover:scale-[1.002] hover:shadow-md transition-all duration-200 group relative z-0 hover:z-10 bg-background">
                 <td className="px-4 py-1.5 text-[11px] font-bold text-foreground tracking-tight border-r border-border">{activity.type}</td>
                 <td className="px-4 py-1.5 text-[11px] text-foreground border-r border-border font-medium">
                   {typeof activity.client === 'object' && activity.client ? activity.client.name : activity.client}
@@ -438,7 +438,7 @@ export default function ActivitiesPage() {
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-muted-foreground uppercase">Comments *</label>
                   <textarea
-                    className="w-full px-3 py-2 bg-secondary/50 border border-border text-sm focus:outline-none focus:border-primary transition-colors h-24 resize-none rounded text-foreground"
+                    className="w-full px-3 py-2 bg-secondary border border-border text-sm focus:outline-none focus:border-primary transition-colors h-24 resize-none rounded text-foreground"
                     value={formData.comments}
                     onChange={e => setFormData({ ...formData, comments: e.target.value })}
                     required
@@ -470,7 +470,7 @@ export default function ActivitiesPage() {
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-border bg-secondary/50 shrink-0 flex justify-end space-x-3">
+            <div className="px-6 py-4 border-t border-border bg-secondary shrink-0 flex justify-end space-x-3">
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
@@ -508,7 +508,7 @@ const FormInput = ({ label, value, onChange, type = "text", required = false, pl
       value={value}
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full px-3 py-2 bg-secondary/50 border border-border text-sm focus:outline-none focus:border-primary transition-colors rounded text-foreground"
+      className="w-full px-3 py-2 bg-secondary border border-border text-sm focus:outline-none focus:border-primary transition-colors rounded text-foreground"
     />
   </div>
 );
@@ -537,7 +537,7 @@ const SearchableSingleSelect = ({ label, options, value, onChange, required }: {
     <div className="space-y-1 relative" ref={wrapperRef}>
       <label className="text-[10px] font-bold text-muted-foreground uppercase">{label} {required && <span className="text-red-500">*</span>}</label>
       <div
-        className="w-full px-3 py-2 bg-secondary/50 border border-border text-sm focus-within:border-primary transition-colors cursor-pointer flex items-center justify-between rounded"
+        className="w-full px-3 py-2 bg-secondary border border-border text-sm focus-within:border-primary transition-colors cursor-pointer flex items-center justify-between rounded"
         onClick={() => { setIsOpen(!isOpen); if (!isOpen) setSearchTerm(''); }}
       >
         <span className={!selectedLabel ? "text-muted-foreground" : "text-foreground"}>{selectedLabel || 'Select Client'}</span>
@@ -552,7 +552,7 @@ const SearchableSingleSelect = ({ label, options, value, onChange, required }: {
               <input
                 type="text"
                 autoFocus
-                className="w-full pl-7 pr-2 py-1.5 text-xs bg-secondary/50 border border-border focus:outline-none focus:border-primary transition-colors rounded text-foreground"
+                className="w-full pl-7 pr-2 py-1.5 text-xs bg-secondary border border-border focus:outline-none focus:border-primary transition-colors rounded text-foreground"
                 placeholder="Search..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}

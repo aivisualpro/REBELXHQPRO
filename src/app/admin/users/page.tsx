@@ -64,13 +64,13 @@ function UserSkeletonRow({ index, visibleColumnKeys = COLUMNS.map(c => c.key) }:
         if (!col) return null;
         return (
           <td key={col.key} className={cn('px-2.5 py-2.5', col.width)}>
-            <div className={cn('h-3.5 rounded-sm bg-secondary/80 animate-pulse',
+            <div className={cn('h-3.5 rounded-sm bg-secondary animate-pulse',
               col.key === 'firstName' ? 'w-4/5' : col.key === 'email' ? 'w-3/4' : 'w-3/5'
             )} style={{ animationDelay: `${index * 30}ms` }} />
           </td>
         );
       })}
-      <td className="w-[60px] px-2.5 py-2.5"><div className="h-3.5 w-8 mx-auto rounded-sm bg-secondary/80 animate-pulse" style={{ animationDelay: `${index * 30}ms` }} /></td>
+      <td className="w-[60px] px-2.5 py-2.5"><div className="h-3.5 w-8 mx-auto rounded-sm bg-secondary animate-pulse" style={{ animationDelay: `${index * 30}ms` }} /></td>
     </tr>
   );
 }
@@ -498,7 +498,7 @@ function UsersContent() {
                       onClick={() => { setRoleFilter(r); setRoleDropdownOpen(false); scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' }); }}
                       className={cn(
                         "w-full text-left px-3 py-2 text-[11px] font-semibold transition-colors flex items-center justify-between",
-                        roleFilter === r ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
+                        roleFilter === r ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
                       )}
                     >
                       <span>{r}</span>
@@ -526,7 +526,7 @@ function UsersContent() {
                 {COLUMNS.filter(c => visibleColumnKeys.includes(c.key)).map(col => (
                   <th key={col.key} onClick={() => handleSort(col.key)}
                     className={cn(
-                      'px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary/60 dark:hover:bg-secondary/50 transition-colors border-r border-border/40 last:border-0 select-none shadow-[0_1px_0_0_hsl(var(--border))]',
+                      'px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary dark:hover:bg-secondary transition-colors border-r border-border/40 last:border-0 select-none shadow-[0_1px_0_0_hsl(var(--border))]',
                       col.width, col.align || 'text-left'
                     )}>
                     <div className={cn('flex items-center gap-1', col.align === 'text-right' && 'justify-end')}>
@@ -583,7 +583,7 @@ function UsersContent() {
       {isModalOpen && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-background border border-border w-full max-w-lg shadow-2xl rounded-md animate-in fade-in zoom-in duration-200">
-            <div className="flex items-center justify-between px-6 py-3 border-b border-border bg-secondary/20">
+            <div className="flex items-center justify-between px-6 py-3 border-b border-border bg-secondary">
               <h2 className="text-sm font-black uppercase tracking-widest text-foreground">{editingUser ? 'Edit User' : 'Add New User'}</h2>
               <button onClick={() => setIsModalOpen(false)} className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"><X className="w-5 h-5" /></button>
             </div>
@@ -642,7 +642,7 @@ function UsersContent() {
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-muted-foreground uppercase">Workspace <span className="text-red-500">*</span></label>
                 {formData.role === 'SuperAdmin' ? (
-                  <div className="px-3 h-[36px] bg-secondary/30 border border-border rounded flex items-center">
+                  <div className="px-3 h-[36px] bg-secondary border border-border rounded flex items-center">
                     <span className="text-xs text-muted-foreground italic">SuperAdmin — full access, no workspace needed</span>
                   </div>
                 ) : (

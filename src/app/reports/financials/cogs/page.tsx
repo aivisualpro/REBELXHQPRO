@@ -216,7 +216,7 @@ function CogsPage() {
                         </div>
 
                         {/* Source Filter Tabs */}
-                        <div className="flex items-center bg-secondary/60 border border-border rounded-lg p-0.5">
+                        <div className="flex items-center bg-secondary border border-border rounded-lg p-0.5">
                             <button
                                 onClick={() => setSource('total')}
                                 className={cn(
@@ -259,7 +259,7 @@ function CogsPage() {
                         <div className="relative" ref={filterDropdownRef}>
                             <button 
                                 onClick={() => setFilterOpen(!filterOpen)}
-                                className="flex items-center gap-2 bg-secondary/60 hover:bg-secondary border border-border px-4 py-2.5 rounded-lg text-sm font-bold transition-all text-foreground"
+                                className="flex items-center gap-2 bg-secondary hover:bg-secondary border border-border px-4 py-2.5 rounded-lg text-sm font-bold transition-all text-foreground"
                             >
                                 <Filter className="w-4 h-4" />
                                 Filters
@@ -281,7 +281,7 @@ function CogsPage() {
                                                         "px-3 py-2 text-[11px] font-bold rounded-md transition-colors text-left border",
                                                         datePreset === preset
                                                             ? "bg-rose-500/15 text-rose-600 border-rose-500/30 shadow-sm"
-                                                            : "bg-secondary/50 text-muted-foreground hover:bg-secondary border-transparent"
+                                                            : "bg-secondary text-muted-foreground hover:bg-secondary border-transparent"
                                                     )}
                                                 >
                                                     {preset.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
@@ -291,7 +291,7 @@ function CogsPage() {
                                     </div>
 
                                     {/* Custom Date Ranges */}
-                                    <div className="p-4 border-b border-border space-y-3 bg-secondary/20">
+                                    <div className="p-4 border-b border-border space-y-3 bg-secondary">
                                         <div className="relative">
                                             <label className="text-[10px] uppercase font-bold text-muted-foreground mb-1 block">Start Date</label>
                                             <input 
@@ -318,7 +318,7 @@ function CogsPage() {
                                         </div>
                                     </div>
 
-                                    <div className="p-4 bg-secondary/30 shrink-0 border-t border-border">
+                                    <div className="p-4 bg-secondary shrink-0 border-t border-border">
                                         <button 
                                             onClick={applyFilters}
                                             className="w-full flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-500 text-white font-bold text-[11px] uppercase tracking-wider px-4 py-3 rounded-lg transition-colors shadow-md"
@@ -369,48 +369,9 @@ function CogsPage() {
                         />
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {/* Monthly Trend Chart */}
-                        <div className="lg:col-span-1 bg-card border border-border rounded-2xl p-6 shadow-sm flex flex-col items-center justify-center h-[350px]">
-                            <div className="flex items-center justify-between w-full mb-6">
-                                <div className="flex items-center gap-3">
-                                    <BarChart3 className="w-5 h-5 text-rose-500" />
-                                    <h3 className="font-bold text-foreground">Monthly COGS</h3>
-                                </div>
-                            </div>
-                            
-                            {data?.monthlyCogs && data.monthlyCogs.length > 0 ? (
-                                <div className="flex items-end justify-center gap-3 h-full w-full pb-2">
-                                    {data.monthlyCogs.map((month, idx) => {
-                                        const cogsList = data.monthlyCogs.map(m => m.cogs || 0);
-                                        const maxCogs = Math.max(...cogsList, 1);
-                                        const heightPx = Math.max(8, Math.round((month.cogs / maxCogs) * (200)));
-                                        return (
-                                            <div key={idx} className="flex-1 flex flex-col items-center justify-end group max-w-[40px]" style={{ height: '100%' }}>
-                                                <div className="hidden group-hover:block text-[9px] text-rose-600 font-bold mb-1 -translate-y-1 transition-all">
-                                                    {formatCompact(month.cogs)}
-                                                </div>
-                                                <div 
-                                                    className="w-full bg-gradient-to-t from-rose-600 to-rose-400 rounded-t-sm transition-all group-hover:from-rose-500 group-hover:to-rose-300 cursor-pointer"
-                                                    style={{ height: `${heightPx}px` }}
-                                                    title={`${month._id}: ${formatCurrency(month.cogs)}`}
-                                                />
-                                                <div className="text-[9px] text-muted-foreground font-bold mt-2 rotate-[-45deg] origin-top-left translate-y-2">
-                                                    {month._id?.split('-')[1] || idx}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            ) : (
-                                <div className="h-full flex items-center justify-center text-muted-foreground text-sm w-full">
-                                    {loading ? 'Loading chart data...' : 'No historical data available'}
-                                </div>
-                            )}
-                        </div>
-
+                    <div className="w-full">
                         {/* Top SKUs List */}
-                        <div className="lg:col-span-2 bg-card border border-border rounded-2xl shadow-sm flex flex-col h-[600px] lg:h-[350px]">
+                        <div className="bg-card border border-border rounded-2xl shadow-sm flex flex-col h-[600px]">
                             <div className="px-6 py-4 border-b border-border flex items-center justify-between shrink-0">
                                 <h3 className="font-bold text-foreground flex items-center gap-2">
                                     <PackageSearch className="w-4 h-4 text-emerald-500" />
@@ -429,7 +390,7 @@ function CogsPage() {
                                     </div>
                                 ) : data?.topSkus && data.topSkus.length > 0 ? (
                                     <table className="w-full border-collapse">
-                                        <thead className="bg-secondary/40 sticky top-0 z-10 border-b border-border/50">
+                                        <thead className="bg-secondary sticky top-0 z-10 border-b border-border/50">
                                             <tr>
                                                 <th className="px-6 py-3 text-left text-[10px] font-black uppercase text-muted-foreground tracking-widest">SKU Name</th>
                                                 <th className="px-4 py-3 text-left text-[10px] font-black uppercase text-muted-foreground tracking-widest hidden md:table-cell">Category</th>
@@ -439,7 +400,7 @@ function CogsPage() {
                                         </thead>
                                         <tbody className="divide-y divide-border/40">
                                             {data.topSkus.map((sku, idx) => (
-                                                <tr key={idx} className="hover:bg-secondary/30 transition-colors group">
+                                                <tr key={idx} className="hover:bg-secondary transition-colors group">
                                                     <td className="px-6 py-3">
                                                         <div className="text-sm font-semibold text-foreground truncate max-w-[180px] sm:max-w-xs">{sku.name}</div>
                                                     </td>

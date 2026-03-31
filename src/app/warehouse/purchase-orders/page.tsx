@@ -178,7 +178,7 @@ function POModal({ editingOrderId, newOrder, setNewOrder, newLineItems, setNewLi
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="bg-background w-full max-w-4xl overflow-hidden animate-in fade-in zoom-in duration-200 border border-border flex flex-col max-h-[92vh] rounded-xl shadow-2xl">
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 h-12 border-b border-border bg-secondary/40 shrink-0 rounded-t-xl">
+        <div className="flex items-center justify-between px-6 h-12 border-b border-border bg-secondary shrink-0 rounded-t-xl">
           <h2 className="text-[11px] font-black uppercase tracking-widest">{editingOrderId ? 'Edit Purchase Order' : 'Create Purchase Order'}</h2>
           <div className="flex items-center gap-3">
             {totalCost > 0 && <span className="text-[10px] font-black text-primary font-mono">Sub: ${subTotalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} + Ship: ${shippingCostNum.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} = ${totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>}
@@ -242,12 +242,12 @@ function POModal({ editingOrderId, newOrder, setNewOrder, newLineItems, setNewLi
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-[10px] font-black uppercase tracking-widest text-foreground">Line Items ({newLineItems.length})</h3>
                 <button type="button" onClick={addLineItem}
-                  className="flex items-center gap-1.5 px-3 h-8 bg-secondary hover:bg-secondary/80 text-foreground rounded-lg text-[10px] font-bold uppercase transition-colors cursor-pointer">
+                  className="flex items-center gap-1.5 px-3 h-8 bg-secondary hover:bg-secondary text-foreground rounded-lg text-[10px] font-bold uppercase transition-colors cursor-pointer">
                   <Plus className="w-3.5 h-3.5" /><span>Add Item</span>
                 </button>
               </div>
               {newLineItems.length === 0 ? (
-                <div className="text-center py-10 bg-secondary/20 rounded-xl border border-dashed border-border text-muted-foreground/50 text-[11px] font-bold uppercase tracking-widest">
+                <div className="text-center py-10 bg-secondary rounded-xl border border-dashed border-border text-muted-foreground/50 text-[11px] font-bold uppercase tracking-widest">
                   No items. Click "Add Item" to start.
                 </div>
               ) : (
@@ -260,7 +260,7 @@ function POModal({ editingOrderId, newOrder, setNewOrder, newLineItems, setNewLi
                     <div className="col-span-1 text-right">Del</div>
                   </div>
                   {newLineItems.map((item: NewLineItem) => (
-                    <div key={item.id} className="grid grid-cols-12 gap-2 items-start bg-secondary/20 p-2 rounded-lg border border-border/60">
+                    <div key={item.id} className="grid grid-cols-12 gap-2 items-start bg-secondary p-2 rounded-lg border border-border/60">
                       <div className="col-span-4">
                         <SearchableSelect triggerClassName="h-9 rounded-lg text-[12px]"
                           options={allSkus.filter(s => !newLineItems.some((i: NewLineItem) => i.id !== item.id && i.sku === s._id)).map(s => ({ value: s._id, label: s.name }))}
@@ -298,9 +298,9 @@ function POModal({ editingOrderId, newOrder, setNewOrder, newLineItems, setNewLi
         </div>
 
         {/* Modal Footer */}
-        <div className="px-6 h-12 border-t border-border bg-secondary/30 flex items-center justify-end gap-3 shrink-0 rounded-b-xl">
+        <div className="px-6 h-12 border-t border-border bg-secondary flex items-center justify-end gap-3 shrink-0 rounded-b-xl">
           <button type="button" onClick={onClose}
-            className="px-4 h-8 rounded-lg border border-border text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:bg-secondary/60 transition-colors cursor-pointer">
+            className="px-4 h-8 rounded-lg border border-border text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:bg-secondary transition-colors cursor-pointer">
             Cancel
           </button>
           <button type="submit" form="create-po-form" disabled={saving}
@@ -338,7 +338,7 @@ function DeleteConfirm({ onCancel, onConfirm }: { onCancel: () => void; onConfir
           <h3 className="text-[12px] font-black uppercase tracking-widest text-foreground mb-2">Confirm Delete</h3>
           <p className="text-[11px] text-muted-foreground mb-6 leading-relaxed">Are you sure you want to delete this order? This cannot be undone.</p>
           <div className="flex gap-3">
-            <button onClick={onCancel} className="flex-1 py-2 border border-border rounded-lg text-[10px] font-bold text-muted-foreground uppercase hover:bg-secondary/50 transition-colors cursor-pointer">Cancel</button>
+            <button onClick={onCancel} className="flex-1 py-2 border border-border rounded-lg text-[10px] font-bold text-muted-foreground uppercase hover:bg-secondary transition-colors cursor-pointer">Cancel</button>
             <button onClick={onConfirm} className="flex-1 py-2 bg-destructive text-white rounded-lg text-[10px] font-black uppercase hover:opacity-90 transition-colors cursor-pointer">Delete</button>
           </div>
         </div>
@@ -640,7 +640,7 @@ function PurchaseOrdersContent() {
             placeholder="Search PO, vendor, lot..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="pl-8 pr-8 h-8 w-60 bg-secondary/60 border border-border text-[12px] rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50 placeholder:text-muted-foreground/50 text-foreground transition-all"
+            className="pl-8 pr-8 h-8 w-60 bg-secondary border border-border text-[12px] rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50 placeholder:text-muted-foreground/50 text-foreground transition-all"
           />
           {search && (
             <button onClick={() => setSearch('')} className="absolute right-2.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
@@ -671,7 +671,7 @@ function PurchaseOrdersContent() {
                     className={cn(
                       'px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest border-r border-border/40 last:border-0 select-none shadow-[0_1px_0_0_hsl(var(--border))]',
                       col.width,
-                      col.sortable && 'cursor-pointer hover:bg-secondary/60 transition-colors',
+                      col.sortable && 'cursor-pointer hover:bg-secondary transition-colors',
                     )}>
                     <div className={cn('flex items-center gap-1', col.align === 'text-right' && 'justify-end', col.align === 'text-center' && 'justify-center')}>
                       <span>{col.label}</span>

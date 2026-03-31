@@ -118,13 +118,13 @@ function RecipeModal({ mode, recipe, skus, session, onClose, onSaved }: {
     finally { setSaving(false); }
   };
 
-  const inp = 'w-full px-3 h-9 bg-secondary/50 border border-border rounded-lg text-[12px] outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/50 transition-colors';
+  const inp = 'w-full px-3 h-9 bg-secondary border border-border rounded-lg text-[12px] outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/50 transition-colors';
 
   return (
     <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="bg-background w-full max-w-md animate-in fade-in zoom-in duration-200 border border-border shadow-2xl rounded-xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 h-11 border-b border-border shrink-0 bg-secondary/30 rounded-t-xl">
+        <div className="flex items-center justify-between px-5 h-11 border-b border-border shrink-0 bg-secondary rounded-t-xl">
           <h3 className="text-[10px] font-black uppercase tracking-widest">
             {mode === 'create' ? 'New Recipe' : mode === 'edit' ? 'Edit Recipe' : 'Copy Recipe'}
           </h3>
@@ -137,7 +137,7 @@ function RecipeModal({ mode, recipe, skus, session, onClose, onSaved }: {
         <div className="p-5 space-y-4 overflow-y-auto scrollbar-custom">
           {/* Info banner for edit/copy */}
           {recipe && (mode === 'edit' || mode === 'copy') && (
-            <div className="bg-secondary/40 px-4 py-3 rounded-lg border border-border">
+            <div className="bg-secondary px-4 py-3 rounded-lg border border-border">
               <p className="text-[11px] text-muted-foreground">
                 {mode === 'copy' ? 'Copying' : 'Contains'}{' '}
                 <span className="text-foreground font-black">{recipe.lineItems?.length || 0}</span> Line Items and{' '}
@@ -175,7 +175,7 @@ function RecipeModal({ mode, recipe, skus, session, onClose, onSaved }: {
             <div className="space-y-1.5">
               <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">UOM</label>
               <select value={formData.uom} onChange={e => setFormData({ ...formData, uom: e.target.value })}
-                className="w-full px-3 h-9 bg-secondary/50 border border-border rounded-lg text-[12px] outline-none focus:border-primary text-foreground font-black uppercase transition-colors">
+                className="w-full px-3 h-9 bg-secondary border border-border rounded-lg text-[12px] outline-none focus:border-primary text-foreground font-black uppercase transition-colors">
                 {['EA', 'KG', 'L', 'M', 'G', 'OZ', 'LB'].map(u => <option key={u} value={u}>{u}</option>)}
               </select>
             </div>
@@ -183,8 +183,8 @@ function RecipeModal({ mode, recipe, skus, session, onClose, onSaved }: {
         </div>
 
         {/* Footer */}
-        <div className="px-5 h-12 border-t border-border bg-secondary/20 flex items-center justify-end gap-3 shrink-0">
-          <button onClick={onClose} className="px-4 h-8 rounded-lg border border-border text-[10px] font-bold uppercase text-muted-foreground hover:bg-secondary/60 transition-colors cursor-pointer">
+        <div className="px-5 h-12 border-t border-border bg-secondary flex items-center justify-end gap-3 shrink-0">
+          <button onClick={onClose} className="px-4 h-8 rounded-lg border border-border text-[10px] font-bold uppercase text-muted-foreground hover:bg-secondary transition-colors cursor-pointer">
             Cancel
           </button>
           <button onClick={handleSave} disabled={saving}
@@ -410,7 +410,7 @@ function RecipesContent() {
             placeholder="Search recipes or SKU..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="pl-8 pr-8 h-8 w-64 bg-secondary/60 border border-border text-[12px] rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50 placeholder:text-muted-foreground/50 text-foreground transition-all"
+            className="pl-8 pr-8 h-8 w-64 bg-secondary border border-border text-[12px] rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50 placeholder:text-muted-foreground/50 text-foreground transition-all"
           />
           {search && (
             <button onClick={() => setSearch('')} className="absolute right-2.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
@@ -441,7 +441,7 @@ function RecipesContent() {
                     className={cn(
                       'px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest border-r border-border/40 last:border-0 select-none shadow-[0_1px_0_0_hsl(var(--border))]',
                       col.width,
-                      col.sortable && 'cursor-pointer hover:bg-secondary/60 transition-colors',
+                      col.sortable && 'cursor-pointer hover:bg-secondary transition-colors',
                     )}>
                     <div className={cn('flex items-center gap-1', col.align === 'right' && 'justify-end')}>
                       {col.align === 'right' && col.sortable && <ArrowUpDown className={cn('w-2.5 h-2.5 flex-shrink-0', sortBy === col.key ? 'text-primary' : 'text-muted-foreground/25')} />}

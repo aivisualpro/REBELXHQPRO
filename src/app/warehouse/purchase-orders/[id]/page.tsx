@@ -518,7 +518,7 @@ export default function PurchaseOrderDetailPage() {
 
             <div className="flex flex-1 overflow-hidden">
                 {/* Left Sidebar: Details (30%) */}
-                <div className="w-[30%] border-r border-border bg-secondary/30 flex flex-col overflow-hidden">
+                <div className="w-[30%] border-r border-border bg-secondary flex flex-col overflow-hidden">
                     <div className="flex-1 overflow-y-auto p-4 space-y-4">
                         {/* Identity Boxes */}
                         <div className="grid grid-cols-3 gap-2">
@@ -626,7 +626,7 @@ export default function PurchaseOrderDetailPage() {
                                 });
                                 setIsHeaderModalOpen(true);
                             }}
-                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-secondary text-foreground border border-border hover:bg-secondary/80 transition-colors cursor-pointer"
+                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-secondary text-foreground border border-border hover:bg-secondary transition-colors cursor-pointer"
                         >
                             <Pencil className="w-3.5 h-3.5" />
                             <span>Edit</span>
@@ -703,7 +703,7 @@ export default function PurchaseOrderDetailPage() {
                             /* Line Items Table */
                             <div className="animate-in fade-in duration-300">
                                 <table className="w-full border-collapse text-left">
-                                    <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
+                                    <thead className="bg-secondary border-y border-border sticky top-0 z-20">
                                         <tr>
                                             {['SKU', 'Lot #', 'UOM', 'Qty Ordered', 'Qty Received', 'Cost', 'Amount', 'Actions'].map(col => (
                                                 <th key={col} className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">
@@ -723,7 +723,7 @@ export default function PurchaseOrderDetailPage() {
                                             const amount = (item.qtyOrdered || 0) * (item.cost || 0);
 
                                             return (
-                                                <tr key={item._id} className="hover:bg-secondary/50 transition-colors">
+                                                <tr key={item._id} className="hover:bg-secondary transition-colors">
                                                     <td className="px-3 py-1.5 text-[10px] text-foreground">
                                                         <span
                                                             onClick={() => router.push(`/warehouse/skus/${skuId}`)}
@@ -763,7 +763,7 @@ export default function PurchaseOrderDetailPage() {
                                         })}
                                     </tbody>
                                     {order.lineItems && order.lineItems.length > 0 && (
-                                        <tfoot className="bg-secondary/50 border-t border-border">
+                                        <tfoot className="bg-secondary border-t border-border">
                                             <tr>
                                                 <td colSpan={3} className="px-3 py-1.5 text-[9px] font-bold text-muted-foreground uppercase text-right tracking-wider">Subtotal</td>
                                                 <td className="px-3 py-1.5 text-[10px] font-bold text-foreground font-mono">{totalQtyOrdered.toFixed(4)}</td>
@@ -797,7 +797,7 @@ export default function PurchaseOrderDetailPage() {
                                                 : '??';
 
                                             return (
-                                                <div key={n._id} className="group bg-secondary/40 border border-border/60 rounded-lg p-3 hover:border-border transition-colors">
+                                                <div key={n._id} className="group bg-secondary border border-border/60 rounded-lg p-3 hover:border-border transition-colors">
                                                     <div className="flex items-start gap-3">
                                                         {/* Avatar */}
                                                         <div className="w-7 h-7 rounded-full bg-primary/15 text-primary flex items-center justify-center text-[9px] font-black uppercase shrink-0 mt-0.5">
@@ -855,7 +855,7 @@ export default function PurchaseOrderDetailPage() {
                                 </div>
 
                                 {/* Add Note Input */}
-                                <div className="border-t border-border px-4 py-3 bg-secondary/30 shrink-0">
+                                <div className="border-t border-border px-4 py-3 bg-secondary shrink-0">
                                     <div className="flex items-center gap-2">
                                         <input
                                             type="text"
@@ -885,7 +885,7 @@ export default function PurchaseOrderDetailPage() {
             {isItemModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-background border border-border rounded shadow-2xl w-full max-w-2xl animate-in fade-in zoom-in duration-200">
-                        <div className="flex items-center justify-between px-6 h-12 border-b border-border bg-secondary/50">
+                        <div className="flex items-center justify-between px-6 h-12 border-b border-border bg-secondary">
                             <h2 className="text-sm font-bold uppercase text-foreground tracking-wider">{editingId ? 'Edit Line Item' : 'Add Line Item'}</h2>
                             <button onClick={() => setIsItemModalOpen(false)} className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
                                 <X className="w-4 h-4" />
@@ -934,7 +934,7 @@ export default function PurchaseOrderDetailPage() {
                                             }
                                             setIsLotSelectorOpen(true);
                                         }}
-                                        className="p-2 bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground rounded transition-colors cursor-pointer"
+                                        className="p-2 bg-secondary hover:bg-secondary text-muted-foreground hover:text-foreground rounded transition-colors cursor-pointer"
                                         title="Select from Inventory"
                                     >
                                         <List className="w-4 h-4" />
@@ -1006,7 +1006,7 @@ export default function PurchaseOrderDetailPage() {
             {isHeaderModalOpen && editingHeader && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-background border border-border rounded shadow-2xl w-full max-w-lg animate-in fade-in zoom-in duration-200">
-                        <div className="flex items-center justify-between px-6 h-[36px] border-b border-border bg-secondary/50">
+                        <div className="flex items-center justify-between px-6 h-[36px] border-b border-border bg-secondary">
                             <h2 className="text-sm font-black uppercase text-foreground tracking-widest">Edit Order Details</h2>
                             <button onClick={() => setIsHeaderModalOpen(false)} className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
                                 <X className="w-4 h-4" />

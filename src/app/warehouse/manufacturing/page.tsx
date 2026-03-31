@@ -143,7 +143,7 @@ function SkeletonRow({ index }: { index: number }) {
         <td key={col.key} className={cn('px-2 py-2.5', col.width)}>
           <div
             className={cn(
-              'h-3.5 rounded-sm bg-secondary/80 animate-pulse',
+              'h-3.5 rounded-sm bg-secondary animate-pulse',
               col.key === 'sku' ? 'w-4/5' :
                 col.key === 'status' ? 'w-14' :
                   col.key === 'createdBy' ? 'w-16' :
@@ -217,14 +217,14 @@ function ShellSkeleton() {
     <div className="flex flex-col h-[calc(100vh-48px)] bg-background">
       {/* Skeleton header */}
       <div className="shrink-0 border-b border-border px-4 py-2.5 flex items-center gap-3">
-        <div className="h-4 w-32 bg-secondary/80 animate-pulse rounded" />
+        <div className="h-4 w-32 bg-secondary animate-pulse rounded" />
         <div className="flex gap-1.5 ml-4">
-          {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-6 w-16 bg-secondary/80 animate-pulse rounded-lg" style={{ animationDelay: `${i * 50}ms` }} />)}
+          {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-6 w-16 bg-secondary animate-pulse rounded-lg" style={{ animationDelay: `${i * 50}ms` }} />)}
         </div>
       </div>
       <div className="flex-1 overflow-hidden px-2 py-1">
         <table className="w-full text-left border-separate border-spacing-0">
-          <thead className="bg-secondary/50 border-b border-border sticky top-0 z-10">
+          <thead className="bg-secondary border-b border-border sticky top-0 z-10">
             <tr>
               {COLUMNS.map((col) => (
                 <th key={col.key} className={cn('px-2 py-2 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border/50 last:border-0', col.width)}>
@@ -662,7 +662,7 @@ function ManufacturingContent() {
                     key={col.key}
                     onClick={() => handleSort(col.key)}
                     className={cn(
-                      'px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary/60 dark:hover:bg-secondary/50 transition-colors border-r border-border/40 last:border-0 select-none shadow-[0_1px_0_0_hsl(var(--border))]',
+                      'px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary dark:hover:bg-secondary transition-colors border-r border-border/40 last:border-0 select-none shadow-[0_1px_0_0_hsl(var(--border))]',
                       col.width,
                       col.align || 'text-left'
                     )}

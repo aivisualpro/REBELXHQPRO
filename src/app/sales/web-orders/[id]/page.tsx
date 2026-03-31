@@ -443,7 +443,7 @@ export default function WebOrderDetailPage() {
                             ].map((row, rowIdx) => (
                                 <div key={rowIdx} className={cn(
                                     "grid grid-cols-2 divide-x divide-border",
-                                    rowIdx % 2 === 0 ? "bg-background" : "bg-secondary/50",
+                                    rowIdx % 2 === 0 ? "bg-background" : "bg-secondary",
                                     rowIdx > 0 && "border-t border-border"
                                 )}>
                                     {row.map((item, colIdx) => (
@@ -465,7 +465,7 @@ export default function WebOrderDetailPage() {
                         {/* Customer Note */}
                         {order.customerNote && (
                             <div className="mx-4 mb-4 border border-border">
-                                <div className="px-4 py-3 bg-secondary/50 flex flex-col gap-0.5">
+                                <div className="px-4 py-3 bg-secondary flex flex-col gap-0.5">
                                     <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Customer Note</span>
                                     <span className="text-sm font-medium text-foreground italic">{order.customerNote}</span>
                                 </div>
@@ -489,7 +489,7 @@ export default function WebOrderDetailPage() {
                                 ].map((item, idx) => (
                                     <div key={idx} className={cn(
                                         "px-4 py-2.5 flex items-center justify-between",
-                                        idx % 2 === 0 ? "bg-background" : "bg-secondary/50",
+                                        idx % 2 === 0 ? "bg-background" : "bg-secondary",
                                         idx > 0 && "border-t border-border"
                                     )}>
                                         <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">{item.label}</span>
@@ -514,7 +514,7 @@ export default function WebOrderDetailPage() {
                                 ].map((item, idx) => (
                                     <div key={idx} className={cn(
                                         "px-4 py-2.5 flex items-center justify-between",
-                                        idx % 2 === 0 ? "bg-background" : "bg-secondary/50",
+                                        idx % 2 === 0 ? "bg-background" : "bg-secondary",
                                         idx > 0 && "border-t border-border"
                                     )}>
                                         <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">{item.label}</span>
@@ -526,13 +526,13 @@ export default function WebOrderDetailPage() {
                             {/* Shipping Lines */}
                             {order.shippingLines && order.shippingLines.length > 0 && (
                                 <div className="mt-3 border border-border">
-                                    <div className="px-4 py-2 bg-secondary/50">
+                                    <div className="px-4 py-2 bg-secondary">
                                         <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Shipping Methods</span>
                                     </div>
                                     {order.shippingLines.map((line: any, idx: number) => (
                                         <div key={idx} className={cn(
                                             "px-4 py-2.5 flex justify-between items-center border-t border-border",
-                                            idx % 2 === 0 ? "bg-background" : "bg-secondary/50"
+                                            idx % 2 === 0 ? "bg-background" : "bg-secondary"
                                         )}>
                                             <span className="text-sm font-bold text-foreground">{line.method_title || line.methodTitle || 'Shipping'}</span>
                                             <span className="text-sm font-mono font-bold text-foreground">${parseFloat(line.total || 0).toFixed(2)}</span>
@@ -589,7 +589,7 @@ export default function WebOrderDetailPage() {
                     <div className="flex-1 overflow-auto">
                         <div>
                             <table className="w-full border-collapse text-left">
-                                <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
+                                <thead className="bg-secondary border-y border-border sticky top-0 z-20">
                                     <tr>
                                             <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">Product</th>
                                             <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">Variation</th>
@@ -612,7 +612,7 @@ export default function WebOrderDetailPage() {
 
                                             return skuRows.length <= 1 ? (
                                                 // Single SKU or no SKU — render single row
-                                                <tr key={item.id} className="hover:bg-secondary/50 transition-colors">
+                                                <tr key={item.id} className="hover:bg-secondary transition-colors">
                                                     <td className="px-3 py-2">
                                                         {(item.webProductId || item.parentProductId) ? (
                                                             <button onClick={(e) => { e.stopPropagation(); router.push(`/warehouse/web-products/${item.webProductId || item.parentProductId}`); }}
@@ -676,14 +676,14 @@ export default function WebOrderDetailPage() {
                                                     <td className="px-3 py-2 text-right text-xs text-foreground font-mono font-bold">{item.quantity}</td>
                                                     {isFieldVisibleCost && <td className="px-3 py-2 text-right text-xs text-orange-500 font-mono font-bold whitespace-nowrap">{(skuRows[0]?.cost ?? item.cost ?? 0) > 0 ? formatCurrency(skuRows[0]?.cost ?? item.cost ?? 0) : '-'}</td>}
                                                     <td className="px-3 py-2 text-right text-xs text-foreground font-mono font-bold">{formatCurrency(item.price)}</td>
-                                                    <td className="px-3 py-2 text-right text-xs text-foreground font-mono font-black bg-secondary/20">{formatCurrency(item.total)}</td>
+                                                    <td className="px-3 py-2 text-right text-xs text-foreground font-mono font-black bg-secondary">{formatCurrency(item.total)}</td>
                                                 </tr>
                                             ) : (
                                                 // Multi-SKU — render multiple sub-rows
                                                 <React.Fragment key={item.id}>
                                                     {skuRows.map((sku, skuIdx) => (
                                                         <tr key={`${item.id}-sku-${skuIdx}`} className={cn(
-                                                            'hover:bg-secondary/50 transition-colors',
+                                                            'hover:bg-secondary transition-colors',
                                                             skuIdx > 0 && 'border-t border-dashed border-border/40'
                                                         )}>
                                                             {/* Product/Variation/Qty/Price/Total only on first row */}
@@ -758,7 +758,7 @@ export default function WebOrderDetailPage() {
                                                             {skuIdx === 0 && (
                                                                 <>
                                                                     <td className="px-3 py-2 text-right text-xs text-foreground font-mono font-bold" rowSpan={rowSpan}>{formatCurrency(item.price)}</td>
-                                                                    <td className="px-3 py-2 text-right text-xs text-foreground font-mono font-black bg-secondary/20" rowSpan={rowSpan}>{formatCurrency(item.total)}</td>
+                                                                    <td className="px-3 py-2 text-right text-xs text-foreground font-mono font-black bg-secondary" rowSpan={rowSpan}>{formatCurrency(item.total)}</td>
                                                                 </>
                                                             )}
                                                         </tr>

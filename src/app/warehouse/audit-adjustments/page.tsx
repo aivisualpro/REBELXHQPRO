@@ -86,7 +86,7 @@ function SkeletonRow({ index }: { index: number }) {
                 <td key={col.key} className={cn('px-2 py-2.5', col.width)}>
                     <div
                         className={cn(
-                            'h-3.5 rounded-sm bg-secondary/80 animate-pulse',
+                            'h-3.5 rounded-sm bg-secondary animate-pulse',
                             col.key === 'sku' ? 'w-4/5' :
                                 col.key === 'reason' ? 'w-3/4' :
                                     col.key === 'createdBy' ? 'w-16' : 'w-10'
@@ -249,12 +249,12 @@ function AdjustmentModal({ onClose, initialData, skus, sessionUser, onSuccess }:
         finally { setSaving(false); }
     };
 
-    const inp = 'w-full px-3 h-9 bg-secondary/50 border border-border rounded-lg text-[12px] outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/50 transition-colors';
+    const inp = 'w-full px-3 h-9 bg-secondary border border-border rounded-lg text-[12px] outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/50 transition-colors';
 
     return (
         <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
             <div className="bg-background border border-border w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh] rounded-xl">
-                <div className="flex items-center justify-between px-5 h-11 border-b border-border shrink-0 bg-secondary/30 rounded-t-xl">
+                <div className="flex items-center justify-between px-5 h-11 border-b border-border shrink-0 bg-secondary rounded-t-xl">
                     <h2 className="text-[10px] font-black uppercase tracking-widest">{initialData ? 'Edit Adjustment' : 'New Adjustment'}</h2>
                     <button onClick={onClose} className="p-1.5 hover:bg-secondary rounded-full transition-colors cursor-pointer"><X className="w-4 h-4 text-muted-foreground" /></button>
                 </div>
@@ -277,7 +277,7 @@ function AdjustmentModal({ onClose, initialData, skus, sessionUser, onSuccess }:
                             <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">Lot Number</label>
                             <div className="flex gap-1.5">
                                 <input type="text" value={formData.lotNumber} onChange={e => setFormData({ ...formData, lotNumber: e.target.value })}
-                                    className="flex-1 px-3 h-9 bg-secondary/50 border border-border rounded-lg text-[12px] outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/50 transition-colors"
+                                    className="flex-1 px-3 h-9 bg-secondary border border-border rounded-lg text-[12px] outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/50 transition-colors"
                                     placeholder="Enter Lot #" />
                                 {formData.sku && (
                                     <button type="button" onClick={() => setIsLotModalOpen(true)}
@@ -299,13 +299,13 @@ function AdjustmentModal({ onClose, initialData, skus, sessionUser, onSuccess }:
                     <div className="space-y-1.5">
                         <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">Reason</label>
                         <textarea value={formData.reason} onChange={e => setFormData({ ...formData, reason: e.target.value })}
-                            className="w-full px-3 py-2 bg-secondary/50 border border-border rounded-lg text-[12px] outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/50 transition-colors min-h-[80px] resize-none"
+                            className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-[12px] outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/50 transition-colors min-h-[80px] resize-none"
                             placeholder="Why is this being adjusted?" />
                     </div>
 
                     {/* Actions */}
                     <div className="h-10 pt-1 flex gap-2 border-t border-border mt-2">
-                        <button type="button" onClick={onClose} className="flex-1 flex items-center justify-center bg-secondary text-muted-foreground hover:text-foreground text-[10px] font-bold uppercase tracking-widest hover:bg-secondary/80 transition-colors rounded-lg cursor-pointer">Cancel</button>
+                        <button type="button" onClick={onClose} className="flex-1 flex items-center justify-center bg-secondary text-muted-foreground hover:text-foreground text-[10px] font-bold uppercase tracking-widest hover:bg-secondary transition-colors rounded-lg cursor-pointer">Cancel</button>
                         <button type="submit" disabled={saving || (!initialData && !formData.sku)}
                             className="flex-1 flex items-center justify-center gap-2 bg-primary text-black text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-all rounded-lg disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
                             {saving && <Loader2 className="w-3 h-3 animate-spin" />}
@@ -338,12 +338,12 @@ function ShellSkeleton() {
     return (
         <div className="flex flex-col h-[calc(100vh-48px)] bg-background">
             <div className="shrink-0 border-b border-border px-4 py-2.5 flex items-center gap-3">
-                <div className="h-4 w-40 bg-secondary/80 animate-pulse rounded" />
-                <div className="h-4 w-12 bg-secondary/80 animate-pulse rounded ml-4" />
+                <div className="h-4 w-40 bg-secondary animate-pulse rounded" />
+                <div className="h-4 w-12 bg-secondary animate-pulse rounded ml-4" />
             </div>
             <div className="flex-1 overflow-hidden px-2 py-1">
                 <table className="w-full text-left border-separate border-spacing-0">
-                    <thead className="bg-secondary/50 border-b border-border sticky top-0 z-10">
+                    <thead className="bg-secondary border-b border-border sticky top-0 z-10">
                         <tr>
                             {COLUMNS.map((col) => (
                                 <th key={col.key} className={cn('px-2 py-2 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border/50 last:border-0', col.width)}>
@@ -698,7 +698,7 @@ function AuditAdjustmentsContent() {
                                 'flex items-center gap-1.5 px-3 h-8 rounded-lg text-[11px] font-semibold transition-all cursor-pointer border',
                                 selectedLots.length > 0
                                     ? 'bg-primary/10 border-primary/30 text-primary'
-                                    : 'bg-secondary/60 border-border text-muted-foreground hover:text-foreground hover:bg-secondary'
+                                    : 'bg-secondary border-border text-muted-foreground hover:text-foreground hover:bg-secondary'
                             )}
                         >
                             <Hash className="w-3.5 h-3.5" />
@@ -710,7 +710,7 @@ function AuditAdjustmentsContent() {
 
                         {lotDropdownOpen && (
                             <div className="absolute top-full mt-1.5 right-0 z-50 bg-background border border-border rounded-xl shadow-2xl min-w-[240px] max-w-[300px] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
-                                <div className="px-3 py-2 border-b border-border bg-secondary/30">
+                                <div className="px-3 py-2 border-b border-border bg-secondary">
                                     <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Filter by Lot Number</span>
                                 </div>
 
@@ -723,7 +723,7 @@ function AuditAdjustmentsContent() {
                                             placeholder="Search lots..."
                                             value={lotSearch}
                                             onChange={e => setLotSearch(e.target.value)}
-                                            className="w-full pl-7 pr-3 h-7 bg-secondary/50 border border-border rounded-md text-[11px] outline-none focus:border-primary/50 text-foreground placeholder:text-muted-foreground/50 transition-colors"
+                                            className="w-full pl-7 pr-3 h-7 bg-secondary border border-border rounded-md text-[11px] outline-none focus:border-primary/50 text-foreground placeholder:text-muted-foreground/50 transition-colors"
                                             autoFocus
                                         />
                                     </div>
@@ -734,7 +734,7 @@ function AuditAdjustmentsContent() {
                                     <button
                                         onClick={() => { setSelectedLots([]); setLotDropdownOpen(false); setLotSearch(''); }}
                                         className={cn(
-                                            'w-full flex items-center gap-2.5 px-3 py-2 text-[12px] font-semibold hover:bg-secondary/60 transition-colors cursor-pointer text-left',
+                                            'w-full flex items-center gap-2.5 px-3 py-2 text-[12px] font-semibold hover:bg-secondary transition-colors cursor-pointer text-left',
                                             selectedLots.length === 0 && 'text-primary'
                                         )}
                                     >
@@ -759,7 +759,7 @@ function AuditAdjustmentsContent() {
                                                             isSelected ? prev.filter(l => l !== lot) : [...prev, lot]
                                                         );
                                                     }}
-                                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-[12px] font-semibold hover:bg-secondary/60 transition-colors cursor-pointer text-left"
+                                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-[12px] font-semibold hover:bg-secondary transition-colors cursor-pointer text-left"
                                                 >
                                                     <div className={cn(
                                                         'w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors',
@@ -780,7 +780,7 @@ function AuditAdjustmentsContent() {
                                 </div>
 
                                 {selectedLots.length > 0 && (
-                                    <div className="px-3 py-2 border-t border-border bg-secondary/20">
+                                    <div className="px-3 py-2 border-t border-border bg-secondary">
                                         <button
                                             onClick={() => { setSelectedLots([]); setLotDropdownOpen(false); setLotSearch(''); }}
                                             className="text-[10px] font-bold text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors cursor-pointer"
@@ -838,7 +838,7 @@ function AuditAdjustmentsContent() {
                                             'px-2.5 py-2 text-[12px] font-semibold text-muted-foreground uppercase tracking-widest border-r border-border/40 last:border-0 select-none shadow-[0_1px_0_0_hsl(var(--border))]',
                                             col.width,
                                             col.align || 'text-left',
-                                            col.sortable && 'cursor-pointer hover:bg-secondary/60 dark:hover:bg-secondary/50 transition-colors',
+                                            col.sortable && 'cursor-pointer hover:bg-secondary dark:hover:bg-secondary transition-colors',
                                         )}
                                     >
                                         <div className={cn('flex items-center gap-1', col.align === 'text-right' && 'justify-end')}>
@@ -866,7 +866,7 @@ function AuditAdjustmentsContent() {
                                         {filterId && (
                                             <button
                                                 onClick={() => { setFilterId(null); router.replace('/warehouse/audit-adjustments', { scroll: false }); globalCache.current = null; pageRef.current = 0; fetchPageRef.current(1, false); }}
-                                                className="mt-3 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-secondary text-foreground border border-border rounded hover:bg-secondary/80 transition-colors cursor-pointer"
+                                                className="mt-3 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-secondary text-foreground border border-border rounded hover:bg-secondary transition-colors cursor-pointer"
                                             >Show All Adjustments</button>
                                         )}
                                     </td>

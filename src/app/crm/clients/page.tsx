@@ -110,7 +110,7 @@ function SkeletonRow({ index }: { index: number }) {
                 <td key={col.key} className={cn('px-2 py-2.5', col.width)}>
                     <div
                         className={cn(
-                            'h-3.5 rounded-sm bg-secondary/80 animate-pulse',
+                            'h-3.5 rounded-sm bg-secondary animate-pulse',
                             col.key === 'name' ? 'w-4/5' : col.key === 'companyType' ? 'w-14' : col.key === 'salesPerson' ? 'w-16' : 'w-8'
                         )}
                         style={{ animationDelay: `${index * 30}ms` }}
@@ -249,13 +249,13 @@ function ShellSkeleton() {
         <div className="flex flex-col h-[calc(100vh-48px)] bg-background">
             <div className="shrink-0 border-b border-border px-4 py-2.5 flex items-center gap-3">
                 <div className="h-4 w-4 rounded bg-secondary animate-pulse" />
-                <div className="h-4 w-24 bg-secondary/80 animate-pulse rounded" />
+                <div className="h-4 w-24 bg-secondary animate-pulse rounded" />
                 <div className="h-5 w-px bg-border" />
-                {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-6 w-16 bg-secondary/80 animate-pulse rounded-lg" style={{ animationDelay: `${i * 50}ms` }} />)}
+                {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-6 w-16 bg-secondary animate-pulse rounded-lg" style={{ animationDelay: `${i * 50}ms` }} />)}
             </div>
             <div className="flex-1 overflow-hidden px-2 py-1">
                 <table className="w-full text-left border-separate border-spacing-0">
-                    <thead className="bg-secondary/50 border-b border-border sticky top-0 z-10">
+                    <thead className="bg-secondary border-b border-border sticky top-0 z-10">
                         <tr>{COLUMNS.map((col) => (
                             <th key={col.key} className={cn('px-2 py-2 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border/50 last:border-0', col.width)}>{col.label}</th>
                         ))}</tr>
@@ -598,7 +598,7 @@ function ClientsContent() {
                                         className={cn(
                                             'px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest border-r border-border/40 last:border-0 select-none shadow-[0_1px_0_0_hsl(var(--border))]',
                                             col.width, col.align || 'text-left',
-                                            !col.nosort && 'cursor-pointer hover:bg-secondary/60 dark:hover:bg-secondary/50 transition-colors'
+                                            !col.nosort && 'cursor-pointer hover:bg-secondary dark:hover:bg-secondary transition-colors'
                                         )}>
                                         <div className={cn('flex items-center gap-1', col.align === 'text-right' && 'justify-end')}>
                                             <span>{col.label}</span>
@@ -674,7 +674,7 @@ function ClientsContent() {
                                     className="flex items-center space-x-3 px-8 py-2.5 bg-[#F9E137] text-black text-[11px] font-black uppercase tracking-[0.15em] hover:bg-[#EBD000] transition-all mr-4 disabled:opacity-50 cursor-pointer">
                                     {sendingEmail ? (<><div className="w-3.5 h-3.5 border-2 border-black border-t-transparent animate-spin rounded-full" /><span>Sending...</span></>) : (<><span>Send</span><Send className="w-3.5 h-3.5" /></>)}
                                 </button>
-                                <button className="p-2 hover:bg-secondary/50 hover:text-foreground transition-all rounded-sm cursor-pointer text-slate-500" title="Attach files"><Paperclip className="w-4 h-4" /></button>
+                                <button className="p-2 hover:bg-secondary hover:text-foreground transition-all rounded-sm cursor-pointer text-slate-500" title="Attach files"><Paperclip className="w-4 h-4" /></button>
                             </div>
                             <button onClick={() => { setIsComposeOpen(false); setComposeData({ to: '', subject: '', body: '' }); }}
                                 className="p-2 text-muted hover:text-red-500 hover:bg-red-500/10 transition-all rounded-sm cursor-pointer"><Trash2 className="w-4 h-4" /></button>

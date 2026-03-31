@@ -287,7 +287,7 @@ export default function WaitingOnLotPage() {
                                 placeholder="Search SKUs..."
                                 value={sidebarSearch}
                                 onChange={e => setSidebarSearch(e.target.value)}
-                                className="w-full pl-8 pr-3 py-1.5 text-xs bg-secondary/50 border border-border rounded-md outline-none focus:ring-1 focus:ring-amber-500/30 focus:border-amber-500/50 text-foreground placeholder:text-muted-foreground transition-colors"
+                                className="w-full pl-8 pr-3 py-1.5 text-xs bg-secondary border border-border rounded-md outline-none focus:ring-1 focus:ring-amber-500/30 focus:border-amber-500/50 text-foreground placeholder:text-muted-foreground transition-colors"
                             />
                         </div>
                     </div>
@@ -302,7 +302,7 @@ export default function WaitingOnLotPage() {
                                         "w-full text-left px-3 py-2.5 border-b border-border transition-all group relative",
                                         isSelected
                                             ? "bg-amber-500/10 border-l-2 border-l-amber-500"
-                                            : "hover:bg-secondary/50 border-l-2 border-l-transparent"
+                                            : "hover:bg-secondary border-l-2 border-l-transparent"
                                     )}
                                 >
                                     <div className="flex items-start gap-2.5">
@@ -346,7 +346,7 @@ export default function WaitingOnLotPage() {
                             </div>
                         )}
                     </div>
-                    <div className="p-2 border-t border-border bg-secondary/30 shrink-0">
+                    <div className="p-2 border-t border-border bg-secondary shrink-0">
                         <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground text-center">
                             {filteredGroups.length} of {groups.length} SKUs
                         </div>
@@ -425,7 +425,7 @@ export default function WaitingOnLotPage() {
                                         </div>
                                         <button
                                             onClick={() => router.push(`/warehouse/skus/${selectedGroupSummary.skuId}`)}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-secondary hover:bg-secondary/80 transition-colors text-xs font-bold text-muted-foreground hover:text-foreground"
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-secondary hover:bg-secondary transition-colors text-xs font-bold text-muted-foreground hover:text-foreground"
                                         >
                                             <span>View SKU</span>
                                             <ExternalLink className="w-3 h-3" />
@@ -462,7 +462,7 @@ export default function WaitingOnLotPage() {
                                                 return (
                                                     <tr
                                                         key={item.id}
-                                                        className="hover:bg-secondary/50 transition-colors group"
+                                                        className="hover:bg-secondary transition-colors group"
                                                     >
                                                         <td className="px-3 py-2 text-xs font-mono font-bold text-foreground whitespace-nowrap">
                                                             {formatDate(item.date)}
@@ -549,7 +549,7 @@ export default function WaitingOnLotPage() {
                     ) : (
                         <div className="flex-1 flex items-center justify-center">
                             <div className="text-center">
-                                <div className="w-14 h-14 rounded-2xl bg-secondary/50 flex items-center justify-center mx-auto mb-3">
+                                <div className="w-14 h-14 rounded-2xl bg-secondary flex items-center justify-center mx-auto mb-3">
                                     <Package className="w-7 h-7 text-muted-foreground" />
                                 </div>
                                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">

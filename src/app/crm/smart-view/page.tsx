@@ -173,7 +173,7 @@ function SkeletonRow({ index }: { index: number }) {
         <tr className="border-b border-border/30">
             {COLUMNS.map((col) => (
                 <td key={col.key} className={cn('px-2 py-2.5', col.width)}>
-                    <div className={cn('h-3.5 rounded-sm bg-secondary/80 animate-pulse',
+                    <div className={cn('h-3.5 rounded-sm bg-secondary animate-pulse',
                         col.key === 'name' ? 'w-4/5' : col.key === 'aging' ? 'w-full' : col.key === 'contactStatus' ? 'w-14' : 'w-8'
                     )} style={{ animationDelay: `${index * 30}ms` }} />
                 </td>
@@ -275,13 +275,13 @@ function ShellSkeleton() {
         <div className="flex flex-col h-[calc(100vh-48px)] bg-background">
             <div className="shrink-0 border-b border-border px-4 py-2.5 flex items-center gap-3">
                 <div className="h-4 w-4 rounded bg-secondary animate-pulse" />
-                <div className="h-4 w-32 bg-secondary/80 animate-pulse rounded" />
+                <div className="h-4 w-32 bg-secondary animate-pulse rounded" />
                 <div className="flex-1" />
-                <div className="h-8 w-56 bg-secondary/80 animate-pulse rounded" />
+                <div className="h-8 w-56 bg-secondary animate-pulse rounded" />
             </div>
             <div className="flex-1 overflow-hidden px-2 py-1">
                 <table className="w-full text-left border-separate border-spacing-0">
-                    <thead className="bg-secondary/50"><tr>{COLUMNS.map(c => <th key={c.key} className={cn('px-2 py-2 text-[11px] font-bold text-muted-foreground uppercase tracking-widest', c.width)}>{c.label}</th>)}</tr></thead>
+                    <thead className="bg-secondary"><tr>{COLUMNS.map(c => <th key={c.key} className={cn('px-2 py-2 text-[11px] font-bold text-muted-foreground uppercase tracking-widest', c.width)}>{c.label}</th>)}</tr></thead>
                     <tbody>{Array.from({ length: 25 }).map((_, i) => <SkeletonRow key={i} index={i} />)}</tbody>
                 </table>
             </div>
@@ -448,7 +448,7 @@ function SmartViewContent() {
 
             {/* Pagination Footer */}
             {totalPages > 1 && (
-                <div className="shrink-0 flex items-center justify-between px-6 py-2.5 border-t border-border bg-secondary/20">
+                <div className="shrink-0 flex items-center justify-between px-6 py-2.5 border-t border-border bg-secondary">
                     <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">
                         Page {page} of {totalPages} · {total} total
                     </span>

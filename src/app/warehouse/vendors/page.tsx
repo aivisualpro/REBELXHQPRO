@@ -362,7 +362,7 @@ function VendorsContent() {
             placeholder="Search vendors..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="pl-8 pr-3 h-8 w-56 bg-secondary/60 border border-border text-[12px] rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50 placeholder:text-muted-foreground/50 text-foreground transition-all"
+            className="pl-8 pr-3 h-8 w-56 bg-secondary border border-border text-[12px] rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50 placeholder:text-muted-foreground/50 text-foreground transition-all"
           />
         </div>
 
@@ -390,7 +390,7 @@ function VendorsContent() {
                     key={col.key}
                     onClick={() => handleSort(col.key)}
                     className={cn(
-                      'px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary/60 transition-colors border-r border-border/40 last:border-0 select-none shadow-[0_1px_0_0_hsl(var(--border))]',
+                      'px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary transition-colors border-r border-border/40 last:border-0 select-none shadow-[0_1px_0_0_hsl(var(--border))]',
                       col.width,
                     )}
                   >

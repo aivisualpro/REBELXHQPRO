@@ -251,7 +251,7 @@ export default function SMSPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-48px)] bg-background transition-colors duration-300">
       {/* Action Bar */}
-      <div className="flex items-center justify-between px-4 h-11 border-b border-border bg-secondary/50 transition-colors">
+      <div className="flex items-center justify-between px-4 h-11 border-b border-border bg-secondary transition-colors">
         <div className="flex items-center space-x-4">
           <h1 className="text-sm font-bold text-foreground uppercase tracking-tighter flex items-center gap-2">
             <MessageSquare className="w-4 h-4" />
@@ -317,10 +317,10 @@ export default function SMSPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background/50 relative">
+      <div className="flex-1 overflow-x-hidden overflow-y-auto scrollbar-custom bg-background relative">
         <div className="min-w-full px-2 py-2">
           <table className="w-full text-left border-separate border-spacing-0 relative z-0">
-          <thead className="sticky top-0 bg-secondary/50 z-10 border-b border-border backdrop-blur-sm">
+          <thead className="sticky top-0 bg-secondary z-10 border-b border-border">
             <tr>
               {[
                 // Removed Type column
@@ -332,7 +332,7 @@ export default function SMSPage() {
                 <th
                   key={col.key}
                   onClick={() => handleSort(col.key)}
-                  className="px-4 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary/80 transition-colors border-r border-border last:border-0"
+                  className="px-4 py-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary transition-colors border-r border-border last:border-0"
                 >
                   <div className="flex items-center space-x-1.5">
                     <span>{col.label}</span>
@@ -351,7 +351,7 @@ export default function SMSPage() {
             ) : activities.length === 0 ? (
               <tr><td colSpan={5} className="px-4 py-12 text-center text-xs text-muted-foreground uppercase font-medium tracking-tighter opacity-50">No SMS found</td></tr>
             ) : activities.map(activity => (
-              <tr key={activity._id} className="hover:bg-secondary/40 hover:scale-[1.002] hover:shadow-md transition-all duration-200 group relative z-0 hover:z-10 bg-background">
+              <tr key={activity._id} className="hover:bg-secondary hover:scale-[1.002] hover:shadow-md transition-all duration-200 group relative z-0 hover:z-10 bg-background">
                 <td className="px-4 py-1.5 text-[11px] text-foreground font-medium">
                   {typeof activity.client === 'object' && activity.client ? activity.client.name : activity.client}
                 </td>
@@ -431,7 +431,7 @@ export default function SMSPage() {
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-muted-foreground uppercase">Comments *</label>
                   <textarea
-                    className="w-full px-3 py-2 bg-secondary/50 border border-border text-sm focus:outline-none focus:border-primary focus:ring-0 transition-colors h-24 resize-none text-foreground placeholder:text-muted-foreground"
+                    className="w-full px-3 py-2 bg-secondary border border-border text-sm focus:outline-none focus:border-primary focus:ring-0 transition-colors h-24 resize-none text-foreground placeholder:text-muted-foreground"
                     value={formData.comments}
                     onChange={e => setFormData({ ...formData, comments: e.target.value })}
                     required
@@ -448,7 +448,7 @@ export default function SMSPage() {
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-muted-foreground uppercase">Sales Rep</label>
                   <select
-                    className="w-full px-3 py-2 bg-secondary/50 border border-border text-sm focus:outline-none focus:border-primary focus:ring-0 transition-colors appearance-none text-foreground"
+                    className="w-full px-3 py-2 bg-secondary border border-border text-sm focus:outline-none focus:border-primary focus:ring-0 transition-colors appearance-none text-foreground"
                     value={formData.createdBy}
                     onChange={(e) => setFormData({ ...formData, createdBy: e.target.value })}
                   >
@@ -463,7 +463,7 @@ export default function SMSPage() {
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-border bg-secondary/30 shrink-0 flex justify-end space-x-3">
+            <div className="px-6 py-4 border-t border-border bg-secondary shrink-0 flex justify-end space-x-3">
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
@@ -501,7 +501,7 @@ const FormInput = ({ label, value, onChange, type = "text", required = false, pl
       value={value}
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full px-3 py-2 bg-secondary/50 border border-border text-sm focus:outline-none focus:border-foreground focus:ring-0 transition-colors text-foreground placeholder:text-muted-foreground"
+      className="w-full px-3 py-2 bg-secondary border border-border text-sm focus:outline-none focus:border-foreground focus:ring-0 transition-colors text-foreground placeholder:text-muted-foreground"
     />
   </div>
 );
@@ -530,7 +530,7 @@ const SearchableSingleSelect = ({ label, options, value, onChange, required }: {
     <div className="space-y-1 relative" ref={wrapperRef}>
       <label className="text-[10px] font-bold text-muted-foreground uppercase">{label} {required && <span className="text-destructive">*</span>}</label>
       <div
-        className="w-full px-3 py-2 bg-secondary/50 border border-border text-sm focus-within:border-foreground transition-colors cursor-pointer flex items-center justify-between text-foreground"
+        className="w-full px-3 py-2 bg-secondary border border-border text-sm focus-within:border-foreground transition-colors cursor-pointer flex items-center justify-between text-foreground"
         onClick={() => { setIsOpen(!isOpen); if (!isOpen) setSearchTerm(''); }}
       >
         <span className={!selectedLabel ? "text-muted-foreground" : ""}>{selectedLabel || 'Select Client'}</span>
@@ -545,7 +545,7 @@ const SearchableSingleSelect = ({ label, options, value, onChange, required }: {
               <input
                 type="text"
                 autoFocus
-                className="w-full pl-7 pr-2 py-1.5 text-xs bg-secondary/50 border border-border focus:outline-none focus:border-foreground transition-colors text-foreground placeholder:text-muted-foreground"
+                className="w-full pl-7 pr-2 py-1.5 text-xs bg-secondary border border-border focus:outline-none focus:border-foreground transition-colors text-foreground placeholder:text-muted-foreground"
                 placeholder="Search..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -561,8 +561,8 @@ const SearchableSingleSelect = ({ label, options, value, onChange, required }: {
                   key={opt.value}
                   onClick={() => { onChange(opt.value); setIsOpen(false); }}
                   className={cn(
-                    "px-4 py-2 text-xs cursor-pointer hover:bg-secondary/80 flex items-center justify-between text-foreground",
-                    value === opt.value && "bg-secondary/50 font-bold"
+                    "px-4 py-2 text-xs cursor-pointer hover:bg-secondary flex items-center justify-between text-foreground",
+                    value === opt.value && "bg-secondary font-bold"
                   )}
                 >
                   <span>{opt.label}</span>

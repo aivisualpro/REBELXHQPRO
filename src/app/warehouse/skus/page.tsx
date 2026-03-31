@@ -240,7 +240,7 @@ function SkuModal({ onClose, onSaved, editing }: { onClose: () => void; onSaved:
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative z-10 w-full max-w-2xl mx-4 bg-background border border-border shadow-2xl rounded-xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
-        <div className="flex items-center justify-between px-5 h-11 border-b border-border bg-secondary/30 shrink-0">
+        <div className="flex items-center justify-between px-5 h-11 border-b border-border bg-secondary shrink-0">
           <h2 className="text-[11px] font-black uppercase tracking-widest">{editing ? 'Edit SKU' : 'Add New SKU'}</h2>
           <button onClick={onClose} className="p-1.5 hover:bg-secondary rounded-full transition-colors cursor-pointer"><X className="w-4 h-4 text-muted-foreground" /></button>
         </div>
@@ -285,7 +285,7 @@ function SkuModal({ onClose, onSaved, editing }: { onClose: () => void; onSaved:
             </div>
           </form>
         </div>
-        <div className="flex items-center justify-end gap-3 px-5 h-11 border-t border-border bg-secondary/30 shrink-0">
+        <div className="flex items-center justify-end gap-3 px-5 h-11 border-t border-border bg-secondary shrink-0">
           <button type="button" onClick={onClose} className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground cursor-pointer">Cancel</button>
           <button type="submit" form="sku-form" disabled={saving} className="px-5 py-1.5 bg-primary text-black text-[10px] font-black uppercase tracking-widest rounded-lg hover:opacity-90 transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer">
             {saving && <Loader2 className="w-3 h-3 animate-spin" />}
@@ -576,7 +576,7 @@ function SkusContent() {
             placeholder="Search SKUs..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="pl-8 pr-3 h-8 w-56 bg-secondary/60 border border-border text-[12px] rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50 placeholder:text-muted-foreground/50 text-foreground transition-all"
+            className="pl-8 pr-3 h-8 w-56 bg-secondary border border-border text-[12px] rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50 placeholder:text-muted-foreground/50 text-foreground transition-all"
           />
         </div>
 
@@ -585,7 +585,7 @@ function SkusContent() {
         {/* No Transactions filter */}
         <button
           onClick={() => { setNoTransactions(p => !p); scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' }); }}
-          className={cn('h-8 px-3 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 text-[11px] font-bold uppercase tracking-widest', noTransactions ? 'bg-orange-500/15 text-orange-500 border border-orange-500/25 shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60')}
+          className={cn('h-8 px-3 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 text-[11px] font-bold uppercase tracking-widest', noTransactions ? 'bg-orange-500/15 text-orange-500 border border-orange-500/25 shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-secondary')}
           title={noTransactions ? 'Showing SKUs with no transactions' : 'Filter: No Transactions'}
         >
           <FileX2 className="w-3.5 h-3.5" />
@@ -595,7 +595,7 @@ function SkusContent() {
         {/* Show Archived toggle */}
         <button
           onClick={() => setShowArchived(p => !p)}
-          className={cn('h-8 px-3 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 text-[11px] font-bold uppercase tracking-widest', showArchived ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20 shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60')}
+          className={cn('h-8 px-3 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 text-[11px] font-bold uppercase tracking-widest', showArchived ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20 shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-secondary')}
           title={showArchived ? 'Viewing Archived SKUs' : 'Show Archived SKUs'}
         >
           <Archive className="w-3.5 h-3.5" />
@@ -623,7 +623,7 @@ function SkusContent() {
                     key={col.key}
                     onClick={() => handleSort(col.key)}
                     className={cn(
-                      'px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary/60 transition-colors border-r border-border/40 select-none shadow-[0_1px_0_0_hsl(var(--border))]',
+                      'px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest cursor-pointer hover:bg-secondary transition-colors border-r border-border/40 select-none shadow-[0_1px_0_0_hsl(var(--border))]',
                       col.width
                     )}
                   >

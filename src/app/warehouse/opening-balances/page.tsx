@@ -132,12 +132,12 @@ function OBModal({
         finally { setSaving(false); }
     };
 
-    const inp = 'w-full px-3 h-9 bg-secondary/50 border border-border rounded-lg text-[12px] outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/50 transition-colors';
+    const inp = 'w-full px-3 h-9 bg-secondary border border-border rounded-lg text-[12px] outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/50 transition-colors';
 
     return (
         <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
             <div className="bg-background border border-border w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh] rounded-xl">
-                <div className="flex items-center justify-between px-5 h-11 border-b border-border shrink-0 bg-secondary/30 rounded-t-xl">
+                <div className="flex items-center justify-between px-5 h-11 border-b border-border shrink-0 bg-secondary rounded-t-xl">
                     <h2 className="text-[10px] font-black uppercase tracking-widest">{editingId ? 'Edit Opening Balance' : 'Add Opening Balance'}</h2>
                     <button onClick={onClose} className="p-1.5 hover:bg-secondary rounded-full transition-colors cursor-pointer"><X className="w-4 h-4 text-muted-foreground" /></button>
                 </div>
@@ -157,10 +157,10 @@ function OBModal({
                             <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">Lot Number</label>
                             <div className="flex gap-2 h-9">
                                 <input type="text" value={formData.lotNumber} onChange={e => setFormData((p: any) => ({ ...p, lotNumber: e.target.value }))}
-                                    className="flex-1 px-3 h-full bg-secondary/50 border border-border rounded-lg text-[12px] outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/50 transition-colors"
+                                    className="flex-1 px-3 h-full bg-secondary border border-border rounded-lg text-[12px] outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/50 transition-colors"
                                     placeholder="Enter Lot #" />
                                 <button type="button" onClick={onOpenLotSelector}
-                                    className="px-3 h-full bg-secondary border border-border rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors cursor-pointer" title="Select Existing Lot">
+                                    className="px-3 h-full bg-secondary border border-border rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer" title="Select Existing Lot">
                                     <List className="w-4 h-4" />
                                 </button>
                             </div>
@@ -185,7 +185,7 @@ function OBModal({
                         <input type="date" value={formData.expirationDate} onChange={e => setFormData((p: any) => ({ ...p, expirationDate: e.target.value }))} className={inp} />
                     </div>
                     <div className="h-10 pt-1 flex gap-2 border-t border-border mt-2">
-                        <button type="button" onClick={onClose} className="flex-1 flex items-center justify-center bg-secondary text-muted-foreground hover:text-foreground text-[10px] font-bold uppercase tracking-widest hover:bg-secondary/80 transition-colors rounded-lg cursor-pointer">Cancel</button>
+                        <button type="button" onClick={onClose} className="flex-1 flex items-center justify-center bg-secondary text-muted-foreground hover:text-foreground text-[10px] font-bold uppercase tracking-widest hover:bg-secondary transition-colors rounded-lg cursor-pointer">Cancel</button>
                         <button type="submit" disabled={saving} className="flex-1 flex items-center justify-center gap-2 bg-primary text-black text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-all rounded-lg disabled:opacity-50 cursor-pointer">
                             {saving && <Loader2 className="w-3 h-3 animate-spin" />}
                             Save
@@ -466,7 +466,7 @@ function OpeningBalancesContent() {
                         placeholder="Search SKU or lot..."
                         value={search}
                         onChange={e => setSearch(e.target.value)}
-                        className="pl-8 pr-8 h-8 w-60 bg-secondary/60 border border-border text-[12px] rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50 placeholder:text-muted-foreground/50 text-foreground transition-all"
+                        className="pl-8 pr-8 h-8 w-60 bg-secondary border border-border text-[12px] rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50 placeholder:text-muted-foreground/50 text-foreground transition-all"
                     />
                     {search && (
                         <button onClick={() => setSearch('')} className="absolute right-2.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
@@ -500,7 +500,7 @@ function OpeningBalancesContent() {
                                         className={cn(
                                             'px-2.5 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest border-r border-border/40 last:border-0 select-none shadow-[0_1px_0_0_hsl(var(--border))]',
                                             col.width,
-                                            col.sortable && 'cursor-pointer hover:bg-secondary/60 transition-colors',
+                                            col.sortable && 'cursor-pointer hover:bg-secondary transition-colors',
                                         )}
                                     >
                                         <div className={cn('flex items-center gap-1', col.align === 'text-right' && 'justify-end')}>

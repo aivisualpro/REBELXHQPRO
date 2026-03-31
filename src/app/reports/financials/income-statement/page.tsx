@@ -231,7 +231,6 @@ function IncomeStatementPage() {
                             </div>
                             <div>
                                 <h1 className="text-xl font-black tracking-tight uppercase text-foreground">Income Statement</h1>
-                                <p className="text-muted-foreground text-xs">Profit & Loss Report</p>
                             </div>
                         </div>
 
@@ -419,7 +418,8 @@ function IncomeStatementPage() {
                         value={loading ? '...' : formatCompact(data?.cogs || 0)}
                         icon={TrendingDown}
                         color="amber"
-                        subtext="Procurement cost"
+                        subtext="Click for SKU profitability"
+                        onClick={() => r.push(`/reports/financials/cogs?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&source=${source}`)}
                     />
                     <SummaryCard 
                         label="Net Income"
@@ -477,6 +477,7 @@ function IncomeStatementPage() {
                             value={`(${formatCurrency(data?.cogs || 0)})`} 
                             isTotal
                             negative
+                            onClick={() => r.push(`/reports/financials/cogs?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&source=${source}`)}
                         />
 
                         {/* GROSS PROFIT */}
@@ -575,12 +576,13 @@ function IncomeStatementPage() {
     );
 }
 
-function SummaryCard({ label, value, icon: Icon, color, subtext }: {
+function SummaryCard({ label, value, icon: Icon, color, subtext, onClick }: {
     label: string;
     value: string;
     icon: any;
     color: 'emerald' | 'blue' | 'amber' | 'purple';
     subtext?: string;
+    onClick?: () => void;
 }) {
     const colorStyles: Record<string, { bg: string; border: string; text: string; iconColor: string }> = {
         emerald: { bg: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.25)', text: '#10b981', iconColor: '#10b981' },
@@ -593,7 +595,8 @@ function SummaryCard({ label, value, icon: Icon, color, subtext }: {
 
     return (
         <div 
-            className="rounded-2xl p-6 relative overflow-hidden group border transition-colors"
+            onClick={onClick}
+            className={cn("rounded-2xl p-6 relative overflow-hidden group border transition-all", onClick && "cursor-pointer hover:shadow-lg hover:-translate-y-0.5 hover:border-foreground/20")}
             style={{ backgroundColor: cs.bg, borderColor: cs.border }}
         >
             <div className="flex items-center justify-between mb-4">
@@ -625,7 +628,8 @@ function StatementRow({
     negative,
     subLabel,
     margin,
-    isFinal
+    isFinal,
+    onClick
 }: { 
     label: string; 
     value: string; 
@@ -637,13 +641,18 @@ function StatementRow({
     subLabel?: string;
     margin?: string;
     isFinal?: boolean;
+    onClick?: () => void;
 }) {
     return (
-        <div className={cn(
-            "px-6 py-4 flex items-center justify-between group hover:bg-secondary/30 transition-colors",
-            highlight && "bg-secondary/50",
-            isFinal && "bg-gradient-to-r from-emerald-500/10 to-transparent border-t-2 border-emerald-500/30"
-        )}>
+        <div 
+            onClick={onClick}
+            className={cn(
+                "px-6 py-4 flex items-center justify-between group transition-all",
+                highlight ? "bg-secondary/50" : "hover:bg-secondary/30",
+                isFinal && "bg-gradient-to-r from-emerald-500/10 to-transparent border-t-2 border-emerald-500/30",
+                onClick && "cursor-pointer hover:bg-secondary/60"
+            )}
+        >
             <div className={cn("flex items-center gap-2", indent && "pl-6")}>
                 {indent && <Minus className="w-3 h-3 text-muted-foreground/50" />}
                 <span className={cn(

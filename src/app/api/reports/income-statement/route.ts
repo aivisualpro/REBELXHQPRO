@@ -102,12 +102,44 @@ export async function GET(req: Request) {
         const totalTax = webTax + saleTax;
 
         // 2. COST OF GOODS SOLD (COGS)
-        const cogsAgg = await PurchaseOrder.aggregate([
-            { $match: defaultDateFilter },
-            { $unwind: "$lineItems" },
-            { $group: { _id: null, total: { $sum: { $multiply: ["$lineItems.qtyReceived", "$lineItems.cost"] } } } }
-        ]);
-        const cogs = cogsAgg[0]?.total || 0;
+        let cogs = 0;
+        
+        // Wholesale COGS
+        if (source !== 'web') {
+            const saleCogsAgg = await SaleOrder.aggregate([
+                { $match: { orderStatus: { $ne: 'Cancelled' }, ...defaultDateFilter } },
+                { $unwind: "$lineItems" },
+                { $group: {
+                    _id: null,
+                    total: { $sum: { $multiply: [{ $ifNull: ["$lineItems.qtyShipped", 0] }, { $ifNull: ["$lineItems.cost", 0] }] } }
+                }}
+            ]);
+            cogs += saleCogsAgg[0]?.total || 0;
+        }
+
+        // Web COGS
+        if (source !== 'wholesale' && !salesRep) {
+            const webCogsAgg = await WebOrder.aggregate([
+                { $match: { 
+                    status: { $in: ['completed', 'shipped', 'Completed', 'Shipped', 'processing', 'Processing'] },
+                    ...webDateFilter
+                }},
+                { $project: { lineItems: 1 } }
+            ]);
+            
+            webCogsAgg.forEach(order => {
+                order.lineItems?.forEach((item: any) => {
+                    const qty = item.quantity || 0;
+                    if (item.linkedSkus && item.linkedSkus.length > 0) {
+                        item.linkedSkus.forEach((ls: any) => {
+                            cogs += (qty * (ls.multiplier || 1)) * (ls.cost || 0);
+                        });
+                    } else if (item.cost) {
+                        cogs += qty * item.cost;
+                    }
+                });
+            });
+        }
 
         // 3. GROSS PROFIT
         const grossProfit = totalRevenue - cogs;

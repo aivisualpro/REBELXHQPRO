@@ -780,7 +780,7 @@ export default function SaleOrderDetailPage() {
                                                     order.orderStatus === 'Shipping' ? "bg-violet-500 text-white border-violet-600 hover:bg-violet-600" :
                                                         order.orderStatus === 'Picking' ? "bg-cyan-500 text-white border-cyan-600 hover:bg-cyan-600" :
                                                             order.orderStatus === 'Pending' ? "bg-orange-500 text-white border-orange-600 hover:bg-orange-600" :
-                                                                "bg-secondary text-muted-foreground border-border hover:bg-secondary/80"
+                                                                "bg-secondary text-muted-foreground border-border hover:bg-secondary"
                                     )}
                                 >
                                     {order.orderStatus}
@@ -828,7 +828,7 @@ export default function SaleOrderDetailPage() {
                             ].map((row, rowIdx) => (
                                 <div key={rowIdx} className={cn(
                                     row.length === 2 ? "grid grid-cols-2 divide-x divide-border" : "",
-                                    rowIdx % 2 === 0 ? "bg-background" : "bg-secondary/50",
+                                    rowIdx % 2 === 0 ? "bg-background" : "bg-secondary",
                                     rowIdx > 0 && "border-t border-border"
                                 )}>
                                     {row.map((item, colIdx) => (
@@ -852,7 +852,7 @@ export default function SaleOrderDetailPage() {
                                     rel="noopener noreferrer"
                                     className="block group"
                                 >
-                                    <div className="border border-border bg-secondary/30 p-3 hover:border-amber-500/50 hover:shadow-sm transition-all cursor-pointer">
+                                    <div className="border border-border bg-secondary p-3 hover:border-amber-500/50 hover:shadow-sm transition-all cursor-pointer">
                                         <div className="flex items-center justify-between mb-1.5">
                                             <div className="flex items-center space-x-2">
                                                 <div className="w-5 h-5 bg-[#FFB500] rounded flex items-center justify-center shrink-0">
@@ -875,7 +875,7 @@ export default function SaleOrderDetailPage() {
                         {/* Shipping Address */}
                         {(order.shippingAddress || order.city || order.state) && (
                             <div className="mx-4 mb-4 border border-border">
-                                <div className="px-4 py-3 bg-secondary/50 flex flex-col gap-0.5">
+                                <div className="px-4 py-3 bg-secondary flex flex-col gap-0.5">
                                     <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Shipping Address</span>
                                     <span className="text-sm font-bold text-foreground">{order.shippingAddress || '-'}</span>
                                     <span className="text-xs text-muted-foreground">{[order.city, order.state].filter(Boolean).join(', ')}</span>
@@ -937,7 +937,7 @@ export default function SaleOrderDetailPage() {
                                         ].map((item, idx) => (
                                             <div key={idx} className={cn(
                                                 "px-4 py-2.5 flex items-center justify-between",
-                                                idx % 2 === 0 ? "bg-background" : "bg-secondary/50",
+                                                idx % 2 === 0 ? "bg-background" : "bg-secondary",
                                                 idx > 0 && "border-t border-border"
                                             )}>
                                                 <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">{item.label}</span>
@@ -963,7 +963,7 @@ export default function SaleOrderDetailPage() {
                                             </div>
                                         </div>
                                         {/* Email row */}
-                                        <div className="px-4 py-2.5 flex items-center justify-between border-t border-border bg-secondary/50">
+                                        <div className="px-4 py-2.5 flex items-center justify-between border-t border-border bg-secondary">
                                             <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Email</span>
                                             <div className="flex items-center space-x-2">
                                                 <span className="text-sm font-bold text-foreground truncate max-w-[160px]">
@@ -1032,7 +1032,7 @@ export default function SaleOrderDetailPage() {
                                             ].map((item, idx) => (
                                                 <div key={idx} className={cn(
                                                     "px-4 py-2.5 flex items-center justify-between",
-                                                    idx % 2 === 0 ? "bg-secondary/50" : "bg-background",
+                                                    idx % 2 === 0 ? "bg-secondary" : "bg-background",
                                                     idx > 0 && "border-t border-border"
                                                 )}>
                                                     <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">{item.label}</span>
@@ -1162,7 +1162,7 @@ export default function SaleOrderDetailPage() {
                                 });
                                 setIsHeaderModalOpen(true);
                             }}
-                            className="h-[34px] flex-1 flex items-center justify-center gap-1.5 px-3 text-[10px] font-bold uppercase tracking-widest bg-secondary text-foreground border border-border hover:bg-secondary/80 transition-colors cursor-pointer"
+                            className="h-[34px] flex-1 flex items-center justify-center gap-1.5 px-3 text-[10px] font-bold uppercase tracking-widest bg-secondary text-foreground border border-border hover:bg-secondary transition-colors cursor-pointer"
                         >
                             <Pencil className="w-3.5 h-3.5" />
                             <span>Edit</span>
@@ -1296,7 +1296,7 @@ export default function SaleOrderDetailPage() {
                     <div className="flex-1 overflow-auto">
                         <div className={cn("animate-in fade-in duration-300", activeTab === 'Line Items' ? 'block' : 'hidden')}>
                                 <table className="w-full border-collapse text-left">
-                                    <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
+                                    <thead className="bg-secondary border-y border-border sticky top-0 z-20">
                                         <tr>
                                             {['SKU', 'Lot #', 'UOM', 'Qty', 'Cost', 'Price', 'Total', 'Actions'].map(col => (
                                                 <th key={col} className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">
@@ -1317,7 +1317,7 @@ export default function SaleOrderDetailPage() {
                                             const skuId = (item.sku && typeof item.sku === 'object') ? item.sku._id : item.sku;
 
                                             return (
-                                                <tr key={item._id} className="hover:bg-secondary/50 transition-colors">
+                                                <tr key={item._id} className="hover:bg-secondary transition-colors">
                                                     <td className="px-3 py-2 text-xs font-bold text-foreground">
                                                         <span
                                                             onClick={() => router.push(`/warehouse/skus/${skuId}`)}
@@ -1351,7 +1351,7 @@ export default function SaleOrderDetailPage() {
                                                     <td className="px-3 py-2 text-xs text-foreground font-mono font-bold">{item.qtyShipped}</td>
                                                     <td className="px-3 py-2 text-xs text-orange-500 font-mono font-bold whitespace-nowrap">{formatCost(item.cost)}</td>
                                                     <td className="px-3 py-2 text-xs text-foreground font-mono font-bold">{formatCurrency(item.price)}</td>
-                                                    <td className="px-3 py-2 text-xs text-foreground font-mono font-black bg-secondary/20">{formatCurrency(lineTotal)}</td>
+                                                    <td className="px-3 py-2 text-xs text-foreground font-mono font-black bg-secondary">{formatCurrency(lineTotal)}</td>
                                                     <td className="px-3 py-1.5">
                                                         <div className="flex items-center space-x-1">
                                                             <button
@@ -1397,7 +1397,7 @@ export default function SaleOrderDetailPage() {
 
                         <div className={cn("animate-in fade-in duration-300", activeTab === 'Payments' ? 'block' : 'hidden')}>
                                 <table className="w-full border-collapse text-left">
-                                    <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
+                                    <thead className="bg-secondary border-y border-border sticky top-0 z-20">
                                         <tr>
                                             {['Date', 'Amount', 'Created By', 'Actions'].map(col => (
                                                 <th key={col} className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">
@@ -1412,7 +1412,7 @@ export default function SaleOrderDetailPage() {
                                                 <td colSpan={4} className="px-3 py-6 text-center text-xs font-bold text-muted-foreground uppercase tracking-wider">No payments recorded</td>
                                             </tr>
                                         ) : order.payments.map(payment => (
-                                            <tr key={payment._id} className="hover:bg-secondary/50 transition-colors">
+                                            <tr key={payment._id} className="hover:bg-secondary transition-colors">
                                                 <td className="px-3 py-2 text-xs text-foreground font-mono font-bold">{formatDate(payment.createdAt)}</td>
                                                 <td className="px-3 py-2 text-xs text-emerald-500 font-mono font-black">{formatCurrency(payment.paymentAmount)}</td>
                                                 <td className="px-3 py-2 text-xs text-foreground font-bold">{getUserName(payment.createdBy)}</td>
@@ -1463,7 +1463,7 @@ export default function SaleOrderDetailPage() {
                                     </div>
                                 ) : (
                                     order.notes.map(note => (
-                                        <div key={note._id} className="border border-border rounded-md p-3 bg-secondary/20 hover:bg-secondary/40 transition-colors group">
+                                        <div key={note._id} className="border border-border rounded-md p-3 bg-secondary hover:bg-secondary transition-colors group">
                                             <div className="flex items-start justify-between">
                                                 <p className="text-sm text-foreground whitespace-pre-wrap flex-1 font-medium">{note.note}</p>
                                                 {canDelete() && (
@@ -1538,7 +1538,7 @@ export default function SaleOrderDetailPage() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
                     <div className="bg-card rounded-lg shadow-2xl w-full max-w-lg animate-in fade-in zoom-in duration-200 flex flex-col">
                         {/* Header - matches main header height */}
-                        <div className="flex items-center justify-between px-4 h-[48px] border-b border-border bg-secondary/50 shrink-0 rounded-t-lg">
+                        <div className="flex items-center justify-between px-4 h-[48px] border-b border-border bg-secondary shrink-0 rounded-t-lg">
                             <h2 className="text-sm font-bold uppercase text-foreground tracking-wider">{editingItem._id ? 'Edit Item' : 'Add Item'}</h2>
                             <button onClick={() => setIsItemModalOpen(false)} className="w-7 h-7 flex items-center justify-center rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
                                 <X className="w-4 h-4" />
@@ -1778,7 +1778,7 @@ export default function SaleOrderDetailPage() {
                                                 type="text"
                                                 readOnly
                                                 value={order?.label || ''}
-                                                className="w-full h-[34px] px-3 border border-border rounded-md text-sm bg-secondary/50 text-muted-foreground focus:outline-none cursor-not-allowed"
+                                                className="w-full h-[34px] px-3 border border-border rounded-md text-sm bg-secondary text-muted-foreground focus:outline-none cursor-not-allowed"
                                             />
                                         </div>
                                         <div className="space-y-1.5">
@@ -1787,7 +1787,7 @@ export default function SaleOrderDetailPage() {
                                                 type="text"
                                                 readOnly
                                                 value={typeof order?.clientId === 'object' && order?.clientId ? (order.clientId as any).name : String(order?.clientId || '')}
-                                                className="w-full h-[34px] px-3 border border-border rounded-md text-sm bg-secondary/50 text-muted-foreground focus:outline-none cursor-not-allowed"
+                                                className="w-full h-[34px] px-3 border border-border rounded-md text-sm bg-secondary text-muted-foreground focus:outline-none cursor-not-allowed"
                                             />
                                         </div>
                                         <div className="space-y-1.5">

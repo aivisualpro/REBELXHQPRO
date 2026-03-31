@@ -364,7 +364,7 @@ export default function VendorDetailPage() {
 
             <div className="flex flex-1 overflow-hidden">
                 {/* Left Panel (30%) - Vendor Details */}
-                <div className="w-[30%] border-r border-border bg-secondary/30 flex flex-col overflow-hidden">
+                <div className="w-[30%] border-r border-border bg-secondary flex flex-col overflow-hidden">
                     <div className="flex-1 overflow-y-auto p-4 space-y-4">
                         {/* Identity Section */}
                         <div className="grid grid-cols-2 gap-2">
@@ -506,7 +506,7 @@ export default function VendorDetailPage() {
                                 });
                                 setIsEditModalOpen(true);
                             }}
-                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-secondary text-foreground border border-border hover:bg-secondary/80 transition-colors cursor-pointer"
+                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-secondary text-foreground border border-border hover:bg-secondary transition-colors cursor-pointer"
                         >
                             <Pencil className="w-3.5 h-3.5" />
                             <span>Edit</span>
@@ -561,7 +561,7 @@ export default function VendorDetailPage() {
                         {activeTab === 'pos' && (
                             <div className="animate-in fade-in duration-300">
                                 <table className="w-full border-collapse text-left">
-                                    <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
+                                    <thead className="bg-secondary border-y border-border sticky top-0 z-20">
                                         <tr>
                                             {['PO #', 'Status', 'Items', 'Qty Ordered', 'Total', 'Payment Terms', 'Sched. Delivery', 'Created'].map(col => (
                                                 <th key={col} className="px-3 py-1.5 text-[8px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">
@@ -579,7 +579,7 @@ export default function VendorDetailPage() {
                                             const poQty = (po.lineItems || []).reduce((s, i) => s + (i.qtyOrdered || 0), 0);
                                             const poTotal = (po.lineItems || []).reduce((s, i) => s + ((i.qtyOrdered || 0) * (i.cost || 0)), 0);
                                             return (
-                                                <tr key={po._id} className="hover:bg-secondary/50 transition-colors group">
+                                                <tr key={po._id} className="hover:bg-secondary transition-colors group">
                                                     <td className="px-3 py-1.5 text-[10px] font-bold text-foreground">
                                                         <span
                                                             onClick={() => router.push(`/warehouse/purchase-orders/${po._id}`)}
@@ -607,7 +607,7 @@ export default function VendorDetailPage() {
                                         })}
                                     </tbody>
                                     {purchaseOrders.length > 0 && (
-                                        <tfoot className="bg-secondary/50 border-t border-border">
+                                        <tfoot className="bg-secondary border-t border-border">
                                             <tr>
                                                 <td colSpan={2} className="px-3 py-1.5 text-[9px] font-bold text-muted-foreground uppercase text-right tracking-wider">Totals</td>
                                                 <td className="px-3 py-1.5 text-[10px] font-bold text-foreground font-mono">{purchaseOrders.reduce((s, po) => s + (po.lineItems?.length || 0), 0)}</td>
@@ -654,7 +654,7 @@ export default function VendorDetailPage() {
                                     ) : [...vendor.notes].reverse().map((note, reversedIndex) => {
                                         const originalIndex = vendor.notes!.length - 1 - reversedIndex;
                                         return (
-                                            <div key={reversedIndex} className="border border-border rounded-md p-4 bg-secondary/30 hover:bg-secondary/50 transition-colors group">
+                                            <div key={reversedIndex} className="border border-border rounded-md p-4 bg-secondary hover:bg-secondary transition-colors group">
                                                 <div className="flex items-start justify-between">
                                                     <div className="flex-1">
                                                         <p className="text-sm text-foreground whitespace-pre-wrap">{note.note}</p>
@@ -704,7 +704,7 @@ export default function VendorDetailPage() {
         return (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                 <div className="bg-background border border-border rounded shadow-2xl w-full max-w-2xl animate-in fade-in zoom-in duration-200">
-                    <div className="flex items-center justify-between px-6 h-[36px] border-b border-border bg-secondary/50">
+                    <div className="flex items-center justify-between px-6 h-[36px] border-b border-border bg-secondary">
                         <h2 className="text-sm font-black uppercase text-foreground tracking-widest">{isNew ? 'Create Vendor' : 'Edit Vendor'}</h2>
                         <button onClick={() => { setIsEditModalOpen(false); if (isNew) router.push('/warehouse/vendors'); }} className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
                             <X className="w-4 h-4" />
@@ -842,7 +842,7 @@ export default function VendorDetailPage() {
                         <div className="pt-2 flex gap-3">
                             <button
                                 onClick={() => { setIsEditModalOpen(false); if (isNew) router.push('/warehouse/vendors'); }}
-                                className="flex-1 py-2.5 bg-secondary text-foreground text-xs font-bold uppercase rounded hover:bg-secondary/80 transition-colors cursor-pointer border border-border"
+                                className="flex-1 py-2.5 bg-secondary text-foreground text-xs font-bold uppercase rounded hover:bg-secondary transition-colors cursor-pointer border border-border"
                             >
                                 Cancel
                             </button>

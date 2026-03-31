@@ -492,7 +492,7 @@ function CommissionPage() {
     return (
         <div className="h-full flex flex-col overflow-hidden bg-background text-foreground transition-colors duration-200">
             {/* ─── Top Header ──────────────────────────────────────────────── */}
-            <div className="relative shrink-0 h-14 border-b border-border bg-background/80 backdrop-blur-xl px-4 flex items-center justify-between z-50 shadow-sm transition-colors duration-200">
+            <div className="relative shrink-0 h-14 border-b border-border bg-background backdrop-blur-xl px-4 flex items-center justify-between z-50 shadow-sm transition-colors duration-200">
                 <div className="flex items-center space-x-3">
                     <button onClick={() => router.back()} className="hover:bg-secondary rounded-full transition-colors p-2 text-muted-foreground cursor-pointer">
                         <ArrowLeft className="w-5 h-5" />
@@ -555,7 +555,7 @@ function CommissionPage() {
                                         key={rep.value}
                                         onClick={() => toggleRep(rep.value)}
                                         className={cn(
-                                            "w-full text-left px-3 py-2 text-[11px] font-medium flex items-center justify-between hover:bg-secondary/60 transition-colors",
+                                            "w-full text-left px-3 py-2 text-[11px] font-medium flex items-center justify-between hover:bg-secondary transition-colors",
                                             selectedReps.includes(rep.value) && "bg-primary/10 text-primary font-bold"
                                         )}
                                     >
@@ -586,7 +586,7 @@ function CommissionPage() {
                                     "px-3 h-full text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap",
                                     datePreset === preset
                                         ? "bg-primary text-primary-foreground"
-                                        : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                                        : "text-muted-foreground hover:text-foreground hover:bg-secondary"
                                 )}
                             >
                                 {preset === 'this_month' ? 'This Month' : preset === 'last_month' ? 'Last Month' : 'This Year'}
@@ -644,7 +644,7 @@ function CommissionPage() {
                     className="flex-1 overflow-y-auto bg-background min-w-0 relative scrollbar-custom transition-colors duration-200"
                 >
                     <table className="w-full text-left border-collapse">
-                        <thead className="sticky top-0 z-20 bg-secondary/95 backdrop-blur-md border-b border-border shadow-sm">
+                        <thead className="sticky top-0 z-20 bg-secondary border-b border-border shadow-sm">
                             <tr>
                                 <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[80px]">Order#</th>
                                 <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[90px]">Date</th>
@@ -666,7 +666,7 @@ function CommissionPage() {
                                         {Array.from({ length: 6 }).map((_, j) => (
                                             <td key={j} className="px-4 py-3">
                                                 <div
-                                                    className="h-3.5 rounded-sm bg-secondary/80 animate-pulse"
+                                                    className="h-3.5 rounded-sm bg-secondary animate-pulse"
                                                     style={{ width: `${40 + Math.random() * 40}%`, animationDelay: `${i * 30}ms` }}
                                                 />
                                             </td>
@@ -721,7 +721,7 @@ function CommissionPage() {
                                         </tr>
                                     ))}
                                     {/* Footer totals row */}
-                                    <tr className="bg-secondary/60 border-t-2 border-primary/30 sticky bottom-0">
+                                    <tr className="bg-secondary border-t-2 border-primary/30 sticky bottom-0">
                                         <td colSpan={4} className="px-4 py-3 text-[11px] font-black text-foreground uppercase tracking-widest">
                                             Totals ({filteredOrders.length} Orders)
                                         </td>
@@ -739,7 +739,7 @@ function CommissionPage() {
                 </div>
 
                 {/* Right Column: Side Panel */}
-                <div className="w-[360px] shrink-0 overflow-y-auto bg-secondary/30 border-l border-border scrollbar-custom p-5 space-y-5 transition-colors duration-200">
+                <div className="w-[360px] shrink-0 overflow-y-auto bg-secondary border-l border-border scrollbar-custom p-5 space-y-5 transition-colors duration-200">
 
                     {/* Grand Total Commission Card */}
                     <div className="relative overflow-hidden bg-background border border-border shadow-sm hover:shadow-md transition-shadow duration-300 rounded-2xl p-5">
@@ -934,7 +934,7 @@ function MetricRow({ label, value, icon: Icon, color }: { label: string; value: 
         gold: 'text-primary bg-primary/10 border-primary/20',
     };
     return (
-        <div className="flex items-center justify-between p-2.5 rounded-lg hover:bg-secondary/60 transition-colors border border-transparent hover:border-border">
+        <div className="flex items-center justify-between p-2.5 rounded-lg hover:bg-secondary transition-colors border border-transparent hover:border-border">
             <div className="flex items-center gap-3">
                 <div className={cn("w-7 h-7 rounded-md flex items-center justify-center border", colorMap[color])}>
                     <Icon className="w-3.5 h-3.5" />

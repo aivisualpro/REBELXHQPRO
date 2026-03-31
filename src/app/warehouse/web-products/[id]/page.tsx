@@ -329,7 +329,7 @@ export default function WebProductDetailsPage() {
                             ].map((row, rowIdx) => (
                                 <div key={rowIdx} className={cn(
                                     "grid grid-cols-2 divide-x divide-border",
-                                    rowIdx % 2 === 0 ? "bg-background" : "bg-secondary/50",
+                                    rowIdx % 2 === 0 ? "bg-background" : "bg-secondary",
                                     rowIdx > 0 && "border-t border-border"
                                 )}>
                                     {row.map((item, colIdx) => (
@@ -395,7 +395,7 @@ export default function WebProductDetailsPage() {
                                 {product.webCategories?.map((cat, idx) => (
                                     <div key={cat.id || cat._id || idx} className={cn(
                                         "px-4 py-2.5 flex items-center justify-between",
-                                        idx % 2 === 0 ? "bg-background" : "bg-secondary/50",
+                                        idx % 2 === 0 ? "bg-background" : "bg-secondary",
                                         idx > 0 && "border-t border-border"
                                     )}>
                                         <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Category</span>
@@ -416,7 +416,7 @@ export default function WebProductDetailsPage() {
                                     {product.webAttributes.map((attr, idx) => (
                                         <div key={attr.id || attr.name} className={cn(
                                             "px-4 py-2.5",
-                                            idx % 2 === 0 ? "bg-background" : "bg-secondary/50",
+                                            idx % 2 === 0 ? "bg-background" : "bg-secondary",
                                             idx > 0 && "border-t border-border"
                                         )}>
                                             <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold block mb-1.5">{attr.name}</span>
@@ -444,7 +444,7 @@ export default function WebProductDetailsPage() {
                                 ].map((item, idx) => (
                                     <div key={idx} className={cn(
                                         "px-4 py-2.5 flex items-center justify-between",
-                                        idx % 2 === 0 ? "bg-background" : "bg-secondary/50",
+                                        idx % 2 === 0 ? "bg-background" : "bg-secondary",
                                         idx > 0 && "border-t border-border"
                                     )}>
                                         <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">{item.label}</span>
@@ -465,7 +465,7 @@ export default function WebProductDetailsPage() {
                                 ].map((item, idx) => (
                                     <div key={idx} className={cn(
                                         "px-4 py-2.5 flex items-center justify-between",
-                                        idx % 2 === 0 ? "bg-background" : "bg-secondary/50",
+                                        idx % 2 === 0 ? "bg-background" : "bg-secondary",
                                         idx > 0 && "border-t border-border"
                                     )}>
                                         <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">{item.label}</span>
@@ -559,7 +559,7 @@ export default function WebProductDetailsPage() {
                         {activeTab === 'Variations' && (
                             <div className="animate-in fade-in duration-300">
                                 <table className="w-full border-collapse text-left">
-                                    <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
+                                    <thead className="bg-secondary border-y border-border sticky top-0 z-20">
                                         <tr>
                                             <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">Variation</th>
                                             <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">Linked SKU</th>
@@ -581,7 +581,7 @@ export default function WebProductDetailsPage() {
                                                     key={vid || idx}
                                                     onClick={() => setVariationFilter(isActive ? null : vid)}
                                                     className={cn(
-                                                        "hover:bg-secondary/50 transition-colors cursor-pointer group",
+                                                        "hover:bg-secondary transition-colors cursor-pointer group",
                                                         isActive && "bg-blue-500/10"
                                                     )}
                                                 >
@@ -662,7 +662,7 @@ export default function WebProductDetailsPage() {
                                 ) : (
                                     <div className="p-4">
                                         {/* Main Image */}
-                                        <div className="relative aspect-video bg-secondary/30 border border-border rounded overflow-hidden group mb-4">
+                                        <div className="relative aspect-video bg-secondary border border-border rounded overflow-hidden group mb-4">
                                             <div className="w-full h-full p-8">
                                                 <img
                                                     src={images[currentImageIndex].src}
@@ -690,7 +690,7 @@ export default function WebProductDetailsPage() {
 
                                         {/* Thumbnails */}
                                         <table className="w-full border-collapse text-left">
-                                            <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
+                                            <thead className="bg-secondary border-y border-border sticky top-0 z-20">
                                                 <tr>
                                                     <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap w-[60px]">Image</th>
                                                     <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">Name</th>
@@ -701,7 +701,7 @@ export default function WebProductDetailsPage() {
                                                 {images.map((img, idx) => (
                                                     <tr
                                                         key={img.id || idx}
-                                                        className={cn("hover:bg-secondary/50 transition-colors cursor-pointer", currentImageIndex === idx && "bg-primary/5")}
+                                                        className={cn("hover:bg-secondary transition-colors cursor-pointer", currentImageIndex === idx && "bg-primary/5")}
                                                         onClick={() => setCurrentImageIndex(idx)}
                                                     >
                                                         <td className="px-3 py-2">
@@ -899,7 +899,7 @@ function RelatedWebOrders({ productWebId, website, baseProductName, variationId,
                         placeholder="Search orders..."
                         value={search}
                         onChange={e => setSearch(e.target.value)}
-                        className="pl-8 pr-3 h-7 w-52 bg-secondary/60 border border-border text-[12px] rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50 placeholder:text-muted-foreground/50 text-foreground transition-all"
+                        className="pl-8 pr-3 h-7 w-52 bg-secondary border border-border text-[12px] rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50 placeholder:text-muted-foreground/50 text-foreground transition-all"
                     />
                 </div>
                 <div className="flex-1" />
@@ -924,7 +924,7 @@ function RelatedWebOrders({ productWebId, website, baseProductName, variationId,
             {/* Table */}
             <div ref={scrollRef} className="flex-1 overflow-auto">
                 <table className="w-full border-collapse text-left">
-                    <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
+                    <thead className="bg-secondary border-y border-border sticky top-0 z-20">
                         <tr>
                             <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">Date</th>
                             <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">Order #</th>
@@ -954,7 +954,7 @@ function RelatedWebOrders({ productWebId, website, baseProductName, variationId,
                                     <tr
                                         key={item._id || idx}
                                         onClick={() => router.push(`/sales/web-orders/${item.orderId}`)}
-                                        className="hover:bg-secondary/50 transition-colors cursor-pointer group"
+                                        className="hover:bg-secondary transition-colors cursor-pointer group"
                                     >
                                         <td className="px-3 py-2 text-xs text-foreground font-mono font-bold whitespace-nowrap">
                                             {item.orderDate ? formatDate(item.orderDate) : '-'}
@@ -999,7 +999,7 @@ function RelatedWebOrders({ productWebId, website, baseProductName, variationId,
                                         <td className="px-3 py-2 text-right text-xs text-foreground font-mono font-bold">
                                             ${(item.price || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </td>
-                                        <td className="px-3 py-2 text-right text-xs text-foreground font-mono font-black bg-secondary/20">
+                                        <td className="px-3 py-2 text-right text-xs text-foreground font-mono font-black bg-secondary">
                                             ${(item.total || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </td>
                                         <td className="px-3 py-2">

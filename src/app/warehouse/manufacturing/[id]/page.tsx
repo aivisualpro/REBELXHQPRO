@@ -647,7 +647,7 @@ export default function ManufacturingDetailPage() {
                     <div className="flex items-center justify-end px-4 h-9 border-b border-border shrink-0">
                         <Link
                             href={`/warehouse/skus/${typeof order.sku === 'object' && order.sku !== null ? (order.sku as any)._id : order.sku}?lot=${encodeURIComponent(order.label || order._id)}`}
-                            className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80 px-2.5 py-1 border border-border transition-colors"
+                            className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary px-2.5 py-1 border border-border transition-colors"
                         >
                             <Layers className="w-3 h-3" />
                             <span>Ledger</span>
@@ -718,7 +718,7 @@ export default function ManufacturingDetailPage() {
                                             order.status === 'Processing' ? "bg-blue-500 text-white border-blue-600 hover:bg-blue-600" :
                                                 order.status === 'Ready to QC' ? "bg-amber-500 text-white border-amber-600 hover:bg-amber-600" :
                                                     order.status === 'Pending' ? "bg-slate-500 text-white border-slate-600 hover:bg-slate-600" :
-                                                        "bg-secondary text-muted-foreground border-border hover:bg-secondary/80"
+                                                        "bg-secondary text-muted-foreground border-border hover:bg-secondary"
                                     )}
                                 >
                                     {order.status}
@@ -858,7 +858,7 @@ export default function ManufacturingDetailPage() {
                                 return (
                                     <>
                                         {pairedRows.map((pair, rowIdx) => (
-                                            <div key={rowIdx} className={cn("grid grid-cols-2 divide-x divide-border", rowIdx % 2 === 0 ? "bg-background" : "bg-secondary/50")}>
+                                            <div key={rowIdx} className={cn("grid grid-cols-2 divide-x divide-border", rowIdx % 2 === 0 ? "bg-background" : "bg-secondary")}>
                                                 {pair.map((item, colIdx) => (
                                                     <div key={colIdx} className="px-4 py-3 flex flex-col gap-0.5">
                                                         <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">{item.label}</span>
@@ -870,7 +870,7 @@ export default function ManufacturingDetailPage() {
                                         {fullWidthRows.map((item, idx) => (
                                             <div key={`fw-${idx}`} className={cn(
                                                 "flex items-center justify-between px-4 py-3",
-                                                (pairedRows.length + idx) % 2 === 0 ? "bg-background" : "bg-secondary/50"
+                                                (pairedRows.length + idx) % 2 === 0 ? "bg-background" : "bg-secondary"
                                             )}>
                                                 <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">{item.label}</span>
                                                 {item.recipeId ? (
@@ -928,7 +928,7 @@ export default function ManufacturingDetailPage() {
                     <div className="border-t border-border px-4 py-4 shrink-0 flex items-center gap-2">
                         <button
                             onClick={() => router.push(`/warehouse/manufacturing/${order._id}/edit`)}
-                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-secondary text-foreground border border-border hover:bg-secondary/80 transition-colors"
+                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-secondary text-foreground border border-border hover:bg-secondary transition-colors"
                         >
                             <Pencil className="w-3.5 h-3.5" />
                             <span>Edit</span>
@@ -1036,7 +1036,7 @@ export default function ManufacturingDetailPage() {
                         {activeTab === 'Items' && (
                             <div className="animate-in fade-in duration-300">
                                 <table className="w-full border-collapse text-left">
-                                    <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
+                                    <thead className="bg-secondary border-y border-border sticky top-0 z-20">
                                         <tr>
                                             {[
                                                 { label: 'Date', width: 'w-[90px]' },
@@ -1100,7 +1100,7 @@ export default function ManufacturingDetailPage() {
                                             }
 
                                             return (
-                                                <tr key={item._id} className="hover:bg-secondary/30 transition-colors">
+                                                <tr key={item._id} className="hover:bg-secondary transition-colors">
                                                     <td className="px-3 py-2 text-[11px] text-muted-foreground font-mono">
                                                         {formatDate(item.createdAt)}
                                                     </td>
@@ -1171,10 +1171,10 @@ export default function ManufacturingDetailPage() {
                                                     <td className="px-3 py-2 text-[11px] text-foreground/80 font-mono bg-blue-50/20 text-right">{bomQty.toLocaleString()}</td>
                                                     <td className="px-3 py-2 text-[11px] text-muted-foreground font-mono text-right">{qtyExtra > 0 ? qtyExtra.toFixed(2) : '-'}</td>
                                                     <td className="px-3 py-2 text-[11px] text-red-500/80 font-mono text-right font-semibold">{qtyScrapped || '-'}</td>
-                                                    <td className="px-3 py-2 text-[11px] font-bold text-foreground/90 bg-secondary/30 text-right">
+                                                    <td className="px-3 py-2 text-[11px] font-bold text-foreground/90 bg-secondary text-right">
                                                         {totalQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                                                     </td>
-                                                    <td className="px-3 py-2 text-[11px] font-mono font-semibold text-foreground/90 bg-secondary/10 whitespace-nowrap text-right">
+                                                    <td className="px-3 py-2 text-[11px] font-mono font-semibold text-foreground/90 bg-secondary whitespace-nowrap text-right">
                                                         {item.cost !== undefined ? `$${(totalQty * item.cost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
                                                     </td>
                                                     <td className="px-3 py-1 text-center">
@@ -1204,7 +1204,7 @@ export default function ManufacturingDetailPage() {
                         {activeTab === 'Labor' && (
                             <div className="animate-in fade-in duration-300">
                                 <table className="w-full border-collapse text-left">
-                                    <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
+                                    <thead className="bg-secondary border-y border-border sticky top-0 z-20">
                                         <tr>
                                             {['Date', 'Type', 'User', 'Duration', 'Actions'].map(col => (
                                                 <th key={col} className={`px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap ${col === 'Actions' ? 'text-right' : ''}`}>
@@ -1229,7 +1229,7 @@ export default function ManufacturingDetailPage() {
                                             const userName = formatUser(entry.user);
 
                                             return (
-                                                <tr key={entry._id} className="hover:bg-secondary/30 transition-colors">
+                                                <tr key={entry._id} className="hover:bg-secondary transition-colors">
                                                     <td className="px-3 py-2 text-[11px] text-muted-foreground font-mono">
                                                         {formatDate(entry.createdAt)}
                                                     </td>
@@ -1410,7 +1410,7 @@ export default function ManufacturingDetailPage() {
                                     </div>
                                 ) : (
                                     <table className="w-full border-collapse text-left">
-                                        <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
+                                        <thead className="bg-secondary border-y border-border sticky top-0 z-20">
                                             <tr>
                                                 <th className="px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap w-16 text-center">Step</th>
                                                 <th className="px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">Description</th>
@@ -1418,7 +1418,7 @@ export default function ManufacturingDetailPage() {
                                         </thead>
                                         <tbody>
                                             {(order.recipesId.steps as any[]).sort((a: any, b: any) => (parseInt(a.step) || 0) - (parseInt(b.step) || 0)).map((step: any, i: number) => (
-                                                <tr key={i} className="border-b border-border hover:bg-secondary/30 transition-colors">
+                                                <tr key={i} className="border-b border-border hover:bg-secondary transition-colors">
                                                     <td className="px-3 py-2.5 text-[12px] font-medium text-foreground whitespace-nowrap align-top text-center">
                                                         {step.step}
                                                     </td>
@@ -1443,14 +1443,14 @@ export default function ManufacturingDetailPage() {
                                     </div>
                                 ) : (
                                     <table className="w-full border-collapse text-left">
-                                        <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
+                                        <thead className="bg-secondary border-y border-border sticky top-0 z-20">
                                             <tr>
                                                 <th className="px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">Recipe</th>
                                                 <th className="px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">Notes</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <tr className="border-b border-border hover:bg-secondary/30 transition-colors">
+                                            <tr className="border-b border-border hover:bg-secondary transition-colors">
                                                 <td className="px-3 py-2.5 text-[12px] font-medium text-foreground/90 whitespace-nowrap align-top">
                                                     {typeof order.recipesId === 'object' ? order.recipesId.name : '-'}
                                                 </td>
@@ -1474,7 +1474,7 @@ export default function ManufacturingDetailPage() {
                         {activeTab === 'QC' && (
                             <div className="animate-in fade-in duration-300">
                                 <table className="w-full border-collapse text-left">
-                                    <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
+                                    <thead className="bg-secondary border-y border-border sticky top-0 z-20">
                                         <tr>
                                             {['Checked By', 'Packaged By', 'Label', 'Lot', 'Seal', 'Pkg Qty', 'Repackaged', 'Weight', 'Target', 'Actual Wt', 'QC By', 'Date'].map(col => (
                                                 <th key={col} className="px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">
@@ -1489,7 +1489,7 @@ export default function ManufacturingDetailPage() {
                                                 <td colSpan={12} className="px-3 py-6 text-center text-[12px] font-bold text-muted-foreground uppercase tracking-wider">No quality checks found</td>
                                             </tr>
                                         ) : order.qualityCheck.map((qc, idx) => (
-                                            <tr key={qc._id || idx} className="hover:bg-secondary/30 transition-colors">
+                                            <tr key={qc._id || idx} className="hover:bg-secondary transition-colors">
                                                 <td className="px-3 py-2 text-[11px] text-foreground/90 font-medium">{formatUser(qc.checkedBy)}</td>
                                                 <td className="px-3 py-2 text-[11px] text-foreground/90 font-medium">{formatUser(qc.packagedBy)}</td>
                                                 <td className="px-3 py-2 text-[11px] text-center">
@@ -1524,7 +1524,7 @@ export default function ManufacturingDetailPage() {
                         {activeTab === 'WO Notes' && (
                             <div className="animate-in fade-in duration-300">
                                 <table className="w-full border-collapse text-left">
-                                    <thead className="bg-secondary/50 border-y border-border sticky top-0 z-20">
+                                    <thead className="bg-secondary border-y border-border sticky top-0 z-20">
                                         <tr>
                                             {['Note', 'Created By', 'Created At', 'Actions'].map(col => (
                                                 <th key={col} className="px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">
@@ -1539,7 +1539,7 @@ export default function ManufacturingDetailPage() {
                                                 <td colSpan={4} className="px-3 py-6 text-center text-[12px] font-bold text-muted-foreground uppercase tracking-wider">No notes found</td>
                                             </tr>
                                         ) : order.notes.map((note, idx) => (
-                                            <tr key={note._id || idx} className="hover:bg-secondary/30 transition-colors">
+                                            <tr key={note._id || idx} className="hover:bg-secondary transition-colors">
                                                 <td className="px-3 py-2 text-[11px] text-foreground/90 font-medium max-w-xl">
                                                     <p className="line-clamp-2">{note.note}</p>
                                                 </td>
@@ -1738,7 +1738,7 @@ export default function ManufacturingDetailPage() {
                                                 setEditingSkuId(typeof editingItem.sku === 'object' ? editingItem.sku._id : editingItem.sku as string);
                                                 setIsAddLotModalOpen(true);
                                             }}
-                                            className="px-3 py-2 text-xs font-bold uppercase bg-secondary text-muted-foreground hover:bg-secondary/80 transition-colors rounded"
+                                            className="px-3 py-2 text-xs font-bold uppercase bg-secondary text-muted-foreground hover:bg-secondary transition-colors rounded"
                                         >
                                             Select Lot
                                         </button>
@@ -1821,7 +1821,7 @@ export default function ManufacturingDetailPage() {
                                 </div>
                             </div>
                         </div>
-                        <div className="flex items-center justify-end space-x-3 px-4 h-9 border-t border-border bg-secondary/50">
+                        <div className="flex items-center justify-end space-x-3 px-4 h-9 border-t border-border bg-secondary">
                             <button
                                 onClick={handleCloseEditModal}
                                 className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground/80 transition-colors"
@@ -1864,7 +1864,7 @@ export default function ManufacturingDetailPage() {
                                 />
                             </div>
                         </div>
-                        <div className="flex items-center justify-end space-x-3 px-6 py-4 border-t border-border bg-secondary/50">
+                        <div className="flex items-center justify-end space-x-3 px-6 py-4 border-t border-border bg-secondary">
                             <button
                                 onClick={() => setIsNoteModalOpen(false)}
                                 className="px-4 py-2 text-xs font-bold uppercase text-muted-foreground hover:text-foreground/80 transition-colors"
@@ -2018,7 +2018,7 @@ export default function ManufacturingDetailPage() {
                                 </div>
                             )}
                         </div>
-                        <div className="flex items-center justify-end space-x-3 px-6 py-4 border-t border-border bg-secondary/50">
+                        <div className="flex items-center justify-end space-x-3 px-6 py-4 border-t border-border bg-secondary">
                             <button
                                 onClick={() => setIsLaborModalOpen(false)}
                                 className="px-4 py-2 text-xs font-bold uppercase text-muted-foreground hover:text-foreground/80 transition-colors"
