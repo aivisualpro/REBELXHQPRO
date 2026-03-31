@@ -15,11 +15,12 @@ export async function GET(req: Request) {
         const startDate = searchParams.get('startDate');
         const endDate = searchParams.get('endDate');
         const source = searchParams.get('source') || 'total'; // 'web', 'wholesale', 'total'
+        const salesRep = searchParams.get('salesRep');
 
         // Build date filters — timezone-safe using explicit UTC boundaries
         let webDateFilter: any = {};
         let defaultDateFilter: any = {};
-        if (startDate && endDate) {
+        if (startDate && endDate && startDate !== 'all' && endDate !== 'all') {
             // Parse as plain dates without timezone offset
             // e.g. "2026-03-01" → midnight UTC on that day
             const start = new Date(startDate + 'T00:00:00.000Z');
@@ -33,6 +34,10 @@ export async function GET(req: Request) {
             };
         }
 
+        if (salesRep) {
+            defaultDateFilter.salesRep = { $in: salesRep.split(',') };
+        }
+
         // 1. REVENUE
         let webRevenue = 0;
         let webOrdersCount = 0;
@@ -43,8 +48,8 @@ export async function GET(req: Request) {
         let saleShipping = 0;
         let saleTax = 0;
 
-        // Web Orders Revenue (skip if source is 'wholesale')
-        if (source !== 'wholesale') {
+        // Web Orders Revenue (skip if source is 'wholesale' or if filtering by sales rep)
+        if (source !== 'wholesale' && !salesRep) {
             const webRevenueAgg = await WebOrder.aggregate([
                 { $match: { 
                     status: { $in: ['completed', 'shipped', 'Completed', 'Shipped', 'processing', 'Processing'] },
@@ -126,7 +131,7 @@ export async function GET(req: Request) {
         // Build based on the source filter
         let monthlyRevenue: any[] = [];
 
-        if (source !== 'wholesale') {
+        if (source !== 'wholesale' && !salesRep) {
             // Web Orders monthly
             const webMonthly = await WebOrder.aggregate([
                 { $match: { 
