@@ -370,6 +370,15 @@ export const MODULE_BLUEPRINTS: ModuleBlueprint[] = [
                 ],
             },
             {
+                key: 'inventory',
+                label: 'Inventory',
+                route: '/reports/inventory',
+                fields: [
+                    { field: 'on-hand', label: 'On Hand' },
+                    { field: 're-order', label: 'Re-Order' }
+                ],
+            },
+            {
                 key: 'business',
                 label: 'Business',
                 route: '/reports/business',

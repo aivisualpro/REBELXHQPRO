@@ -53,6 +53,7 @@ export const MENU_ITEMS = [
         items: [
             { title: 'Dashboard', href: '/reports/dashboard', icon: LayoutDashboard },
             { title: 'Financials', href: '/reports/financials', icon: LineChart },
+            { title: 'Inventory', href: '/reports/inventory', icon: Package },
             { title: 'Business', href: '/reports/business', icon: PieChart },
             { title: 'Waiting on Lot', href: '/reports/waiting-on-lot', icon: AlertTriangle },
             { title: 'Missing Cost', href: '/reports/missing-cost', icon: CircleDollarSign },
