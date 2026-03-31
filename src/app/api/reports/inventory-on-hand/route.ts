@@ -19,7 +19,7 @@ async function computeInventoryAtDate(tillEnd: Date) {
     const woDateQ = { dateCreated: { $lte: tillEnd } };
     const WO_STATUSES = ['completed', 'shipped', 'Completed', 'Shipped', 'processing', 'Processing', 'pending', 'Pending', 'on-hold', 'On Hold'];
 
-    const [obsAgg, posAgg, sosAgg, mosProdAgg, mosConsAgg, adjsAgg, wosAgg, wosVarAgg, skusRaw] = await Promise.all([
+    const [obsAgg, posAgg, sosAgg, mosProdRaw, mosConsAgg, adjsAgg, wosAgg, wosVarAgg, skusRaw] = await Promise.all([
         OpeningBalance.aggregate([
             { $match: dateQ },
             { $group: { _id: { $toString: '$sku' }, qty: { $sum: '$qty' }, costVal: { $sum: { $multiply: ['$qty', { $ifNull: ['$cost', 0] }] } } } }
@@ -34,10 +34,10 @@ async function computeInventoryAtDate(tillEnd: Date) {
             { $unwind: '$lineItems' },
             { $group: { _id: { $toString: '$lineItems.sku' }, qty: { $sum: { $ifNull: ['$lineItems.qtyShipped', 0] } } } }
         ]),
-        Manufacturing.aggregate([
-            { $match: { status: { $ne: 'Pending' }, ...dateQ } },
-            { $group: { _id: { $toString: '$sku' }, qty: { $sum: { $add: [{ $ifNull: ['$qty', 0] }, { $ifNull: ['$qtyDifference', 0] }] } } } }
-        ]),
+        // Manufacturing production — find().lean() for BOM cost math + labor parsing
+        Manufacturing.find({ status: { $ne: 'Pending' }, ...dateQ })
+            .select('sku qty qtyDifference lineItems labor status')
+            .lean(),
         Manufacturing.aggregate([
             { $match: { status: 'Fulfilled', ...dateQ } },
             { $unwind: '$lineItems' },
@@ -80,11 +80,34 @@ async function computeInventoryAtDate(tillEnd: Date) {
     const obsMap = new Map(obsAgg.map((r: any) => [r._id, r]));
     const posMap = new Map(posAgg.map((r: any) => [r._id, r]));
     const sosMap = new Map(sosAgg.map((r: any) => [r._id, r]));
-    const moProdMap = new Map(mosProdAgg.map((r: any) => [r._id, r]));
     const moConsMap = new Map(mosConsAgg.map((r: any) => [r._id, r]));
     const adjsMap = new Map(adjsAgg.map((r: any) => [r._id, r]));
     const wosMap = new Map(wosAgg.map((r: any) => [r._id, r]));
     const wosVarMap = new Map(wosVarAgg.map((r: any) => [r._id, r]));
+
+    // Compute Manufacturing production cost in Node.js (BOM math + labor)
+    const moProdMap = new Map<string, { qty: number; costVal: number }>();
+    (mosProdRaw as any[]).forEach((mo: any) => {
+        const id = mo.sku?.toString();
+        if (!id) return;
+        const qtyProduced = (mo.qty || 0) + (mo.qtyDifference || 0);
+        let moCost = 0;
+        mo.lineItems?.forEach((li: any) => {
+            const bomQty = (mo.qty || 0) * (li.recipeQty || 0);
+            const sa = (li.sa || 0) / 100;
+            const qtyExtra = sa > 0 ? (bomQty / sa) - bomQty : 0;
+            moCost += (bomQty + (li.qtyScrapped || 0) + qtyExtra) * (li.cost || 0);
+        });
+        mo.labor?.forEach((lab: any) => {
+            const parts = (lab.duration || '0:0:0').split(':');
+            const hours = parseInt(parts[0] || '0') + parseInt(parts[1] || '0') / 60 + parseInt(parts[2] || '0') / 3600;
+            moCost += hours * (lab.hourlyRate || 0);
+        });
+        const ex = moProdMap.get(id) || { qty: 0, costVal: 0 };
+        ex.qty += qtyProduced;
+        if (qtyProduced > 0) ex.costVal += moCost;
+        moProdMap.set(id, ex);
+    });
 
     return skusRaw.map((sku: any) => {
         const id = sku._id.toString();
@@ -97,7 +120,7 @@ async function computeInventoryAtDate(tillEnd: Date) {
         if (po) { qtyIn += po.qty || 0; totalCostIn += po.costVal || 0; }
 
         const moProd = moProdMap.get(id);
-        if (moProd) { qtyIn += moProd.qty || 0; }
+        if (moProd) { qtyIn += moProd.qty || 0; totalCostIn += moProd.costVal || 0; } // ← cost included
 
         const moCons = moConsMap.get(id);
         if (moCons) { qtyOut += moCons.qty || 0; }
