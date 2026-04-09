@@ -108,6 +108,7 @@ function transformShopifyOrder(order: any, siteName: string) {
         paymentMethodTitle: order.payment_gateway_names?.[0],
         lineItems,
         website: siteName,
+        platform: 'shopify',
         updatedAt: new Date()
     };
 }
