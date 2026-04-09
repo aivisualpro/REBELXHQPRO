@@ -10,7 +10,6 @@ export async function GET(request: Request) {
 
     // 1. Initial Visit -> Redirect to Shopify Auth Check
     if (!code) {
-        // ADDED: read_orders, read_all_orders
         const scopes = 'read_products,write_products,read_orders,read_all_orders';
         const redirectUri = `https://www.rebelxbrandscrm.com/api/debug/shopify-auth`;
         const authUrl = `https://${shop}/admin/oauth/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${redirectUri}&state=nonce123`;
@@ -19,10 +18,14 @@ export async function GET(request: Request) {
     }
 
     // 2. Callback Visit -> Exchange code for permanent token
+    let rawText = '';
     try {
         const tokenRes = await fetch(`https://${shop}/admin/oauth/access_token`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Accept': 'application/json' 
+            },
             body: JSON.stringify({
                 client_id: clientId,
                 client_secret: clientSecret,
@@ -30,16 +33,15 @@ export async function GET(request: Request) {
             })
         });
 
-        const data = await tokenRes.json();
+        rawText = await tokenRes.text(); // Grab raw text first to avoid JSON parse crashes!
+        return NextResponse.json(JSON.parse(rawText));
 
-        return NextResponse.json({
-            success: true,
-            message: "NEW TOKEN GENERATED! Copy the access_token below into your .env.local as GRHKTATOM_SHOPIFY_ACCESS_TOKEN and in your Vercel environment variables.",
-            access_token: data.access_token,
-            scope: data.scope,
-            shop
-        });
     } catch (err: any) {
-        return NextResponse.json({ error: err.message }, { status: 500 });
+        // Return exactly what the Shopify server spat back out so we can debug it
+        return NextResponse.json({ 
+            error: "Failed to parse Shopify response", 
+            statusCodeText: err.message, 
+            rawShopifyResponse: rawText 
+        }, { status: 500 });
     }
 }
