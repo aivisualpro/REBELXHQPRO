@@ -20,7 +20,8 @@ import {
   Check,
   SquarePen,
   Calendar,
-  ChevronDown
+  ChevronDown,
+  Settings2
 } from 'lucide-react';
 import { cn, formatDate, toDateInputValue } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -288,13 +289,14 @@ interface QuickEditValues {
 }
 
 const WholesaleTableRow = React.memo(function WholesaleTableRow({
-  order, onClick, highlight, isQuickEdit, quickEditValues, onQuickEditChange, isFieldVisibleCost
+  order, onClick, highlight, isQuickEdit, quickEditValues, onQuickEditChange, isFieldVisibleCost, hiddenColumns = new Set()
 }: {
   order: SaleOrder; onClick: () => void; highlight?: boolean;
   isQuickEdit?: boolean;
   quickEditValues?: QuickEditValues;
   onQuickEditChange?: (orderId: string, field: keyof QuickEditValues, value: string) => void;
   isFieldVisibleCost?: boolean;
+  hiddenColumns?: Set<string>;
 }) {
   const subtotal = calcSubtotal(order);
   const shipping = quickEditValues ? (parseFloat(quickEditValues.shippingCost) || 0) : (order.shippingCost ?? 0);
@@ -328,21 +330,35 @@ const WholesaleTableRow = React.memo(function WholesaleTableRow({
       )}
       onClick={isQuickEdit ? undefined : onClick}
     >
-      <td className="px-2.5 py-2.5 w-[70px] text-[12px] font-mono font-bold text-foreground/90 group-hover:text-foreground transition-colors">
-        <span className="group-hover:border-l-2 group-hover:border-l-primary group-hover:pl-1.5 transition-all">{order.label || '-'}</span>
-      </td>
-      <td className="px-2.5 py-2.5 w-[85px] text-[12px] font-mono text-foreground/60">
-        {formatDate(order.createdAt)}
-      </td>
-      <td className="px-2.5 py-2.5 w-[160px] text-[12px] text-foreground/90 group-hover:text-foreground transition-colors font-semibold truncate">
-        {getClientName(order) || '-'}
-      </td>
-      <td className="px-2.5 py-2.5 w-[110px] text-[12px] font-medium text-foreground/60 truncate">{getSalesRepName(order) || '-'}</td>
-      <td className="px-2.5 py-2.5 w-[100px] text-[12px] text-foreground/60">{order.paymentMethod || '-'}</td>
-      <td className="px-2.5 py-2.5 w-[95px]"><OrderStatusBadge status={order.orderStatus} /></td>
-      <td className="px-2.5 py-2.5 w-[90px] text-[12px] font-mono text-right text-foreground/70">{fmtCurrency(subtotal)}</td>
-      {isQuickEdit ? (
-        <>
+      {!hiddenColumns.has('label') && (
+        <td className="px-2.5 py-2.5 w-[70px] text-[12px] font-mono font-bold text-foreground/90 group-hover:text-foreground transition-colors">
+          <span className="group-hover:border-l-2 group-hover:border-l-primary group-hover:pl-1.5 transition-all">{order.label || '-'}</span>
+        </td>
+      )}
+      {!hiddenColumns.has('createdAt') && (
+        <td className="px-2.5 py-2.5 w-[85px] text-[12px] font-mono text-foreground/60">
+          {formatDate(order.createdAt)}
+        </td>
+      )}
+      {!hiddenColumns.has('clientId') && (
+        <td className="px-2.5 py-2.5 w-[160px] text-[12px] text-foreground/90 group-hover:text-foreground transition-colors font-semibold truncate">
+          {getClientName(order) || '-'}
+        </td>
+      )}
+      {!hiddenColumns.has('salesRep') && (
+        <td className="px-2.5 py-2.5 w-[110px] text-[12px] font-medium text-foreground/60 truncate">{getSalesRepName(order) || '-'}</td>
+      )}
+      {!hiddenColumns.has('paymentMethod') && (
+        <td className="px-2.5 py-2.5 w-[100px] text-[12px] text-foreground/60">{order.paymentMethod || '-'}</td>
+      )}
+      {!hiddenColumns.has('orderStatus') && (
+        <td className="px-2.5 py-2.5 w-[95px]"><OrderStatusBadge status={order.orderStatus} /></td>
+      )}
+      {!hiddenColumns.has('subtotal') && (
+        <td className="px-2.5 py-2.5 w-[90px] text-[12px] font-mono text-right text-foreground/70">{fmtCurrency(subtotal)}</td>
+      )}
+      {!hiddenColumns.has('shippingCost') && (
+        isQuickEdit ? (
           <td className="px-1 py-1 w-[75px]">
             <input
               type="text"
@@ -353,6 +369,12 @@ const WholesaleTableRow = React.memo(function WholesaleTableRow({
               className="w-full h-7 px-1.5 text-[12px] font-mono text-right bg-background border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-foreground transition-all"
             />
           </td>
+        ) : (
+          <td className="px-2.5 py-2.5 w-[75px] text-[12px] font-mono text-right text-foreground/70">{fmtCurrency(shipping)}</td>
+        )
+      )}
+      {!hiddenColumns.has('discount') && (
+        isQuickEdit ? (
           <td className="px-1 py-1 w-[75px]">
             <input
               type="text"
@@ -363,6 +385,12 @@ const WholesaleTableRow = React.memo(function WholesaleTableRow({
               className="w-full h-7 px-1.5 text-[12px] font-mono text-right bg-background border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-foreground transition-all"
             />
           </td>
+        ) : (
+          <td className="px-2.5 py-2.5 w-[75px] text-[12px] font-mono text-right text-foreground/70">{fmtCurrency(discount)}</td>
+        )
+      )}
+      {!hiddenColumns.has('tax') && (
+        isQuickEdit ? (
           <td className="px-1 py-1 w-[65px]">
             <input
               type="text"
@@ -373,21 +401,21 @@ const WholesaleTableRow = React.memo(function WholesaleTableRow({
               className="w-full h-7 px-1.5 text-[12px] font-mono text-right bg-background border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-foreground transition-all"
             />
           </td>
-        </>
-      ) : (
-        <>
-          <td className="px-2.5 py-2.5 w-[75px] text-[12px] font-mono text-right text-foreground/70">{fmtCurrency(shipping)}</td>
-          <td className="px-2.5 py-2.5 w-[75px] text-[12px] font-mono text-right text-foreground/70">{fmtCurrency(discount)}</td>
+        ) : (
           <td className="px-2.5 py-2.5 w-[65px] text-[12px] font-mono text-right text-foreground/70">{fmtCurrency(tax)}</td>
-        </>
+        )
       )}
-      <td className="px-2.5 py-2.5 w-[90px] text-[12px] font-mono text-right font-black text-foreground group-hover:text-foreground transition-colors">{fmtCurrency(grandTotal)}</td>
-      <td className={cn('px-2.5 py-2.5 w-[85px] text-[12px] font-mono text-right font-bold', Math.abs(balance) <= 0.01 ? 'text-muted-foreground/30' : balance > 0 ? 'text-red-500' : 'text-emerald-500')}>{Math.abs(balance) <= 0.01 ? <span className="text-muted-foreground/30">—</span> : fmtCurrency(balance)}</td>
-      {isFieldVisibleCost && (
-        <>
-          <td className="px-2.5 py-2.5 w-[80px] text-[12px] font-mono text-right text-foreground/70">{fmtCurrency(cost)}</td>
-          <td className={cn('px-2.5 py-2.5 w-[80px] text-[12px] font-mono text-right font-bold', margin < 0 ? 'text-red-500' : 'text-emerald-500')}>{fmtCurrency(margin)}</td>
-        </>
+      {!hiddenColumns.has('grandTotal') && (
+        <td className="px-2.5 py-2.5 w-[90px] text-[12px] font-mono text-right font-black text-foreground group-hover:text-foreground transition-colors">{fmtCurrency(grandTotal)}</td>
+      )}
+      {!hiddenColumns.has('balance') && (
+        <td className={cn('px-2.5 py-2.5 w-[85px] text-[12px] font-mono text-right font-bold', Math.abs(balance) <= 0.01 ? 'text-muted-foreground/30' : balance > 0 ? 'text-red-500' : 'text-emerald-500')}>{Math.abs(balance) <= 0.01 ? <span className="text-muted-foreground/30">—</span> : fmtCurrency(balance)}</td>
+      )}
+      {!hiddenColumns.has('cost') && isFieldVisibleCost && (
+        <td className="px-2.5 py-2.5 w-[80px] text-[12px] font-mono text-right text-foreground/70">{fmtCurrency(cost)}</td>
+      )}
+      {!hiddenColumns.has('margin') && isFieldVisibleCost && (
+        <td className={cn('px-2.5 py-2.5 w-[80px] text-[12px] font-mono text-right font-bold', margin < 0 ? 'text-red-500' : 'text-emerald-500')}>{fmtCurrency(margin)}</td>
       )}
     </tr>
   );
@@ -399,9 +427,34 @@ function SaleOrdersContent() {
   const { isFieldVisible } = usePermissions();
   const isFieldVisibleCost = isFieldVisible('cost');
 
+  const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set());
+  const [isColumnsLoaded, setIsColumnsLoaded] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('wholesale_orders_hidden_cols');
+    if (saved) {
+      try {
+        setHiddenColumns(new Set(JSON.parse(saved)));
+      } catch (e) {}
+    } else {
+      setHiddenColumns(new Set(['paymentMethod', 'balance']));
+    }
+    setIsColumnsLoaded(true);
+  }, []);
+
+  const toggleColumn = (key: string) => {
+    setHiddenColumns(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      localStorage.setItem('wholesale_orders_hidden_cols', JSON.stringify(Array.from(next)));
+      return next;
+    });
+  };
+
   const visibleColumns = COLUMNS.filter(col => {
-    if (col.key === 'cost' || col.key === 'margin') return isFieldVisibleCost;
-    return true;
+    if (col.key === 'cost' || col.key === 'margin') return isFieldVisibleCost && !hiddenColumns.has(col.key);
+    return !hiddenColumns.has(col.key);
   });
 
   const [orders, setOrders] = useState<SaleOrder[]>(globalCache.current?.orders || []);
@@ -420,6 +473,8 @@ function SaleOrdersContent() {
   const dateDropdownRef = useRef<HTMLDivElement>(null);
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
+  const [isColumnsDropdownOpen, setIsColumnsDropdownOpen] = useState(false);
+  const columnsDropdownRef = useRef<HTMLDivElement>(null);
 
   // Close date dropdown on click outside
   useEffect(() => {
@@ -442,6 +497,17 @@ function SaleOrdersContent() {
     if (isStatusDropdownOpen) document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, [isStatusDropdownOpen]);
+
+  // Close columns dropdown on click outside
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (columnsDropdownRef.current && !columnsDropdownRef.current.contains(e.target as Node)) {
+        setIsColumnsDropdownOpen(false);
+      }
+    };
+    if (isColumnsDropdownOpen) document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [isColumnsDropdownOpen]);
 
   const pageRef = useRef(globalCache.current?.page || 0);
   const mountedRef = useRef(true);
@@ -1459,6 +1525,37 @@ function SaleOrdersContent() {
               </button>
             )}
           </div>
+
+          <div className="relative shrink-0" ref={columnsDropdownRef}>
+            <button onClick={() => setIsColumnsDropdownOpen(p => !p)}
+              className={cn(
+                'h-8 px-3 transition-all rounded shadow-md flex items-center space-x-1.5 cursor-pointer shrink-0 border bg-secondary text-foreground border-border hover:bg-secondary/80'
+              )}>
+              <Settings2 className="w-3 h-3" />
+              <span className="hidden sm:inline text-[12px] font-black uppercase tracking-widest">
+                Columns
+              </span>
+            </button>
+            {isColumnsDropdownOpen && (
+              <div className="absolute right-0 top-full mt-1 z-50 w-48 bg-background border border-border rounded-lg shadow-xl overflow-hidden py-1">
+                {COLUMNS.map((col) => {
+                  if ((col.key === 'cost' || col.key === 'margin') && !isFieldVisibleCost) return null;
+                  const isVisible = !hiddenColumns.has(col.key);
+                  return (
+                    <button
+                      key={col.key}
+                      onClick={() => toggleColumn(col.key)}
+                      className="w-full text-left px-4 py-2 text-[12px] font-medium transition-colors cursor-pointer flex items-center justify-between hover:bg-muted/50"
+                    >
+                      <span>{col.label}</span>
+                      {isVisible && <Check className="w-3.5 h-3.5 text-primary" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           <button onClick={toggleQuickEdit}
             className={cn(
               'h-8 px-3 transition-all rounded shadow-md flex items-center space-x-1.5 cursor-pointer shrink-0 border',
@@ -1518,6 +1615,7 @@ function SaleOrdersContent() {
                     quickEditValues={quickEditData[order._id]}
                     onQuickEditChange={handleQuickEditChange}
                     isFieldVisibleCost={isFieldVisibleCost}
+                    hiddenColumns={hiddenColumns}
                     onClick={() => {
                       sessionStorage.setItem('ws_scroll_to', order._id);
                       if (scrollRef.current) sessionStorage.setItem('ws_scroll_top', String(scrollRef.current.scrollTop));
