@@ -37,7 +37,7 @@ export async function GET() {
 
         // 2. Leads by Stage (Funnel)
         const leadsByStageRaw = await Client.aggregate([
-            { $match: { contactStatus: { $exists: true, $ne: null, $ne: '' } } },
+            { $match: { contactStatus: { $exists: true, $nin: [null, ''] } } },
             { $group: { _id: '$contactStatus', count: { $sum: 1 }, value: { $sum: '$forecastedAmount' } } },
             { $sort: { count: -1 } }
         ]);
@@ -49,7 +49,7 @@ export async function GET() {
 
         // 3. Leads by Type
         const leadsByTypeRaw = await Client.aggregate([
-            { $match: { companyType: { $exists: true, $ne: null, $ne: '' } } },
+            { $match: { companyType: { $exists: true, $nin: [null, ''] } } },
             { $group: { _id: '$companyType', count: { $sum: 1 } } },
             { $sort: { count: -1 } },
             { $limit: 6 }
