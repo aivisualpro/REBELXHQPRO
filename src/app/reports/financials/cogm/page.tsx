@@ -241,6 +241,7 @@ function COGMPage() {
 
     const getStatusColor = (status: string) => {
         switch (status) {
+            case 'Fulfilled':
             case 'Completed': return 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30';
             case 'In Progress': return 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30';
             case 'Draft': return 'bg-slate-500/20 text-muted-foreground border-border';
@@ -363,19 +364,17 @@ function COGMPage() {
                     <table className="w-full text-left border-collapse">
                         <thead className="sticky top-0 z-20 bg-secondary border-b border-border shadow-sm">
                             <tr>
-                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[100px]">WO#</th>
-                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[100px]">Date</th>
-                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border">SKU</th>
-                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[100px] text-right">Qty Mfg.</th>
-                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[80px]">UOM</th>
-                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[100px]">Priority</th>
-                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[120px]">Status</th>
-                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[120px]">Created By</th>
-                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest text-right border-r border-border min-w-[110px]">Mat. Cost</th>
-                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest text-right border-r border-border min-w-[110px]">Pack. Cost</th>
-                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest text-right border-r border-border min-w-[110px]">Labor Cost</th>
-                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest text-right border-r border-border min-w-[110px]">Total Cost</th>
-                                <th className="px-4 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest text-right min-w-[110px]">Unit Cost</th>
+                                <th className="px-3 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[70px]">WO#</th>
+                                <th className="px-3 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[80px]">Date</th>
+                                <th className="px-3 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border">SKU</th>
+                                <th className="px-3 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[80px] text-right">Qty Mfg.</th>
+                                <th className="px-3 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[50px]">UOM</th>
+                                <th className="px-3 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-r border-border min-w-[100px]">Created By</th>
+                                <th className="px-3 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest text-right border-r border-border min-w-[90px]">Mat. Cost</th>
+                                <th className="px-3 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest text-right border-r border-border min-w-[90px]">Pack. Cost</th>
+                                <th className="px-3 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest text-right border-r border-border min-w-[90px]">Labor Cost</th>
+                                <th className="px-3 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest text-right border-r border-border min-w-[90px]">Total Cost</th>
+                                <th className="px-3 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest text-right min-w-[90px]">Unit Cost</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
@@ -387,46 +386,38 @@ function COGMPage() {
                                     onClick={() => router.push(`/warehouse/manufacturing/${record._id}`)}
                                     className="hover:bg-muted/30 dark:hover:bg-muted/10 transition-colors duration-150 cursor-pointer group"
                                 >
-                                    <td className="px-4 py-3 text-[11px] font-bold text-foreground border-r border-border group-hover:text-primary transition-colors">
+                                    <td className="px-3 py-3 text-[11px] font-bold text-foreground border-r border-border group-hover:text-primary transition-colors">
                                         {record.label || record._id.slice(-6)}
                                     </td>
-                                    <td className="px-4 py-3 text-[11px] font-medium text-muted-foreground border-r border-border">
+                                    <td className="px-3 py-3 text-[11px] font-medium text-muted-foreground border-r border-border">
                                         {formatDate(record.createdAt)}
                                     </td>
-                                    <td className="px-4 py-3 text-[11px] font-medium text-foreground/80 border-r border-border max-w-[200px] truncate" title={getSkuName(record.sku)}>
+                                    <td className="px-3 py-3 text-[11px] font-medium text-foreground/80 border-r border-border max-w-[200px] truncate" title={getSkuName(record.sku)}>
                                         {getSkuName(record.sku)}
                                     </td>
-                                    <td className="px-4 py-3 text-[11px] font-bold text-primary border-r border-border text-right font-mono">
+                                    <td className="px-3 py-3 text-[11px] font-bold text-primary border-r border-border text-right font-mono">
                                         {record.qty?.toLocaleString() || 0}
                                     </td>
-                                    <td className="px-4 py-3 text-[10px] font-black text-muted-foreground uppercase tracking-widest border-r border-border">
+                                    <td className="px-3 py-3 text-[10px] font-black text-muted-foreground uppercase tracking-widest border-r border-border">
                                         {record.uom || '-'}
                                     </td>
-                                    <td className={cn("px-4 py-3 text-[11px] font-bold border-r border-border", getPriorityColor(record.priority))}>
-                                        {record.priority}
-                                    </td>
-                                    <td className="px-4 py-3 border-r border-border">
-                                        <span className={cn("px-2 py-1 text-[11px] font-bold uppercase rounded-md border", getStatusColor(record.status))}>
-                                            {record.status}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3 text-[11px] font-medium text-muted-foreground border-r border-border whitespace-nowrap">
+                                    <td className="px-3 py-3 text-[11px] font-medium text-muted-foreground border-r border-border whitespace-nowrap">
                                         {record.createdBy ? `${record.createdBy.firstName} ${record.createdBy.lastName?.charAt(0)}.` : '-'}
                                     </td>
-                                    <td className="px-4 py-3 text-[11px] text-foreground/80 text-right border-r border-border font-mono tracking-tight">
+                                    <td className="px-3 py-3 text-[11px] text-foreground/80 text-right border-r border-border font-mono tracking-tight">
                                         {(record.materialCost || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
                                     </td>
-                                    <td className="px-4 py-3 text-[11px] text-foreground/80 text-right border-r border-border font-mono tracking-tight">
+                                    <td className="px-3 py-3 text-[11px] text-foreground/80 text-right border-r border-border font-mono tracking-tight">
                                         {(record.packagingCost || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
                                     </td>
-                                    <td className="px-4 py-3 text-[11px] text-foreground/80 text-right border-r border-border font-mono tracking-tight">
+                                    <td className="px-3 py-3 text-[11px] text-foreground/80 text-right border-r border-border font-mono tracking-tight">
                                         {(record.laborCost || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
                                     </td>
-                                    <td className="px-4 py-3 text-[11px] font-bold text-foreground text-right border-r border-border font-mono tracking-tight">
+                                    <td className="px-3 py-3 text-[11px] font-bold text-foreground text-right border-r border-border font-mono tracking-tight">
                                         {(record.totalCost || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
                                     </td>
-                                    <td className="px-4 py-3 text-[11px] font-bold text-primary text-right font-mono tracking-tight group-hover:bg-primary/5 transition-colors">
-                                        {(record.qty > 0 ? (record.totalCost || 0) / record.qty : 0).toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 6 })}
+                                    <td className="px-3 py-3 text-[11px] font-bold text-primary text-right font-mono tracking-tight group-hover:bg-primary/5 transition-colors">
+                                        {(record.qty > 0 ? (record.totalCost || 0) / record.qty : 0).toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </td>
                                 </tr>
                             ))}
@@ -452,11 +443,11 @@ function COGMPage() {
                 </div>
 
                 {/* Right Column: Side Panels */}
-                <div className="w-[340px] shrink-0 overflow-y-auto bg-secondary border-l border-border scrollbar-custom p-5 space-y-5 transition-colors duration-200">
+                <div className="w-[340px] shrink-0 overflow-y-auto bg-secondary border-l border-border scrollbar-custom p-2 space-y-2 transition-colors duration-200">
                     
                     {/* COGM Summary Card */}
                     {summary && (
-                        <div className="bg-background border border-border shadow-sm hover:shadow-md transition-shadow duration-300 rounded-2xl p-5 overflow-hidden relative">
+                        <div className="bg-background border border-border shadow-sm hover:shadow-md transition-shadow duration-300 rounded-2xl p-2 overflow-hidden relative">
                             <h3 className="font-bold flex items-center gap-2 mb-4 text-[11px] uppercase tracking-widest text-foreground relative z-10">
                                 <div className="w-6 h-6 rounded-md bg-teal-500/10 flex items-center justify-center border border-teal-500/20">
                                     <DollarSign className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
@@ -483,7 +474,7 @@ function COGMPage() {
                                             {/* Cost Per Unit */}
                                             <div className="relative overflow-hidden rounded-md border border-slate-800 dark:border-slate-700 bg-slate-900 dark:bg-slate-800 px-3 py-2.5 flex items-center justify-between shadow-md group transition-all duration-300 hover:border-teal-500">
                                                 <span className="relative z-10 text-[11px] font-black text-white uppercase tracking-tight drop-shadow-sm">Cost Per Unit</span>
-                                                <span className="relative z-10 text-[12px] font-black text-teal-400 font-mono tracking-tight cursor-default drop-shadow-sm" title={unitC.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 6 })}>{unitC.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 6 })}</span>
+                                                <span className="relative z-10 text-[12px] font-black text-teal-400 font-mono tracking-tight cursor-default drop-shadow-sm" title={unitC.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })}>{unitC.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                             </div>
 
                                             {/* Material Cost */}
@@ -521,7 +512,7 @@ function COGMPage() {
                     )}
 
                     {/* Top Production Card */}
-                    <div className="bg-background border border-border shadow-sm hover:shadow-md transition-shadow duration-300 rounded-2xl p-5 overflow-hidden relative">
+                    <div className="bg-background border border-border shadow-sm hover:shadow-md transition-shadow duration-300 rounded-2xl p-2 overflow-hidden relative">
                         <div className="absolute top-0 right-0 p-8 opacity-[0.03] pointer-events-none">
                             <TrendingUp className="w-32 h-32 text-primary" />
                         </div>
@@ -558,7 +549,7 @@ function COGMPage() {
                     </div>
 
                     {/* Top Materials Used */}
-                    <div className="bg-background border border-border shadow-sm hover:shadow-md transition-shadow duration-300 rounded-2xl p-5 overflow-hidden relative">
+                    <div className="bg-background border border-border shadow-sm hover:shadow-md transition-shadow duration-300 rounded-2xl p-2 overflow-hidden relative">
                         <div className="absolute top-0 right-0 p-8 opacity-[0.03] pointer-events-none">
                             <Package className="w-32 h-32 text-blue-500" />
                         </div>

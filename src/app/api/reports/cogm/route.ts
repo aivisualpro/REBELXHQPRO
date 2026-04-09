@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import Manufacturing from '@/models/Manufacturing';
 import Sku from '@/models/Sku';
+import User from '@/models/User';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,6 +10,7 @@ export async function GET(req: Request) {
     try {
         await dbConnect();
         void Sku; // Reference to ensure model is loaded
+        void User; // Reference to ensure model is loaded
         
         const { searchParams } = new URL(req.url);
         const startDate = searchParams.get('startDate');
@@ -19,7 +21,7 @@ export async function GET(req: Request) {
         const limit = parseInt(searchParams.get('limit') || '50');
 
         // Build query
-        let query: any = {};
+        let query: any = { status: 'Fulfilled' };
 
         // Date filter
         if (startDate && endDate) {
@@ -38,10 +40,12 @@ export async function GET(req: Request) {
         // Text Search
         if (search) {
             const searchRegex = { $regex: search, $options: 'i' };
-            const searchConditions = [
+            const searchConditions: any[] = [
                 { label: searchRegex },
                 { status: searchRegex },
-                { priority: searchRegex }
+                { priority: searchRegex },
+                { legacyId: searchRegex },
+                { $expr: { $regexMatch: { input: { $toString: "$_id" }, regex: search, options: "i" } } }
             ];
             
             if (query.$or) {
