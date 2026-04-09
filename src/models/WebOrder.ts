@@ -93,6 +93,7 @@ const WebOrderSchema = new mongoose.Schema({
     couponLines: [mongoose.Schema.Types.Mixed],
     refunds: [mongoose.Schema.Types.Mixed],
     website: String, // Source website (KINGKKRATOM, GRASSROOTSHARVEST, etc.)
+    platform: { type: String, default: 'woocommerce' },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 }, { _id: false });

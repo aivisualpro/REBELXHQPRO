@@ -213,6 +213,166 @@ function transformOrder(
         couponLines: order.coupon_lines,
         refunds: order.refunds,
         website: site.name,
+        platform: 'woocommerce',
+        updatedAt: new Date()
+    };
+}
+
+async function fetchOrdersFromShopify(
+    baseUrl: string,
+    key: string,
+    siteName: string,
+    modifiedAfter?: Date
+) {
+    let allOrders: any[] = [];
+    syncProgress.fetchingPhase = true;
+    syncProgress.fetchingSite = siteName;
+    syncProgress.fetchingPage = 0;
+    syncProgress.fetchingFound = 0;
+
+    const apiBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+    let url = `${apiBase}admin/api/2024-01/orders.json?status=any&limit=250`;
+    if (modifiedAfter) {
+        url += `&updated_at_min=${modifiedAfter.toISOString()}`;
+    }
+
+    let hasNextPage = true;
+    while (hasNextPage) {
+        try {
+            syncProgress.fetchingPage++;
+            syncProgress.currentStep = `Fetching Shopify orders page ${syncProgress.fetchingPage} from ${siteName}...`;
+
+            const res = await fetch(url, {
+                headers: { 'X-Shopify-Access-Token': key },
+                cache: 'no-store'
+            });
+
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(`Shopify Orders API Error (${res.status}): ${errText}`);
+            }
+
+            const data = await res.json();
+            if (data.orders && data.orders.length > 0) {
+                allOrders = allOrders.concat(data.orders);
+            }
+
+            const linkHeader = res.headers.get('link');
+            if (linkHeader && linkHeader.includes('rel="next"')) {
+                const match = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
+                if (match) {
+                    url = match[1];
+                    syncProgress.fetchingFound = allOrders.length;
+                } else {
+                    hasNextPage = false;
+                }
+            } else {
+                hasNextPage = false;
+            }
+        } catch (error: any) {
+            console.error(`Error fetching Shopify orders from ${baseUrl}:`, error.message);
+            hasNextPage = false;
+            throw error;
+        }
+    }
+    syncProgress.fetchingPhase = false;
+    return allOrders;
+}
+
+function transformShopifyOrder(
+    order: any,
+    site: any,
+    webProductMap: Map<string, WebProductMapItem>,
+    lotMap: Map<string, LotBalance[]>
+) {
+    const orderId = `WC-${site.name}-${order.id}`;
+
+    const lineItems = (order.line_items || []).map((item: any) => {
+        const wpKey = `${item.product_id}-${site.name}`;
+        const webProduct = webProductMap.get(wpKey);
+
+        let linkedSkuId = null;
+        if (webProduct) {
+            if (item.variant_id) {
+                const variant = webProduct.variations?.find((v: any) => v.id === item.variant_id || v.id === String(item.variant_id));
+                linkedSkuId = variant?.linkedSkuId || webProduct.linkedSkuId;
+            } else {
+                linkedSkuId = webProduct.linkedSkuId;
+            }
+        }
+
+        return {
+            id: item.id,
+            name: item.title,
+            productId: item.product_id,
+            variationId: item.variant_id,
+            webProductId: webProduct?._id || null,
+            linkedSkuId: linkedSkuId || null,
+            lotNumber: null,
+            cost: null,
+            quantity: item.quantity,
+            subtotal: parseFloat(item.price) * item.quantity || 0,
+            subtotalTax: 0,
+            total: parseFloat(item.price) * item.quantity || 0,
+            totalTax: 0,
+            taxes: [],
+            metaData: [],
+            sku: item.sku,
+            price: parseFloat(item.price),
+            image: webProduct?.image || '',
+            parentProductId: webProduct?._id || null
+        };
+    });
+
+    return {
+        _id: orderId,
+        webId: order.id,
+        parentId: 0,
+        number: order.name || order.order_number?.toString(),
+        orderKey: order.token,
+        createdVia: 'shopify',
+        version: 'shopify',
+        status: order.financial_status === 'paid' ? 'processing' : 'pending',
+        currency: order.currency,
+        dateCreated: order.created_at ? new Date(order.created_at) : null,
+        dateModified: order.updated_at ? new Date(order.updated_at) : null,
+        discountTotal: parseFloat(order.total_discounts) || 0,
+        shippingTotal: parseFloat(order.total_shipping_price_set?.shop_money?.amount || 0),
+        total: parseFloat(order.total_price) || 0,
+        totalTax: parseFloat(order.total_tax) || 0,
+        pricesIncludeTax: order.taxes_included || false,
+        customerId: order.customer?.id,
+        customerIpAddress: order.browser_ip,
+        customerNote: order.note,
+        billing: {
+            firstName: order.billing_address?.first_name,
+            lastName: order.billing_address?.last_name,
+            company: order.billing_address?.company,
+            address1: order.billing_address?.address1,
+            address2: order.billing_address?.address2,
+            city: order.billing_address?.city,
+            state: order.billing_address?.province,
+            postcode: order.billing_address?.zip,
+            country: order.billing_address?.country,
+            email: order.email,
+            phone: order.billing_address?.phone
+        },
+        shipping: {
+            firstName: order.shipping_address?.first_name,
+            lastName: order.shipping_address?.last_name,
+            company: order.shipping_address?.company,
+            address1: order.shipping_address?.address1,
+            address2: order.shipping_address?.address2,
+            city: order.shipping_address?.city,
+            state: order.shipping_address?.province,
+            postcode: order.shipping_address?.zip,
+            country: order.shipping_address?.country
+        },
+        paymentMethodTitle: order.payment_gateway_names?.[0] || '',
+        lineItems,
+        refunds: [],
+        website: site.name,
+        platform: 'shopify',
         updatedAt: new Date()
     };
 }
@@ -294,7 +454,15 @@ export async function POST(request: Request) {
                     name: process.env.GRHKTATOMTITLE || 'GRHKTATOM',
                     baseUrl: process.env.GRHKTATOMAPI || '',
                     key: process.env.GRHKTATOMCONSUMERKEY || '',
-                    secret: process.env.GRHKTATOMCONSUMERSECRET || ''
+                    secret: process.env.GRHKTATOMCONSUMERSECRET || '',
+                    platform: 'woocommerce'
+                },
+                {
+                    name: 'GRHKTATOM', // Same website logic to group properly
+                    baseUrl: process.env.GRHKTATOM_SHOPIFY_STORE_URL || '',
+                    key: process.env.GRHKTATOM_SHOPIFY_ACCESS_TOKEN || '',
+                    secret: 'shopify', // dummy explicitly passed
+                    platform: 'shopify'
                 },
                 {
                     name: process.env.REBELXBRANDSRODUCERTITLE || 'REBELXBRANDS',
@@ -346,15 +514,28 @@ export async function POST(request: Request) {
                 }
 
                 try {
-                    const orders = await fetchOrdersFromWC(
-                        site.baseUrl, site.key, site.secret, site.name,
-                        lastSyncAt ? new Date(lastSyncAt) : undefined
-                    );
+                    let orders;
+                    if (site.platform === 'shopify') {
+                        orders = await fetchOrdersFromShopify(
+                            site.baseUrl, site.key, site.name,
+                            lastSyncAt ? new Date(lastSyncAt) : undefined
+                        );
+                    } else {
+                        orders = await fetchOrdersFromWC(
+                            site.baseUrl, site.key, site.secret, site.name,
+                            lastSyncAt ? new Date(lastSyncAt) : undefined
+                        );
+                    }
 
                     // Filter out Cancelled, Trash, and Failed orders
                     const filteredOrders = orders.filter(order => {
-                        const s = order.status?.toLowerCase();
-                        return s !== 'cancelled' && s !== 'trash' && s !== 'failed';
+                        if (site.platform === 'shopify') {
+                            const s = order.financial_status?.toLowerCase();
+                            return s !== 'refunded' && s !== 'voided' && order.cancelled_at === null;
+                        } else {
+                            const s = order.status?.toLowerCase();
+                            return s !== 'cancelled' && s !== 'trash' && s !== 'failed';
+                        }
                     });
 
                     filteredOrders.forEach(order => allWebOrders.push({ site, order }));
@@ -449,7 +630,11 @@ export async function POST(request: Request) {
                 const lotMap = await getAvailableLotsForSkus(Array.from(batchSkuIds));
 
                 // Transform all orders in batch
-                const transformedOrders = batch.map(({ site, order }) => transformOrder(order, site, webProductMap, lotMap));
+                const transformedOrders = batch.map(({ site, order }) => 
+                    site.platform === 'shopify' 
+                        ? transformShopifyOrder(order, site, webProductMap, lotMap)
+                        : transformOrder(order, site, webProductMap, lotMap)
+                );
 
                 // Get existing orders WITH their line items to preserve manual enrichment data
                 const existingOrders = await WebOrder.find(
