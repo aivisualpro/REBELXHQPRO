@@ -531,7 +531,7 @@ export async function POST(request: Request) {
                     const filteredOrders = orders.filter(order => {
                         if (site.platform === 'shopify') {
                             const s = order.financial_status?.toLowerCase();
-                            return s !== 'refunded' && s !== 'voided' && order.cancelled_at === null;
+                            return s !== 'refunded' && s !== 'voided' && !order.cancelled_at;
                         } else {
                             const s = order.status?.toLowerCase();
                             return s !== 'cancelled' && s !== 'trash' && s !== 'failed';
