@@ -27,15 +27,7 @@ const SMART_VIEWS = [
     activeBg: 'bg-blue-500/10 border-blue-500/30',
     badgeColor: 'bg-blue-500'
   },
-  {
-    id: 'red-flag',
-    name: 'Red Flag Opportunities',
-    icon: <div className="w-3 h-3 rounded-full bg-red-600 shadow-[0_0_8px_rgba(220,38,38,0.5)]" />,
-    iconColor: 'text-red-500',
-    activeGlow: 'shadow-red-500/20',
-    activeBg: 'bg-red-500/10 border-red-500/30',
-    badgeColor: 'bg-red-500'
-  },
+
   {
     id: 'leads-to-call',
     name: 'Leads to Call',
@@ -54,15 +46,7 @@ const SMART_VIEWS = [
     activeBg: 'bg-amber-500/10 border-amber-500/30',
     badgeColor: 'bg-amber-500'
   },
-  {
-    id: 'email-opened-week',
-    name: 'Email Opened This Week',
-    icon: <Eye className="w-4 h-4" />,
-    iconColor: 'text-violet-500',
-    activeGlow: 'shadow-violet-500/20',
-    activeBg: 'bg-violet-500/10 border-violet-500/30',
-    badgeColor: 'bg-violet-500'
-  }
+
 ];
 
 function SmartViewsSidebar({ isSidebarCollapsed }: { isSidebarCollapsed: boolean }) {

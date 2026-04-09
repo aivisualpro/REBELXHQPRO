@@ -85,6 +85,83 @@ async function fetchProductsFromWC(
     return allProducts;
 }
 
+async function fetchProductsFromShopify(
+    baseUrl: string,
+    accessToken: string,
+    siteName: string,
+    modifiedAfter?: Date
+) {
+    let allProducts: any[] = [];
+    let url = `${baseUrl.replace(/\/$/, '')}/admin/api/2024-01/products.json?limit=250`;
+    if (modifiedAfter) {
+        url += `&updated_at_min=${modifiedAfter.toISOString()}`;
+    }
+
+    syncProgress.fetchingPhase = true;
+    syncProgress.fetchingSite = `${siteName} (Shopify)`;
+    syncProgress.fetchingPage = 1;
+
+    let hasNextPage = true;
+
+    while (hasNextPage) {
+        try {
+            const res = await fetch(url, {
+                headers: {
+                    'X-Shopify-Access-Token': accessToken,
+                    'Content-Type': 'application/json'
+                },
+                cache: 'no-store'
+            });
+
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(`Shopify API Error (${res.status}): ${errText}`);
+            }
+
+            const data = await res.json();
+            
+            if (data.products) {
+                const transformed = data.products.map((p: any) => ({
+                    ...p,
+                    is_shopify: true,
+                    name: p.title,
+                    images: [{ src: p.image?.src || p.images?.[0]?.src || '' }],
+                    type: p.variants?.length > 1 ? 'variable' : 'simple',
+                    sku: p.variants?.[0]?.sku || '',
+                    price: p.variants?.[0]?.price || '0',
+                    regular_price: p.variants?.[0]?.compare_at_price || p.variants?.[0]?.price || '0',
+                    status: p.status === 'active' ? 'publish' : 'draft',
+                    slug: p.handle,
+                    date_created: p.created_at,
+                    date_modified: p.updated_at,
+                    description: p.body_html,
+                }));
+                allProducts = allProducts.concat(transformed);
+            }
+
+            const linkHeader = res.headers.get('link');
+            if (linkHeader && linkHeader.includes('rel="next"')) {
+                const match = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
+                if (match) {
+                    url = match[1];
+                    syncProgress.fetchingPage++;
+                    syncProgress.fetchingFound = allProducts.length;
+                } else {
+                    hasNextPage = false;
+                }
+            } else {
+                hasNextPage = false;
+            }
+        } catch (error: any) {
+            console.error(`Error fetching from Shopify ${baseUrl}:`, error.message);
+            hasNextPage = false;
+            throw error;
+        }
+    }
+    syncProgress.fetchingPhase = false;
+    return allProducts;
+}
+
 async function fetchVariations(baseUrl: string, productId: number, key: string, secret: string) {
     const apiBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
     const auth = Buffer.from(`${key}:${secret}`).toString('base64');
@@ -191,6 +268,13 @@ export async function POST(request: Request) {
                     baseUrl: process.env.GUDTONICSAPI || '',
                     key: process.env.GUDTONICSCONSUMERKEY || '',
                     secret: process.env.GUDTONICSCONSUMERSECRET || ''
+                },
+                {
+                    name: 'GRHKTATOM', // Matches WooCommerce so it groups correctly
+                    platform: 'shopify',
+                    baseUrl: process.env.GRHKTATOM_SHOPIFY_STORE_URL || '',
+                    key: process.env.GRHKTATOM_SHOPIFY_ACCESS_TOKEN || '',
+                    secret: 'shopify' // filler to bypass check
                 }
             ];
 
@@ -220,13 +304,24 @@ export async function POST(request: Request) {
                 }
 
                 try {
-                    const products = await fetchProductsFromWC(
-                        site.baseUrl,
-                        site.key,
-                        site.secret,
-                        site.name,
-                        lastSyncAt ? new Date(lastSyncAt) : undefined
-                    );
+                    let products = [];
+                    if (site.platform === 'shopify') {
+                         products = await fetchProductsFromShopify(
+                             site.baseUrl,
+                             site.key,
+                             site.name,
+                             lastSyncAt ? new Date(lastSyncAt) : undefined
+                         );
+                    } else {
+                         products = await fetchProductsFromWC(
+                             site.baseUrl,
+                             site.key,
+                             site.secret,
+                             site.name,
+                             lastSyncAt ? new Date(lastSyncAt) : undefined
+                         );
+                    }
+                    
                     products.forEach(p => allWebProducts.push({ site, p }));
 
                     if (lastSyncAt) {
@@ -267,7 +362,27 @@ export async function POST(request: Request) {
 
                     // Fetch variations for variable products
                     let variations: any[] = [];
-                    if (p.type === 'variable' && p.variations?.length > 0) {
+                    if (p.is_shopify && Array.isArray(p.variants) && p.type === 'variable') {
+                        const existingVariations = (existingWebProduct as any)?.variations || [];
+                        variations = p.variants.map((v: any) => {
+                             const existingVar = existingVariations.find((ev: any) => ev.id === v.id || ev._id === v.id.toString());
+                             return {
+                                 _id: v.id.toString(),
+                                 id: v.id,
+                                 name: v.title,
+                                 website: site.name,
+                                 platform: 'shopify',
+                                 sku: v.sku,
+                                 price: parseFloat(v.price) || 0,
+                                 regularPrice: parseFloat(v.compare_at_price) || parseFloat(v.price) || 0,
+                                 salePrice: parseFloat(v.price) || 0,
+                                 stockQuantity: v.inventory_quantity,
+                                 dateCreated: p.created_at ? new Date(p.created_at) : null,
+                                 dateModified: p.updated_at ? new Date(p.updated_at) : null,
+                                 linkedSkuId: existingVar?.linkedSkuId || null
+                             };
+                        });
+                    } else if (p.type === 'variable' && p.variations?.length > 0) {
                         const vars = await fetchVariations(site.baseUrl, p.id, site.key, site.secret);
                         if (Array.isArray(vars)) {
                             // Get existing variations to preserve linkedSkuId
@@ -282,6 +397,7 @@ export async function POST(request: Request) {
                                     id: v.id,
                                     name: v.attributes?.map((a: any) => a.option).join(' / ') || v.sku || `Var ${v.id}`,
                                     website: site.name,
+                                    platform: site.platform || 'woocommerce',
                                     image: v.image?.src || p.images?.[0]?.src || '',
                                     sku: v.sku,
                                     price: parseFloat(v.price) || 0,
@@ -326,6 +442,7 @@ export async function POST(request: Request) {
                                 name: p.name,
                                 image: p.images?.[0]?.src || '',
                                 website: site.name,
+                                platform: site.platform || 'woocommerce',
                                 updatedAt: new Date(),
                                 // Full WooCommerce Mappings
                                 webId: p.id,
@@ -411,8 +528,9 @@ export async function POST(request: Request) {
             for (const site of websites) {
                 if (!site.baseUrl || !site.key || !site.secret) continue;
 
-                const syncMetaId = `web-products-${site.name}`;
-                const siteProductCount = await WebProduct.countDocuments({ website: site.name });
+                // Unique Sync Meta per platform/site combination
+                const syncMetaId = `web-products-${site.name}-${site.platform || 'woocommerce'}`;
+                const siteProductCount = await WebProduct.countDocuments({ website: site.name, platform: site.platform || 'woocommerce' });
 
                 await SyncMeta.findOneAndUpdate(
                     { _id: syncMetaId },

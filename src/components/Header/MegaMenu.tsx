@@ -53,7 +53,7 @@ export const MegaMenu = () => {
                     return (
                         <Link
                             key={menu.title}
-                            href={menu.title === 'CRM' ? '/crm/inbox' : href}
+                            href={menu.title === 'CRM' ? '/crm' : href}
                             className="text-sm font-medium text-muted transition-colors hover:text-foreground h-full flex items-center cursor-pointer"
                         >
                             {menu.title}

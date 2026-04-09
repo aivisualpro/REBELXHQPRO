@@ -48,13 +48,6 @@ const VIEW_CONFIG: Record<string, {
         accentColor: 'text-blue-500',
         iconBg: 'bg-blue-500/10 border-blue-500/20',
     },
-    'red-flag': {
-        title: 'Red Flag Opportunities',
-        description: 'High-value leads that need immediate attention',
-        icon: <AlertTriangle className="w-4 h-4" />,
-        accentColor: 'text-red-500',
-        iconBg: 'bg-red-500/10 border-red-500/20',
-    },
     'leads-to-call': {
         title: 'Leads to Call',
         description: 'Leads with phone numbers that have never been called',
@@ -68,13 +61,6 @@ const VIEW_CONFIG: Record<string, {
         icon: <Hourglass className="w-4 h-4" />,
         accentColor: 'text-amber-500',
         iconBg: 'bg-amber-500/10 border-amber-500/20',
-    },
-    'email-opened-week': {
-        title: 'Email Opened This Week',
-        description: 'Contacts who received emails this week',
-        icon: <Eye className="w-4 h-4" />,
-        accentColor: 'text-violet-500',
-        iconBg: 'bg-violet-500/10 border-violet-500/20',
     }
 };
 

@@ -11,7 +11,8 @@ const VariationSchema = new mongoose.Schema({
     name: String,
     website: String,
     image: String,
-    sku: String,                   // WooCommerce SKU code
+    sku: String,                   // WooCommerce/Shopify SKU code
+    platform: { type: String, default: 'woocommerce' }, // 'woocommerce' | 'shopify'
     price: Number,
     regularPrice: Number,
     salePrice: Number,
@@ -35,8 +36,9 @@ const WebProductSchema = new mongoose.Schema({
     name: { type: String, required: true },
     image: String,
     website: String,               // KINGKKRATOM, GRASSROOTSHARVEST, etc.
-    // WooCommerce Fields
-    webId: Number,                 // WooCommerce product ID
+    platform: { type: String, default: 'woocommerce' }, // 'woocommerce' | 'shopify'
+    // WooCommerce/Shopify Fields
+    webId: Number,                 // WooCommerce/Shopify product ID
     slug: String,
     permalink: String,
     dateCreated: Date,

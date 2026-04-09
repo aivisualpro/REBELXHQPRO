@@ -31,10 +31,8 @@ export async function GET(request: Request) {
             // Get all clients with phone numbers (for "Daily Calling List" and "Leads to Call")
             const [
                 dailyCallingCount,
-                redFlagCount,
                 leadsToCallCount,
-                noContactCount,
-                emailOpenedCount
+                noContactCount
             ] = await Promise.all([
                 // Daily Calling List: Leads with phone numbers that haven't been called today
                 (async () => {
@@ -61,33 +59,6 @@ export async function GET(request: Request) {
                     return clientsWithPhones.filter(c => !calledSet.has(c._id.toString())).length;
                 })(),
 
-                // Red Flag Opportunities: Leads with high forecasted amount but "Closed lost" status
-                // OR leads with no activity in 30+ days that have forecasted amount
-                (async () => {
-                    const thirtyDaysAgo = new Date();
-                    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-                    const closedLost = await Client.countDocuments({
-                        contactStatus: 'Closed lost',
-                        forecastedAmount: { $gt: 0 }
-                    });
-
-                    // Also find high-value leads with stale activity
-                    const highValueClients = await Client.find(
-                        { forecastedAmount: { $gte: 1000 } },
-                        { _id: 1 }
-                    ).lean();
-
-                    if (highValueClients.length === 0) return closedLost;
-
-                    const staleHighValue = await Activity.aggregate([
-                        { $match: { client: { $in: highValueClients.map(c => c._id) } } },
-                        { $group: { _id: '$client', lastActivity: { $max: '$createdAt' } } },
-                        { $match: { lastActivity: { $lt: thirtyDaysAgo } } }
-                    ]);
-
-                    return closedLost + staleHighValue.length;
-                })(),
 
                 // Leads to Call: Leads with phones but zero calls ever
                 (async () => {
@@ -117,20 +88,13 @@ export async function GET(request: Request) {
                     return allClients.filter(c => !recentSet.has(c._id.toString())).length;
                 })(),
 
-                // Email Opened This Week: Clients who received emails this week
-                Activity.distinct('client', {
-                    type: 'Email',
-                    createdAt: { $gte: startOfWeek }
-                }).then(ids => ids.length)
             ]);
 
             return NextResponse.json({
                 counts: {
                     'daily-calling': dailyCallingCount,
-                    'red-flag': redFlagCount,
                     'leads-to-call': leadsToCallCount,
-                    'no-contact-7d': noContactCount,
-                    'email-opened-week': emailOpenedCount
+                    'no-contact-7d': noContactCount
                 }
             });
         }
@@ -173,45 +137,6 @@ export async function GET(request: Request) {
                 break;
             }
 
-            case 'red-flag': {
-                const thirtyDaysAgo = new Date();
-                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-                // Closed lost with forecasted amount
-                const closedLostClients = await Client.find({
-                    contactStatus: 'Closed lost',
-                    forecastedAmount: { $gt: 0 }
-                }).lean();
-
-                // High-value stale leads
-                const highValueClients = await Client.find(
-                    { forecastedAmount: { $gte: 1000 } },
-                    { _id: 1 }
-                ).lean();
-
-                let staleIds: string[] = [];
-                if (highValueClients.length > 0) {
-                    const staleHighValue = await Activity.aggregate([
-                        { $match: { client: { $in: highValueClients.map(c => c._id) } } },
-                        { $group: { _id: '$client', lastActivity: { $max: '$createdAt' } } },
-                        { $match: { lastActivity: { $lt: thirtyDaysAgo } } }
-                    ]);
-                    staleIds = staleHighValue.map((s: any) => s._id.toString());
-                }
-
-                const allRedFlagIds = new Set([
-                    ...closedLostClients.map(c => c._id.toString()),
-                    ...staleIds
-                ]);
-
-                total = allRedFlagIds.size;
-                clients = await Client.find({ _id: { $in: Array.from(allRedFlagIds) } })
-                    .sort({ forecastedAmount: -1 })
-                    .skip(skip)
-                    .limit(limit)
-                    .lean();
-                break;
-            }
 
             case 'leads-to-call': {
                 const clientsWithPhones = await Client.find(
@@ -257,24 +182,6 @@ export async function GET(request: Request) {
                 break;
             }
 
-            case 'email-opened-week': {
-                const startOfWeek = new Date();
-                startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
-                startOfWeek.setHours(0, 0, 0, 0);
-
-                const emailedClientIds = await Activity.distinct('client', {
-                    type: 'Email',
-                    createdAt: { $gte: startOfWeek }
-                });
-
-                total = emailedClientIds.length;
-                clients = await Client.find({ _id: { $in: emailedClientIds } })
-                    .sort({ name: 1 })
-                    .skip(skip)
-                    .limit(limit)
-                    .lean();
-                break;
-            }
 
             default:
                 return NextResponse.json({ error: 'Invalid view' }, { status: 400 });

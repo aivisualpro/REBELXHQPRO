@@ -44,15 +44,6 @@ const VIEW_CONFIG: Record<string, {
         iconBg: 'bg-blue-500/10 border-blue-500/20',
         emptyMessage: 'All contacts have been called today! 🎉'
     },
-    'red-flag': {
-        title: 'Red Flag Opportunities',
-        description: 'High-value leads that need immediate attention',
-        icon: <AlertTriangle className="w-5 h-5" />,
-        gradient: 'from-red-500/10 via-red-400/5 to-transparent',
-        accentColor: 'text-red-500',
-        iconBg: 'bg-red-500/10 border-red-500/20',
-        emptyMessage: 'No red flag opportunities detected'
-    },
     'leads-to-call': {
         title: 'Leads to Call',
         description: 'Leads with phone numbers that have never been called',
@@ -70,15 +61,6 @@ const VIEW_CONFIG: Record<string, {
         accentColor: 'text-amber-500',
         iconBg: 'bg-amber-500/10 border-amber-500/20',
         emptyMessage: 'All contacts have been reached within 7 days!'
-    },
-    'email-opened-week': {
-        title: 'Email Opened This Week',
-        description: 'Contacts who received emails this week',
-        icon: <Eye className="w-5 h-5" />,
-        gradient: 'from-violet-500/10 via-violet-400/5 to-transparent',
-        accentColor: 'text-violet-500',
-        iconBg: 'bg-violet-500/10 border-violet-500/20',
-        emptyMessage: 'No email activity recorded this week'
     }
 };
 
