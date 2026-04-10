@@ -1,6 +1,7 @@
 import { NextResponse, after } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import Manufacturing from '@/models/Manufacturing';
+import Counter from '@/models/Counter';
 import mongoose from 'mongoose';
 import Sku from '@/models/Sku';
 import User from '@/models/User';
@@ -8,6 +9,40 @@ import { applyDateFilter } from '@/lib/global-settings';
 import { getSkuTiers } from '@/lib/sku-tiers';
 import { syncManufacturingToAppSheet, syncManufacturingLineItemsToAppSheet } from '@/lib/appsheet';
 import { buildFuzzySearchQuery, buildFuzzyRegex } from '@/lib/fuzzy-search';
+
+/**
+ * Atomically generates the next manufacturing WO# label.
+ * Seeds the counter from the highest existing numeric label on first use.
+ * Uses MongoDB findOneAndUpdate $inc — race-condition-safe under concurrent requests.
+ */
+async function getNextManufacturingLabel(): Promise<string> {
+    const existing = await Counter.findById('manufacturingLabel');
+    if (!existing) {
+        // Find the highest numeric label currently in the collection
+        const result = await Manufacturing.aggregate([
+            { $addFields: { _num: { $toInt: { $ifNull: ['$label', '0'] } } } },
+            { $sort: { _num: -1 } },
+            { $limit: 1 },
+            { $project: { _num: 1 } }
+        ]);
+        const highestSeen = result[0]?._num || 0;
+
+        // upsert so two concurrent "first calls" don't both try to insert
+        await Counter.findOneAndUpdate(
+            { _id: 'manufacturingLabel' },
+            { $setOnInsert: { seq: highestSeen } },
+            { upsert: true, new: false }
+        );
+    }
+
+    const counter = await Counter.findOneAndUpdate(
+        { _id: 'manufacturingLabel' },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true }
+    );
+
+    return String(counter.seq);
+}
 
 // Ensure indexes once per cold start
 let indexesEnsured = false;
@@ -206,16 +241,8 @@ export async function POST(request: Request) {
         await dbConnect();
         const body = await request.json();
 
-        if (!body.label) {
-            const result = await Manufacturing.aggregate([
-                { $addFields: { numericLabel: { $toInt: { $ifNull: ['$label', '0'] } } } },
-                { $sort: { numericLabel: -1 } },
-                { $limit: 1 },
-                { $project: { numericLabel: 1 } }
-            ]);
-            const maxLabel = result[0]?.numericLabel || 0;
-            body.label = String(maxLabel + 1);
-        }
+        // Always generate the label server-side — atomic & race-condition-safe.
+        body.label = await getNextManufacturingLabel();
 
         const newItem: any = await Manufacturing.create(body);
 

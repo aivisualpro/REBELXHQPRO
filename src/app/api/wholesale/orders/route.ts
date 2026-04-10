@@ -1,6 +1,7 @@
 import { NextResponse, after } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import SaleOrder from '@/models/SaleOrder';
+import Counter from '@/models/Counter';
 import Sku from '@/models/Sku';
 import Client from '@/models/Client';
 import RXHQUsers from '@/models/User';
@@ -8,6 +9,40 @@ import { applyDateFilter } from '@/lib/global-settings';
 import { syncOrderToAppSheet } from '@/lib/appsheet';
 import { buildFuzzySearchQuery, buildFuzzyRegex } from '@/lib/fuzzy-search';
 import mongoose from 'mongoose';
+
+/**
+ * Atomically generates the next sale order label.
+ * Seeds the counter from the highest existing numeric label on first use.
+ * Uses MongoDB findOneAndUpdate $inc — race-condition-safe under concurrent requests.
+ */
+async function getNextOrderLabel(): Promise<string> {
+    // Seed the counter if it doesn't exist yet
+    const existing = await Counter.findById('saleOrderLabel');
+    if (!existing) {
+        // Find the highest numeric label currently in the collection
+        const lastOrder = await SaleOrder.findOne(
+            { label: { $regex: /^\d+$/ } },
+            { label: 1 }
+        ).sort({ label: -1 }).lean() as { label?: string } | null;
+
+        const highestSeen = lastOrder?.label ? parseInt(lastOrder.label, 10) : 53001;
+
+        // upsert so two concurrent "first calls" don't both try to insert
+        await Counter.findOneAndUpdate(
+            { _id: 'saleOrderLabel' },
+            { $setOnInsert: { seq: highestSeen } },
+            { upsert: true, new: false }
+        );
+    }
+
+    const counter = await Counter.findOneAndUpdate(
+        { _id: 'saleOrderLabel' },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true }
+    );
+
+    return String(counter.seq);
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -233,6 +268,10 @@ export async function POST(request: Request) {
     try {
         await dbConnect();
         const body = await request.json();
+
+        // Always generate the label server-side — atomic & race-condition-safe.
+        // Ignore any label the client may have sent to prevent duplicates.
+        body.label = await getNextOrderLabel();
 
         if (body.lineItems && Array.isArray(body.lineItems)) {
             body.lineItems = body.lineItems.map((item: any) => ({

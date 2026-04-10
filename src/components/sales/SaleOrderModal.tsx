@@ -272,32 +272,8 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
     }, [allClients, initialClientId, isOpen, orderToEdit, newOrder.shippingAddress]);
 
 
-    // Generate Label (only for new orders)
-    useEffect(() => {
-        if (isOpen && !orderToEdit && !newOrder.label) {
-            const generateLabel = async () => {
-                try {
-                    const res = await fetch('/api/wholesale/orders?limit=1&sortBy=createdAt&sortOrder=desc');
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (data.orders && data.orders.length > 0) {
-                            const lastLabel = data.orders[0].label;
-                            const match = lastLabel.match(/(\d+)/);
-                            if (match) {
-                                const nextNum = parseInt(match[0]) + 1;
-                                setNewOrder(prev => ({ ...prev, label: String(nextNum) }));
-                                return;
-                            }
-                        }
-                    }
-                    setNewOrder(prev => ({ ...prev, label: '53002' }));
-                } catch {
-                    setNewOrder(prev => ({ ...prev, label: '53002' }));
-                }
-            };
-            generateLabel();
-        }
-    }, [isOpen, orderToEdit, newOrder.label]);
+    // Label is now generated server-side atomically to prevent duplicates.
+    // No client-side label generation needed.
 
     const handleClientChange = (clientId: string) => {
         const client = allClients.find(c => c._id === clientId);
@@ -436,7 +412,8 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
                     headers: { 'Content-Type': 'application/json' }
                 });
                 if (res.ok) {
-                    toast.success('Order created');
+                    const created = await res.json();
+                    toast.success(`Order #${created.label} created`);
                     onSuccess();
                     onClose();
                 } else {
@@ -475,13 +452,12 @@ export function SaleOrderModal({ isOpen, onClose, onSuccess, initialClientId, or
                                 <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-4 pb-2 border-b border-border/40">Order Details</h4>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
                                     <div className="space-y-1.5">
-                                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Order Name/ID <span className="text-destructive">*</span></label>
+                                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Order Name/ID</label>
                                         <input
                                             type="text"
-                                            required
                                             readOnly
-                                            value={newOrder.label}
-                                            className="w-full h-9 px-3 border border-border/50 rounded-lg text-sm bg-muted/30 text-muted-foreground focus:outline-none cursor-not-allowed shadow-sm"
+                                            value={orderToEdit ? newOrder.label : 'Auto-generated'}
+                                            className="w-full h-9 px-3 border border-border/50 rounded-lg text-sm bg-muted/30 text-muted-foreground focus:outline-none cursor-not-allowed shadow-sm italic"
                                         />
                                     </div>
                                     <div className="space-y-1.5">

@@ -123,7 +123,7 @@ export default function NewManufacturingOrderPage() {
             }
 
             const newOrder = await res.json();
-            toast.success('Manufacturing order created');
+            toast.success(`Manufacturing order WO#${newOrder.label} created`);
             router.push(`/warehouse/manufacturing/${newOrder._id}`);
         } catch (error: any) {
             toast.error(error.message || 'Error creating order');

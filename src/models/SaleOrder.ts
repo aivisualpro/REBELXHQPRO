@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 const SaleOrderSchema = new mongoose.Schema({
     // _id is now auto-generated as native ObjectId by MongoDB
     legacyId: { type: String, index: true, sparse: true }, // For import matching (same pattern as clients)
-    label: String, // Order ID/Label
+    label: { type: String, index: true, sparse: true, unique: true }, // Order ID/Label — unique enforced at DB level
     clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'Client' },
     salesRep: { type: String, ref: 'RXHQUsers' },
     discount: Number,

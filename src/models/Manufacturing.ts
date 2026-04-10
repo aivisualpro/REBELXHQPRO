@@ -14,7 +14,7 @@ const LaborSchema = new mongoose.Schema({
 const ManufacturingSchema = new mongoose.Schema({
     // _id auto-generated as ObjectId
     legacyId: { type: String, index: true, sparse: true },
-    label: String,
+    label: { type: String, index: true, sparse: true, unique: true }, // WO# — unique enforced at DB level
     sku: { type: String, ref: 'Sku', required: true }, // reference by SKU string ID
     recipesId: { type: String, ref: 'Recipe' },
     uom: String,
