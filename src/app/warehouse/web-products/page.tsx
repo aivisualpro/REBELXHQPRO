@@ -128,7 +128,11 @@ function WebProductsContent() {
   const searchParams = useSearchParams();
 
   const [products, setProducts] = useState<WebProduct[]>(globalCache.current?.products || []);
-  const [isLoading, setIsLoading] = useState(!globalCache.current);
+  const [isLoading, setIsLoading] = useState(() => {
+    if (!globalCache.current) return true;
+    if (!globalCache.current.products || globalCache.current.products.length === 0) return true;
+    return false;
+  });
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(globalCache.current?.hasMore ?? true);
   const [total, setTotal] = useState(globalCache.current?.total || 0);

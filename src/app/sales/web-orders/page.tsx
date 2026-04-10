@@ -180,7 +180,11 @@ function WebOrdersContent() {
   const searchParams = useSearchParams();
 
   const [orders, setOrders] = useState<WebOrder[]>(globalCache.current?.orders || []);
-  const [isLoading, setIsLoading] = useState(!globalCache.current);
+  const [isLoading, setIsLoading] = useState(() => {
+    if (!globalCache.current) return true;
+    if (!globalCache.current.orders || globalCache.current.orders.length === 0) return true;
+    return false;
+  });
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(globalCache.current?.hasMore ?? true);
   const [error, setError] = useState<string | null>(null);
