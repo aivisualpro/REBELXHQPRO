@@ -108,12 +108,10 @@ function WebsiteBadge({ website, platform }: { website: string; platform?: strin
       >
         {website || 'N/A'}
       </span>
-      {platform === 'shopify' && (
-        <div title="Shopify Order" className="bg-[#95BF47]/10 p-1 rounded border border-[#95BF47]/20 flex items-center justify-center">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" className="w-3.5 h-3.5" fill="#95BF47">
-                <path d="M388.3 125.1c9.4 0 17.5-6.7 19.3-15.9 3.5-18.4 20.3-64.8 20.3-64.8-1.5 5.5-11.2 56.4-13.8 68.7-2 9.5 5.2 18.5 14.8 19.4 12.8 1.2 18.4 2 18.4 2L428.8 389c0 0-41.9 83.2-192.6 83.2-125.6 0-192.6-83.2-192.6-83.2L25 134.6c0 0 5-1.2 15.5-2.5 8.9-1.1 15-9.3 14-18.2-1.8-15.6-8-61.9-8-61.9 20.3 35.8 24.3 45.4 24.3 45.4 3 6.1 9.9 9.3 16.5 7.8l56.8-13 19.8-70.1c1.5-5.3 7-8.3 12.3-6.8l77.4 21.8c5.3 1.5 8.4 7.2 6.8 12.5l-23 81.1 79.1 21.6c6.4 1.7 13.5-1.3 16.2-7.5l26-60.6s3.8 27.2 5.5 39.5c1 7.2 7.2 12.5 14.4 12.5h19z" />
-            </svg>
-        </div>
+      {platform === 'shopify' ? (
+        <img src="/shopify.png" alt="Shopify Order" title="Shopify Order" className="w-5 h-5 object-contain shrink-0" />
+      ) : (
+        <img src="/woocomerce.png" alt="WooCommerce Order" title="WooCommerce Order" className="w-5 h-5 object-contain shrink-0" />
       )}
     </div>
   );
