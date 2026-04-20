@@ -516,9 +516,20 @@ export async function POST(request: Request) {
                 try {
                     let orders;
                     if (site.platform === 'shopify') {
+                        let syncFromDate = lastSyncAt ? new Date(lastSyncAt) : undefined;
+                        
+                        // RULE: Only sync shopify GRHKTATOM orders from now and onwards
+                        if (site.name === 'GRHKTATOM') {
+                            const cutoffDate = new Date('2026-04-20T12:00:00Z');
+                            if (!syncFromDate || syncFromDate < cutoffDate) {
+                                syncFromDate = cutoffDate;
+                                syncProgress.logs.push(`🛑 ${site.name} (Shopify): Applying cutoff rule, syncing from ${cutoffDate.toISOString()} onwards`);
+                            }
+                        }
+
                         orders = await fetchOrdersFromShopify(
                             site.baseUrl, site.key, site.name,
-                            lastSyncAt ? new Date(lastSyncAt) : undefined
+                            syncFromDate
                         );
                     } else {
                         orders = await fetchOrdersFromWC(
