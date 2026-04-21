@@ -447,21 +447,17 @@ export async function POST(request: Request) {
                 {
                     name: process.env.GRASSROOTSHARVESTTITLE || 'GRASSROOTSHARVEST',
                     baseUrl: process.env.GRASSROOTSHARVESTAPI || '',
-                    key: process.env.GRASSROOTSHARVESTCONSUMERKEY || '',
+                    // NOTE: env var was previously misspelled as GRASSROOTSHARVESTONSUMERKEY (missing C)
+                    key: process.env.GRASSROOTSHARVESTCONSUMERKEY || process.env.GRASSROOTSHARVESTONSUMERKEY || '',
                     secret: process.env.GRASSROOTSHARVESTCONSUMERSECRET || ''
                 },
+                // GRHKTATOM WooCommerce REMOVED — website transferred to Shopify.
+                // Existing WC orders are preserved in DB; new orders come from Shopify below.
                 {
-                    name: process.env.GRHKTATOMTITLE || 'GRHKTATOM',
-                    baseUrl: process.env.GRHKTATOMAPI || '',
-                    key: process.env.GRHKTATOMCONSUMERKEY || '',
-                    secret: process.env.GRHKTATOMCONSUMERSECRET || '',
-                    platform: 'woocommerce'
-                },
-                {
-                    name: 'GRHKTATOM', // Same website logic to group properly
+                    name: 'GRHKTATOM',
                     baseUrl: process.env.GRHKTATOM_SHOPIFY_STORE_URL || '',
                     key: process.env.GRHKTATOM_SHOPIFY_ACCESS_TOKEN || '',
-                    secret: 'shopify', // dummy explicitly passed
+                    secret: 'shopify',
                     platform: 'shopify'
                 },
                 {

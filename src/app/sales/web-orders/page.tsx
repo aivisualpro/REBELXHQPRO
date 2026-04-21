@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  ArrowUpDown, Search, Loader2, CreditCard, Truck, X, Download, Upload, ShoppingBag, Globe, ChevronDown, Check,
+  ArrowUpDown, Search, Loader2, CreditCard, Truck, X, Download, Upload, ShoppingBag, Globe, ChevronDown, Check, Calendar,
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { cn, formatDate } from '@/lib/utils';
@@ -38,7 +38,7 @@ interface WebOrder {
 
 interface CacheEntry {
   orders: WebOrder[]; hasMore: boolean; page: number;
-  sortBy: string; sortOrder: string; search: string; status: string; websites: string[]; timestamp: number;
+  sortBy: string; sortOrder: string; search: string; status: string; websites: string[]; fromDate: string; toDate: string; timestamp: number;
 }
 const globalCache: { current: CacheEntry | null } = { current: null };
 const CACHE_TTL = 120_000;
@@ -199,6 +199,39 @@ function WebOrdersContent() {
   const [websiteDropdownOpen, setWebsiteDropdownOpen] = useState(false);
   const websiteDropdownRef = useRef<HTMLDivElement | null>(null);
 
+  // Date Filter
+  const [dateFilterOpen, setDateFilterOpen] = useState(false);
+  const dateFilterRef = useRef<HTMLDivElement | null>(null);
+  const [datePreset, setDatePreset] = useState<string>('All Time');
+  const [fromDate, setFromDate] = useState<string>('');
+  const [toDate, setToDate] = useState<string>('');
+
+  const handleDatePreset = (preset: string) => {
+    const today = new Date();
+    const formatDateStr = (d: Date) => d.toISOString().split('T')[0];
+    let start = '';
+    let end = '';
+
+    if (preset === 'This Month') {
+      start = formatDateStr(new Date(today.getFullYear(), today.getMonth(), 1));
+      end = formatDateStr(new Date(today.getFullYear(), today.getMonth() + 1, 0));
+    } else if (preset === 'Last Month') {
+      start = formatDateStr(new Date(today.getFullYear(), today.getMonth() - 1, 1));
+      end = formatDateStr(new Date(today.getFullYear(), today.getMonth(), 0));
+    } else if (preset === 'This Year') {
+      start = formatDateStr(new Date(today.getFullYear(), 0, 1));
+      end = formatDateStr(new Date(today.getFullYear(), 11, 31));
+    } else if (preset === 'Last Year') {
+      start = formatDateStr(new Date(today.getFullYear() - 1, 0, 1));
+      end = formatDateStr(new Date(today.getFullYear() - 1, 11, 31));
+    }
+
+    setDatePreset(preset);
+    setFromDate(start);
+    setToDate(end);
+    setDateFilterOpen(false);
+  };
+
   // Product filter (from web-products page link)
   const productIdFilter = searchParams.get('productId') || '';
   const variationIdFilter = searchParams.get('variationId') || '';
@@ -220,11 +253,14 @@ function WebOrdersContent() {
     }).catch(() => {});
   }, []);
 
-  // Close website dropdown on click outside
+  // Close dropdowns on click outside
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (websiteDropdownRef.current && !websiteDropdownRef.current.contains(e.target as Node)) {
         setWebsiteDropdownOpen(false);
+      }
+      if (dateFilterRef.current && !dateFilterRef.current.contains(e.target as Node)) {
+        setDateFilterOpen(false);
       }
     };
     document.addEventListener('mousedown', handler);
@@ -322,6 +358,8 @@ function WebOrdersContent() {
     try {
       const params = new URLSearchParams({ page: String(pageNum), limit: String(PAGE_SIZE), sortBy, sortOrder, search: debouncedSearch });
       if (activeStatus !== 'All') params.set('status', activeStatus);
+      if (fromDate) params.set('fromDate', fromDate);
+      if (toDate) params.set('toDate', toDate);
       if (productIdFilter) params.set('productId', productIdFilter);
       if (variationIdFilter) params.set('variationId', variationIdFilter);
       // Website filter: URL param takes priority, else use interactive selection
@@ -336,18 +374,18 @@ function WebOrdersContent() {
           setOrders(prev => {
             const ids = new Set(prev.map(o => o._id));
             const merged = [...prev, ...newOrders.filter((o: WebOrder) => !ids.has(o._id))];
-            globalCache.current = { orders: merged, hasMore: newHasMore, page: pageNum, sortBy, sortOrder, search: debouncedSearch, status: activeStatus, websites: selectedWebsites, timestamp: Date.now() };
+            globalCache.current = { orders: merged, hasMore: newHasMore, page: pageNum, sortBy, sortOrder, search: debouncedSearch, status: activeStatus, websites: selectedWebsites, fromDate, toDate, timestamp: Date.now() };
             return merged;
           });
         } else {
           setOrders(newOrders);
-          globalCache.current = { orders: newOrders, hasMore: newHasMore, page: pageNum, sortBy, sortOrder, search: debouncedSearch, status: activeStatus, websites: selectedWebsites, timestamp: Date.now() };
+          globalCache.current = { orders: newOrders, hasMore: newHasMore, page: pageNum, sortBy, sortOrder, search: debouncedSearch, status: activeStatus, websites: selectedWebsites, fromDate, toDate, timestamp: Date.now() };
         }
         setHasMore(newHasMore); pageRef.current = pageNum; setError(null);
       } else { setError(data.error || 'Failed to fetch'); }
     } catch (e: any) { if (e?.name === 'AbortError') return; if (mountedRef.current) setError(e.message); }
     finally { fetchingRef.current = false; if (mountedRef.current) { setIsLoading(false); setIsLoadingMore(false); } }
-  }, [sortBy, sortOrder, debouncedSearch, activeStatus, productIdFilter, variationIdFilter, websiteFilter, selectedWebsites]);
+  }, [sortBy, sortOrder, debouncedSearch, activeStatus, productIdFilter, variationIdFilter, websiteFilter, selectedWebsites, fromDate, toDate]);
 
   const fetchPageRef = useRef(fetchPage); fetchPageRef.current = fetchPage;
   const isFirstMount = useRef(true);
@@ -356,13 +394,13 @@ function WebOrdersContent() {
     if (isFirstMount.current) {
       isFirstMount.current = false;
       const c = globalCache.current;
-      if (c && c.orders.length > 0 && (Date.now() - c.timestamp) < CACHE_TTL && c.sortBy === sortBy && c.sortOrder === sortOrder && c.search === debouncedSearch && c.status === activeStatus && JSON.stringify(c.websites) === JSON.stringify(selectedWebsites)) {
+      if (c && c.orders.length > 0 && (Date.now() - c.timestamp) < CACHE_TTL && c.sortBy === sortBy && c.sortOrder === sortOrder && c.search === debouncedSearch && c.status === activeStatus && JSON.stringify(c.websites) === JSON.stringify(selectedWebsites) && c.fromDate === fromDate && c.toDate === toDate) {
         setOrders(c.orders); setHasMore(c.hasMore); pageRef.current = c.page; setIsLoading(false); return;
       }
     }
     globalCache.current = null; pageRef.current = 0; setOrders([]); setHasMore(true);
     fetchPageRef.current(1, false);
-  }, [sortBy, sortOrder, debouncedSearch, activeStatus, selectedWebsites]);
+  }, [sortBy, sortOrder, debouncedSearch, activeStatus, selectedWebsites, fromDate, toDate]);
 
   useEffect(() => {
     const sentinel = sentinelRef.current; const container = scrollRef.current;
@@ -525,6 +563,60 @@ function WebOrdersContent() {
             <input type="text" placeholder="Search orders..." value={search} onChange={e => setSearch(e.target.value)}
               className="pl-8 pr-8 h-8 w-56 bg-background border border-border text-[12px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded" />
             {search && (<button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors z-20 cursor-pointer"><X className="h-3 w-3" /></button>)}
+          </div>
+          {/* Date Filter */}
+          <div ref={dateFilterRef} className="relative shrink-0">
+            <button
+              onClick={() => setDateFilterOpen(p => !p)}
+              className={cn(
+                'flex items-center gap-1.5 px-3 h-8 rounded-lg border border-border text-[11px] font-semibold transition-all cursor-pointer bg-background hover:bg-secondary',
+                (fromDate || toDate)
+                  ? 'bg-primary/10 border-primary/30 text-primary hover:bg-primary/20'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span className="uppercase tracking-wider text-nowrap">
+                {datePreset !== 'All Time' ? datePreset : (fromDate || toDate) ? 'Custom' : 'All Time'}
+              </span>
+              <ChevronDown className={cn('w-3 h-3 transition-transform', dateFilterOpen && 'rotate-180')} />
+            </button>
+            {dateFilterOpen && (
+              <div className="absolute top-full mt-1.5 right-0 z-50 bg-background border border-border rounded-xl shadow-2xl min-w-[280px] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="px-3 py-2 border-b border-border bg-secondary flex justify-between items-center">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Date Filter</span>
+                  {(fromDate || toDate || datePreset !== 'All Time') && (
+                    <button onClick={() => { setDatePreset('All Time'); setFromDate(''); setToDate(''); setDateFilterOpen(false); }} className="text-[9px] font-bold text-primary hover:underline cursor-pointer">
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <div className="p-3 bg-background grid gap-1.5 grid-cols-2 text-center pb-3 border-b border-border">
+                  {['This Month', 'Last Month', 'This Year', 'Last Year'].map(preset => (
+                    <button
+                      key={preset}
+                      onClick={() => handleDatePreset(preset)}
+                      className={cn(
+                        'px-2 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors cursor-pointer',
+                        datePreset === preset ? 'bg-primary border-primary text-white' : 'bg-secondary border-border hover:bg-secondary/80 text-foreground'
+                      )}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+                <div className="p-3 bg-background space-y-2">
+                  <div className="space-y-1 text-left">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase opacity-70">From</label>
+                    <input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); setDatePreset('Custom'); }} className="w-full bg-background border border-border rounded-lg px-2 h-8 text-[12px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all text-foreground [color-scheme:dark_light]" />
+                  </div>
+                  <div className="space-y-1 text-left">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase opacity-70">To</label>
+                    <input type="date" value={toDate} onChange={e => { setToDate(e.target.value); setDatePreset('Custom'); }} className="w-full bg-background border border-border rounded-lg px-2 h-8 text-[12px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all text-foreground [color-scheme:dark_light]" />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           {/* Export */}
           <button onClick={handleExportLineItems} disabled={exporting}
