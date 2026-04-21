@@ -165,27 +165,37 @@ export async function POST(req: NextRequest) {
         await dbConnect();
         const { searchParams } = new URL(req.url);
         const site = searchParams.get('site');
-        
+
         if (!site) {
             return NextResponse.json({ error: 'Missing site parameter. Setup your webhook url as /api/webhooks/woocommerce?site=YOUR_SITE_NAME' }, { status: 400 });
         }
 
         const topic = req.headers.get('x-wc-webhook-topic') || '';
         const rawBodyText = await req.text();
-        const signature = req.headers.get('x-wc-webhook-signature');
 
-        // Note: You can verify the WooCommerce webhook signature using crypto.createHmac
-        // if you store the webhook secrets for each site. For now, we proceed to parse the body.
-        let body;
+        // ── WooCommerce sends a test ping on webhook creation/save ──────────────
+        // The ping topic (or empty body) must always return 200 or WC marks it failed.
+        if (topic === 'ping' || !rawBodyText || rawBodyText.trim() === '') {
+            return NextResponse.json({ success: true, message: 'ping acknowledged' });
+        }
+
+        let body: any;
         try {
             body = JSON.parse(rawBodyText);
         } catch (e) {
-            return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+            // Non-JSON body (e.g. form data or malformed test) — acknowledge gracefully
+            console.warn(`[WC Webhook] Non-JSON body from ${site} (topic: ${topic}), acknowledging.`);
+            return NextResponse.json({ success: true, message: 'acknowledged' });
+        }
+
+        // Ignore ping-like payloads (some WC versions send {"webhook_id": N} for tests)
+        if (topic === 'ping' || (body && body.webhook_id && !body.id)) {
+            return NextResponse.json({ success: true, message: 'ping acknowledged' });
         }
 
         if (topic === 'product.created' || topic === 'product.updated') {
             const transformedData = transformProduct(body, site);
-            
+
             // Webhook payload might not have variations loaded if it's just the parent body
             // We use findOneAndUpdate to preserve any variations that might exist
             await WebProduct.findOneAndUpdate(
@@ -196,13 +206,13 @@ export async function POST(req: NextRequest) {
 
         } else if (topic === 'order.created' || topic === 'order.updated') {
             const transformedData = transformOrder(body, site);
-            
+
             // Preserve existing lineItems manual additions (like lotNumber/cost)
             const existingOrder = await WebOrder.findById(transformedData._id).select('lineItems').lean();
-            
+
             if (existingOrder?.lineItems) {
                 const existingItemMap = new Map((existingOrder.lineItems as any[]).map(li => [li.id, li]));
-                
+
                 transformedData.lineItems = transformedData.lineItems.map((newItem: any) => {
                     const existingItem = existingItemMap.get(newItem.id) as any;
                     if (existingItem) {
@@ -227,6 +237,10 @@ export async function POST(req: NextRequest) {
                 { $set: transformedData },
                 { upsert: true }
             );
+
+        } else if (topic === 'order.deleted') {
+            // Orders are preserved in DB for historical records — just acknowledge
+            console.log(`[WC Webhook] Order deleted on ${site} — preserved in DB.`);
         }
 
         return NextResponse.json({ success: true });
