@@ -482,9 +482,9 @@ function MissingCostContent() {
             <div className="flex flex-1 overflow-hidden">
 
                 {/* ── Left Sidebar: SKU List ── */}
-                <div className="w-[350px] border-r border-border bg-background flex flex-col overflow-hidden shrink-0">
+                <div className="w-[450px] border-r border-border bg-background flex flex-col overflow-hidden shrink-0">
                     <div className="p-2 border-b border-border shrink-0">
-                        <div className="relative">
+                        <div className="relative mb-2">
                             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                             <input
                                 type="text"
@@ -493,6 +493,15 @@ function MissingCostContent() {
                                 onChange={e => setSidebarSearch(e.target.value)}
                                 className="w-full pl-8 pr-3 py-1.5 text-xs bg-secondary border border-border rounded-md outline-none focus:ring-1 focus:ring-rose-500/30 focus:border-rose-500/50 text-foreground placeholder:text-muted-foreground transition-colors"
                             />
+                        </div>
+                        <div className="flex items-center gap-3 px-3 mt-3">
+                            <div className="w-6 shrink-0"></div>
+                            <div className="flex-1 min-w-0">
+                                <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">SKU</span>
+                            </div>
+                            <div className="w-14 text-right pr-6 shrink-0">
+                                <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Records</span>
+                            </div>
                         </div>
                     </div>
                     <div className="flex-1 overflow-y-auto scrollbar-custom">
@@ -506,7 +515,7 @@ function MissingCostContent() {
                                     : "hover:bg-secondary border-l-2 border-l-transparent"
                             )}
                         >
-                            <div className="flex items-start gap-2.5">
+                            <div className="flex items-center gap-3 w-full">
                                 <div className={cn(
                                     "w-6 h-6 rounded-md flex items-center justify-center shrink-0 text-[10px] font-black",
                                     selectedSkuId === 'all' ? "bg-rose-500 text-white" : "bg-secondary text-muted-foreground"
@@ -515,28 +524,24 @@ function MissingCostContent() {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className={cn(
-                                        "text-xs font-bold leading-tight line-clamp-2 mb-1",
+                                        "text-xs font-bold leading-tight truncate",
                                         selectedSkuId === 'all' ? "text-foreground" : "text-foreground/80"
                                     )}>
                                         All SKUs
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className={cn(
-                                            "text-[10px] font-black uppercase tracking-wider",
-                                            selectedSkuId === 'all' ? "text-rose-500" : "text-muted-foreground"
-                                        )}>
-                                            {summary?.totalItems || 0} records
-                                        </span>
-                                        <span className="text-muted-foreground">·</span>
-                                        <span className="text-[10px] font-bold text-muted-foreground">
-                                            {summary?.totalQty || 0} qty
-                                        </span>
-                                    </div>
                                 </div>
-                                <ChevronRight className={cn(
-                                    "w-3.5 h-3.5 shrink-0 transition-transform mt-1",
-                                    selectedSkuId === 'all' ? "text-rose-500 translate-x-0.5" : "text-muted-foreground/50"
-                                )} />
+                                <div className="w-14 text-right pr-2 shrink-0 flex items-center justify-end gap-2">
+                                    <span className={cn(
+                                        "text-[10px] font-black uppercase tracking-wider",
+                                        selectedSkuId === 'all' ? "text-rose-500" : "text-muted-foreground"
+                                    )}>
+                                        {summary?.totalItems || 0}
+                                    </span>
+                                    <ChevronRight className={cn(
+                                        "w-3.5 h-3.5 shrink-0 transition-transform",
+                                        selectedSkuId === 'all' ? "text-rose-500 translate-x-0.5" : "text-muted-foreground/50"
+                                    )} />
+                                </div>
                             </div>
                         </button>
                         {filteredGroups.map((group, idx) => {
@@ -552,37 +557,27 @@ function MissingCostContent() {
                                             : "hover:bg-secondary border-l-2 border-l-transparent"
                                     )}
                                 >
-                                    <div className="flex items-start gap-2.5">
-                                        <div className={cn(
-                                            "w-6 h-6 rounded-md flex items-center justify-center shrink-0 text-[10px] font-black",
-                                            isSelected ? "bg-rose-500 text-white" : "bg-secondary text-muted-foreground"
-                                        )}>
-                                            {idx + 1}
-                                        </div>
+                                    <div className="flex items-center gap-3 w-full pl-9">
                                         <div className="flex-1 min-w-0">
                                             <div className={cn(
-                                                "text-xs font-bold leading-tight line-clamp-2 mb-1",
+                                                "text-xs font-bold leading-tight line-clamp-2",
                                                 isSelected ? "text-foreground" : "text-foreground/80"
                                             )}>
                                                 {group.name}
                                             </div>
-                                            <div className="flex items-center gap-2">
-                                                <span className={cn(
-                                                    "text-[10px] font-black uppercase tracking-wider",
-                                                    isSelected ? "text-rose-500" : "text-muted-foreground"
-                                                )}>
-                                                    {group.count} record{group.count !== 1 ? 's' : ''}
-                                                </span>
-                                                <span className="text-muted-foreground">·</span>
-                                                <span className="text-[10px] font-bold text-muted-foreground">
-                                                    {group.totalQty} qty
-                                                </span>
-                                            </div>
                                         </div>
-                                        <ChevronRight className={cn(
-                                            "w-3.5 h-3.5 shrink-0 transition-transform mt-1",
-                                            isSelected ? "text-rose-500 translate-x-0.5" : "text-muted-foreground/50"
-                                        )} />
+                                        <div className="w-14 text-right pr-2 shrink-0 flex items-center justify-end gap-2">
+                                            <span className={cn(
+                                                "text-[10px] font-black uppercase tracking-wider",
+                                                isSelected ? "text-rose-500" : "text-muted-foreground"
+                                            )}>
+                                                {group.count}
+                                            </span>
+                                            <ChevronRight className={cn(
+                                                "w-3.5 h-3.5 shrink-0 transition-transform",
+                                                isSelected ? "text-rose-500 translate-x-0.5" : "text-muted-foreground/50"
+                                            )} />
+                                        </div>
                                     </div>
                                 </button>
                             );
@@ -733,7 +728,7 @@ function MissingCostContent() {
                                                         </td>
                                                         <td className="px-3 py-2 text-center">
                                                             <span className="text-xs font-black text-rose-500">
-                                                                -{item.quantity}
+                                                                -{Math.round(item.quantity)}
                                                             </span>
                                                         </td>
                                                         <td className="px-3 py-2">
@@ -757,23 +752,6 @@ function MissingCostContent() {
                                                 );
                                             })}
                                         </tbody>
-                                        {filteredDetailItems.length > 0 && (
-                                            <tfoot className="border-t-2 border-border bg-secondary sticky bottom-0 z-10">
-                                                <tr>
-                                                    <td className="px-3 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground" colSpan={5}>
-                                                        Total ({filteredDetailItems.length} records)
-                                                    </td>
-                                                    <td className="px-3 py-2 text-center text-xs font-black text-rose-500">
-                                                        -{filteredDetailItems.reduce((s, i) => s + i.quantity, 0)}
-                                                    </td>
-                                                    <td className="px-3 py-2"></td>
-                                                    <td className="px-3 py-2 text-right text-xs font-black text-foreground">
-                                                        {formatCurrency(filteredDetailItems.reduce((s, i) => s + i.total, 0))}
-                                                    </td>
-                                                    <td className="px-3 py-2"></td>
-                                                </tr>
-                                            </tfoot>
-                                        )}
                                     </table>
                                 )}
                             </div>

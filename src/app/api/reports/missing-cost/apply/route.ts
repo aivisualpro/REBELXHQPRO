@@ -41,14 +41,18 @@ export async function POST(request: NextRequest) {
         };
 
         // ── Step 1: Fetch lot costs for this SKU ──
+        const t0 = Date.now();
         const lotCosts = await getLotsWithCost(skuId);
+        console.log(`[Apply Cost] lotCosts fetched in ${Date.now() - t0}ms`);
 
         const resolvedOrderIds: string[] = [];
         let totalFixed = 0;
 
-        // ── Step 2: Find all records across ALL sources ──
+        // ── Step 2: Find all records across applicable sources ──
+        // Only fetch _id + lineItems (projection) to minimize data transfer
+        const t1 = Date.now();
         const [webOrders, saleOrders, openingBalances, purchaseOrders, mfgOutputs, mfgConsumptions] = await Promise.all([
-            // Web Orders
+            // Web Orders — only fetch lineItems
             WebOrder.find({
                 status: { $nin: ['cancelled', 'trash', 'failed', 'refunded'] },
                 ...(globalStartDate ? { dateCreated: { $gte: globalStartDate } } : {}),
@@ -56,19 +60,19 @@ export async function POST(request: NextRequest) {
                     { 'lineItems.linkedSkuId': skuMatch },
                     { 'lineItems.linkedSkus.skuId': skuMatch },
                 ],
-            }).lean() as any,
+            }).select('_id lineItems').lean() as any,
 
-            // Sale Orders
+            // Sale Orders — only fetch lineItems
             SaleOrder.find({
                 status: { $nin: ['Cancelled', 'Voided'] },
                 ...(globalStartDate ? { createdAt: { $gte: globalStartDate } } : {}),
                 'lineItems.sku': skuMatch,
-            }).lean() as any,
+            }).select('_id lineItems').lean() as any,
 
-            // Opening Balances (Intentionally excluded from auto-apply because they are a cost source)
+            // Opening Balances (excluded from auto-apply)
             Promise.resolve([]),
 
-            // Purchase Orders (Intentionally excluded from auto-apply because they are a cost source)
+            // Purchase Orders (excluded from auto-apply)
             Promise.resolve([]),
 
             // Manufacturing — output (this SKU is the produced item)
@@ -77,15 +81,16 @@ export async function POST(request: NextRequest) {
                 ...(globalStartDate ? { createdAt: { $gte: globalStartDate } } : {}),
                 sku: skuMatch,
                 $or: [{ totalCost: 0 }, { totalCost: null }, { totalCost: { $exists: false } }],
-            }).lean() as any,
+            }).select('_id sku qty qtyDifference totalCost costPerUnit lineItems labor packagingCost lotNumber label').lean() as any,
 
             // Manufacturing — consumption (this SKU is used as an ingredient)
             Manufacturing.find({
                 status: { $nin: ['cancelled'] },
                 ...(globalStartDate ? { createdAt: { $gte: globalStartDate } } : {}),
                 'lineItems.sku': skuMatch,
-            }).lean() as any,
+            }).select('_id lineItems').lean() as any,
         ]);
+        console.log(`[Apply Cost] DB queries in ${Date.now() - t1}ms`);
 
         console.log(`[Apply Cost] SKU=${skuId} | lotCosts: [${[...lotCosts.entries()].map(([k,v]) => `${k}=$${v.toFixed(2)}`).join(', ')}]`);
         console.log(`[Apply Cost] Records: WO=${webOrders.length} SO=${saleOrders.length} OB=${openingBalances.length} PO=${purchaseOrders.length} MFG=${mfgOutputs.length} MFG_CON=${mfgConsumptions.length}`);

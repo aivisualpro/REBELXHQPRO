@@ -83,6 +83,8 @@ async function getSummary() {
                         'lineItems.linkedSkuId': { $exists: true, $ne: null, $nin: EXCLUDED_SKUS },
                         // Has a REAL lot number (not empty/null/N/A/Allocated)
                         'lineItems.lotNumber': { $exists: true, $nin: INVALID_LOT_VALUES },
+                        // Exclude records where quantity is 0
+                        'lineItems.quantity': { $nin: [0, -0, '0', '-0'] },
                         // But cost is 0 or missing
                         $or: missingCostOr('lineItems.cost')
                     }
@@ -110,6 +112,7 @@ async function getSummary() {
                     $match: {
                         'lineItems.sku': { $exists: true, $ne: null, $nin: EXCLUDED_SKUS },
                         'lineItems.lotNumber': { $exists: true, $nin: INVALID_LOT_VALUES },
+                        'lineItems.qty': { $nin: [0, -0, '0', '-0'] },
                         $or: missingCostOr('lineItems.cost')
                     }
                 },
@@ -137,6 +140,7 @@ async function getSummary() {
                         // Removed globalStartDate filter: Opening Balances carry forward indefinitely
                         sku: { $exists: true, $ne: null, $nin: EXCLUDED_SKUS },
                         lotNumber: { $exists: true, $nin: INVALID_LOT_VALUES },
+                        qty: { $nin: [0, -0, '0', '-0'] },
                         $or: missingCostOr('cost')
                     }
                 },
@@ -191,23 +195,30 @@ async function getSummary() {
                     }
                 },
                 {
+                    $addFields: {
+                        producedQty: { $add: [{ $ifNull: ['$qty', 0] }, { $ifNull: ['$qtyDifference', 0] }] }
+                    }
+                },
+                {
                     $project: {
                         sku: 1,
                         qty: 1,
                         qtyDifference: 1,
+                        producedQty: 1,
                         lot: { $ifNull: ['$lotNumber', '$label'] }
                     }
                 },
                 {
                     $match: {
-                        lot: { $exists: true, $nin: INVALID_LOT_VALUES }
+                        lot: { $exists: true, $nin: INVALID_LOT_VALUES },
+                        producedQty: { $nin: [0, -0] }
                     }
                 },
                 {
                     $group: {
                         _id: { sku: '$sku', type: 'Manufacturing' },
                         count: { $sum: 1 },
-                        totalQty: { $sum: { $add: [{ $ifNull: ['$qty', 0] }, { $ifNull: ['$qtyDifference', 0] }] } },
+                        totalQty: { $sum: '$producedQty' },
                         totalValue: { $sum: 0 },
                     }
                 }
@@ -223,9 +234,21 @@ async function getSummary() {
                 },
                 { $unwind: '$lineItems' },
                 {
+                    $addFields: {
+                        consumedQty: {
+                            $add: [
+                                { $multiply: [{ $ifNull: ['$lineItems.recipeQty', 0] }, { $ifNull: ['$qty', 0] }] },
+                                { $ifNull: ['$lineItems.qtyExtra', 0] },
+                                { $ifNull: ['$lineItems.qtyScrapped', 0] }
+                            ]
+                        }
+                    }
+                },
+                {
                     $match: {
                         'lineItems.sku': { $exists: true, $ne: null, $nin: EXCLUDED_SKUS },
                         'lineItems.lotNumber': { $exists: true, $nin: INVALID_LOT_VALUES },
+                        consumedQty: { $nin: [0, -0] },
                         $or: missingCostOr('lineItems.cost')
                     }
                 },
@@ -233,7 +256,7 @@ async function getSummary() {
                     $group: {
                         _id: { sku: '$lineItems.sku', type: 'Mfg. Consumption' },
                         count: { $sum: 1 },
-                        totalQty: { $sum: { $ifNull: ['$lineItems.qty', 0] } },
+                        totalQty: { $sum: '$consumedQty' },
                         totalValue: { $sum: 0 },
                     }
                 }
@@ -355,6 +378,7 @@ async function getSkuDetail(skuId: string) {
                     $match: {
                         'lineItems.linkedSkuId': skuMatch,
                         'lineItems.lotNumber': { $exists: true, $nin: INVALID_LOT_VALUES },
+                        'lineItems.quantity': { $nin: [0, -0, '0', '-0'] },
                         $or: missingCostOr('lineItems.cost')
                     }
                 },
@@ -387,6 +411,7 @@ async function getSkuDetail(skuId: string) {
                     $match: {
                         'lineItems.sku': skuMatch,
                         'lineItems.lotNumber': { $exists: true, $nin: INVALID_LOT_VALUES },
+                        'lineItems.qty': { $nin: [0, -0, '0', '-0'] },
                         $or: missingCostOr('lineItems.cost')
                     }
                 },
@@ -411,6 +436,7 @@ async function getSkuDetail(skuId: string) {
                         // Removed globalStartDate filter: Opening Balances carry forward indefinitely
                         sku: skuMatch,
                         lotNumber: { $exists: true, $nin: INVALID_LOT_VALUES },
+                        qty: { $nin: [0, -0, '0', '-0'] },
                         $or: missingCostOr('cost')
                     }
                 },
@@ -470,6 +496,11 @@ async function getSkuDetail(skuId: string) {
                     }
                 },
                 {
+                    $addFields: {
+                        producedQty: { $add: [{ $ifNull: ['$qty', 0] }, { $ifNull: ['$qtyDifference', 0] }] }
+                    }
+                },
+                {
                     $project: {
                         _id: 1,
                         label: 1,
@@ -477,6 +508,7 @@ async function getSkuDetail(skuId: string) {
                         createdAt: 1,
                         qty: 1,
                         qtyDifference: 1,
+                        producedQty: 1,
                         lotNumber: 1,
                         totalCost: 1,
                         lot: { $ifNull: ['$lotNumber', '$label'] }
@@ -484,7 +516,8 @@ async function getSkuDetail(skuId: string) {
                 },
                 {
                     $match: {
-                        lot: { $exists: true, $nin: INVALID_LOT_VALUES }
+                        lot: { $exists: true, $nin: INVALID_LOT_VALUES },
+                        producedQty: { $nin: [0, -0] }
                     }
                 },
                 { $sort: { createdAt: -1 } },
@@ -499,9 +532,21 @@ async function getSkuDetail(skuId: string) {
                 },
                 { $unwind: '$lineItems' },
                 {
+                    $addFields: {
+                        consumedQty: {
+                            $add: [
+                                { $multiply: [{ $ifNull: ['$lineItems.recipeQty', 0] }, { $ifNull: ['$qty', 0] }] },
+                                { $ifNull: ['$lineItems.qtyExtra', 0] },
+                                { $ifNull: ['$lineItems.qtyScrapped', 0] }
+                            ]
+                        }
+                    }
+                },
+                {
                     $match: {
                         'lineItems.sku': skuMatch,
                         'lineItems.lotNumber': { $exists: true, $nin: INVALID_LOT_VALUES },
+                        consumedQty: { $nin: [0, -0] },
                         $or: missingCostOr('lineItems.cost')
                     }
                 },
@@ -511,7 +556,7 @@ async function getSkuDetail(skuId: string) {
                         label: 1,
                         status: 1,
                         createdAt: 1,
-                        'lineItems.qty': 1,
+                        consumedQty: 1,
                         'lineItems.lotNumber': 1,
                         'lineItems.cost': 1,
                     }
@@ -601,7 +646,7 @@ async function getSkuDetail(skuId: string) {
                 date: mfg.createdAt || '',
                 lotNumber: mfg.lot || '',
                 cost: mfg.totalCost || 0,
-                quantity: (mfg.qty || 0) + (mfg.qtyDifference || 0),
+                quantity: mfg.producedQty || 0,
                 total: 0,
                 link: `/warehouse/manufacturing/${mfg._id}`,
             });
@@ -618,7 +663,7 @@ async function getSkuDetail(skuId: string) {
                 date: mfgCon.createdAt || '',
                 lotNumber: line.lotNumber || '',
                 cost: line.cost || 0,
-                quantity: line.qty || 0,
+                quantity: mfgCon.consumedQty || 0,
                 total: 0,
                 link: `/warehouse/manufacturing/${mfgCon._id}`,
             });
