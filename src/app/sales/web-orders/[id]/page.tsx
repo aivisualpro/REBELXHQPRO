@@ -11,6 +11,7 @@ import {
     Edit2,
     ExternalLink,
     ChevronDown,
+    Copy,
 } from 'lucide-react';
 import { cn, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -352,6 +353,66 @@ export default function WebOrderDetailPage() {
         }
     };
 
+    // ─── Duplicate Line Item Handler ────────────────────────────────────────
+    const handleDuplicate = async (item: LineItem) => {
+        if (!order) return;
+        try {
+            const res = await fetch(`/api/retail/web-orders/${order._id}/line-item`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'duplicate',
+                    lineItemId: item.id,
+                })
+            });
+
+            if (res.ok) {
+                toast.success('Line item duplicated');
+                fetchOrder();
+            } else {
+                toast.error('Failed to duplicate line item');
+            }
+        } catch (e) {
+            toast.error('Error duplicating line item');
+        }
+    };
+
+    // ─── Quantity Change Handler ───────────────────────────────────────────
+    const handleQuantityChange = async (item: LineItem, newQty: number) => {
+        if (!order || newQty < 0) return;
+        
+        // Optimistic UI
+        const price = item.price || 0;
+        const newTotal = newQty * price;
+        const updatedLineItems = order.lineItems.map(li => {
+            if (li.id !== item.id) return li;
+            return { ...li, quantity: newQty, total: newTotal, subtotal: newTotal };
+        });
+        setOrder({ ...order, lineItems: updatedLineItems });
+
+        try {
+            const res = await fetch(`/api/retail/web-orders/${order._id}/line-item`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    lineItemId: item.id,
+                    quantity: newQty,
+                })
+            });
+
+            if (res.ok) {
+                toast.success('Quantity updated');
+                fetchOrder(); // Refetch to get updated order totals
+            } else {
+                toast.error('Failed to update quantity');
+                fetchOrder();
+            }
+        } catch (e) {
+            toast.error('Error updating quantity');
+            fetchOrder();
+        }
+    };
+
 
     if (loading) {
         return (
@@ -689,7 +750,25 @@ export default function WebOrderDetailPage() {
                                                         </div>
                                                     </td>
                                                     <td className="px-3 py-2 text-right text-xs text-purple-500 font-mono font-bold">{skuRows.length === 1 ? (skuRows[0].multiplier || 1) : 1}</td>
-                                                    <td className="px-3 py-2 text-right text-xs text-foreground font-mono font-bold">{item.quantity}</td>
+                                                    <td className="px-3 py-2 text-right">
+                                                        <div className="flex items-center justify-end gap-1.5">
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                step="1"
+                                                                value={item.quantity}
+                                                                onChange={(e) => handleQuantityChange(item, parseInt(e.target.value) || 0)}
+                                                                className="w-16 bg-background border border-border rounded px-1.5 py-1 text-xs font-mono font-bold text-right text-foreground hover:border-primary/50 focus:border-primary focus:outline-none transition-colors"
+                                                            />
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handleDuplicate(item); }}
+                                                                className="p-1 text-muted-foreground hover:text-blue-500 transition-colors rounded-sm opacity-0 group-hover:opacity-100"
+                                                                title="Duplicate Line Item"
+                                                            >
+                                                                <Copy className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    </td>
                                                     {isFieldVisibleCost && <td className="px-3 py-2 text-right text-xs text-orange-500 font-mono font-bold whitespace-nowrap">{(skuRows[0]?.cost ?? item.cost ?? 0) > 0 ? formatCurrency(skuRows[0]?.cost ?? item.cost ?? 0) : '-'}</td>}
                                                     <td className="px-3 py-2 text-right text-xs text-foreground font-mono font-bold">{formatCurrency(item.price)}</td>
                                                     <td className="px-3 py-2 text-right text-xs text-foreground font-mono font-black bg-secondary">{formatCurrency(item.total)}</td>
@@ -779,7 +858,27 @@ export default function WebOrderDetailPage() {
                                                             </td>
                                                             {/* multiX, Qty and Cost on every row; Price/Total only on first row */}
                                                             <td className="px-3 py-1.5 text-right text-xs text-purple-500 font-mono font-bold">{sku.multiplier || 1}</td>
-                                                            {skuIdx === 0 && <td className="px-3 py-1.5 text-right text-xs text-foreground font-mono font-bold" rowSpan={rowSpan}>{item.quantity}</td>}
+                                                            {skuIdx === 0 && (
+                                                                <td className="px-3 py-1.5 text-right" rowSpan={rowSpan}>
+                                                                    <div className="flex items-center justify-end gap-1.5">
+                                                                        <input
+                                                                            type="number"
+                                                                            min="0"
+                                                                            step="1"
+                                                                            value={item.quantity}
+                                                                            onChange={(e) => handleQuantityChange(item, parseInt(e.target.value) || 0)}
+                                                                            className="w-16 bg-background border border-border rounded px-1.5 py-1 text-xs font-mono font-bold text-right text-foreground hover:border-primary/50 focus:border-primary focus:outline-none transition-colors"
+                                                                        />
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); handleDuplicate(item); }}
+                                                                            className="p-1 text-muted-foreground hover:text-blue-500 transition-colors rounded-sm opacity-0 group-hover:opacity-100"
+                                                                            title="Duplicate Line Item"
+                                                                        >
+                                                                            <Copy className="w-3.5 h-3.5" />
+                                                                        </button>
+                                                                    </div>
+                                                                </td>
+                                                            )}
                                                             {isFieldVisibleCost && <td className="px-3 py-1.5 text-right text-xs text-orange-500 font-mono font-bold whitespace-nowrap">{(sku.cost ?? 0) > 0 ? formatCurrency(sku.cost!) : '-'}</td>}
                                                             {skuIdx === 0 && (
                                                                 <>

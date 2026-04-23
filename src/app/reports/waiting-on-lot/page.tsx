@@ -578,23 +578,7 @@ export default function WaitingOnLotPage() {
                                                 );
                                             })}
                                         </tbody>
-                                        {filteredDetailItems.length > 0 && (
-                                            <tfoot className="border-t-2 border-border bg-secondary sticky bottom-0 z-10">
-                                                <tr>
-                                                    <td className="px-3 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground" colSpan={5}>
-                                                        Total ({filteredDetailItems.length} records)
-                                                    </td>
-                                                    <td className="px-3 py-2 text-center text-xs font-black text-rose-500">
-                                                        -{filteredDetailItems.reduce((s, i) => s + i.quantity, 0)}
-                                                    </td>
-                                                    <td className="px-3 py-2"></td>
-                                                    <td className="px-3 py-2 text-right text-xs font-black text-foreground">
-                                                        {formatCurrency(filteredDetailItems.reduce((s, i) => s + i.total, 0))}
-                                                    </td>
-                                                    <td className="px-3 py-2"></td>
-                                                </tr>
-                                            </tfoot>
-                                        )}
+
                                     </table>
                                 )}
                             </div>

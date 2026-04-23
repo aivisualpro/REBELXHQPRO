@@ -8,6 +8,7 @@ import {
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import ClientModal from '@/components/crm/ClientModal';
+import { useSession } from 'next-auth/react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -272,6 +273,8 @@ function ShellSkeleton() {
 function ClientsContent() {
     const router = useRouter();
 
+    const { data: session } = useSession();
+
     const [clients, setClients] = useState<Client[]>(globalCache.current?.clients || []);
     const [isLoading, setIsLoading] = useState(!globalCache.current);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -283,7 +286,10 @@ function ClientsContent() {
     const [sortBy, setSortBy] = useState('totalRevenue');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
     const [activeType, setActiveType] = useState<string>('All');
-    const [repFilter, setRepFilter] = useState<string>('');  // '' = All reps
+    
+    // Check if we have a default rep in session storage (for navigation persistence)
+    const [repFilter, setRepFilter] = useState<string>(globalCache.current?.repFilter ?? 'uninitialized'); 
+    
     const [repList, setRepList] = useState<Rep[]>([]);
     const [repDropdownOpen, setRepDropdownOpen] = useState(false);
     const repDropdownRef = useRef<HTMLDivElement | null>(null);
@@ -303,15 +309,26 @@ function ClientsContent() {
     useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
     useEffect(() => { const t = setTimeout(() => setDebouncedSearch(search), 250); return () => clearTimeout(t); }, [search]);
 
-    // Fetch reps for filter
+    // Fetch reps for filter and set default
     useEffect(() => {
         (async () => {
             try {
-                const res = await fetch('/api/users?limit=200&sortBy=firstName&sortOrder=asc');
-                if (res.ok) { const d = await res.json(); setRepList(d.users || []); }
+                const res = await fetch('/api/clients/reps');
+                if (res.ok) { 
+                    const d = await res.json(); 
+                    const reps = d.reps || [];
+                    setRepList(reps); 
+                    
+                    // Set default repFilter if not initialized yet
+                    if (repFilter === 'uninitialized') {
+                        const userEmail = (session?.user as any)?.email;
+                        const defaultRep = reps.find((r: any) => r._id === userEmail || r.email === userEmail);
+                        setRepFilter(defaultRep ? defaultRep._id : '');
+                    }
+                }
             } catch { }
         })();
-    }, []);
+    }, [session?.user]);
 
     // Close rep dropdown on outside click
     useEffect(() => {
@@ -355,6 +372,8 @@ function ClientsContent() {
     const seqRef = useRef(0);
 
     const fetchPage = useCallback(async (pageNum: number, isAppend: boolean) => {
+        if (repFilter === 'uninitialized') return;
+        
         if (abortRef.current) abortRef.current.abort();
         const ctrl = new AbortController(); abortRef.current = ctrl;
         const seq = ++seqRef.current; fetchingRef.current = true;
@@ -392,6 +411,8 @@ function ClientsContent() {
     const isFirstMount = useRef(true);
 
     useEffect(() => {
+        if (repFilter === 'uninitialized') return;
+
         if (isFirstMount.current) {
             isFirstMount.current = false;
             const c = globalCache.current;

@@ -38,7 +38,7 @@ export async function PATCH(
         await dbConnect();
         const { id } = await context.params;
         const body = await request.json();
-        const { lineItemId, skuIndex, lotNumber, cost, variationId, variationName } = body;
+        const { lineItemId, skuIndex, lotNumber, cost, variationId, variationName, quantity } = body;
 
         if (lineItemId === undefined) {
             return NextResponse.json({ error: 'lineItemId is required' }, { status: 400 });
@@ -59,6 +59,28 @@ export async function PATCH(
         }
 
         const lineItem = order.lineItems[lineItemIdx];
+
+        // ─── Quantity update ──────────────────────────────────────────────
+        if (quantity !== undefined) {
+            const newQty = Number(quantity);
+            if (!isNaN(newQty) && newQty >= 0) {
+                const price = lineItem.price || 0;
+                const newTotal = newQty * price;
+                order.set(`lineItems.${lineItemIdx}.quantity`, newQty);
+                order.set(`lineItems.${lineItemIdx}.total`, newTotal);
+                order.set(`lineItems.${lineItemIdx}.subtotal`, newTotal);
+                
+                order.updatedAt = new Date();
+                await order.save();
+                return NextResponse.json({
+                    success: true,
+                    lineItemId,
+                    quantity: newQty,
+                    total: newTotal,
+                    message: `Quantity updated to ${newQty}`,
+                });
+            }
+        }
 
         // ─── Variation update: set variationId and resolve linked SKUs ────
         if (variationId !== undefined) {
@@ -231,6 +253,78 @@ export async function PATCH(
 
     } catch (error: any) {
         console.error('Update line item error:', error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+}
+
+export async function POST(
+    request: NextRequest,
+    context: { params: Promise<{ id: string }> }
+) {
+    try {
+        await dbConnect();
+        const { id } = await context.params;
+        const body = await request.json();
+        const { action, lineItemId } = body;
+
+        const order = await WebOrder.findById(id);
+        if (!order) {
+            return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+        }
+
+        if (action === 'duplicate') {
+            if (lineItemId === undefined) {
+                return NextResponse.json({ error: 'lineItemId is required for duplication' }, { status: 400 });
+            }
+
+            const lineItemIdx = order.lineItems.findIndex((li: any) =>
+                li.id === lineItemId || li._id?.toString() === String(lineItemId)
+            );
+
+            if (lineItemIdx === -1) {
+                return NextResponse.json({ error: 'Line item not found' }, { status: 404 });
+            }
+
+            const originalItem = order.lineItems[lineItemIdx];
+            
+            // Clone the item
+            const newItem = { ...originalItem.toObject() };
+            delete (newItem as any)._id; // Let mongoose generate a new _id
+
+            // Generate a random negative id so it doesn't conflict with real WC ids
+            // But it needs to be unique in this order's context
+            let newId = -Math.floor(Math.random() * 1000000);
+            while (order.lineItems.some((li: any) => li.id === newId)) {
+                newId = -Math.floor(Math.random() * 1000000);
+            }
+            newItem.id = newId;
+            
+            // Optionally clear the lot number so they have to set it?
+            // Actually, the user asked to "copy the lineitem as it is, and then i can change the lot number".
+            
+            order.lineItems.push(newItem);
+            
+            // Recalculate order totals if we want, but wait, duplicating a line item adds to the total
+            // Usually we'd want to recalculate order total. Let's do it simple:
+            order.total = (order.total || 0) + (newItem.total || 0);
+            if (newItem.totalTax) {
+                order.totalTax = (order.totalTax || 0) + newItem.totalTax;
+            }
+            
+            order.updatedAt = new Date();
+            await order.save();
+
+            return NextResponse.json({
+                success: true,
+                message: 'Line item duplicated successfully',
+                lineItem: newItem
+            });
+        }
+
+        return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+
+    } catch (error: any) {
+        console.error('Line item POST error:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
