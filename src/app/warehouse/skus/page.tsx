@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowUpDown, Plus, Search, X, Loader2, Archive, ArchiveRestore, FileX2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/components/ThemeProvider';
@@ -318,6 +318,7 @@ const CATEGORY_COLORS: Record<string, { bg: string; color: string; hoverBg: stri
 
 function SkusContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [skus, setSkus] = useState<Sku[]>(globalCache.current?.skus || []);
   const [isLoading, setIsLoading] = useState(!globalCache.current);
@@ -326,16 +327,16 @@ function SkusContent() {
   const [total, setTotal] = useState(globalCache.current?.total || 0);
   const [error, setError] = useState<string | null>(null);
 
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [sortBy, setSortBy] = useState('name');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [activeCategory, setActiveCategory] = useState<string>('All');
+  const [search, setSearch] = useState(searchParams.get('search') || '');
+  const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('search') || '');
+  const [sortBy, setSortBy] = useState(searchParams.get('sortBy') || 'name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>((searchParams.get('sortOrder') as 'asc' | 'desc') || 'asc');
+  const [activeCategory, setActiveCategory] = useState<string>(searchParams.get('category') || 'All');
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingSku, setEditingSku] = useState<Sku | null>(null);
-  const [showArchived, setShowArchived] = useState(false);
-  const [noTransactions, setNoTransactions] = useState(false);
+  const [showArchived, setShowArchived] = useState(searchParams.get('showArchived') === 'true');
+  const [noTransactions, setNoTransactions] = useState(searchParams.get('noTransactions') === 'true');
 
   const pageRef = useRef(globalCache.current?.page || 0);
   const mountedRef = useRef(true);
@@ -356,6 +357,24 @@ function SkusContent() {
     const t = setTimeout(() => setDebouncedSearch(search), 250);
     return () => clearTimeout(t);
   }, [search]);
+
+  // ─── Sync filters to URL ────────────────────────────────────────────────
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (debouncedSearch) params.set('search', debouncedSearch);
+    if (sortBy !== 'name') params.set('sortBy', sortBy);
+    if (sortOrder !== 'asc') params.set('sortOrder', sortOrder);
+    if (activeCategory !== 'All') params.set('category', activeCategory);
+    if (showArchived) params.set('showArchived', 'true');
+    if (noTransactions) params.set('noTransactions', 'true');
+
+    const qs = params.toString();
+    const newUrl = `${window.location.pathname}${qs ? '?' + qs : ''}`;
+    const currentQs = window.location.search.replace(/^\?/, '');
+    if (currentQs !== qs) {
+      router.replace(newUrl, { scroll: false });
+    }
+  }, [debouncedSearch, sortBy, sortOrder, activeCategory, showArchived, noTransactions, router]);
 
   // ─── Scroll-back & highlight ─────────────────────────────────────────────
 

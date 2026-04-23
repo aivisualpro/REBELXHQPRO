@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowUpDown, Plus, Search, Building2 } from 'lucide-react';
 import { cn, formatDate } from '@/lib/utils';
 
@@ -128,6 +128,7 @@ const VendorRow = React.memo(function VendorRow({
 
 function VendorsContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [vendors, setVendors] = useState<Vendor[]>(globalCache.current?.vendors || []);
   const [isLoading, setIsLoading] = useState(!globalCache.current);
@@ -136,11 +137,11 @@ function VendorsContent() {
   const [total, setTotal] = useState(globalCache.current?.total || 0);
   const [error, setError] = useState<string | null>(null);
 
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [sortBy, setSortBy] = useState('createdAt');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [activeStatus, setActiveStatus] = useState<string>('All');
+  const [search, setSearch] = useState(searchParams.get('search') || '');
+  const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('search') || '');
+  const [sortBy, setSortBy] = useState(searchParams.get('sortBy') || 'createdAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>((searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc');
+  const [activeStatus, setActiveStatus] = useState<string>(searchParams.get('status') || 'All');
   const [highlightId, setHighlightId] = useState<string | null>(null);
 
   const pageRef = useRef(globalCache.current?.page || 0);
@@ -162,6 +163,22 @@ function VendorsContent() {
     const timer = setTimeout(() => setDebouncedSearch(search), 250);
     return () => clearTimeout(timer);
   }, [search]);
+
+  // ─── Sync filters to URL ────────────────────────────────────────────────
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (debouncedSearch) params.set('search', debouncedSearch);
+    if (sortBy !== 'createdAt') params.set('sortBy', sortBy);
+    if (sortOrder !== 'desc') params.set('sortOrder', sortOrder);
+    if (activeStatus !== 'All') params.set('status', activeStatus);
+
+    const qs = params.toString();
+    const newUrl = `${window.location.pathname}${qs ? '?' + qs : ''}`;
+    const currentQs = window.location.search.replace(/^\?/, '');
+    if (currentQs !== qs) {
+      router.replace(newUrl, { scroll: false });
+    }
+  }, [debouncedSearch, sortBy, sortOrder, activeStatus, router]);
 
   // ─── Scroll-back & highlight ─────────────────────────────────────────────
 

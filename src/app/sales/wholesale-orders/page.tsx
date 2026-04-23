@@ -121,49 +121,7 @@ const SHIPPING_METHODS = [
 
 // ─── In-Memory Cache ─────────────────────────────────────────────────────────
 
-type DatePreset = 'all' | 'today' | 'yesterday' | 'thisMonth' | 'lastMonth' | 'thisYear' | 'lastYear';
 
-const DATE_PRESET_LABELS: Record<DatePreset, string> = {
-  all: 'All',
-  today: 'Today',
-  yesterday: 'Yesterday',
-  thisMonth: 'This Month',
-  lastMonth: 'Last Month',
-  thisYear: 'This Year',
-  lastYear: 'Last Year',
-};
-
-function getDateRange(preset: DatePreset): { fromDate: string; toDate: string } | null {
-  if (preset === 'all') return null;
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth();
-  const d = now.getDate();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const fmt = (dt: Date) => `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
-
-  switch (preset) {
-    case 'today':
-      return { fromDate: fmt(now), toDate: fmt(now) };
-    case 'yesterday': {
-      const yd = new Date(y, m, d - 1);
-      return { fromDate: fmt(yd), toDate: fmt(yd) };
-    }
-    case 'thisMonth':
-      return { fromDate: `${y}-${pad(m + 1)}-01`, toDate: fmt(now) };
-    case 'lastMonth': {
-      const firstLM = new Date(y, m - 1, 1);
-      const lastLM = new Date(y, m, 0);
-      return { fromDate: fmt(firstLM), toDate: fmt(lastLM) };
-    }
-    case 'thisYear':
-      return { fromDate: `${y}-01-01`, toDate: fmt(now) };
-    case 'lastYear':
-      return { fromDate: `${y - 1}-01-01`, toDate: `${y - 1}-12-31` };
-    default:
-      return null;
-  }
-}
 
 interface CacheEntry {
   orders: SaleOrder[];
@@ -174,6 +132,8 @@ interface CacheEntry {
   search: string;
   status: string;
   datePreset: string;
+  fromDate: string;
+  toDate: string;
   timestamp: number;
 }
 
@@ -465,10 +425,46 @@ function SaleOrdersContent() {
 
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('search') || '');
-  const [sortBy, setSortBy] = useState('createdAt');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [activeStatus, setActiveStatus] = useState<string>('All');
-  const [datePreset, setDatePreset] = useState<DatePreset>('thisYear');
+  const [sortBy, setSortBy] = useState(searchParams.get('sortBy') || 'createdAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>((searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc');
+  const [activeStatus, setActiveStatus] = useState<string>(searchParams.get('status') || 'All');
+  
+  // Date Filter State
+  const [datePreset, setDatePreset] = useState<string>(searchParams.get('datePreset') || 'All Time');
+  const [fromDate, setFromDate] = useState<string>(searchParams.get('fromDate') || '');
+  const [toDate, setToDate] = useState<string>(searchParams.get('toDate') || '');
+
+  const handleDatePreset = (preset: string) => {
+    const today = new Date();
+    const formatDateStr = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    let start = '';
+    let end = '';
+
+    if (preset === 'This Month') {
+      start = formatDateStr(new Date(today.getFullYear(), today.getMonth(), 1));
+      end = formatDateStr(new Date(today.getFullYear(), today.getMonth() + 1, 0));
+    } else if (preset === 'Last Month') {
+      start = formatDateStr(new Date(today.getFullYear(), today.getMonth() - 1, 1));
+      end = formatDateStr(new Date(today.getFullYear(), today.getMonth(), 0));
+    } else if (preset === 'This Year') {
+      start = formatDateStr(new Date(today.getFullYear(), 0, 1));
+      end = formatDateStr(new Date(today.getFullYear(), 11, 31));
+    } else if (preset === 'Last Year') {
+      start = formatDateStr(new Date(today.getFullYear() - 1, 0, 1));
+      end = formatDateStr(new Date(today.getFullYear() - 1, 11, 31));
+    }
+
+    setDatePreset(preset);
+    setFromDate(start);
+    setToDate(end);
+    setIsDateDropdownOpen(false);
+  };
+  
   const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
   const dateDropdownRef = useRef<HTMLDivElement>(null);
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
@@ -526,17 +522,27 @@ function SaleOrdersContent() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Sync search to URL
+  // Sync filters to URL
   useEffect(() => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (debouncedSearch) {
-      params.set('search', debouncedSearch);
-    } else {
-      params.delete('search');
+    const params = new URLSearchParams();
+    
+    if (debouncedSearch) params.set('search', debouncedSearch);
+    if (sortBy !== 'createdAt') params.set('sortBy', sortBy);
+    if (sortOrder !== 'desc') params.set('sortOrder', sortOrder);
+    if (activeStatus !== 'All') params.set('status', activeStatus);
+    if (datePreset !== 'All Time') params.set('datePreset', datePreset);
+    if (fromDate) params.set('fromDate', fromDate);
+    if (toDate) params.set('toDate', toDate);
+
+    const qs = params.toString();
+    const newUrl = `${window.location.pathname}${qs ? '?' + qs : ''}`;
+    
+    // Only replace if it has actually changed to prevent infinite loops
+    const currentQs = window.location.search.replace(/^\?/, '');
+    if (currentQs !== qs) {
+      router.replace(newUrl, { scroll: false });
     }
-    const newUrl = params.toString() ? `/sales/wholesale-orders?${params.toString()}` : '/sales/wholesale-orders';
-    router.replace(newUrl, { scroll: false });
-  }, [debouncedSearch]);
+  }, [debouncedSearch, sortBy, sortOrder, activeStatus, datePreset, fromDate, toDate, router]);
 
   // Scroll-back & highlight on return from detail
   const [highlightId, setHighlightId] = useState<string | null>(null);
@@ -594,11 +600,8 @@ function SaleOrdersContent() {
       const params = new URLSearchParams();
       if (activeStatus !== 'All') params.set('status', activeStatus);
       if (debouncedSearch) params.set('search', debouncedSearch);
-      const dateRange = getDateRange(datePreset);
-      if (dateRange) {
-        params.set('fromDate', dateRange.fromDate + 'T00:00:00.000Z');
-        params.set('toDate', dateRange.toDate + 'T23:59:59.999Z');
-      }
+      if (fromDate) params.set('fromDate', fromDate + 'T00:00:00.000Z');
+      if (toDate) params.set('toDate', toDate + 'T23:59:59.999Z');
       const res = await fetch(`/api/wholesale/orders/stats?${params}`, { signal: controller.signal });
       if (res.ok) {
         const data = await res.json();
@@ -609,7 +612,7 @@ function SaleOrdersContent() {
     } finally {
       setAggStatsLoading(false);
     }
-  }, [activeStatus, debouncedSearch, datePreset]);
+  }, [activeStatus, debouncedSearch, fromDate, toDate]);
 
   const fetchStatusCounts = useCallback(async () => {
     try {
@@ -919,11 +922,8 @@ function SaleOrdersContent() {
       if (activeStatus !== 'All') params.set('status', activeStatus);
 
       // Date preset filter
-      const dateRange = getDateRange(datePreset);
-      if (dateRange) {
-        params.set('fromDate', dateRange.fromDate + 'T00:00:00.000Z');
-        params.set('toDate', dateRange.toDate + 'T23:59:59.999Z');
-      }
+      if (fromDate) params.set('fromDate', fromDate + 'T00:00:00.000Z');
+      if (toDate) params.set('toDate', toDate + 'T23:59:59.999Z');
 
       const res = await fetch(`/api/wholesale/orders?${params}`, { signal: controller.signal });
       const data = await res.json();
@@ -938,12 +938,12 @@ function SaleOrdersContent() {
             const existingIds = new Set(prev.map(o => o._id));
             const filtered = newOrders.filter((o: SaleOrder) => !existingIds.has(o._id));
             const merged = [...prev, ...filtered];
-            globalCache.current = { orders: merged, hasMore: newHasMore, page: pageNum, sortBy, sortOrder, search: debouncedSearch, status: activeStatus, datePreset, timestamp: Date.now() };
+            globalCache.current = { orders: merged, hasMore: newHasMore, page: pageNum, sortBy, sortOrder, search: debouncedSearch, status: activeStatus, datePreset, fromDate, toDate, timestamp: Date.now() };
             return merged;
           });
         } else {
           setOrders(newOrders);
-          globalCache.current = { orders: newOrders, hasMore: newHasMore, page: pageNum, sortBy, sortOrder, search: debouncedSearch, status: activeStatus, datePreset, timestamp: Date.now() };
+          globalCache.current = { orders: newOrders, hasMore: newHasMore, page: pageNum, sortBy, sortOrder, search: debouncedSearch, status: activeStatus, datePreset, fromDate, toDate, timestamp: Date.now() };
         }
         setHasMore(newHasMore);
         pageRef.current = pageNum;
@@ -958,30 +958,30 @@ function SaleOrdersContent() {
       fetchingRef.current = false;
       if (mountedRef.current) { setIsLoading(false); setIsLoadingMore(false); }
     }
-  }, [sortBy, sortOrder, debouncedSearch, activeStatus, datePreset]);
+  }, [sortBy, sortOrder, debouncedSearch, activeStatus, fromDate, toDate]);
 
   // ─── Initial load & filter changes ────────────────────────────────────────
   const fetchPageRef = useRef(fetchPage);
   fetchPageRef.current = fetchPage;
   const isFirstMount = useRef(true);
-  const prevFiltersRef = useRef({ sortBy, sortOrder, search: debouncedSearch, status: activeStatus, datePreset });
+  const prevFiltersRef = useRef({ sortBy, sortOrder, search: debouncedSearch, status: activeStatus, datePreset, fromDate, toDate });
 
   useEffect(() => {
     const prev = prevFiltersRef.current;
-    prevFiltersRef.current = { sortBy, sortOrder, search: debouncedSearch, status: activeStatus, datePreset };
+    prevFiltersRef.current = { sortBy, sortOrder, search: debouncedSearch, status: activeStatus, datePreset, fromDate, toDate };
 
     if (isFirstMount.current) {
       isFirstMount.current = false;
       const cache = globalCache.current;
       if (cache && cache.orders.length > 0 && (Date.now() - cache.timestamp) < CACHE_TTL &&
-        cache.sortBy === sortBy && cache.sortOrder === sortOrder && cache.search === debouncedSearch && cache.status === activeStatus && cache.datePreset === datePreset) {
+        cache.sortBy === sortBy && cache.sortOrder === sortOrder && cache.search === debouncedSearch && cache.status === activeStatus && cache.datePreset === datePreset && cache.fromDate === fromDate && cache.toDate === toDate) {
         setOrders(cache.orders); setHasMore(cache.hasMore); pageRef.current = cache.page; setIsLoading(false);
         return;
       }
     }
     globalCache.current = null; pageRef.current = 0; setOrders([]); setHasMore(true);
     fetchPageRef.current(1, false);
-  }, [sortBy, sortOrder, debouncedSearch, activeStatus, datePreset]);
+  }, [sortBy, sortOrder, debouncedSearch, activeStatus, datePreset, fromDate, toDate]);
 
   // ─── Scroll to load more ──────────────────────────────────────────────────
   useEffect(() => {
@@ -1477,39 +1477,56 @@ function SaleOrdersContent() {
             ) : null}
           </div>
 
-          {/* Date Preset Dropdown */}
+          {/* Date Filter Dropdown */}
           <div className="relative shrink-0" ref={dateDropdownRef}>
             <button
               onClick={() => setIsDateDropdownOpen(p => !p)}
               className={cn(
-                'h-8 px-3 rounded border flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0',
-                datePreset !== 'all'
-                  ? 'bg-primary/10 border-primary/30 text-primary'
-                  : 'bg-secondary text-foreground border-border hover:bg-secondary'
+                'flex items-center gap-1.5 px-3 h-8 rounded border text-[11px] font-semibold transition-all cursor-pointer bg-secondary border-border hover:bg-secondary/80',
+                (fromDate || toDate)
+                  ? 'bg-primary/10 border-primary/30 text-primary hover:bg-primary/20'
+                  : 'text-foreground'
               )}
             >
-              <Calendar className="w-3.5 h-3.5" />
-              <span>{DATE_PRESET_LABELS[datePreset]}</span>
+              <Calendar className="w-3 h-3" />
+              <span className="uppercase tracking-wider text-nowrap">
+                {datePreset !== 'All Time' ? datePreset : (fromDate || toDate) ? 'Custom' : 'All Time'}
+              </span>
               <ChevronDown className={cn('w-3 h-3 transition-transform', isDateDropdownOpen && 'rotate-180')} />
             </button>
             {isDateDropdownOpen && (
-              <div className="absolute right-0 top-full mt-1 z-50 w-44 bg-background border border-border rounded-lg shadow-xl overflow-hidden">
-                <div className="py-1">
-                  {(Object.keys(DATE_PRESET_LABELS) as DatePreset[]).map((key) => (
+              <div className="absolute right-0 top-full mt-1.5 z-50 bg-background border border-border rounded-xl shadow-2xl min-w-[280px] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="px-3 py-2 border-b border-border bg-secondary flex justify-between items-center">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Date Filter</span>
+                  {(fromDate || toDate || datePreset !== 'All Time') && (
+                    <button onClick={() => { setDatePreset('All Time'); setFromDate(''); setToDate(''); setIsDateDropdownOpen(false); }} className="text-[9px] font-bold text-primary hover:underline cursor-pointer">
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <div className="p-3 bg-background grid gap-1.5 grid-cols-2 text-center pb-3 border-b border-border">
+                  {['This Month', 'Last Month', 'This Year', 'Last Year'].map(preset => (
                     <button
-                      key={key}
-                      onClick={() => { setDatePreset(key); setIsDateDropdownOpen(false); }}
+                      key={preset}
+                      onClick={() => handleDatePreset(preset)}
                       className={cn(
-                        'w-full text-left px-4 py-2 text-[12px] font-medium transition-colors cursor-pointer flex items-center justify-between',
-                        datePreset === key
-                          ? 'bg-primary/10 text-primary font-bold'
-                          : 'text-foreground/80 hover:bg-muted/50'
+                        'px-2 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors cursor-pointer',
+                        datePreset === preset ? 'bg-primary border-primary text-white' : 'bg-secondary border-border hover:bg-secondary/80 text-foreground'
                       )}
                     >
-                      <span>{DATE_PRESET_LABELS[key]}</span>
-                      {datePreset === key && <Check className="w-3.5 h-3.5 text-primary" />}
+                      {preset}
                     </button>
                   ))}
+                </div>
+                <div className="p-3 bg-background space-y-2">
+                  <div className="space-y-1 text-left">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase opacity-70">From</label>
+                    <input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); setDatePreset('Custom'); }} className="w-full bg-background border border-border rounded-lg px-2 h-8 text-[12px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all text-foreground [color-scheme:dark_light]" />
+                  </div>
+                  <div className="space-y-1 text-left">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase opacity-70">To</label>
+                    <input type="date" value={toDate} onChange={e => { setToDate(e.target.value); setDatePreset('Custom'); }} className="w-full bg-background border border-border rounded-lg px-2 h-8 text-[12px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all text-foreground [color-scheme:dark_light]" />
+                  </div>
                 </div>
               </div>
             )}

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
-import { ArrowUpDown, X, Search, Loader2, Plus, ClipboardCheck, Pencil, Trash2, Hash, ChevronDown, Check, Package } from 'lucide-react';
+import { ArrowUpDown, X, Search, Loader2, Plus, ClipboardCheck, Pencil, Trash2, Hash, ChevronDown, Check, Package, Calendar } from 'lucide-react';
 import { cn, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { useSession } from 'next-auth/react';
@@ -32,6 +32,9 @@ interface CacheEntry {
     sortOrder: string;
     search: string;
     lotNumbers: string[];
+    datePreset: string;
+    fromDate: string;
+    toDate: string;
     timestamp: number;
 }
 
@@ -378,8 +381,46 @@ function AuditAdjustmentsContent() {
     // Initialize from URL params
     const [search, setSearch] = useState(searchParams.get('search') || '');
     const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('search') || '');
-    const [sortBy, setSortBy] = useState('createdAt');
-    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+    const [sortBy, setSortBy] = useState(searchParams.get('sortBy') || 'createdAt');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>((searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc');
+
+    // Date Filter State
+    const [datePreset, setDatePreset] = useState<string>(searchParams.get('datePreset') || globalCache.current?.datePreset || 'All Time');
+    const [fromDate, setFromDate] = useState<string>(searchParams.get('fromDate') || globalCache.current?.fromDate || '');
+    const [toDate, setToDate] = useState<string>(searchParams.get('toDate') || globalCache.current?.toDate || '');
+    const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
+    const dateDropdownRef = useRef<HTMLDivElement>(null);
+
+    const handleDatePreset = (preset: string) => {
+        const today = new Date();
+        const formatDateStr = (d: Date) => {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+        let start = '';
+        let end = '';
+
+        if (preset === 'This Month') {
+            start = formatDateStr(new Date(today.getFullYear(), today.getMonth(), 1));
+            end = formatDateStr(new Date(today.getFullYear(), today.getMonth() + 1, 0));
+        } else if (preset === 'Last Month') {
+            start = formatDateStr(new Date(today.getFullYear(), today.getMonth() - 1, 1));
+            end = formatDateStr(new Date(today.getFullYear(), today.getMonth(), 0));
+        } else if (preset === 'This Year') {
+            start = formatDateStr(new Date(today.getFullYear(), 0, 1));
+            end = formatDateStr(new Date(today.getFullYear(), 11, 31));
+        } else if (preset === 'Last Year') {
+            start = formatDateStr(new Date(today.getFullYear() - 1, 0, 1));
+            end = formatDateStr(new Date(today.getFullYear() - 1, 11, 31));
+        }
+
+        setDatePreset(preset);
+        setFromDate(start);
+        setToDate(end);
+        setIsDateDropdownOpen(false);
+    };
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<AuditAdjustment | null>(null);
@@ -458,32 +499,34 @@ function AuditAdjustmentsContent() {
         return () => document.removeEventListener('mousedown', handler);
     }, []);
 
-    // ─── Sync search to URL ─────────────────────────────────────────────────
-
+    // Close date dropdown on outside click
     useEffect(() => {
-        const params = new URLSearchParams(searchParams.toString());
-        if (debouncedSearch) {
-            params.set('search', debouncedSearch);
-        } else {
-            params.delete('search');
-        }
-        const newQs = params.toString();
-        const currentQs = searchParams.toString();
-        if (newQs !== currentQs) {
-            router.push(`${window.location.pathname}${newQs ? '?' + newQs : ''}`, { scroll: false });
-        }
-    }, [debouncedSearch, router, searchParams]);
+        const handleClick = (e: MouseEvent) => {
+            if (dateDropdownRef.current && !dateDropdownRef.current.contains(e.target as Node)) {
+                setIsDateDropdownOpen(false);
+            }
+        };
+        if (isDateDropdownOpen) document.addEventListener('mousedown', handleClick);
+        return () => document.removeEventListener('mousedown', handleClick);
+    }, [isDateDropdownOpen]);
 
-    // ─── Sync URL back to state (browser back/forward) ──────────────────────
-
+    // ─── Sync filters to URL ─────────────────────────────────────────────────
     useEffect(() => {
-        const urlSearch = searchParams.get('search') || '';
-        if (urlSearch !== debouncedSearch) {
-            setSearch(urlSearch);
-            setDebouncedSearch(urlSearch);
+        const params = new URLSearchParams();
+        if (debouncedSearch) params.set('search', debouncedSearch);
+        if (sortBy !== 'createdAt') params.set('sortBy', sortBy);
+        if (sortOrder !== 'desc') params.set('sortOrder', sortOrder);
+        if (datePreset !== 'All Time') params.set('datePreset', datePreset);
+        if (fromDate) params.set('fromDate', fromDate);
+        if (toDate) params.set('toDate', toDate);
+
+        const qs = params.toString();
+        const newUrl = `${window.location.pathname}${qs ? '?' + qs : ''}`;
+        const currentQs = window.location.search.replace(/^\?/, '');
+        if (currentQs !== qs) {
+            router.replace(newUrl, { scroll: false });
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [searchParams]);
+    }, [debouncedSearch, sortBy, sortOrder, datePreset, fromDate, toDate, router]);
 
     // ─── Scroll-back highlight ──────────────────────────────────────────────
 
@@ -522,6 +565,8 @@ function AuditAdjustmentsContent() {
             });
             if (filterId) params.set('id', filterId);
             if (selectedLots.length > 0) params.set('lotNumber', selectedLots.join(','));
+            if (fromDate) params.set('fromDate', fromDate + 'T00:00:00.000Z');
+            if (toDate) params.set('toDate', toDate + 'T23:59:59.999Z');
 
             const res = await fetch(`/api/warehouse/audit-adjustments?${params}`, { signal: controller.signal });
             const data = await res.json();
@@ -536,13 +581,13 @@ function AuditAdjustmentsContent() {
                     setAdjustments(prev => {
                         const ids = new Set(prev.map(a => a._id));
                         const merged = [...prev, ...newItems.filter(a => !ids.has(a._id))];
-                        globalCache.current = { adjustments: merged, hasMore: newHasMore, page: pageNum, total: newTotal, sortBy, sortOrder, search: debouncedSearch, lotNumbers: selectedLots, timestamp: Date.now() };
+                        globalCache.current = { adjustments: merged, hasMore: newHasMore, page: pageNum, total: newTotal, sortBy, sortOrder, search: debouncedSearch, lotNumbers: selectedLots, datePreset, fromDate, toDate, timestamp: Date.now() };
                         return merged;
                     });
                 } else {
                     setAdjustments(newItems);
                     setTotal(newTotal);
-                    globalCache.current = { adjustments: newItems, hasMore: newHasMore, page: pageNum, total: newTotal, sortBy, sortOrder, search: debouncedSearch, lotNumbers: selectedLots, timestamp: Date.now() };
+                    globalCache.current = { adjustments: newItems, hasMore: newHasMore, page: pageNum, total: newTotal, sortBy, sortOrder, search: debouncedSearch, lotNumbers: selectedLots, datePreset, fromDate, toDate, timestamp: Date.now() };
                 }
                 setHasMore(newHasMore);
                 pageRef.current = pageNum;
@@ -557,7 +602,7 @@ function AuditAdjustmentsContent() {
             fetchingRef.current = false;
             if (mountedRef.current) { setIsLoading(false); setIsLoadingMore(false); }
         }
-    }, [sortBy, sortOrder, debouncedSearch, filterId, selectedLots]);
+    }, [sortBy, sortOrder, debouncedSearch, filterId, selectedLots, fromDate, toDate]);
 
     // ─── Initial load / filter changes ──────────────────────────────────────
 
@@ -572,7 +617,7 @@ function AuditAdjustmentsContent() {
             if (!filterId) {
                 const cache = globalCache.current;
                 if (cache && cache.adjustments.length > 0 && (Date.now() - cache.timestamp) < CACHE_TTL &&
-                    cache.sortBy === sortBy && cache.sortOrder === sortOrder && cache.search === debouncedSearch && JSON.stringify(cache.lotNumbers) === JSON.stringify(selectedLots)) {
+                    cache.sortBy === sortBy && cache.sortOrder === sortOrder && cache.search === debouncedSearch && JSON.stringify(cache.lotNumbers) === JSON.stringify(selectedLots) && cache.datePreset === datePreset && cache.fromDate === fromDate && cache.toDate === toDate) {
                     setAdjustments(cache.adjustments); setHasMore(cache.hasMore); setTotal(cache.total);
                     pageRef.current = cache.page; setIsLoading(false); return;
                 }
@@ -584,7 +629,7 @@ function AuditAdjustmentsContent() {
         setHasMore(true);
         fetchPageRef.current(1, false);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [sortBy, sortOrder, debouncedSearch, filterId, selectedLots]);
+    }, [sortBy, sortOrder, debouncedSearch, filterId, selectedLots, datePreset, fromDate, toDate]);
 
     // ─── Infinite scroll ────────────────────────────────────────────────────
 
@@ -789,6 +834,61 @@ function AuditAdjustmentsContent() {
                                         </button>
                                     </div>
                                 )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Date Filter Dropdown */}
+                    <div className="relative shrink-0" ref={dateDropdownRef}>
+                        <button
+                            onClick={() => setIsDateDropdownOpen(p => !p)}
+                            className={cn(
+                                'flex items-center gap-1.5 px-3 h-8 rounded-lg border text-[11px] font-semibold transition-all cursor-pointer bg-secondary border-border hover:bg-secondary/80',
+                                (fromDate || toDate)
+                                    ? 'bg-primary/10 border-primary/30 text-primary hover:bg-primary/20'
+                                    : 'text-foreground'
+                            )}
+                        >
+                            <Calendar className="w-3.5 h-3.5" />
+                            <span className="uppercase tracking-wider text-nowrap">
+                                {datePreset !== 'All Time' ? datePreset : (fromDate || toDate) ? 'Custom' : 'All Time'}
+                            </span>
+                            <ChevronDown className={cn('w-3 h-3 transition-transform', isDateDropdownOpen && 'rotate-180')} />
+                        </button>
+                        {isDateDropdownOpen && (
+                            <div className="absolute right-0 top-full mt-1.5 z-50 bg-background border border-border rounded-xl shadow-2xl min-w-[280px] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                                <div className="px-3 py-2 border-b border-border bg-secondary flex justify-between items-center">
+                                    <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Date Filter</span>
+                                    {(fromDate || toDate || datePreset !== 'All Time') && (
+                                        <button onClick={() => { setDatePreset('All Time'); setFromDate(''); setToDate(''); setIsDateDropdownOpen(false); }} className="text-[9px] font-bold text-primary hover:underline cursor-pointer">
+                                            Clear
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="p-3 bg-background grid gap-1.5 grid-cols-2 text-center pb-3 border-b border-border">
+                                    {['This Month', 'Last Month', 'This Year', 'Last Year'].map(preset => (
+                                        <button
+                                            key={preset}
+                                            onClick={() => handleDatePreset(preset)}
+                                            className={cn(
+                                                'px-2 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors cursor-pointer',
+                                                datePreset === preset ? 'bg-primary border-primary text-white' : 'bg-secondary border-border hover:bg-secondary/80 text-foreground'
+                                            )}
+                                        >
+                                            {preset}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="p-3 bg-background space-y-2">
+                                    <div className="space-y-1 text-left">
+                                        <label className="text-[10px] font-bold text-muted-foreground uppercase opacity-70">From</label>
+                                        <input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); setDatePreset('Custom'); }} className="w-full bg-background border border-border rounded-lg px-2 h-8 text-[12px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all text-foreground [color-scheme:dark_light]" />
+                                    </div>
+                                    <div className="space-y-1 text-left">
+                                        <label className="text-[10px] font-bold text-muted-foreground uppercase opacity-70">To</label>
+                                        <input type="date" value={toDate} onChange={e => { setToDate(e.target.value); setDatePreset('Custom'); }} className="w-full bg-background border border-border rounded-lg px-2 h-8 text-[12px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all text-foreground [color-scheme:dark_light]" />
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </div>
