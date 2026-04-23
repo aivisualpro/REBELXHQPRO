@@ -1,13 +1,25 @@
 import {
     ClipboardList, Trash2, DollarSign, Users, BarChart3, Timer, FileWarning,
-    Package, ShieldAlert, Activity, XCircle, Repeat
+    Package, ShieldAlert, Activity, XCircle, Repeat, AlertOctagon
 } from 'lucide-react';
 
 export const KPIS: {
     id: string; label: string; desc: string; icon: any; key: string;
     severity: (v: number) => 'red' | 'amber' | 'green';
     cols: { key: string; label: string; w?: string }[];
+    hero?: boolean; // special full-width hero treatment
 }[] = [
+    {
+        id: 'unfulfilledOrders', label: 'Unfulfilled Orders', desc: 'All manufacturing orders not yet fulfilled — requires immediate attention',
+        icon: AlertOctagon, key: 'unfulfilledOrders', hero: true,
+        severity: v => v > 20 ? 'red' : v > 5 ? 'amber' : 'green',
+        cols: [
+            { key: 'label', label: 'MO#', w: 'w-24' }, { key: 'skuName', label: 'SKU' },
+            { key: 'status', label: 'Status', w: 'w-28' }, { key: 'ageDays', label: 'Age (Days)', w: 'w-24' },
+            { key: 'priority', label: 'Priority', w: 'w-24' }, { key: 'qty', label: 'Qty', w: 'w-20' },
+            { key: 'scheduledFinish', label: 'Sched. Finish', w: 'w-32' }, { key: 'createdBy', label: 'Created By', w: 'w-28' },
+        ],
+    },
     {
         id: 'incomplete', label: 'Incomplete MOs', desc: 'Open manufacturing orders',
         icon: ClipboardList, key: 'incomplete',

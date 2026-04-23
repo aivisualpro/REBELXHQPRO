@@ -57,7 +57,7 @@ export function LotSelectionModal({
                 const isPendingProd = (t: any) => t.type === 'Produced' && ['pending', 'processing'].includes((t.status || '').toLowerCase());
                 const isUnfulfilledCons = (t: any) => t.type === 'Consumption' && (t.status || '').toLowerCase() !== 'fulfilled';
 
-                const lotMap = new Map<string, { balance: number; source: string; date: string; cost: number }>();
+                const lotMap = new Map<string, { balance: number; source: string; date: string; cost: number; hasSource?: boolean }>();
                 // When dates are equal, source (positive) records come first
                 const tp: Record<string, number> = { 'Opening': 0, 'Audit': 1, 'Purchase Order': 2, 'Produced': 3, 'Consumption': 4, 'Orders': 5, 'Web Order': 6 };
                 const sorted = [...txList].sort((a: any, b: any) => {
@@ -89,11 +89,16 @@ export function LotSelectionModal({
                                         tx.type
                     ) : null;
 
+                    const newHasSource = existing?.hasSource || isSourceType;
+                    const newSource = existing?.hasSource ? existing.source : (sourceType || 'Unknown');
+                    const newDate = (isSourceType && !existing?.hasSource) ? tx.date : (existing?.date || tx.date);
+
                     lotMap.set(lot, {
                         balance: (existing?.balance || 0) + (tx.quantity || 0),
-                        source: existing?.source || sourceType || 'Unknown',
-                        date: existing?.date || tx.date,
+                        source: newSource,
+                        date: newDate,
                         cost: tx.cost > 0 && !existing?.cost ? tx.cost : (existing?.cost || 0),
+                        hasSource: newHasSource,
                     });
                 }
 

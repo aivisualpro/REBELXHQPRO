@@ -17,6 +17,10 @@ const CFG = {
     baselineDays: 180,
 };
 
+/* ── In-memory cache (60s TTL) ──────────────────────────────── */
+const CACHE_TTL = 60_000;
+let summaryCache: { data: any; timestamp: number } | null = null;
+
 /* ── Stat Helpers ──────────────────────────────────────────── */
 function median(arr: number[]): number {
     if (!arr.length) return 0;
@@ -60,7 +64,12 @@ export async function GET(request: NextRequest) {
             return handleDrilldown(drilldown, dateMatch, now);
         }
 
-        /* ── Summary counts (Parallelized) ────────────────────────── */
+        // ── Check cache ──
+        if (summaryCache && (Date.now() - summaryCache.timestamp) < CACHE_TTL) {
+            return apiSuccess(summaryCache.data);
+        }
+
+        /* ── Summary counts — ALL done via countDocuments or lightweight aggregation ── */
         
         const [
             incomplete, 
@@ -71,86 +80,222 @@ export async function GET(request: NextRequest) {
             unreservedCount,
             noValuation,
             scrapAgg,
-            laborMos,
-            costMos,
-            opDiscMos,
-            yieldVarMos,
-            reworkMos
+            laborAnomalyCount,
+            costOutlierCount,
+            opDiscCount,
+            yieldVarCount,
+            reworkCount,
+            unfulfilledAgg
         ] = await Promise.all([
+            // 1. Incomplete MOs — simple count
             Manufacturing.countDocuments({ ...dateMatch, status: { $ne: 'Fulfilled' } }),
+            
+            // 2. Scrap MO count — simple count
             Manufacturing.countDocuments({ ...dateMatch, 'lineItems.qtyScrapped': { $gt: 0 } }),
+            
+            // 3. Missing Cost — simple count
             Manufacturing.countDocuments({ ...dateMatch, status: 'Fulfilled', $or: [{ totalCost: 0 }, { totalCost: null }, { totalCost: { $exists: false } }] }),
+            
+            // 4. Overdue — simple count
             Manufacturing.countDocuments({ ...dateMatch, status: { $ne: 'Fulfilled' }, scheduledFinish: { $lt: now } }),
+            
+            // 5. No BOM — simple count
             Manufacturing.countDocuments({ ...dateMatch, $or: [{ recipesId: null }, { recipesId: { $exists: false } }] }),
+            
+            // 6. Unreserved — simple count
             Manufacturing.countDocuments({ ...dateMatch, status: { $ne: 'Fulfilled' }, 'lineItems.lotNumber': { $in: [null, '', undefined] } }),
+            
+            // 7. No Valuation — simple count
             Manufacturing.countDocuments({ ...dateMatch, status: 'Fulfilled', $or: [{ laborCost: 0 }, { laborCost: null }], 'labor.0': { $exists: true } }),
             
+            // 8. Total scrap qty — lightweight aggregation
             Manufacturing.aggregate([
                 { $match: { ...dateMatch, 'lineItems.qtyScrapped': { $gt: 0 } } },
                 { $unwind: '$lineItems' },
                 { $group: { _id: null, totalScrap: { $sum: '$lineItems.qtyScrapped' } } }
             ]),
 
-            // For laborAnomalies
-            Manufacturing.find({ ...dateMatch, status: 'Fulfilled', 'labor.0': { $exists: true } })
-                .select('_id sku labor.user labor.duration').lean(),
-                
-            // For costOutliers
-            Manufacturing.find({ ...dateMatch, status: 'Fulfilled', totalCost: { $gt: 0 } })
-                .select('_id sku qty qtyDifference totalCost').lean(),
+            // 9. Labor anomalies — compute COUNT via aggregation
+            // Group by SKU, compute per-MO labor hours, then do statistical analysis server-side
+            // but ONLY fetch the minimal fields needed (sku + total labor hours per MO)
+            Manufacturing.aggregate([
+                { $match: { ...dateMatch, status: 'Fulfilled', 'labor.0': { $exists: true } } },
+                { $project: { 
+                    sku: 1,
+                    laborHours: {
+                        $reduce: {
+                            input: '$labor',
+                            initialValue: 0,
+                            in: {
+                                $add: [
+                                    '$$value',
+                                    { $let: {
+                                        vars: {
+                                            parts: { $split: [{ $ifNull: ['$$this.duration', '0:0:0'] }, ':'] }
+                                        },
+                                        in: {
+                                            $add: [
+                                                { $toDouble: { $ifNull: [{ $arrayElemAt: ['$$parts', 0] }, '0'] } },
+                                                { $divide: [{ $toDouble: { $ifNull: [{ $arrayElemAt: ['$$parts', 1] }, '0'] } }, 60] },
+                                                { $divide: [{ $toDouble: { $ifNull: [{ $arrayElemAt: ['$$parts', 2] }, '0'] } }, 3600] }
+                                            ]
+                                        }
+                                    }}
+                                ]
+                            }
+                        }
+                    }
+                }},
+                { $match: { laborHours: { $gt: 0 } } },
+                { $group: { 
+                    _id: '$sku', 
+                    hours: { $push: '$laborHours' },
+                    count: { $sum: 1 }
+                }},
+                { $match: { count: { $gte: CFG.minSampleSize } } }
+            ]),
 
-            // For operatorDiscrepancies
-            Manufacturing.find({ ...dateMatch, 'labor.0': { $exists: true } })
-                .select('_id label sku labor.user labor.createdAt').lean(),
+            // 10. Cost outliers — compute COUNT via aggregation
+            Manufacturing.aggregate([
+                { $match: { ...dateMatch, status: 'Fulfilled', totalCost: { $gt: 0 } } },
+                { $project: {
+                    sku: 1,
+                    costPerUnit: {
+                        $cond: [
+                            { $gt: [{ $add: [{ $ifNull: ['$qty', 0] }, { $ifNull: ['$qtyDifference', 0] }] }, 0] },
+                            { $divide: ['$totalCost', { $add: [{ $ifNull: ['$qty', 0] }, { $ifNull: ['$qtyDifference', 0] }] }] },
+                            0
+                        ]
+                    }
+                }},
+                { $match: { costPerUnit: { $gt: 0 } } },
+                { $group: {
+                    _id: '$sku',
+                    costs: { $push: '$costPerUnit' },
+                    count: { $sum: 1 }
+                }},
+                { $match: { count: { $gte: CFG.minSampleSize } } }
+            ]),
 
-            // For yieldVariance
-            Manufacturing.find({ ...dateMatch, status: 'Fulfilled' })
-                .select('_id qty qtyDifference').lean(),
+            // 11. Operator discrepancies — count via aggregation
+            Manufacturing.aggregate([
+                { $match: { ...dateMatch, 'labor.0': { $exists: true } } },
+                { $unwind: '$labor' },
+                { $match: { 'labor.user': { $exists: true, $ne: null }, 'labor.createdAt': { $exists: true } } },
+                { $project: {
+                    moId: '$_id',
+                    user: '$labor.user',
+                    day: { $dateToString: { format: '%Y-%m-%d', date: '$labor.createdAt' } }
+                }},
+                { $group: {
+                    _id: { user: '$user', day: '$day' },
+                    uniqueMOs: { $addToSet: '$moId' }
+                }},
+                { $project: {
+                    moCount: { $size: '$uniqueMOs' }
+                }},
+                { $match: { moCount: { $gt: 1 } } },
+                { $count: 'total' }
+            ]),
 
-            // For reworkLoops
-            Manufacturing.find({ ...dateMatch, 'lineItems.1': { $exists: true } })
-                .select('_id lineItems.sku').lean()
+            // 12. Yield variance — count via aggregation
+            Manufacturing.aggregate([
+                { $match: { ...dateMatch, status: 'Fulfilled', qty: { $gt: 0 } } },
+                { $project: {
+                    variancePct: {
+                        $multiply: [
+                            { $divide: [{ $abs: { $ifNull: ['$qtyDifference', 0] } }, '$qty'] },
+                            100
+                        ]
+                    }
+                }},
+                { $match: { variancePct: { $gt: CFG.yieldVariancePct } } },
+                { $count: 'total' }
+            ]),
+
+            // 13. Rework loops — count via aggregation
+            Manufacturing.aggregate([
+                { $match: { ...dateMatch, 'lineItems.1': { $exists: true } } },
+                { $project: {
+                    lineItems: { $filter: {
+                        input: '$lineItems',
+                        as: 'li',
+                        cond: { $ne: ['$$li.sku', null] }
+                    }}
+                }},
+                { $project: {
+                    skuCount: { $size: '$lineItems' },
+                    uniqueSkuCount: { $size: { $setUnion: [
+                        { $map: { input: '$lineItems', as: 'li', in: '$$li.sku' } },
+                        []
+                    ]}}
+                }},
+                { $match: { $expr: { $gt: ['$skuCount', '$uniqueSkuCount'] } } },
+                { $count: 'total' }
+            ]),
+
+            // 14. Unfulfilled Orders — count + status breakdown
+            Manufacturing.aggregate([
+                { $match: { ...dateMatch, status: { $ne: 'Fulfilled' } } },
+                { $group: { _id: '$status', count: { $sum: 1 }, totalQty: { $sum: { $ifNull: ['$qty', 0] } } } },
+                { $sort: { count: -1 } }
+            ])
         ]);
 
         const totalScrapQty = scrapAgg.length > 0 ? scrapAgg[0].totalScrap : 0;
 
-        const laborFlags = computeLaborAnomalies(laborMos);
-        const costFlags = computeCostOutliers(costMos);
-        const opDiscrepancies = computeOperatorDiscrepancies(opDiscMos);
-
-        // Yield Variance
-        const yieldVar = yieldVarMos.filter((m: any) => {
-            if (!m.qty || m.qty === 0) return false;
-            const variance = Math.abs(m.qtyDifference || 0) / m.qty * 100;
-            return variance > CFG.yieldVariancePct;
-        }).length;
-
-        // Rework Loops
-        let reworkCount = 0;
-        reworkMos.forEach((m: any) => {
-            const skuSet = new Map<string, number>();
-            (m.lineItems || []).forEach((li: any) => {
-                if (li.sku) skuSet.set(li.sku.toString(), (skuSet.get(li.sku.toString()) || 0) + 1);
-            });
-            for (const c of skuSet.values()) { 
-                if (c > 1) { reworkCount++; break; } 
+        // Compute labor anomaly count from aggregated per-SKU hours arrays
+        let laborAnomalies = 0;
+        for (const group of laborAnomalyCount) {
+            const hrs = group.hours as number[];
+            const med = median(hrs);
+            const avg = hrs.reduce((a: number, b: number) => a + b, 0) / hrs.length;
+            const sd = stddev(hrs, avg);
+            if (sd === 0) continue;
+            for (const h of hrs) {
+                if (Math.abs(h - med) > CFG.laborSigma * sd) laborAnomalies++;
             }
-        });
+        }
 
-        return apiSuccess({
+        // Compute cost outlier count from aggregated per-SKU cost arrays
+        let costOutliers = 0;
+        for (const group of costOutlierCount) {
+            const costs = group.costs as number[];
+            const med = median(costs);
+            const avg = costs.reduce((a: number, b: number) => a + b, 0) / costs.length;
+            const sd = stddev(costs, avg);
+            if (sd === 0) continue;
+            for (const c of costs) {
+                if (Math.abs(c - med) > CFG.costSigma * sd) costOutliers++;
+            }
+        }
+
+        // Unfulfilled Orders total + status breakdown
+        const unfulfilledTotal = unfulfilledAgg.reduce((s: number, g: any) => s + g.count, 0);
+        const unfulfilledStatusBreakdown = unfulfilledAgg.map((g: any) => ({ status: g._id || 'Unknown', count: g.count, totalQty: g.totalQty }));
+
+        const result = {
             incomplete, scrap: scrapMOCount, scrapQty: totalScrapQty,
-            missingCost, laborAnomalies: laborFlags.length, costOutliers: costFlags.length,
+            missingCost, laborAnomalies, costOutliers,
             overdue, noBom, unreserved: unreservedCount,
-            operatorDiscrepancies: opDiscrepancies.length,
-            yieldVariance: yieldVar, noValuation, reworkLoops: reworkCount,
-        });
+            operatorDiscrepancies: opDiscCount.length > 0 ? opDiscCount[0].total : 0,
+            yieldVariance: yieldVarCount.length > 0 ? yieldVarCount[0].total : 0,
+            noValuation, reworkLoops: reworkCount.length > 0 ? reworkCount[0].total : 0,
+            unfulfilledOrders: unfulfilledTotal,
+            unfulfilledStatusBreakdown,
+        };
+
+        // Cache result
+        summaryCache = { data: result, timestamp: Date.now() };
+
+        return apiSuccess(result);
     } catch (err: any) {
         console.error('KPI API Error:', err);
         return apiError(err.message, 500);
     }
 }
 
-/* ── Statistical computations ──────────────────────────────── */
+/* ── Statistical computations (for drilldowns only) ────────── */
 function computeLaborAnomalies(mos: any[]) {
     const bySku = new Map<string, { mo: any; hours: number }[]>();
     mos.forEach(mo => {
@@ -242,6 +387,14 @@ async function handleDrilldown(kpi: string, dateMatch: any, now: Date) {
     };
 
     switch (kpi) {
+        case 'unfulfilledOrders': {
+            const mos = await Manufacturing.find({ ...dateMatch, status: { $ne: 'Fulfilled' } })
+                .select('_id label sku status qty qtyDifference scheduledFinish priority createdAt createdBy')
+                .sort({ createdAt: -1 })
+                .lean();
+            return apiSuccess((await enrich(mos)).sort((a, b) => b.ageDays - a.ageDays));
+        }
+
         case 'incomplete': {
             const mos = await Manufacturing.find({ ...dateMatch, status: { $ne: 'Fulfilled' } })
                 .select('_id label sku status qty qtyDifference scheduledFinish priority createdAt createdBy')

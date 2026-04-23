@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
     Package,
     Loader2,
@@ -80,13 +80,43 @@ const formatCurrency = (val: number) => {
     return '$' + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
+// ── Wrapper with Suspense boundary for useSearchParams ──
 export default function MissingCostPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex flex-col h-[calc(100vh-48px)] bg-background items-center justify-center">
+                <Loader2 className="w-10 h-10 text-rose-500 animate-spin" />
+                <p className="mt-4 text-xs font-bold uppercase tracking-widest text-muted-foreground animate-pulse">Loading...</p>
+            </div>
+        }>
+            <MissingCostContent />
+        </Suspense>
+    );
+}
+
+function MissingCostContent() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+
     const [groups, setGroups] = useState<SkuGroupSummary[]>([]);
     const [loading, setLoading] = useState(true);
-    const [selectedSkuId, setSelectedSkuId] = useState<string | null>(null);
-    const [sidebarSearch, setSidebarSearch] = useState('');
-    const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
+    const [selectedSkuId, setSelectedSkuId] = useState<string | null>(searchParams.get('skuId') || null);
+    const [sidebarSearch, setSidebarSearch] = useState(searchParams.get('search') || '');
+    const [typeFilter, setTypeFilter] = useState<TypeFilter>((searchParams.get('type') as TypeFilter) || 'all');
+
+    // Sync state → URL
+    useEffect(() => {
+        const params = new URLSearchParams();
+        if (selectedSkuId) params.set('skuId', selectedSkuId);
+        if (sidebarSearch) params.set('search', sidebarSearch);
+        if (typeFilter !== 'all') params.set('type', typeFilter);
+
+        const qs = params.toString();
+        const newUrl = `${window.location.pathname}${qs ? '?' + qs : ''}`;
+        if (window.location.search.replace(/^\?/, '') !== qs) {
+            router.replace(newUrl, { scroll: false });
+        }
+    }, [selectedSkuId, sidebarSearch, typeFilter, router]);
 
     // Detail state (lazy-loaded per SKU)
     const [detailItems, setDetailItems] = useState<DetailItem[]>([]);
@@ -178,7 +208,8 @@ export default function MissingCostPage() {
                     const json = await res.json();
                     const payload = json.data || json;
                     setGroups(payload.groups || []);
-                    if (payload.groups?.length > 0) {
+                    // Only auto-select first SKU if none was provided via URL
+                    if (!selectedSkuId && payload.groups?.length > 0) {
                         setSelectedSkuId(payload.groups[0].skuId);
                     }
                 }
@@ -188,7 +219,7 @@ export default function MissingCostPage() {
                 setLoading(false);
             }
         })();
-    }, []);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // ── Load detail items when SKU changes ──
     const loadSkuDetail = useCallback(async (skuId: string) => {
