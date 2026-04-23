@@ -23,12 +23,21 @@ const inventoryReports = [
         icon: AlertCircle,
         color: 'orange' as const,
         available: true
+    },
+    {
+        title: 'Manufacturing',
+        description: 'Production efficiency, work order status, and labor tracking metrics',
+        href: '/reports/inventory/manufacturing',
+        icon: Package,
+        color: 'purple' as const,
+        available: true
     }
 ];
 
 const colorClasses = {
     blue: 'from-blue-500 to-blue-600 shadow-blue-500/30 text-white',
     orange: 'from-orange-500 to-orange-600 shadow-orange-500/30 text-white',
+    purple: 'from-purple-500 to-purple-600 shadow-purple-500/30 text-white',
 };
 
 export default function InventoryIndexPage() {

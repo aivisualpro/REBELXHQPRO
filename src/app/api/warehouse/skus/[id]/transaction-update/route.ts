@@ -59,13 +59,50 @@ export async function POST(
                 break;
 
             case 'Web Order':
-                // Web Orders might be tricky if lineItems don't have _ids preserved or matched perfectly
-                // Try matching by _id first
-                result = await WebOrder.findOneAndUpdate(
-                    { _id: docId, "lineItems._id": lineItemId },
-                    { $set: { "lineItems.$.lotNumber": newLotNumber } },
-                    { new: true }
-                );
+                const resolvedParams = await props.params;
+                const skuIdToUpdate = body.skuId || resolvedParams?.id;
+                let realLineId: string | number = lineItemId;
+                if (typeof lineItemId === 'string' && lineItemId.includes('_')) {
+                    const parts = lineItemId.split('_');
+                    if (parts.length >= 2) {
+                        realLineId = parts[1]; 
+                    }
+                }
+                
+                const isNumericId = !isNaN(Number(realLineId)) && realLineId !== '';
+                const matchQuery = isNumericId 
+                    ? { _id: docId, "lineItems.id": Number(realLineId) }
+                    : { _id: docId, "lineItems._id": realLineId };
+
+                const wo = await WebOrder.findOne(matchQuery);
+                if (wo) {
+                    const line = isNumericId 
+                        ? wo.lineItems.find((l: any) => l.id === Number(realLineId))
+                        : wo.lineItems.find((l: any) => l._id?.toString() === realLineId);
+                        
+                    if (line) {
+                        // Always update BOTH the main lotNumber and the linkedSkus array.
+                        // This guarantees the ledger will pick it up regardless of whether it's a bundle or direct match.
+                        const linkedSkuIndex = line.linkedSkus?.findIndex((ls: any) => ls.skuId === skuIdToUpdate);
+                        if (linkedSkuIndex !== undefined && linkedSkuIndex >= 0) {
+                            const updateKey = `lineItems.$.linkedSkus.${linkedSkuIndex}.lotNumber`;
+                            result = await WebOrder.findOneAndUpdate(
+                                matchQuery,
+                                { $set: { [updateKey]: newLotNumber, "lineItems.$.lotNumber": newLotNumber } },
+                                { new: true }
+                            );
+                        } else {
+                            result = await WebOrder.findOneAndUpdate(
+                                matchQuery,
+                                { 
+                                    $push: { "lineItems.$.linkedSkus": { skuId: skuIdToUpdate, lotNumber: newLotNumber, multiplier: 1, cost: 0 } },
+                                    $set: { "lineItems.$.lotNumber": newLotNumber }
+                                },
+                                { new: true }
+                            );
+                        }
+                    }
+                }
                 break;
 
             case 'Audit': // Audit Adjustment

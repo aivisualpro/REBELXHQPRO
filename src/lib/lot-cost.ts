@@ -27,6 +27,44 @@ const cleanLot = (lot: any): string => {
     return s;
 };
 
+export const durationToHours = (duration: string): number => {
+    if (!duration) return 0;
+    const parts = duration.split(':').map(p => parseFloat(p) || 0);
+    if (parts.length === 3) return parts[0] + parts[1] / 60 + parts[2] / 3600;
+    if (parts.length === 2) return parts[0] + parts[1] / 60;
+    return parts[0] || 0;
+};
+
+export const calculateJobCostPerUnit = (job: any): number => {
+    let costPerUnit = 0;
+
+    // Use stored totalCost if available
+    if (job.totalCost && job.totalCost > 0) {
+        const totalQtyProduced = (job.qty || 0) + (job.qtyDifference || 0);
+        costPerUnit = totalQtyProduced > 0 ? job.totalCost / totalQtyProduced : 0;
+    } else {
+        // Calculate from components (materials + labor + packaging)
+        let totalMatCost = 0;
+        job.lineItems?.forEach((li: any) => {
+            if (!li.sku) return;
+            const totalConsumed = ((li.recipeQty || 0) * (job.qty || 0)) + (li.qtyExtra || 0) + (li.qtyScrapped || 0);
+            const ingredientCost = li.obCost || li.poCost || 0;
+            totalMatCost += totalConsumed * ingredientCost;
+        });
+
+        let totalLaborCost = 0;
+        job.labor?.forEach((l: any) => {
+            totalLaborCost += durationToHours(l.duration) * (l.hourlyRate || 0);
+        });
+
+        const packagingCost = job.packagingCost || 0;
+        const totalQtyProduced = (job.qty || 0) + (job.qtyDifference || 0);
+        costPerUnit = totalQtyProduced > 0 ? (totalMatCost + totalLaborCost + packagingCost) / totalQtyProduced : 0;
+    }
+
+    return costPerUnit;
+};
+
 // ⚡ In-memory cache for lot costs (60s TTL)
 const LOT_COST_CACHE_TTL = 60_000;
 const lotCostCache = new Map<string, { data: Map<string, number>; timestamp: number }>();
@@ -164,43 +202,11 @@ export async function getLotsWithCost(skuId: string): Promise<Map<string, number
     });
 
     // Apply Manufacturing
-    const durationToHours = (duration: string): number => {
-        if (!duration) return 0;
-        const parts = duration.split(':').map(p => parseFloat(p) || 0);
-        if (parts.length === 3) return parts[0] + parts[1] / 60 + parts[2] / 3600;
-        if (parts.length === 2) return parts[0] + parts[1] / 60;
-        return parts[0] || 0;
-    };
-
     manufacturingJobs.forEach((job: any) => {
         const lot = cleanLot(job.lotNumber || job.label);
         if (!lot || lotCosts.has(lot)) return;
 
-        let costPerUnit = 0;
-
-        // Use stored totalCost if available
-        if (job.totalCost && job.totalCost > 0) {
-            const totalQtyProduced = (job.qty || 0) + (job.qtyDifference || 0);
-            costPerUnit = totalQtyProduced > 0 ? job.totalCost / totalQtyProduced : 0;
-        } else {
-            // Calculate from components (materials + labor + packaging)
-            let totalMatCost = 0;
-            job.lineItems?.forEach((li: any) => {
-                if (!li.sku) return;
-                const totalConsumed = ((li.recipeQty || 0) * (job.qty || 0)) + (li.qtyExtra || 0) + (li.qtyScrapped || 0);
-                const ingredientCost = li.obCost || li.poCost || 0;
-                totalMatCost += totalConsumed * ingredientCost;
-            });
-
-            let totalLaborCost = 0;
-            job.labor?.forEach((l: any) => {
-                totalLaborCost += durationToHours(l.duration) * (l.hourlyRate || 0);
-            });
-
-            const packagingCost = job.packagingCost || 0;
-            const totalQtyProduced = (job.qty || 0) + (job.qtyDifference || 0);
-            costPerUnit = totalQtyProduced > 0 ? (totalMatCost + totalLaborCost + packagingCost) / totalQtyProduced : 0;
-        }
+        const costPerUnit = calculateJobCostPerUnit(job);
 
         lotCosts.set(lot, costPerUnit);
     });

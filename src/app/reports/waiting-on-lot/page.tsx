@@ -39,7 +39,7 @@ interface Summary {
 
 interface DetailItem {
     id: string;
-    source: 'Web Order' | 'Sale Order';
+    source: string;
     orderId: string;
     lineItemId?: number;
     orderNumber: string;
@@ -145,6 +145,7 @@ export default function WaitingOnLotPage() {
     // Filter detail items by type
     const filteredDetailItems = useMemo(() => {
         if (typeFilter === 'all') return detailItems;
+        if (typeFilter === 'Web Order') return detailItems.filter(i => i.source.startsWith('Web Order'));
         return detailItems.filter(i => i.source === typeFilter);
     }, [detailItems, typeFilter]);
 
@@ -173,15 +174,21 @@ export default function WaitingOnLotPage() {
     const handleLotSelect = async (lotNumber: string, cost?: number) => {
         if (!editingItem || !selectedSkuId) return;
 
-        // Only web orders supported for now
-        if (editingItem.source === 'Web Order' && editingItem.lineItemId != null) {
+        // Support all web order types (direct, bundle, WP-resolved)
+        if (editingItem.source.startsWith('Web Order') && editingItem.orderId) {
             try {
-                const res = await fetch(`/api/retail/web-orders/${editingItem.orderId}/line-item`, {
-                    method: 'PATCH',
+                // Use the transaction-update API (handles synthetic IDs, bundles, linkedSkus)
+                const res = await fetch(`/api/warehouse/skus/${selectedSkuId}/transaction-update`, {
+                    method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        lineItemId: editingItem.lineItemId,
-                        lotNumber: lotNumber || null,
+                        type: 'Web Order',
+                        docId: editingItem.orderId,
+                        lineItemId: editingItem.lineItemId != null
+                            ? `${editingItem.orderId}_${editingItem.lineItemId}_${selectedSkuId}`
+                            : editingItem.orderId,
+                        newLotNumber: lotNumber || null,
+                        skuId: selectedSkuId,
                     })
                 });
 
@@ -192,14 +199,49 @@ export default function WaitingOnLotPage() {
                     // Update sidebar count
                     setGroups(prev => prev.map(g =>
                         g.skuId === selectedSkuId
-                            ? { ...g, count: g.count - 1, totalQty: g.totalQty - editingItem.quantity }
+                            ? { ...g, count: g.count - 1, totalQty: g.totalQty - Math.abs(editingItem.quantity) }
                             : g
                     ).filter(g => g.count > 0));
                     // Update summary
                     setSummary(prev => prev ? {
                         ...prev,
                         totalItems: prev.totalItems - 1,
-                        totalQty: prev.totalQty - editingItem.quantity,
+                        totalQty: prev.totalQty - Math.abs(editingItem.quantity),
+                        totalValue: prev.totalValue - editingItem.total,
+                    } : null);
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    toast.error(err?.error || 'Failed to update lot');
+                }
+            } catch (e) {
+                toast.error('Error updating lot');
+            }
+        } else if (editingItem.source === 'Sale Order') {
+            // Sale Orders use the same transaction-update API
+            try {
+                const res = await fetch(`/api/warehouse/skus/${selectedSkuId}/transaction-update`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        type: 'Orders',
+                        docId: editingItem.orderId,
+                        lineItemId: editingItem.lineItemId,
+                        newLotNumber: lotNumber || null,
+                    })
+                });
+
+                if (res.ok) {
+                    toast.success(lotNumber ? `Lot set to ${lotNumber}` : 'Lot cleared');
+                    setDetailItems(prev => prev.filter(i => i.id !== editingItem.id));
+                    setGroups(prev => prev.map(g =>
+                        g.skuId === selectedSkuId
+                            ? { ...g, count: g.count - 1, totalQty: g.totalQty - Math.abs(editingItem.quantity) }
+                            : g
+                    ).filter(g => g.count > 0));
+                    setSummary(prev => prev ? {
+                        ...prev,
+                        totalItems: prev.totalItems - 1,
+                        totalQty: prev.totalQty - Math.abs(editingItem.quantity),
                         totalValue: prev.totalValue - editingItem.total,
                     } : null);
                 } else {
@@ -209,7 +251,7 @@ export default function WaitingOnLotPage() {
                 toast.error('Error updating lot');
             }
         } else {
-            toast.error('Lot assignment from here is only supported for Web Orders');
+            toast.error('Unsupported order type for lot assignment');
         }
 
         setIsLotModalOpen(false);
@@ -247,7 +289,7 @@ export default function WaitingOnLotPage() {
     }
 
     // Type filter counts
-    const woCount = detailItems.filter(i => i.source === 'Web Order').length;
+    const woCount = detailItems.filter(i => i.source.startsWith('Web Order')).length;
     const soCount = detailItems.filter(i => i.source === 'Sale Order').length;
 
     return (

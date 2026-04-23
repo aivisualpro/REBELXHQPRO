@@ -51,6 +51,14 @@ export const TimerPanel = () => {
                 <>
                     {/* Backdrop */}
                     <motion.div
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                setIsPanelOpen(false);
+                            }
+                        }}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}

@@ -3,7 +3,8 @@ import { getLotsWithBalances } from '../src/lib/lot-helpers';
 import Sku from '../src/models/Sku';
 
 async function test() {
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb+srv://adeel:Easports49971984@cluster1.2ttstsb.mongodb.net/RebelXHQSystems?authSource=admin');
+    if (!process.env.MONGODB_URI) throw new Error('MONGODB_URI required');
+    await mongoose.connect(process.env.MONGODB_URI);
     
     try {
         // Pick a random SKU that likely has lot history

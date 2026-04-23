@@ -175,10 +175,11 @@ export default function MissingCostPage() {
                 setLoading(true);
                 const res = await fetch('/api/reports/missing-cost');
                 if (res.ok) {
-                    const data = await res.json();
-                    setGroups(data.groups || []);
-                    if (data.groups?.length > 0) {
-                        setSelectedSkuId(data.groups[0].skuId);
+                    const json = await res.json();
+                    const payload = json.data || json;
+                    setGroups(payload.groups || []);
+                    if (payload.groups?.length > 0) {
+                        setSelectedSkuId(payload.groups[0].skuId);
                     }
                 }
             } catch (e) {
@@ -196,8 +197,9 @@ export default function MissingCostPage() {
             setDetailItems([]);
             const res = await fetch(`/api/reports/missing-cost?skuId=${skuId}`);
             if (res.ok) {
-                const data = await res.json();
-                setDetailItems(data.items || []);
+                const json = await res.json();
+                const payload = json.data || json;
+                setDetailItems(payload.items || []);
             }
         } catch (e) {
             console.error('Failed to fetch SKU detail:', e);

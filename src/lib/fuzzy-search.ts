@@ -35,8 +35,9 @@ export function buildFuzzySearchQuery(search: string, fields: string[]): Record<
         // IMPORTANT: Trim from the RAW token first, then escape.
         // Slicing the escaped string can break escape sequences
         // (e.g. "\(" sliced to "\" is invalid regex).
-        if (token.length >= 4) patterns.push(escapeRegex(token.slice(0, -1)));
-        if (token.length >= 6) patterns.push(escapeRegex(token.slice(0, -2)));
+        // Only trim for longer tokens to avoid false positives (e.g. "nimo" → "nim" matching "animal")
+        if (token.length >= 5) patterns.push(escapeRegex(token.slice(0, -1)));
+        if (token.length >= 7) patterns.push(escapeRegex(token.slice(0, -2)));
 
         const fuzzyPattern = [...new Set(patterns)].join('|');
 
@@ -68,8 +69,9 @@ export function buildFuzzyRegex(search: string): string {
         const escaped = escapeRegex(token);
         allPatterns.push(escaped);
         // Trim from the RAW token first, then escape to avoid broken escape sequences
-        if (token.length >= 4) allPatterns.push(escapeRegex(token.slice(0, -1)));
-        if (token.length >= 6) allPatterns.push(escapeRegex(token.slice(0, -2)));
+        // Only trim for longer tokens to avoid false positives
+        if (token.length >= 5) allPatterns.push(escapeRegex(token.slice(0, -1)));
+        if (token.length >= 7) allPatterns.push(escapeRegex(token.slice(0, -2)));
     });
 
     return [...new Set(allPatterns)].join('|');

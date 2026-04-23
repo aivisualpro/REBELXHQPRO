@@ -1,12 +1,14 @@
 import 'dotenv/config'; // Load env vars if run standalone
 import mongoose from 'mongoose';
 
-// Connect using the specific MONGODB_URI or a fallback
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://adeel:Easports49971984@cluster1.2ttstsb.mongodb.net/RebelXHQSystems?authSource=admin';
+const MONGODB_URI = process.env.MONGODB_URI;
+if (!MONGODB_URI) {
+    throw new Error('Please define the MONGODB_URI environment variable');
+}
 
 async function run() {
     console.log('Connecting to MongoDB...');
-    await mongoose.connect(MONGODB_URI);
+    await mongoose.connect(MONGODB_URI!);
     console.log('Connected.\n');
 
     if (!mongoose.connection.db) {

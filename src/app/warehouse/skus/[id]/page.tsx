@@ -284,7 +284,7 @@ function SkuDetailsPageContent() {
 
                 // Derive lots from ledger transactions (single source of truth)
                 const txList = data.transactions || [];
-                const lotMap = new Map<string, { balance: number; source: string; date: string | null; cost: number }>();
+                const lotMap = new Map<string, { balance: number; source: string; date: string | null; cost: number; hasSource?: boolean }>();
                 const isPendingProd = (t: any) => t.type === 'Produced' && ['pending', 'processing'].includes((t.status || '').toLowerCase());
                 const isUnfulfilledCons = (t: any) => t.type === 'Consumption' && (t.status || '').toLowerCase() !== 'fulfilled';
 
@@ -326,11 +326,16 @@ function SkuDetailsPageContent() {
                                         tx.type
                     ) : null;
 
+                    const newHasSource = existing?.hasSource || isSourceType;
+                    const newSource = existing?.hasSource ? existing.source : (sourceType || 'Unknown');
+                    const newDate = (isSourceType && !existing?.hasSource) ? tx.date : (existing?.date || tx.date);
+
                     lotMap.set(lot, {
                         balance: (existing?.balance || 0) + (tx.quantity || 0),
-                        source: existing?.source || sourceType || 'Unknown',
-                        date: existing?.date || (isSourceType ? tx.date : null) || existing?.date || tx.date,
+                        source: newSource,
+                        date: newDate,
                         cost: tx.cost > 0 && !existing?.cost ? tx.cost : (existing?.cost || 0),
+                        hasSource: newHasSource
                     });
                 }
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import WebOrder from '@/models/WebOrder';
 import SaleOrder from '@/models/SaleOrder';
+import WebProduct from '@/models/WebProduct';
 import Sku from '@/models/Sku';
 import { getGlobalStartDate } from '@/lib/global-settings';
 
@@ -11,6 +12,15 @@ export const dynamic = 'force-dynamic';
 const CACHE_TTL = 120_000;
 let summaryCache: { data: any; timestamp: number } | null = null;
 let detailCache = new Map<string, { data: any; timestamp: number }>();
+
+// Lot values we consider "missing"
+const MISSING_LOT_OR = [
+    { 'lineItems.lotNumber': { $exists: false } },
+    { 'lineItems.lotNumber': null },
+    { 'lineItems.lotNumber': '' },
+    { 'lineItems.lotNumber': 'N/A' },
+    { 'lineItems.lotNumber': 'Allocated' },
+];
 
 /**
  * GET /api/reports/waiting-on-lot
@@ -40,7 +50,7 @@ async function getSummary() {
         const globalStartDate = await getGlobalStartDate();
 
         const [woGroups, soGroups, allSkus] = await Promise.all([
-            // ⚡ Web Orders: group by SKU, count items
+            // ⚡ Web Orders: group by SKU, count items missing lot
             WebOrder.aggregate([
                 {
                     $match: {
@@ -53,13 +63,7 @@ async function getSummary() {
                 {
                     $match: {
                         'lineItems.linkedSkuId': { $exists: true, $ne: null },
-                        $or: [
-                            { 'lineItems.lotNumber': { $exists: false } },
-                            { 'lineItems.lotNumber': null },
-                            { 'lineItems.lotNumber': '' },
-                            { 'lineItems.lotNumber': 'N/A' },
-                            { 'lineItems.lotNumber': 'Allocated' },
-                        ]
+                        $or: MISSING_LOT_OR,
                     }
                 },
                 {
@@ -137,6 +141,155 @@ async function getSummary() {
             mergedMap.set(id, existing);
         }
 
+        // ── Phase 2: WebProduct-resolved web orders ──
+        // For each known SKU, find WebProducts that reference it,
+        // then find web orders via productId that are missing lot numbers
+        // but DON'T have a direct linkedSkuId (already counted above).
+        const allSkuIds = Array.from(skuMap.keys());
+        const webProducts = await WebProduct.find({
+            $or: [
+                { linkedSkuId: { $in: allSkuIds } },
+                { 'variations.linkedSkuId': { $in: allSkuIds } },
+                { 'linkedSkus.skuId': { $in: allSkuIds } },
+                { 'variations.linkedSkus.skuId': { $in: allSkuIds } },
+            ]
+        }).select('webId website linkedSkuId linkedSkus multiplier variations').lean();
+
+        // Build: skuId -> [{ website, productId, variationId?, multiplier }]
+        const wpResolutions: { skuId: string; website: string; productId: number; variationId?: number; multiplier: number }[] = [];
+        (webProducts as any[]).forEach(wp => {
+            // Product-level direct link
+            if (wp.linkedSkuId && allSkuIds.includes(wp.linkedSkuId)) {
+                wpResolutions.push({ skuId: wp.linkedSkuId, website: wp.website, productId: wp.webId, multiplier: wp.multiplier || 1 });
+            }
+            // Product-level linkedSkus
+            wp.linkedSkus?.forEach((ls: any) => {
+                if (allSkuIds.includes(ls.skuId)) {
+                    wpResolutions.push({ skuId: ls.skuId, website: wp.website, productId: wp.webId, multiplier: ls.multiplier || 1 });
+                }
+            });
+            // Variation-level
+            wp.variations?.forEach((v: any) => {
+                const vid = v.id || v._id;
+                if (v.linkedSkuId && allSkuIds.includes(v.linkedSkuId)) {
+                    wpResolutions.push({ skuId: v.linkedSkuId, website: wp.website, productId: wp.webId, variationId: vid, multiplier: v.multiplier || wp.multiplier || 1 });
+                }
+                v.linkedSkus?.forEach((ls: any) => {
+                    if (allSkuIds.includes(ls.skuId)) {
+                        wpResolutions.push({ skuId: ls.skuId, website: wp.website, productId: wp.webId, variationId: vid, multiplier: ls.multiplier || 1 });
+                    }
+                });
+            });
+        });
+
+        // Group WebProduct resolutions by website+productId for querying
+        const wpProductKeys = new Set<string>();
+        const wpWebIds: number[] = [];
+        const wpWebsites: string[] = [];
+        wpResolutions.forEach(r => {
+            const key = `${r.website}-${r.productId}`;
+            if (!wpProductKeys.has(key)) {
+                wpProductKeys.add(key);
+                wpWebIds.push(r.productId);
+                if (!wpWebsites.includes(r.website)) wpWebsites.push(r.website);
+            }
+        });
+
+        if (wpWebIds.length > 0) {
+            // Fetch ALL web orders matched via WebProduct productId
+            // Do NOT filter by lot status here — for WP-resolved items, the ledger
+            // treats them as always "missing lot" regardless of lineItems.lotNumber.
+            const wpWoGroups = await WebOrder.aggregate([
+                {
+                    $match: {
+                        status: { $nin: ['cancelled', 'trash', 'failed', 'refunded'] },
+                        'lineItems.productId': { $in: wpWebIds },
+                        website: { $in: wpWebsites },
+                        ...(globalStartDate ? { dateCreated: { $gte: globalStartDate } } : {}),
+                    }
+                },
+                { $unwind: '$lineItems' },
+                {
+                    $match: {
+                        'lineItems.productId': { $in: wpWebIds },
+                    }
+                },
+                {
+                    $project: {
+                        _id: 1,
+                        website: 1,
+                        'lineItems.id': 1,
+                        'lineItems._id': 1,
+                        'lineItems.productId': 1,
+                        'lineItems.variationId': 1,
+                        'lineItems.quantity': 1,
+                        'lineItems.total': 1,
+                        'lineItems.linkedSkuId': 1,
+                        'lineItems.lotNumber': 1,
+                        'lineItems.linkedSkus': 1,
+                    }
+                }
+            ]).allowDiskUse(true);
+
+            // Deduplicate: track (orderId_lineId_skuId) to prevent double-counting
+            // items already counted via Phase 1 (direct linkedSkuId)
+            const counted = new Set<string>();
+
+            // Pre-populate with Phase 1 items (direct linkedSkuId matches)
+            // — these were already counted in the woGroups aggregation
+            for (const wo of wpWoGroups) {
+                const line = wo.lineItems;
+                if (line.linkedSkuId) {
+                    counted.add(`${wo._id}_${line.id || line._id}_${line.linkedSkuId}`);
+                }
+            }
+
+            // Resolve each matched line item to a SKU via the wpResolutions map
+            for (const wo of wpWoGroups) {
+                const line = wo.lineItems;
+
+                // Find matching WebProduct resolution
+                const matchingRes = wpResolutions.filter(r =>
+                    r.website === wo.website && r.productId === line.productId
+                );
+
+                for (const res of matchingRes) {
+                    // If resolution has a variationId, only match if line has that variationId
+                    if (res.variationId && line.variationId !== res.variationId) continue;
+                    // If resolution has no variationId and line has one, skip (variation-level should match)
+                    if (!res.variationId && line.variationId && matchingRes.some(r => r.variationId === line.variationId)) continue;
+
+                    const dedupeKey = `${wo._id}_${line.id || line._id}_${res.skuId}`;
+                    if (counted.has(dedupeKey)) continue;
+                    counted.add(dedupeKey);
+
+                    // Determine lot status using the same logic as the ledger:
+                    // - Direct match (linkedSkuId === skuId): check lineItems.lotNumber
+                    // - LinkedSkus match: check linkedSkus[].lotNumber
+                    // - WP-resolved: always treated as missing lot
+                    const isDirectMatch = line.linkedSkuId === res.skuId;
+                    const linkedSkuMatch = line.linkedSkus?.find((ls: any) => ls.skuId === res.skuId);
+
+                    let lot = '';
+                    if (linkedSkuMatch) {
+                        lot = linkedSkuMatch.lotNumber || '';
+                    } else if (isDirectMatch) {
+                        lot = line.lotNumber || '';
+                    }
+                    // else: WP-resolved → lot stays ''
+
+                    const isMissing = !lot || lot === '' || lot === 'N/A' || lot === 'Allocated';
+                    if (!isMissing) continue;
+
+                    const existing = mergedMap.get(res.skuId) || { count: 0, totalQty: 0, totalValue: 0 };
+                    existing.count += 1;
+                    existing.totalQty += (line.quantity || 0) * res.multiplier;
+                    existing.totalValue += parseFloat(line.total || '0') || 0;
+                    mergedMap.set(res.skuId, existing);
+                }
+            }
+        }
+
         // Build response
         const groups = Array.from(mergedMap.entries())
             .map(([skuId, stats]) => {
@@ -151,6 +304,7 @@ async function getSummary() {
                     totalValue: stats.totalValue,
                 };
             })
+            .filter(g => g.name !== 'Unknown SKU' && g.totalQty > 0)
             .sort((a, b) => b.totalQty - a.totalQty);
 
         const result = {
@@ -185,25 +339,76 @@ async function getSkuDetail(skuId: string) {
         // ── Fetch global start date filter ──
         const globalStartDate = await getGlobalStartDate();
 
+        // ── Phase 1: Fetch WebProducts that reference this SKU ──
+        const webProducts = await WebProduct.find({
+            $or: [
+                { linkedSkuId: skuId },
+                { 'variations.linkedSkuId': skuId },
+                { 'linkedSkus.skuId': skuId },
+                { 'variations.linkedSkus.skuId': skuId },
+            ]
+        }).select('webId website linkedSkuId linkedSkus multiplier variations').lean();
+
+        // Build WebProduct lookup: website+productId -> variationId -> multiplier
+        const wpMultiplierMap = new Map<string, Map<number | string, number>>();
+        (webProducts as any[]).forEach(wp => {
+            const wpKey = `${wp.website}-${wp.webId}`;
+            // Product-level
+            if (wp.linkedSkuId === skuId) {
+                if (!wpMultiplierMap.has(wpKey)) wpMultiplierMap.set(wpKey, new Map());
+                wpMultiplierMap.get(wpKey)!.set('simple', wp.multiplier || 1);
+            }
+            if (wp.linkedSkus?.some((ls: any) => ls.skuId === skuId)) {
+                const match = wp.linkedSkus.find((ls: any) => ls.skuId === skuId);
+                if (!wpMultiplierMap.has(wpKey)) wpMultiplierMap.set(wpKey, new Map());
+                wpMultiplierMap.get(wpKey)!.set('simple', match.multiplier || 1);
+            }
+            // Variation-level
+            wp.variations?.forEach((v: any) => {
+                const vid = v.id || v._id;
+                const varLinked = v.linkedSkuId === skuId;
+                const varLsMatch = v.linkedSkus?.find((ls: any) => ls.skuId === skuId);
+                if (varLinked || varLsMatch) {
+                    if (!wpMultiplierMap.has(wpKey)) wpMultiplierMap.set(wpKey, new Map());
+                    wpMultiplierMap.get(wpKey)!.set(vid, varLsMatch?.multiplier || v.multiplier || wp.multiplier || 1);
+                }
+            });
+        });
+
+        // Build query for web orders: combine direct + WebProduct resolution
+        const wpWebIds = (webProducts as any[]).map((wp: any) => wp.webId).filter(Boolean);
+        const wpWebsites = [...new Set((webProducts as any[]).map((wp: any) => wp.website).filter(Boolean))];
+
+        const woMatchOr: any[] = [
+            { 'lineItems.linkedSkuId': skuId },
+            { 'lineItems.linkedSkus.skuId': skuId },
+        ];
+        if (wpWebIds.length > 0) {
+            woMatchOr.push({ 'lineItems.productId': { $in: wpWebIds }, website: { $in: wpWebsites } });
+        }
+
+        const innerMatchOr: any[] = [
+            { 'lineItems.linkedSkuId': skuId },
+            { 'lineItems.linkedSkus.skuId': skuId },
+        ];
+        if (wpWebIds.length > 0) {
+            innerMatchOr.push({ 'lineItems.productId': { $in: wpWebIds } });
+        }
+
         const [woItems, soItems] = await Promise.all([
+            // ⚡ Web Orders: use same resolution as ledger (direct + WebProduct)
             WebOrder.aggregate([
                 {
                     $match: {
                         status: { $nin: ['cancelled', 'trash', 'failed', 'refunded'] },
+                        $or: woMatchOr,
                         ...(globalStartDate ? { dateCreated: { $gte: globalStartDate } } : {}),
                     }
                 },
                 { $unwind: '$lineItems' },
                 {
                     $match: {
-                        'lineItems.linkedSkuId': skuId,
-                        $or: [
-                            { 'lineItems.lotNumber': { $exists: false } },
-                            { 'lineItems.lotNumber': null },
-                            { 'lineItems.lotNumber': '' },
-                            { 'lineItems.lotNumber': 'N/A' },
-                            { 'lineItems.lotNumber': 'Allocated' },
-                        ]
+                        $or: innerMatchOr,
                     }
                 },
                 {
@@ -216,6 +421,12 @@ async function getSkuDetail(skuId: string) {
                         'billing.firstName': 1,
                         'billing.lastName': 1,
                         'lineItems.id': 1,
+                        'lineItems._id': 1,
+                        'lineItems.productId': 1,
+                        'lineItems.variationId': 1,
+                        'lineItems.linkedSkuId': 1,
+                        'lineItems.linkedSkus': 1,
+                        'lineItems.lotNumber': 1,
                         'lineItems.quantity': 1,
                         'lineItems.total': 1,
                     }
@@ -253,19 +464,60 @@ async function getSkuDetail(skuId: string) {
         ]);
 
         const items: any[] = [];
+        const seen = new Set<string>(); // deduplicate
 
         for (const wo of woItems) {
             const line = wo.lineItems;
+            const dedupeKey = `${wo._id}_${line.id || line._id}_${skuId}`;
+            if (seen.has(dedupeKey)) continue;
+
+            // Determine how this line item matches the SKU
+            const isDirectMatch = line.linkedSkuId === skuId;
+            const linkedSkuMatch = line.linkedSkus?.find((ls: any) => ls.skuId === skuId);
+
+            // WebProduct resolution
+            const wpKey = `${wo.website}-${line.productId}`;
+            const wpMap = wpMultiplierMap.get(wpKey);
+            let wpResolvedMultiplier: number | null = null;
+            if (wpMap) {
+                if (line.variationId && wpMap.has(line.variationId)) {
+                    wpResolvedMultiplier = wpMap.get(line.variationId)!;
+                } else if (wpMap.has('simple')) {
+                    wpResolvedMultiplier = wpMap.get('simple')!;
+                }
+            }
+
+            if (!isDirectMatch && !linkedSkuMatch && wpResolvedMultiplier === null) continue;
+
+            // Determine lot number for THIS specific SKU
+            const lot = linkedSkuMatch
+                ? (linkedSkuMatch.lotNumber || '')
+                : (wpResolvedMultiplier !== null
+                    ? '' // WebProduct-resolved: lot is on the linked component, not the line
+                    : (isDirectMatch ? (line.lotNumber || '') : ''));
+
+            // Only include if lot is missing
+            const isMissing = !lot || lot === '' || lot === 'N/A' || lot === 'Allocated';
+            if (!isMissing) continue;
+
+            seen.add(dedupeKey);
+
+            const multiplier = linkedSkuMatch ? (linkedSkuMatch.multiplier || 1)
+                : (wpResolvedMultiplier !== null ? wpResolvedMultiplier : 1);
+
+            const source = linkedSkuMatch ? 'Web Order (Bundle)'
+                : (wpResolvedMultiplier !== null ? 'Web Order' : 'Web Order');
+
             items.push({
-                id: `WO_${wo._id}_${line.id}`,
-                source: 'Web Order',
+                id: `WO_${wo._id}_${line.id || line._id}`,
+                source,
                 orderId: wo._id,
-                lineItemId: line.id,
+                lineItemId: line.id || line._id,
                 orderNumber: wo.number || wo._id,
                 website: wo.website || '',
                 status: wo.status || '',
                 date: wo.dateCreated || '',
-                quantity: line.quantity || 0,
+                quantity: (line.quantity || 0) * multiplier,
                 total: parseFloat(line.total) || 0,
                 link: `/sales/web-orders/${wo._id}`,
             });

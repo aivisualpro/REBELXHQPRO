@@ -49,12 +49,10 @@ const PAGE_SIZE = 50;
 const COLUMNS = [
     { key: 'createdAt', label: 'Date', sortable: true, width: 'w-[100px]' },
     { key: 'sku', label: 'SKU', sortable: true, width: 'w-[220px]' },
-    { key: 'lotNumber', label: 'Lot #', sortable: true, width: 'w-[120px]' },
-    { key: 'qty', label: 'Qty', sortable: true, width: 'w-[80px]', align: 'text-right' as const },
-    { key: 'cost', label: 'Cost', sortable: true, width: 'w-[90px]', align: 'text-right' as const },
-    { key: 'reason', label: 'Reason', sortable: true, width: 'w-[150px]' },
+    { key: 'lotNumber', label: 'Lot #', sortable: true, width: 'w-[100px]' },
+    { key: 'qty', label: 'Qty', sortable: true, width: 'w-[60px]', align: 'text-right' as const },
+    { key: 'reason', label: 'Reason', sortable: true, width: 'w-[370px]' },
     { key: 'createdBy', label: 'Created By', sortable: false, width: 'w-[140px]' },
-    { key: 'actions', label: 'Actions', sortable: false, width: 'w-[90px]', align: 'text-center' as const },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -172,15 +170,8 @@ const TableRow = React.memo(function TableRow({
                 <QtyBadge qty={item.qty} />
             </td>
 
-            {/* Cost */}
-            <td className="px-2.5 py-2.5 text-right text-[12px] font-mono font-bold text-foreground/80 cursor-pointer">
-                {item.cost && item.cost > 0
-                    ? `$${item.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                    : <span className="text-muted-foreground/30">—</span>}
-            </td>
-
             {/* Reason */}
-            <td className="px-2.5 py-2.5 text-[12px] text-foreground/80 truncate cursor-pointer max-w-[150px]" title={item.reason}>
+            <td className="px-2.5 py-2.5 text-[12px] text-foreground/80 truncate cursor-pointer max-w-[370px]" title={item.reason}>
                 {item.reason || <span className="text-muted-foreground/30">—</span>}
             </td>
 
@@ -189,27 +180,6 @@ const TableRow = React.memo(function TableRow({
                 {userName}
             </td>
 
-            {/* Actions */}
-            <td className="px-2.5 py-2.5 text-center cursor-pointer">
-                <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                        onClick={onEdit}
-                        className="p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors cursor-pointer"
-                        title="Edit"
-                    >
-                        <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                    {canDelete() && (
-                        <button
-                            onClick={onDelete}
-                            className="p-1.5 rounded-md hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-colors cursor-pointer"
-                            title="Delete"
-                        >
-                            <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                    )}
-                </div>
-            </td>
         </tr>
     );
 });
@@ -954,11 +924,11 @@ function AuditAdjustmentsContent() {
                                 Array.from({ length: 25 }).map((_, i) => <SkeletonRow key={i} index={i} />)
                             ) : error ? (
                                 <tr>
-                                    <td colSpan={8} className="px-2 py-8 text-center text-destructive text-[12px]">{error}</td>
+                                    <td colSpan={6} className="px-2 py-8 text-center text-destructive text-[12px]">{error}</td>
                                 </tr>
                             ) : adjustments.length === 0 ? (
                                 <tr>
-                                    <td colSpan={8} className="px-2 py-16 text-center">
+                                    <td colSpan={6} className="px-2 py-16 text-center">
                                         <ClipboardCheck className="w-8 h-8 mx-auto mb-3 text-muted-foreground/20" />
                                         <p className="text-[12px] text-muted-foreground/50 uppercase tracking-widest font-bold">
                                             {debouncedSearch ? 'No matching adjustments' : filterId ? 'Adjustment not found' : 'No adjustments found'}
