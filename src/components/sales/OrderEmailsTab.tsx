@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react';
 import {
     Send, X, Mail, Paperclip, CheckCircle2, XCircle, AlertCircle,
     ChevronDown, ChevronUp, FileText, Loader2, MailPlus, Inbox, Search,
-    BookTemplate, Save, Trash2, FileDown, History
+    BookTemplate, Save, Trash2, FileDown, History, RefreshCw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -326,6 +326,67 @@ export function OrderEmailsTab({ orderId, orderLabel, client }: OrderEmailsTabPr
                     e._id === optimisticEmail._id ? { ...e, status: 'failed' as const, errorMessage: err.message || 'Network error' } : e
                 ));
                 toast.error('Network error sending email');
+            });
+    };
+
+    const handleResend = (email: EmailRecord, e: React.MouseEvent) => {
+        e.stopPropagation();
+
+        const optimisticEmail: EmailRecord = {
+            _id: `optimistic-${Date.now()}`,
+            from: email.from || 'info@rebelxbrandscrm.com',
+            to: [...email.to],
+            cc: [...(email.cc || [])],
+            bcc: [...(email.bcc || [])],
+            subject: email.subject,
+            body: email.body,
+            bodyText: email.bodyText,
+            hasAttachment: email.hasAttachment,
+            attachmentName: email.attachmentName,
+            status: 'queued',
+            sentBy: (session?.user as any)?.email || '',
+            sentAt: new Date().toISOString(),
+        };
+
+        const sendPayload = {
+            to: [...email.to],
+            cc: email.cc && email.cc.length > 0 ? [...email.cc] : undefined,
+            bcc: email.bcc && email.bcc.length > 0 ? [...email.bcc] : undefined,
+            subject: email.subject,
+            htmlBody: email.body,
+            textBody: email.bodyText,
+            attachPdf: email.hasAttachment,
+            sentBy: (session?.user as any)?.email || (session?.user as any)?.id || '',
+            orderLabel,
+        };
+
+        setEmails(prev => [optimisticEmail, ...prev]);
+        toast.success('Resending email...', { icon: '🚀' });
+
+        fetch(`/api/sales/orders/${orderId}/emails`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(sendPayload),
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && data.email) {
+                    setEmails(prev => prev.map(e =>
+                        e._id === optimisticEmail._id ? { ...data.email } : e
+                    ));
+                    startPolling();
+                } else {
+                    setEmails(prev => prev.map(e =>
+                        e._id === optimisticEmail._id ? { ...e, status: 'failed' as const, errorMessage: data.error || 'Failed to resend' } : e
+                    ));
+                    toast.error(data.error || 'Failed to resend email');
+                }
+            })
+            .catch(err => {
+                setEmails(prev => prev.map(e =>
+                    e._id === optimisticEmail._id ? { ...e, status: 'failed' as const, errorMessage: err.message || 'Network error' } : e
+                ));
+                toast.error('Network error resending email');
             });
     };
 
@@ -695,6 +756,13 @@ export function OrderEmailsTab({ orderId, orderLabel, client }: OrderEmailsTabPr
                                     </div>
 
                                     <div className="flex items-center space-x-3 shrink-0">
+                                        <button
+                                            onClick={(e) => handleResend(email, e)}
+                                            title="Resend this email"
+                                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground mr-1"
+                                        >
+                                            <RefreshCw className="w-3.5 h-3.5" />
+                                        </button>
                                         {getStatusBadge(email.status)}
                                         <span className="text-[10px] font-bold text-muted-foreground whitespace-nowrap">
                                             {formatEmailDate(email.sentAt)}

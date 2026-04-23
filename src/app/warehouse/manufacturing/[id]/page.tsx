@@ -529,7 +529,13 @@ export default function ManufacturingDetailPage() {
     // Sanitize a line item for API: extract SKU ID string from populated objects, strip empty _id
     const sanitizeLineItem = (item: any) => {
         const skuId = typeof item.sku === 'object' && item.sku !== null ? item.sku._id : item.sku;
-        const cleaned: any = { ...item, sku: skuId };
+        const cleaned: any = { 
+            ...item, 
+            sku: skuId,
+            recipeQty: typeof item.recipeQty === 'string' ? parseFloat(item.recipeQty) || 0 : item.recipeQty,
+            sa: typeof item.sa === 'string' ? parseFloat(item.sa) || 0 : item.sa,
+            qtyScrapped: typeof item.qtyScrapped === 'string' ? parseFloat(item.qtyScrapped) || 0 : item.qtyScrapped,
+        };
         if (!cleaned._id) delete cleaned._id;
         return cleaned;
     };
@@ -1768,9 +1774,9 @@ export default function ManufacturingDetailPage() {
                                     <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Recipe Qty</label>
                                     <input
                                         type="number"
-                                        step="0.01"
-                                        value={editingItem.recipeQty || ''}
-                                        onChange={e => setEditingItem({ ...editingItem, recipeQty: parseFloat(e.target.value) || 0 })}
+                                        step="any"
+                                        value={editingItem.recipeQty ?? ''}
+                                        onChange={e => setEditingItem({ ...editingItem, recipeQty: e.target.value as any })}
                                         className="w-full px-3 py-2 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-black/10"
                                     />
                                 </div>
@@ -1797,9 +1803,9 @@ export default function ManufacturingDetailPage() {
                                     <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Assay (%)</label>
                                     <input
                                         type="number"
-                                        step="0.01"
-                                        value={editingItem.sa || ''}
-                                        onChange={e => setEditingItem({ ...editingItem, sa: parseFloat(e.target.value) || 0 })}
+                                        step="any"
+                                        value={editingItem.sa ?? ''}
+                                        onChange={e => setEditingItem({ ...editingItem, sa: e.target.value as any })}
                                         className="w-full px-3 py-2 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-black/10"
                                         placeholder="e.g., 55.6"
                                     />
@@ -1829,9 +1835,9 @@ export default function ManufacturingDetailPage() {
                                     <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Qty Scrapped</label>
                                     <input
                                         type="number"
-                                        step="0.01"
-                                        value={editingItem.qtyScrapped || ''}
-                                        onChange={e => setEditingItem({ ...editingItem, qtyScrapped: parseFloat(e.target.value) || 0 })}
+                                        step="any"
+                                        value={editingItem.qtyScrapped ?? ''}
+                                        onChange={e => setEditingItem({ ...editingItem, qtyScrapped: e.target.value as any })}
                                         className="w-full px-3 py-2 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-black/10"
                                     />
                                 </div>

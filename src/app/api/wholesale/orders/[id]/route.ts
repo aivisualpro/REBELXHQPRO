@@ -498,46 +498,152 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         if (
             body.orderStatus === 'Completed' && 
             existingOrderData && 
-            existingOrderData.orderStatus !== 'Completed' &&
-            allClientEmails.length > 0
+            existingOrderData.orderStatus !== 'Completed'
         ) {
             const salesRepEmail = updatedOrder.salesRep?.email;
-            const ccList = salesRepEmail ? [salesRepEmail] : [];
-            const toList = allClientEmails;
             const clientName = updatedOrder.clientId?.name || 'Valued Customer';
+            const fromEmail = process.env.RESEND_FROM_EMAIL || 'info@rebelxbrandscrm.com';
             
-            // Step 1: Create email record instantly
-            const emailRecord = await OrderEmail.create({
-                orderId: id,
-                from: process.env.RESEND_FROM_EMAIL || 'info@rebelxbrandscrm.com',
-                to: toList,
-                cc: ccList,
-                bcc: [],
-                subject: `Order ${updatedOrder.label || 'Details'} Completed`,
-                body: `<p>Dear ${clientName},</p><p>Your wholesale order <strong>${updatedOrder.label}</strong> has been marked as Completed and is ready.</p><p>Please find the attached PDF snapshot of your order details.</p><p>Thank you for your business!</p>`,
-                bodyText: `Dear ${clientName},\n\nYour wholesale order ${updatedOrder.label} has been marked as Completed and is ready.\nPlease find the attached PDF snapshot of your order details.\n\nThank you for your business!`,
-                hasAttachment: true,
-                attachmentName: `${updatedOrder.label || 'SaleOrder'}.pdf`,
-                status: 'queued',
-                sentBy: 'system',
-            });
+            // 1. Client Email
+            if (allClientEmails.length > 0) {
+                const trackingSection = updatedOrder.trackingNumber 
+                    ? `
+        <div style="background-color: #f1f5f9; border-radius: 6px; padding: 20px; margin: 0 0 24px 0; text-align: center; border: 1px dashed #cbd5e1;">
+            <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: bold; color: #64748b; text-transform: uppercase; letter-spacing: 1px;">Tracking Information</p>
+            <p style="margin: 0 0 12px 0; font-size: 18px; font-weight: bold; color: #0f172a;">${updatedOrder.trackingNumber}</p>
+            <a href="https://www.google.com/search?q=${encodeURIComponent(updatedOrder.trackingNumber)}" style="display: inline-block; background-color: #0f172a; color: #ffffff; text-decoration: none; padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: bold;">Track Package</a>
+        </div>`
+                    : '';
 
-            // Step 2: Kick off background processing
-            after(async () => {
-                try {
-                    await processEmailInBackground(emailRecord._id.toString(), id, {
-                        to: toList,
-                        cc: ccList,
-                        subject: `Order ${updatedOrder.label || 'Details'} Completed`,
-                        htmlBody: `<p>Dear ${clientName},</p><p>Your wholesale order <strong>${updatedOrder.label}</strong> has been marked as Completed and is ready.</p><p>Please find the attached PDF snapshot of your order details.</p><p>Thank you for your business!</p>`,
-                        textBody: `Dear ${clientName},\n\nYour wholesale order ${updatedOrder.label} has been marked as Completed and is ready.\nPlease find the attached PDF snapshot of your order details.\n\nThank you for your business!`,
-                        attachPdf: true,
-                        orderLabel: updatedOrder.label,
-                    });
-                } catch (err) {
-                    console.error('Background auto-email error:', err);
-                }
-            });
+                const trackingText = updatedOrder.trackingNumber 
+                    ? `Tracking Number: ${updatedOrder.trackingNumber}\nTrack here: https://www.google.com/search?q=${encodeURIComponent(updatedOrder.trackingNumber)}\n\n` 
+                    : '';
+
+                const clientHtml = `
+<div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; background-color: #ffffff;">
+    <div style="background-color: #0f172a; padding: 32px 24px; text-align: center;">
+        <h1 style="color: #ffffff; margin: 0; font-size: 24px; letter-spacing: 1px; text-transform: uppercase;">Order Completed</h1>
+        <p style="color: #94a3b8; margin: 8px 0 0 0; font-size: 14px;">RebelX Brands</p>
+    </div>
+    <div style="padding: 40px 32px;">
+        <h2 style="margin: 0 0 20px 0; font-size: 20px; color: #1e293b;">Dear ${clientName},</h2>
+        <p style="margin: 0 0 16px 0; font-size: 16px; color: #475569; line-height: 1.6;">Great news! Your wholesale order <strong style="color: #0f172a;">${updatedOrder.label}</strong> has been fully processed and marked as <span style="background-color: #10b981; color: #ffffff; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">Completed</span>.</p>
+        <p style="margin: 0 0 24px 0; font-size: 16px; color: #475569; line-height: 1.6;">Our team has finalized everything, and your products are ready. We have attached a comprehensive PDF snapshot of your order details for your records.</p>
+        ${trackingSection}
+        <div style="background-color: #f8fafc; border-left: 4px solid #f59e0b; padding: 16px; margin: 0 0 32px 0; border-radius: 0 4px 4px 0;">
+            <p style="margin: 0; font-size: 14px; color: #334155; font-weight: 500;"><strong>Next Steps:</strong> Please review the attached document. If you have any questions regarding your shipment or pick-up, reply directly to this email or contact your sales representative.</p>
+        </div>
+        
+        <p style="margin: 0 0 8px 0; font-size: 16px; color: #1e293b; font-weight: bold;">Thank you for your business!</p>
+        <p style="margin: 0; font-size: 14px; color: #64748b;">— The RebelX Brands Team</p>
+    </div>
+    <div style="background-color: #f1f5f9; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
+        <p style="margin: 0; font-size: 12px; color: #94a3b8;">&copy; ${new Date().getFullYear()} RebelX Brands. All rights reserved.</p>
+    </div>
+</div>`;
+
+                const clientText = `Dear ${clientName},\n\nGreat news! Your wholesale order ${updatedOrder.label} has been fully processed and marked as Completed.\n\nOur team has finalized everything, and your products are ready. We have attached a comprehensive PDF snapshot of your order details for your records.\n\n${trackingText}Next Steps: Please review the attached document. If you have any questions regarding your shipment or pick-up, reply directly to this email.\n\nThank you for your business!\n— The RebelX Brands Team`;
+
+                const clientEmailRecord = await OrderEmail.create({
+                    orderId: id,
+                    from: fromEmail,
+                    to: allClientEmails,
+                    cc: [],
+                    bcc: [],
+                    subject: `Order ${updatedOrder.label || 'Details'} Completed`,
+                    body: clientHtml,
+                    bodyText: clientText,
+                    hasAttachment: true,
+                    attachmentName: `${updatedOrder.label || 'SaleOrder'}.pdf`,
+                    status: 'queued',
+                    sentBy: 'system',
+                });
+
+                after(async () => {
+                    try {
+                        await processEmailInBackground(clientEmailRecord._id.toString(), id, {
+                            to: allClientEmails,
+                            cc: [],
+                            subject: `Order ${updatedOrder.label || 'Details'} Completed`,
+                            htmlBody: clientHtml,
+                            textBody: clientText,
+                            attachPdf: true,
+                            orderLabel: updatedOrder.label,
+                        });
+                    } catch (err) {
+                        console.error('Background auto-email to client error:', err);
+                    }
+                });
+            }
+
+            // 2. Sales Rep Email
+            if (salesRepEmail) {
+                const repHtml = `
+<div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; background-color: #ffffff;">
+    <div style="background-color: #1e293b; padding: 24px; text-align: center; border-bottom: 4px solid #f59e0b;">
+        <h1 style="color: #ffffff; margin: 0; font-size: 20px; letter-spacing: 1px; text-transform: uppercase;">Internal Notification</h1>
+        <p style="color: #f59e0b; margin: 4px 0 0 0; font-size: 12px; font-weight: bold; letter-spacing: 2px;">ORDER COMPLETED</p>
+    </div>
+    <div style="padding: 32px;">
+        <h2 style="margin: 0 0 24px 0; font-size: 18px; color: #1e293b;">Hello${updatedOrder.salesRep?.firstName ? ' ' + updatedOrder.salesRep.firstName : ''},</h2>
+        <p style="margin: 0 0 20px 0; font-size: 15px; color: #475569; line-height: 1.6;">Excellent work! Wholesale order <strong style="color: #0f172a; border-bottom: 1px dashed #94a3b8;">${updatedOrder.label}</strong> for your client <strong style="color: #0f172a;">${clientName}</strong> has just been marked as completed by the fulfillment team.</p>
+        
+        <table style="width: 100%; border-collapse: collapse; margin: 0 0 24px 0; background-color: #f8fafc; border-radius: 6px; overflow: hidden;">
+            <tr>
+                <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #64748b; font-weight: bold; width: 40%;">CLIENT</td>
+                <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-size: 14px; color: #0f172a; font-weight: bold;">${clientName}</td>
+            </tr>
+            <tr>
+                <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #64748b; font-weight: bold;">ORDER REF</td>
+                <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-size: 14px; color: #0f172a;">${updatedOrder.label}</td>
+            </tr>
+            <tr>
+                <td style="padding: 12px 16px; font-size: 13px; color: #64748b; font-weight: bold;">STATUS</td>
+                <td style="padding: 12px 16px; font-size: 14px;"><span style="color: #10b981; font-weight: bold;">● Completed</span></td>
+            </tr>
+        </table>
+        
+        <p style="margin: 0 0 24px 0; font-size: 14px; color: #475569; line-height: 1.6;">The client has been automatically notified. We have attached a copy of the final PDF snapshot for your personal records.</p>
+        
+        <div style="text-align: center; margin-top: 32px;">
+            <a href="https://www.rebelxbrandscrm.com/sales/wholesale-orders/${id}" style="display: inline-block; background-color: #0f172a; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 4px; font-size: 14px; font-weight: bold; letter-spacing: 0.5px;">VIEW ORDER IN CRM</a>
+        </div>
+    </div>
+</div>`;
+
+                const repText = `Hello${updatedOrder.salesRep?.firstName ? ' ' + updatedOrder.salesRep.firstName : ''},\n\nExcellent work! Wholesale order ${updatedOrder.label} for your client ${clientName} has just been marked as completed by the fulfillment team.\n\nThe client has been automatically notified. We have attached a copy of the final PDF snapshot for your personal records.\n\nView Order: https://www.rebelxbrandscrm.com/sales/wholesale-orders/${id}`;
+
+                const repEmailRecord = await OrderEmail.create({
+                    orderId: id,
+                    from: fromEmail,
+                    to: [salesRepEmail],
+                    cc: [],
+                    bcc: [],
+                    subject: `Order ${updatedOrder.label || 'Details'} Completed - Internal Copy`,
+                    body: repHtml,
+                    bodyText: repText,
+                    hasAttachment: true,
+                    attachmentName: `${updatedOrder.label || 'SaleOrder'}.pdf`,
+                    status: 'queued',
+                    sentBy: 'system',
+                });
+
+                after(async () => {
+                    try {
+                        await processEmailInBackground(repEmailRecord._id.toString(), id, {
+                            to: [salesRepEmail],
+                            cc: [],
+                            subject: `Order ${updatedOrder.label || 'Details'} Completed - Internal Copy`,
+                            htmlBody: repHtml,
+                            textBody: repText,
+                            attachPdf: true,
+                            orderLabel: updatedOrder.label,
+                        });
+                    } catch (err) {
+                        console.error('Background auto-email to sales rep error:', err);
+                    }
+                });
+            }
         }
 
         return NextResponse.json(updatedOrder);
