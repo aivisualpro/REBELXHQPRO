@@ -167,7 +167,6 @@ export default function CRMDashboard() {
                 value={salesRep}
                 onChange={setSalesRep}
                 placeholder="Sales Rep"
-                icon={<Users className="w-4 h-4 text-muted-foreground" />}
               />
             </div>
             {/* Date Filters */}
