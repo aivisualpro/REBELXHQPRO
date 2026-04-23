@@ -310,23 +310,23 @@ function CommissionPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
 
-    // Default date range: current month
-    const defaultRange = getPresetRange('this_month');
-
     const urlStart = searchParams.get('startDate');
     const urlEnd = searchParams.get('endDate');
     const urlRep = searchParams.get('salesRep');
 
     const [dateRange, setDateRange] = useState({
-        startDate: urlStart || defaultRange.startDate,
-        endDate: urlEnd || defaultRange.endDate,
+        startDate: urlStart || '',
+        endDate: urlEnd || '',
     });
-    const [datePreset, setDatePreset] = useState<DatePreset>(
-        !urlStart && !urlEnd ? 'this_month' : 'custom'
+    const [datePreset, setDatePreset] = useState<string>(
+        searchParams.get('datePreset') || 'This Month'
     );
+    const [dateFilterOpen, setDateFilterOpen] = useState(false);
+    const dateFilterRef = useRef<HTMLDivElement | null>(null);
+
     const [selectedReps, setSelectedReps] = useState<string[]>(urlRep ? urlRep.split(',') : []);
-    const [search, setSearch] = useState('');
-    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [search, setSearch] = useState(searchParams.get('search') || '');
+    const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('search') || '');
 
     const [orders, setOrders] = useState<CommissionOrder[]>([]);
     const [repSummaries, setRepSummaries] = useState<RepSummary[]>([]);
@@ -365,8 +365,6 @@ function CommissionPage() {
 
     // Sales rep options for the dropdown
     const [salesRepOptions, setSalesRepOptions] = useState<{ label: string; value: string }[]>([]);
-    const [repDropdownOpen, setRepDropdownOpen] = useState(false);
-    const repDropdownRef = useRef<HTMLDivElement>(null);
 
     // Debounce search
     useEffect(() => {
@@ -374,29 +372,15 @@ function CommissionPage() {
         return () => clearTimeout(t);
     }, [search]);
 
-    // Close rep dropdown on click outside
+    // Close dropdowns on click outside
     useEffect(() => {
         const handleClick = (e: MouseEvent) => {
-            if (repDropdownRef.current && !repDropdownRef.current.contains(e.target as Node)) {
-                setRepDropdownOpen(false);
+            if (dateFilterRef.current && !dateFilterRef.current.contains(e.target as Node)) {
+                setDateFilterOpen(false);
             }
         };
-        if (repDropdownOpen) document.addEventListener('mousedown', handleClick);
+        document.addEventListener('mousedown', handleClick);
         return () => document.removeEventListener('mousedown', handleClick);
-    }, [repDropdownOpen]);
-
-    // Fetch sales reps on mount
-    useEffect(() => {
-        fetch('/api/users?limit=1000')
-            .then(res => res.json())
-            .then(data => {
-                const users = data.users || [];
-                setSalesRepOptions(users.map((u: any) => ({
-                    label: `${u.firstName} ${u.lastName}`,
-                    value: u._id
-                })));
-            })
-            .catch(console.error);
     }, []);
 
     // Fetch commission data
@@ -416,6 +400,19 @@ function CommissionPage() {
                 setOrders(data.orders || []);
                 setRepSummaries(data.repSummaries || []);
                 setGrandTotal(data.grandTotal || { totalOrders: 0, totalRevenue: 0, totalCommission: 0 });
+                
+                if (data.activeReps) {
+                    const options = data.activeReps.map((r: any) => {
+                        if (!r._id) return { label: 'Unassigned', value: 'unassigned' };
+                        if (typeof r._id === 'object' && 'firstName' in r._id) {
+                            return { label: `${r._id.firstName} ${r._id.lastName}`, value: r._id._id };
+                        }
+                        return { label: String(r._id), value: String(r._id) };
+                    });
+                    
+                    options.sort((a: any, b: any) => a.label.localeCompare(b.label));
+                    setSalesRepOptions(options);
+                }
             } else {
                 setError(data.error || 'Failed to load data');
             }
@@ -437,19 +434,55 @@ function CommissionPage() {
         if (dateRange.startDate) params.set('startDate', dateRange.startDate);
         if (dateRange.endDate) params.set('endDate', dateRange.endDate);
         if (selectedReps.length > 0) params.set('salesRep', selectedReps.join(','));
+        if (datePreset !== 'This Month') params.set('datePreset', datePreset);
+        if (debouncedSearch) params.set('search', debouncedSearch);
+
         const currentQs = searchParams.toString();
         const newQs = params.toString();
         if (currentQs !== newQs) {
-            router.push(`${window.location.pathname}?${newQs}`, { scroll: false });
+            router.replace(`${window.location.pathname}?${newQs}`, { scroll: false });
         }
-    }, [dateRange, selectedReps, router, searchParams]);
+    }, [dateRange, selectedReps, datePreset, debouncedSearch, router, searchParams]);
 
-    const handlePresetChange = (preset: DatePreset) => {
-        setDatePreset(preset);
-        if (preset !== 'custom') {
-            setDateRange(getPresetRange(preset));
+    const handleDatePreset = (preset: string) => {
+        const today = new Date();
+        const formatDateStr = (d: Date) => {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+        let start = '';
+        let end = '';
+
+        if (preset === 'This Month') {
+            start = formatDateStr(new Date(today.getFullYear(), today.getMonth(), 1));
+            end = formatDateStr(new Date(today.getFullYear(), today.getMonth() + 1, 0));
+        } else if (preset === 'Last Month') {
+            start = formatDateStr(new Date(today.getFullYear(), today.getMonth() - 1, 1));
+            end = formatDateStr(new Date(today.getFullYear(), today.getMonth(), 0));
+        } else if (preset === 'This Year') {
+            start = formatDateStr(new Date(today.getFullYear(), 0, 1));
+            end = formatDateStr(new Date(today.getFullYear(), 11, 31));
+        } else if (preset === 'Last Year') {
+            start = formatDateStr(new Date(today.getFullYear() - 1, 0, 1));
+            end = formatDateStr(new Date(today.getFullYear() - 1, 11, 31));
+        } else if (preset === 'All Time') {
+            start = '';
+            end = '';
         }
+
+        setDatePreset(preset);
+        setDateRange({ startDate: start, endDate: end });
+        setDateFilterOpen(false);
     };
+
+    // Initialize default date range on mount if empty
+    useEffect(() => {
+        if (!dateRange.startDate && !dateRange.endDate && datePreset === 'This Month') {
+            handleDatePreset('This Month');
+        }
+    }, []);
 
     // Filter orders by client-side search
     const filteredOrders = debouncedSearch
@@ -473,21 +506,21 @@ function CommissionPage() {
         generateCommissionPDF(filteredOrders, repSummaries, grandTotal, dateRange, selectedRepName);
     };
 
-    const toggleRep = (repId: string) => {
-        setSelectedReps(prev =>
-            prev.includes(repId) ? prev.filter(r => r !== repId) : [...prev, repId]
-        );
+    const handleRepTabClick = (repId: string | null) => {
+        if (repId === null) {
+            setSelectedReps([]);
+        } else {
+            setSelectedReps([repId]);
+        }
     };
 
     const clearFilters = () => {
-        const def = getPresetRange('this_month');
-        setDateRange(def);
-        setDatePreset('this_month');
+        handleDatePreset('This Month');
         setSelectedReps([]);
         setSearch('');
     };
 
-    const hasActiveFilters = selectedReps.length > 0 || datePreset !== 'this_month' || search;
+    const hasActiveFilters = selectedReps.length > 0 || datePreset !== 'This Month' || search || dateRange.startDate || dateRange.endDate;
 
     return (
         <div className="h-full flex flex-col overflow-hidden bg-background text-foreground transition-colors duration-200">
@@ -525,91 +558,62 @@ function CommissionPage() {
                         />
                     </div>
 
-                    {/* Sales Rep Multi-Select Dropdown */}
-                    <div className="relative" ref={repDropdownRef}>
+                    {/* Sales Rep Filter Removed from Header */}
+
+                    {/* Date Filter */}
+                    <div ref={dateFilterRef} className="relative shrink-0">
                         <button
-                            onClick={() => setRepDropdownOpen(!repDropdownOpen)}
+                            onClick={() => setDateFilterOpen(p => !p)}
                             className={cn(
-                                "h-9 px-3 flex items-center gap-2 border rounded-lg text-[11px] font-bold transition-all shadow-sm",
-                                selectedReps.length > 0
-                                    ? "bg-primary/10 border-primary/30 text-primary"
-                                    : "bg-background border-border text-muted-foreground hover:border-border/80"
+                                'flex items-center gap-1.5 px-3 h-9 rounded-lg border border-border text-[11px] font-semibold transition-all cursor-pointer bg-background hover:bg-secondary shadow-sm',
+                                (dateRange.startDate || dateRange.endDate)
+                                    ? 'bg-primary/10 border-primary/30 text-primary hover:bg-primary/20'
+                                    : 'text-muted-foreground hover:text-foreground'
                             )}
                         >
-                            <Users className="w-3.5 h-3.5" />
-                            {selectedReps.length > 0 ? `${selectedReps.length} Rep${selectedReps.length > 1 ? 's' : ''}` : 'Sales Rep'}
-                            <ChevronDown className="w-3 h-3" />
+                            <Calendar className="w-3.5 h-3.5" />
+                            <span className="uppercase tracking-wider text-nowrap">
+                                {datePreset !== 'All Time' ? datePreset : (dateRange.startDate || dateRange.endDate) ? 'Custom' : 'All Time'}
+                            </span>
+                            <ChevronDown className={cn('w-3 h-3 transition-transform', dateFilterOpen && 'rotate-180')} />
                         </button>
-                        {repDropdownOpen && (
-                            <div className="absolute right-0 top-full mt-1 w-64 max-h-72 bg-background border border-border rounded-lg shadow-xl z-[100] overflow-y-auto">
-                                <div className="p-2 border-b border-border">
-                                    <button
-                                        onClick={() => setSelectedReps([])}
-                                        className="text-[10px] font-bold text-muted-foreground hover:text-foreground transition-colors uppercase tracking-wider"
-                                    >
-                                        Clear Selection
-                                    </button>
+                        {dateFilterOpen && (
+                            <div className="absolute top-full mt-1.5 right-0 z-50 bg-background border border-border rounded-xl shadow-2xl min-w-[280px] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                                <div className="px-3 py-2 border-b border-border bg-secondary flex justify-between items-center">
+                                    <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Date Filter</span>
+                                    {(dateRange.startDate || dateRange.endDate || datePreset !== 'All Time') && (
+                                        <button onClick={() => { setDatePreset('All Time'); setDateRange({ startDate: '', endDate: '' }); setDateFilterOpen(false); }} className="text-[9px] font-bold text-primary hover:underline cursor-pointer">
+                                            Clear
+                                        </button>
+                                    )}
                                 </div>
-                                {salesRepOptions.map(rep => (
-                                    <button
-                                        key={rep.value}
-                                        onClick={() => toggleRep(rep.value)}
-                                        className={cn(
-                                            "w-full text-left px-3 py-2 text-[11px] font-medium flex items-center justify-between hover:bg-secondary transition-colors",
-                                            selectedReps.includes(rep.value) && "bg-primary/10 text-primary font-bold"
-                                        )}
-                                    >
-                                        <span>{rep.label}</span>
-                                        {selectedReps.includes(rep.value) && (
-                                            <div className="w-4 h-4 bg-primary rounded-full flex items-center justify-center">
-                                                <svg className="w-2.5 h-2.5 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                                </svg>
-                                            </div>
-                                        )}
-                                    </button>
-                                ))}
-                                {salesRepOptions.length === 0 && (
-                                    <div className="p-3 text-center text-[11px] text-muted-foreground">Loading...</div>
-                                )}
+                                <div className="p-3 bg-background grid gap-1.5 grid-cols-2 text-center pb-3 border-b border-border">
+                                    {['All Time', 'This Month', 'Last Month', 'This Year', 'Last Year'].map((preset, idx) => (
+                                        <button
+                                            key={preset}
+                                            onClick={() => handleDatePreset(preset)}
+                                            className={cn(
+                                                'px-2 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors cursor-pointer',
+                                                preset === 'All Time' && idx === 0 ? 'col-span-2' : '',
+                                                datePreset === preset ? 'bg-primary border-primary text-primary-foreground' : 'bg-secondary border-border hover:bg-secondary/80 text-foreground'
+                                            )}
+                                        >
+                                            {preset}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="p-3 bg-background space-y-2">
+                                    <div className="space-y-1 text-left">
+                                        <label className="text-[10px] font-bold text-muted-foreground uppercase opacity-70">From</label>
+                                        <input type="date" value={dateRange.startDate} onChange={e => { setDateRange(prev => ({ ...prev, startDate: e.target.value })); setDatePreset('Custom'); }} className="w-full bg-background border border-border rounded-lg px-2 h-8 text-[12px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all text-foreground [color-scheme:dark_light]" />
+                                    </div>
+                                    <div className="space-y-1 text-left">
+                                        <label className="text-[10px] font-bold text-muted-foreground uppercase opacity-70">To</label>
+                                        <input type="date" value={dateRange.endDate} onChange={e => { setDateRange(prev => ({ ...prev, endDate: e.target.value })); setDatePreset('Custom'); }} className="w-full bg-background border border-border rounded-lg px-2 h-8 text-[12px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all text-foreground [color-scheme:dark_light]" />
+                                    </div>
+                                </div>
                             </div>
                         )}
-                    </div>
-
-                    {/* Date Quick Presets */}
-                    <div className="flex items-center gap-0 bg-background border border-border rounded-lg overflow-hidden shadow-sm h-9">
-                        {(['this_month', 'last_month', 'this_year'] as DatePreset[]).map(preset => (
-                            <button
-                                key={preset}
-                                onClick={() => handlePresetChange(preset)}
-                                className={cn(
-                                    "px-3 h-full text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap",
-                                    datePreset === preset
-                                        ? "bg-primary text-primary-foreground"
-                                        : "text-muted-foreground hover:text-foreground hover:bg-secondary"
-                                )}
-                            >
-                                {preset === 'this_month' ? 'This Month' : preset === 'last_month' ? 'Last Month' : 'This Year'}
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* Date Range Picker */}
-                    <div className="flex items-center gap-2 bg-background border border-border rounded-lg px-2 py-0.5 h-9 shadow-sm transition-all hover:border-border/80">
-                        <Calendar className="w-4 h-4 text-primary ml-1" />
-                        <input
-                            type="date"
-                            value={dateRange.startDate}
-                            onChange={e => { setDateRange(prev => ({ ...prev, startDate: e.target.value })); setDatePreset('custom'); }}
-                            className="bg-transparent text-[11px] font-medium text-foreground outline-none w-26 cursor-pointer color-scheme-auto"
-                        />
-                        <span className="text-muted-foreground/50 text-[11px] font-bold">-</span>
-                        <input
-                            type="date"
-                            value={dateRange.endDate}
-                            onChange={e => { setDateRange(prev => ({ ...prev, endDate: e.target.value })); setDatePreset('custom'); }}
-                            className="bg-transparent text-[11px] font-medium text-foreground outline-none w-26 cursor-pointer color-scheme-auto"
-                        />
                     </div>
 
                     {/* Export PDF */}
@@ -638,7 +642,52 @@ function CommissionPage() {
             {/* ─── Content Area ─────────────────────────────────────────────── */}
             <div className="flex-1 flex overflow-hidden">
 
-                {/* Left Column: Orders Table */}
+                {/* Left Sidebar: Sales Reps */}
+                <div className="w-[240px] shrink-0 bg-secondary/30 border-r border-border flex flex-col overflow-y-auto scrollbar-custom">
+                    <div className="p-4 border-b border-border/50 sticky top-0 bg-secondary/30 backdrop-blur-md z-10 flex items-center gap-2">
+                        <Users className="w-4 h-4 text-muted-foreground" />
+                        <h2 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">Sales Reps</h2>
+                    </div>
+                    <div className="p-3 space-y-1">
+                        <button
+                            onClick={() => handleRepTabClick(null)}
+                            className={cn(
+                                "w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-[12px] font-semibold transition-all duration-200",
+                                selectedReps.length === 0
+                                    ? "bg-primary text-primary-foreground shadow-md ring-1 ring-primary/50"
+                                    : "text-foreground/70 hover:bg-muted hover:text-foreground"
+                            )}
+                        >
+                            <span>All Reps</span>
+                        </button>
+                        
+                        {loading && salesRepOptions.length === 0 ? (
+                            Array.from({ length: 5 }).map((_, i) => (
+                                <div key={i} className="h-9 w-full bg-secondary/50 animate-pulse rounded-lg mt-1" />
+                            ))
+                        ) : (
+                            salesRepOptions.map(rep => {
+                                const isSelected = selectedReps.includes(rep.value) && selectedReps.length === 1;
+                                return (
+                                    <button
+                                        key={rep.value}
+                                        onClick={() => handleRepTabClick(rep.value)}
+                                        className={cn(
+                                            "w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-[12px] font-semibold transition-all duration-200",
+                                            isSelected
+                                                ? "bg-primary text-primary-foreground shadow-md ring-1 ring-primary/50"
+                                                : "text-foreground/70 hover:bg-muted hover:text-foreground"
+                                        )}
+                                    >
+                                        <span className="truncate">{rep.label}</span>
+                                    </button>
+                                );
+                            })
+                        )}
+                    </div>
+                </div>
+
+                {/* Middle Column: Orders Table */}
                 <div 
                     ref={scrollRef}
                     className="flex-1 overflow-y-auto bg-background min-w-0 relative scrollbar-custom transition-colors duration-200"
@@ -817,8 +866,9 @@ function CommissionPage() {
                                 <div className="text-muted-foreground text-[11px] font-medium italic">No data available</div>
                             ) : (
                                 repSummaries.map((rep, idx) => {
-                                    const maxCommission = repSummaries[0]?.totalCommission || 1;
-                                    const widthPercent = (rep.totalCommission / maxCommission) * 100;
+                                    const widthPercent = grandTotal.totalCommission > 0 
+                                        ? (rep.totalCommission / grandTotal.totalCommission) * 100 
+                                        : 0;
                                     return (
                                         <div key={idx} className="group">
                                             <div className="relative overflow-hidden rounded-md border border-slate-800 dark:border-slate-700 bg-slate-900 dark:bg-slate-800 px-3 py-2.5 shadow-md transition-all duration-300 hover:border-primary">

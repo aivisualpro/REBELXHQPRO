@@ -17,6 +17,7 @@ export async function GET(req: Request) {
         const startDate = searchParams.get('startDate');
         const endDate = searchParams.get('endDate');
         const source = searchParams.get('source') || 'total'; // 'web', 'wholesale', 'total'
+        const salesRep = searchParams.get('salesRep');
 
         // Build date filters timezone-safely
         let defaultDateFilter: any = {};
@@ -32,6 +33,10 @@ export async function GET(req: Request) {
             webDateFilter = {
                 dateCreated: { $gte: start, $lte: end }
             };
+        }
+
+        if (salesRep) {
+            defaultDateFilter.salesRep = { $in: salesRep.split(',') };
         }
 
         let totalCogs = 0;
@@ -84,8 +89,8 @@ export async function GET(req: Request) {
             });
         }
 
-        // 2. Process Web Orders (WebOrder)
-        if (source === 'web' || source === 'total') {
+        // 2. Process Web Orders (WebOrder) - skip if salesRep is filtered (since web orders don't have sales reps)
+        if ((source === 'web' || source === 'total') && !salesRep) {
             const woAgg = await WebOrder.aggregate([
                 { $match: { 
                     status: { $in: ['completed', 'shipped', 'Completed', 'Shipped', 'processing', 'Processing'] },

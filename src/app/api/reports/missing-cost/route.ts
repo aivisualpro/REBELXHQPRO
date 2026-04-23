@@ -305,16 +305,18 @@ async function getSummary() {
         const groups = Array.from(mergedMap.entries())
             .map(([skuId, stats]) => {
                 const skuData = skuMap.get(skuId);
+                if (!skuData) return null; // Ignore unknown or archived SKUs
                 return {
                     skuId,
-                    name: skuData?.name || 'Unknown SKU',
-                    category: skuData?.category || '',
-                    uom: skuData?.uom || 'EA',
+                    name: skuData.name,
+                    category: skuData.category || '',
+                    uom: skuData.uom || 'EA',
                     count: stats.count,
                     totalQty: stats.totalQty,
                     totalValue: stats.totalValue,
                 };
             })
+            .filter((g): g is any => g !== null)
             .sort((a, b) => b.totalQty - a.totalQty);
 
         const result = {

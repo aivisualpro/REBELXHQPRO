@@ -128,10 +128,42 @@ export async function GET(request: Request) {
             }
         ];
 
-        const [orders, repSummaries, grandTotals] = await Promise.all([
+        // ─── Active Reps (regardless of salesRep filter, but within date) ───
+        const dateQuery: any = { orderStatus: 'Completed' };
+        if (startDate || endDate) {
+            dateQuery.createdAt = {};
+            if (startDate) dateQuery.createdAt.$gte = new Date(startDate + 'T00:00:00.000Z');
+            if (endDate) dateQuery.createdAt.$lte = new Date(endDate + 'T23:59:59.999Z');
+        }
+
+        const activeRepsPipeline = [
+            { $match: dateQuery },
+            {
+                $addFields: {
+                    _subtotal: {
+                        $sum: {
+                            $map: {
+                                input: { $ifNull: ['$lineItems', []] },
+                                as: 'item',
+                                in: { $multiply: [{ $ifNull: ['$$item.qtyShipped', 0] }, { $ifNull: ['$$item.price', 0] }] }
+                            }
+                        }
+                    }
+                }
+            },
+            { $match: { _subtotal: { $gt: 0 } } },
+            {
+                $group: {
+                    _id: '$salesRep'
+                }
+            }
+        ];
+
+        const [orders, repSummaries, grandTotals, activeRepsRaw] = await Promise.all([
             SaleOrder.aggregate(ordersPipeline),
             SaleOrder.aggregate(summaryPipeline),
-            SaleOrder.aggregate(grandTotalPipeline)
+            SaleOrder.aggregate(grandTotalPipeline),
+            SaleOrder.aggregate(activeRepsPipeline)
         ]);
 
         // Populate references
@@ -146,6 +178,10 @@ export async function GET(request: Request) {
             { path: '_id', model: 'RXHQUsers', select: 'firstName lastName' }
         ]);
 
+        const populatedActiveReps = await SaleOrder.populate(activeRepsRaw, [
+            { path: '_id', model: 'RXHQUsers', select: 'firstName lastName' }
+        ]);
+
         const grandTotal = grandTotals[0] || {
             totalOrders: 0,
             totalRevenue: 0,
@@ -156,6 +192,7 @@ export async function GET(request: Request) {
         return NextResponse.json({
             orders: populatedOrders,
             repSummaries: populatedSummaries,
+            activeReps: populatedActiveReps,
             grandTotal,
             commissionRate: COMMISSION_RATE
         });

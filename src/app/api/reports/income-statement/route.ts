@@ -101,44 +101,27 @@ export async function GET(req: Request) {
         const totalShipping = webShipping + saleShipping;
         const totalTax = webTax + saleTax;
 
-        // 2. COST OF GOODS SOLD (COGS)
+        // 2. COST OF GOODS SOLD (COGS) - Fetched directly from the dedicated COGS endpoint for parity
         let cogs = 0;
-        
-        // Wholesale COGS
-        if (source !== 'web') {
-            const saleCogsAgg = await SaleOrder.aggregate([
-                { $match: { orderStatus: { $ne: 'Cancelled' }, ...defaultDateFilter } },
-                { $unwind: "$lineItems" },
-                { $group: {
-                    _id: null,
-                    total: { $sum: { $multiply: [{ $ifNull: ["$lineItems.qtyShipped", 0] }, { $ifNull: ["$lineItems.cost", 0] }] } }
-                }}
-            ]);
-            cogs += saleCogsAgg[0]?.total || 0;
-        }
-
-        // Web COGS
-        if (source !== 'wholesale' && !salesRep) {
-            const webCogsAgg = await WebOrder.aggregate([
-                { $match: { 
-                    status: { $in: ['completed', 'shipped', 'Completed', 'Shipped', 'processing', 'Processing'] },
-                    ...webDateFilter
-                }},
-                { $project: { lineItems: 1 } }
-            ]);
+        try {
+            const protocol = req.headers.get('x-forwarded-proto') || 'http';
+            const host = req.headers.get('host') || 'localhost:3000';
+            const cogsUrl = new URL('/api/reports/cogs', `${protocol}://${host}`);
             
-            webCogsAgg.forEach(order => {
-                order.lineItems?.forEach((item: any) => {
-                    const qty = item.quantity || 0;
-                    if (item.linkedSkus && item.linkedSkus.length > 0) {
-                        item.linkedSkus.forEach((ls: any) => {
-                            cogs += (qty * (ls.multiplier || 1)) * (ls.cost || 0);
-                        });
-                    } else if (item.cost) {
-                        cogs += qty * item.cost;
-                    }
-                });
-            });
+            if (startDate) cogsUrl.searchParams.set('startDate', startDate);
+            if (endDate) cogsUrl.searchParams.set('endDate', endDate);
+            cogsUrl.searchParams.set('source', source);
+            if (salesRep) cogsUrl.searchParams.set('salesRep', salesRep);
+
+            const cogsRes = await fetch(cogsUrl.toString());
+            if (cogsRes.ok) {
+                const cogsData = await cogsRes.json();
+                cogs = cogsData?.summary?.totalCogs || 0;
+            } else {
+                console.warn("Failed to fetch COGS for Income Statement:", await cogsRes.text());
+            }
+        } catch (err) {
+            console.error("Error fetching COGS loopback:", err);
         }
 
         // 3. GROSS PROFIT

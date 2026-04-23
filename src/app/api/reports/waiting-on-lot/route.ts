@@ -142,16 +142,13 @@ async function getSummary() {
         }
 
         // ── Phase 2: WebProduct-resolved web orders ──
-        // For each known SKU, find WebProducts that reference it,
-        // then find web orders via productId that are missing lot numbers
-        // but DON'T have a direct linkedSkuId (already counted above).
         const allSkuIds = Array.from(skuMap.keys());
         const webProducts = await WebProduct.find({
             $or: [
-                { linkedSkuId: { $in: allSkuIds } },
-                { 'variations.linkedSkuId': { $in: allSkuIds } },
-                { 'linkedSkus.skuId': { $in: allSkuIds } },
-                { 'variations.linkedSkus.skuId': { $in: allSkuIds } },
+                { linkedSkuId: { $exists: true, $ne: null } },
+                { 'variations.linkedSkuId': { $exists: true, $ne: null } },
+                { 'linkedSkus.0': { $exists: true } },
+                { 'variations.linkedSkus.0': { $exists: true } },
             ]
         }).select('webId website linkedSkuId linkedSkus multiplier variations').lean();
 
@@ -294,17 +291,18 @@ async function getSummary() {
         const groups = Array.from(mergedMap.entries())
             .map(([skuId, stats]) => {
                 const skuData = skuMap.get(skuId);
+                if (!skuData) return null; // Drop unknown or archived SKUs
                 return {
                     skuId,
-                    name: skuData?.name || 'Unknown SKU',
-                    category: skuData?.category || '',
-                    uom: skuData?.uom || 'EA',
+                    name: skuData.name,
+                    category: skuData.category || '',
+                    uom: skuData.uom || 'EA',
                     count: stats.count,
                     totalQty: stats.totalQty,
                     totalValue: stats.totalValue,
                 };
             })
-            .filter(g => g.name !== 'Unknown SKU' && g.totalQty > 0)
+            .filter((g): g is any => g !== null && g.totalQty > 0)
             .sort((a, b) => b.totalQty - a.totalQty);
 
         const result = {
