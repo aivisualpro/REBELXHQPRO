@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
                 const li = wo.lineItems[i];
 
                 // Legacy single-SKU path
-                if (li.linkedSkuId === skuId && li.lotNumber && !INVALID_LOT_VALUES.includes(li.lotNumber) && (!li.cost || li.cost === 0)) {
+                if (String(li.linkedSkuId) === skuId && li.lotNumber && !INVALID_LOT_VALUES.includes(li.lotNumber) && (!li.cost || li.cost === 0)) {
                     const cleanedLot = String(li.lotNumber).trim().replace(/,/g, '').replace(/\.0+$/, '');
                     const baseCost = lotCosts.get(cleanedLot) ?? lotCosts.get(li.lotNumber) ?? 0;
                     if (baseCost > 0) {
@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
                 if (li.linkedSkus?.length) {
                     for (let j = 0; j < li.linkedSkus.length; j++) {
                         const ls = li.linkedSkus[j];
-                        if (ls.skuId === skuId && ls.lotNumber && !INVALID_LOT_VALUES.includes(ls.lotNumber) && (!ls.cost || ls.cost === 0)) {
+                        if (String(ls.skuId) === skuId && ls.lotNumber && !INVALID_LOT_VALUES.includes(ls.lotNumber) && (!ls.cost || ls.cost === 0)) {
                             const cleanedLot = String(ls.lotNumber).trim().replace(/,/g, '').replace(/\.0+$/, '');
                             const baseCost = lotCosts.get(cleanedLot) ?? lotCosts.get(ls.lotNumber) ?? 0;
                             if (baseCost > 0) {
@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
 
             for (let i = 0; i < (so.lineItems || []).length; i++) {
                 const li = so.lineItems[i];
-                if (li.sku === skuId && li.lotNumber && !INVALID_LOT_VALUES.includes(li.lotNumber) && (!li.cost || li.cost === 0)) {
+                if (String(li.sku) === skuId && li.lotNumber && !INVALID_LOT_VALUES.includes(li.lotNumber) && (!li.cost || li.cost === 0)) {
                     const cleanedLot = String(li.lotNumber).trim().replace(/,/g, '').replace(/\.0+$/, '');
                     const cost = lotCosts.get(cleanedLot) ?? lotCosts.get(li.lotNumber) ?? 0;
                     if (cost > 0) {
