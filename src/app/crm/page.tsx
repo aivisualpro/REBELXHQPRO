@@ -15,7 +15,7 @@ const formatCurrency = (val: number) => new Intl.NumberFormat('en-US', { style: 
 
 import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function CRMDashboard() {
+function CRMDashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -514,5 +514,22 @@ function MetricCard({ title, value, icon, color, bg, trend, trendDown }: any) {
         <p className="text-2xl font-black text-foreground tracking-tight">{value}</p>
       </div>
     </div>
+  );
+}
+
+export default function CRMDashboard() {
+  return (
+    <React.Suspense fallback={
+      <div className="flex items-center justify-center h-full bg-background">
+        <div className="flex flex-col items-center space-y-4">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground animate-pulse">
+            Loading...
+          </span>
+        </div>
+      </div>
+    }>
+      <CRMDashboardContent />
+    </React.Suspense>
   );
 }
