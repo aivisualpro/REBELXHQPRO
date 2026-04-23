@@ -1,23 +1,119 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Users, Briefcase, DollarSign, Activity, 
   TrendingUp, TrendingDown, Clock, Phone, Mail, MessageSquare, Loader2,
-  PieChart as PieChartIcon, BarChart3
+  PieChart as PieChartIcon, BarChart3, ChevronDown, ChevronUp, Calendar
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, toDateInputValue } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
 
 // ─── Number Formatter ────────────────────────────────────────────────────────
 const formatCurrency = (val: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val);
 
+import { useRouter, useSearchParams } from 'next/navigation';
+
 export default function CRMDashboard() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [data, setData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [expandedActivity, setExpandedActivity] = useState<string | null>(null);
+
+  const [datePreset, setDatePreset] = useState<string>(searchParams.get('datePreset') || 'This Month');
+  const [fromDate, setFromDate] = useState<string>(searchParams.get('fromDate') || '');
+  const [toDate, setToDate] = useState<string>(searchParams.get('toDate') || '');
+  const [salesRep, setSalesRep] = useState<string>(searchParams.get('salesRep') || 'All');
+
+  const [salesRepOptions, setSalesRepOptions] = useState<{ label: string; value: string }[]>([]);
+
+  // Fetch Reps
+  useEffect(() => {
+    fetch('/api/clients/reps')
+      .then(res => res.json())
+      .then(d => {
+        if (d.reps) {
+          setSalesRepOptions(d.reps.map((r: any) => ({ label: `${r.firstName} ${r.lastName}`, value: r.firstName }))); // Or mapping by name depending on what activity uses.
+          // Wait, activity uses createdBy which is full name or email usually. 
+          // Client uses salesPerson name. The API we just wrote handles whatever we pass.
+          // Let's pass the rep's firstName + lastName, or wait: the previous code used name
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
+  const dateDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch('/api/crm/dashboard')
+    const handleClick = (e: MouseEvent) => {
+      if (dateDropdownRef.current && !dateDropdownRef.current.contains(e.target as Node)) {
+        setIsDateDropdownOpen(false);
+      }
+    };
+    if (isDateDropdownOpen) document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [isDateDropdownOpen]);
+
+  const handleDatePreset = (preset: string) => {
+    const today = new Date();
+    const formatDateStr = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    let start = '';
+    let end = '';
+
+    if (preset === 'This Month') {
+      start = formatDateStr(new Date(today.getFullYear(), today.getMonth(), 1));
+      end = formatDateStr(new Date(today.getFullYear(), today.getMonth() + 1, 0));
+    } else if (preset === 'Last Month') {
+      start = formatDateStr(new Date(today.getFullYear(), today.getMonth() - 1, 1));
+      end = formatDateStr(new Date(today.getFullYear(), today.getMonth(), 0));
+    } else if (preset === 'This Year') {
+      start = formatDateStr(new Date(today.getFullYear(), 0, 1));
+      end = formatDateStr(new Date(today.getFullYear(), 11, 31));
+    } else if (preset === 'Last Year') {
+      start = formatDateStr(new Date(today.getFullYear() - 1, 0, 1));
+      end = formatDateStr(new Date(today.getFullYear() - 1, 11, 31));
+    }
+
+    setDatePreset(preset);
+    setFromDate(start);
+    setToDate(end);
+    setIsDateDropdownOpen(false);
+  };
+
+  // Sync to URL
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (datePreset !== 'This Month') params.set('datePreset', datePreset);
+    if (fromDate) params.set('fromDate', fromDate);
+    if (toDate) params.set('toDate', toDate);
+    if (salesRep !== 'All') params.set('salesRep', salesRep);
+
+    const qs = params.toString();
+    const newUrl = `${window.location.pathname}${qs ? '?' + qs : ''}`;
+    
+    if (window.location.search.replace(/^\?/, '') !== qs) {
+      router.replace(newUrl, { scroll: false });
+    }
+  }, [datePreset, fromDate, toDate, salesRep, router]);
+
+  // Fetch dashboard data
+  useEffect(() => {
+    setIsLoading(true);
+    const params = new URLSearchParams();
+    if (fromDate) params.set('startDate', fromDate + 'T00:00:00.000Z');
+    if (toDate) params.set('endDate', toDate + 'T23:59:59.999Z');
+    if (salesRep && salesRep !== 'All') params.set('salesRep', salesRep);
+
+    fetch(`/api/crm/dashboard?${params}`)
       .then(res => res.json())
       .then(d => {
         if (d.error) throw new Error(d.error);
@@ -25,7 +121,7 @@ export default function CRMDashboard() {
       })
       .catch(err => toast.error(err.message || 'Failed to load dashboard'))
       .finally(() => setIsLoading(false));
-  }, []);
+  }, [fromDate, toDate, salesRep]);
 
   if (isLoading) {
     return (
@@ -51,9 +147,9 @@ export default function CRMDashboard() {
   return (
     <div className="flex flex-col h-full bg-background overflow-hidden relative">
       {/* ─── Premium Header ─── */}
-      <div className="shrink-0 relative overflow-hidden border-b border-border">
+      <div className="shrink-0 relative overflow-hidden border-b border-border z-10 bg-background">
         <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent pointer-events-none" />
-        <div className="relative px-6 py-5 flex items-center justify-between">
+        <div className="relative px-6 py-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
             <h1 className="text-xl font-black text-foreground uppercase tracking-tight flex items-center gap-2">
               <Briefcase className="w-5 h-5 text-primary" />
@@ -63,8 +159,81 @@ export default function CRMDashboard() {
               Real-time snapshot of your sales pipeline and activity
             </p>
           </div>
-          <div className="text-[11px] font-black uppercase tracking-widest text-muted-foreground bg-secondary/50 px-3 py-1.5 rounded-lg border border-border">
-            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Sales Rep Filter */}
+            <div className="w-[180px]">
+              <SearchableSelect
+                options={[{ label: 'All Reps', value: 'All' }, ...salesRepOptions]}
+                value={salesRep}
+                onChange={setSalesRep}
+                placeholder="Sales Rep"
+                icon={<Users className="w-4 h-4 text-muted-foreground" />}
+              />
+            </div>
+            {/* Date Filters */}
+            <div className="relative" ref={dateDropdownRef}>
+              <button
+                onClick={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
+                className={cn(
+                  "flex items-center gap-2 h-9 px-3 rounded-md border text-[11px] font-bold uppercase tracking-wider transition-all",
+                  isDateDropdownOpen || datePreset !== 'All Time'
+                    ? "border-primary/50 bg-primary/5 text-primary"
+                    : "border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground"
+                )}
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>{datePreset}</span>
+                <ChevronDown className={cn("w-3 h-3 transition-transform", isDateDropdownOpen && "rotate-180")} />
+              </button>
+
+              {isDateDropdownOpen && (
+                <div className="absolute top-full right-0 mt-2 w-[320px] bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                  <div className="p-3 grid grid-cols-2 gap-1 border-b border-border/50 bg-secondary/30">
+                    {['This Month', 'Last Month', 'This Year', 'Last Year', 'All Time'].map((preset) => (
+                      <button
+                        key={preset}
+                        onClick={() => handleDatePreset(preset)}
+                        className={cn(
+                          "px-3 py-1.5 text-left text-[11px] font-bold uppercase tracking-wider rounded-md transition-colors",
+                          datePreset === preset
+                            ? "bg-primary text-primary-foreground"
+                            : "hover:bg-secondary text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="p-3 space-y-3 bg-background">
+                    <div className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Custom Range</div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 block px-1">From</label>
+                        <input
+                          type="date"
+                          value={fromDate}
+                          onChange={(e) => { setFromDate(e.target.value); setDatePreset('Custom'); }}
+                          className="w-full bg-secondary border border-border rounded-md px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:border-primary transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 block px-1">To</label>
+                        <input
+                          type="date"
+                          value={toDate}
+                          onChange={(e) => { setToDate(e.target.value); setDatePreset('Custom'); }}
+                          className="w-full bg-secondary border border-border rounded-md px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:border-primary transition-colors"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="hidden lg:block text-[11px] font-black uppercase tracking-widest text-muted-foreground bg-secondary/50 px-3 py-1.5 rounded-lg border border-border">
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+            </div>
           </div>
         </div>
       </div>
@@ -213,20 +382,54 @@ export default function CRMDashboard() {
                 const total = metrics?.activitiesThisMonth || 1;
                 const pct = Math.round((act.count / total) * 100);
 
+                const isExpanded = expandedActivity === act.name;
+                const repData = charts?.activityByRep?.[act.name] || [];
+
                 return (
-                  <div key={act.name} className="flex items-center gap-4">
-                    <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border border-border/50 shadow-sm", colorCls)}>
-                      <IconWrapper className="w-4 h-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-end mb-1.5">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-foreground">{act.name}s</span>
-                        <span className="text-[12px] font-black text-foreground">{act.count}</span>
+                  <div key={act.name} className="flex flex-col">
+                    <div 
+                      className="flex items-center gap-4 cursor-pointer group p-2 -mx-2 rounded-lg hover:bg-secondary/50 transition-colors"
+                      onClick={() => setExpandedActivity(isExpanded ? null : act.name)}
+                    >
+                      <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border border-border/50 shadow-sm transition-transform group-hover:scale-105", colorCls)}>
+                        <IconWrapper className="w-4 h-4" />
                       </div>
-                      <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
-                        <div className={cn("h-full rounded-full", bgCls)} style={{ width: `${pct}%` }} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-end mb-1.5">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
+                            {act.name}s
+                            {repData.length > 0 && (
+                              isExpanded ? <ChevronUp className="w-3 h-3 text-muted-foreground" /> : <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                            )}
+                          </span>
+                          <span className="text-[12px] font-black text-foreground">{act.count}</span>
+                        </div>
+                        <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                          <div className={cn("h-full rounded-full", bgCls)} style={{ width: `${pct}%` }} />
+                        </div>
                       </div>
                     </div>
+                    {isExpanded && repData.length > 0 && (
+                      <div className="mt-2 ml-12 space-y-2.5 border-l-2 border-border/50 pl-4 py-1 animate-in slide-in-from-top-1 fade-in duration-200">
+                        {repData.map((r: any, rIdx: number) => {
+                           const rPct = Math.round((r.count / act.count) * 100);
+                           return (
+                             <div key={rIdx} className="flex items-center justify-between group/rep">
+                               <div className="flex items-center gap-2">
+                                 <div className={cn("w-1.5 h-1.5 rounded-full", bgCls, "opacity-40 group-hover/rep:opacity-100 transition-opacity")} />
+                                 <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground group-hover/rep:text-foreground transition-colors truncate max-w-[100px]">{r.rep}</span>
+                               </div>
+                               <div className="flex items-center gap-2">
+                                 <div className="w-16 h-1 bg-secondary rounded-full overflow-hidden">
+                                   <div className={cn("h-full rounded-full opacity-40 group-hover/rep:opacity-100 transition-opacity", bgCls)} style={{ width: `${rPct}%` }} />
+                                 </div>
+                                 <span className="text-[10px] font-black text-foreground w-6 text-right">{r.count}</span>
+                               </div>
+                             </div>
+                           )
+                        })}
+                      </div>
+                    )}
                   </div>
                 );
               })}
