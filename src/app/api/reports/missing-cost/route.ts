@@ -6,18 +6,20 @@ import SaleOrder from '@/models/SaleOrder';
 import Sku from '@/models/Sku';
 import OpeningBalance from '@/models/OpeningBalance';
 import PurchaseOrder from '@/models/PurchaseOrder';
+import mongoose from 'mongoose';
 import Manufacturing from '@/models/Manufacturing';
 import { getGlobalStartDate } from '@/lib/global-settings';
 
 export const dynamic = 'force-dynamic';
 
-// ⚡ In-memory cache (2 min TTL)
-const CACHE_TTL = 120_000;
+// ⚡ In-memory cache (5 sec TTL)
+const CACHE_TTL = 5_000;
 let summaryCache: { data: any; timestamp: number } | null = null;
 let detailCache = new Map<string, { data: any; timestamp: number }>();
 
 // Lot numbers that are considered "not real" (no cost expected)
-const INVALID_LOT_VALUES = [null, '', 'N/A', 'Allocated'];
+const INVALID_LOT_VALUES = [null, '', 'N/A', 'Allocated', 'Free'];
+
 
 // Helper to catch all forms of missing/empty cost in DB
 const missingCostOr = (field: string) => [
@@ -55,23 +57,30 @@ async function getSummary() {
     try {
         await dbConnect();
 
-        // ── Fetch global start date filter ──
-        const globalStartDate = await getGlobalStartDate();
-
+        // ── Fetch global start date filter and excluded SKUs ──
+        const [globalStartDate, excludedSkusDocs] = await Promise.all([
+            getGlobalStartDate(),
+            Sku.find({ noCost: true }).select('_id').lean()
+        ]);
+        // Include both String and ObjectId forms since SKU refs vary across collections
+        const EXCLUDED_SKUS = excludedSkusDocs.flatMap((s: any) => {
+            const idStr = s._id.toString();
+            return mongoose.Types.ObjectId.isValid(idStr) ? [idStr, new mongoose.Types.ObjectId(idStr)] : [idStr];
+        });
         const [woGroups, soGroups, obGroups, poGroups, mfgGroups, mfgConGroups, allSkus] = await Promise.all([
             // ⚡ Web Orders: line items with valid lotNumber but cost=0/null
             WebOrder.aggregate([
                 {
                     $match: {
                         status: { $nin: ['cancelled', 'trash', 'failed', 'refunded'] },
-                        'lineItems.linkedSkuId': { $exists: true, $ne: null },
+                        'lineItems.linkedSkuId': { $exists: true, $ne: null, $nin: EXCLUDED_SKUS },
                         ...(globalStartDate ? { dateCreated: { $gte: globalStartDate } } : {}),
                     }
                 },
                 { $unwind: '$lineItems' },
                 {
                     $match: {
-                        'lineItems.linkedSkuId': { $exists: true, $ne: null },
+                        'lineItems.linkedSkuId': { $exists: true, $ne: null, $nin: EXCLUDED_SKUS },
                         // Has a REAL lot number (not empty/null/N/A/Allocated)
                         'lineItems.lotNumber': { $exists: true, $nin: INVALID_LOT_VALUES },
                         // But cost is 0 or missing
@@ -79,21 +88,11 @@ async function getSummary() {
                     }
                 },
                 {
-                    $sort: { dateCreated: 1 }
-                },
-                {
                     $group: {
-                        _id: { sku: '$lineItems.linkedSkuId', lot: '$lineItems.lotNumber' },
-                        quantity: { $first: { $ifNull: ['$lineItems.quantity', 0] } },
-                        total: { $first: { $toDouble: { $ifNull: ['$lineItems.total', 0] } } }
-                    }
-                },
-                {
-                    $group: {
-                        _id: '$_id.sku',
+                        _id: { sku: '$lineItems.linkedSkuId', type: { $ifNull: ['$website', 'Web Order'] } },
                         count: { $sum: 1 },
-                        totalQty: { $sum: '$quantity' },
-                        totalValue: { $sum: '$total' },
+                        totalQty: { $sum: { $ifNull: ['$lineItems.quantity', 0] } },
+                        totalValue: { $sum: { $toDouble: { $ifNull: ['$lineItems.total', 0] } } },
                     }
                 }
             ]).allowDiskUse(true),
@@ -109,31 +108,21 @@ async function getSummary() {
                 { $unwind: '$lineItems' },
                 {
                     $match: {
-                        'lineItems.sku': { $exists: true, $ne: null },
+                        'lineItems.sku': { $exists: true, $ne: null, $nin: EXCLUDED_SKUS },
                         'lineItems.lotNumber': { $exists: true, $nin: INVALID_LOT_VALUES },
                         $or: missingCostOr('lineItems.cost')
                     }
                 },
                 {
-                    $sort: { createdAt: 1 }
-                },
-                {
                     $group: {
-                        _id: { sku: '$lineItems.sku', lot: '$lineItems.lotNumber' },
-                        qty: { $first: { $ifNull: ['$lineItems.qty', 0] } },
-                        price: { $first: { $ifNull: ['$lineItems.price', 0] } }
-                    }
-                },
-                {
-                    $group: {
-                        _id: '$_id.sku',
+                        _id: { sku: '$lineItems.sku', type: 'Sale Order' },
                         count: { $sum: 1 },
-                        totalQty: { $sum: '$qty' },
+                        totalQty: { $sum: { $ifNull: ['$lineItems.qty', 0] } },
                         totalValue: {
                             $sum: {
                                 $multiply: [
-                                    '$qty',
-                                    '$price'
+                                    { $ifNull: ['$lineItems.qty', 0] },
+                                    { $ifNull: ['$lineItems.price', 0] }
                                 ]
                             }
                         },
@@ -146,23 +135,16 @@ async function getSummary() {
                 {
                     $match: {
                         // Removed globalStartDate filter: Opening Balances carry forward indefinitely
-                        sku: { $exists: true, $ne: null },
+                        sku: { $exists: true, $ne: null, $nin: EXCLUDED_SKUS },
                         lotNumber: { $exists: true, $nin: INVALID_LOT_VALUES },
                         $or: missingCostOr('cost')
                     }
                 },
                 {
                     $group: {
-                        _id: { sku: '$sku', lot: '$lotNumber' },
-                        quantity: { $first: { $ifNull: ['$qty', 0] } },
-                        total: { $first: 0 }
-                    }
-                },
-                {
-                    $group: {
-                        _id: '$_id.sku',
+                        _id: { sku: '$sku', type: 'Opening Balance' },
                         count: { $sum: 1 },
-                        totalQty: { $sum: '$quantity' },
+                        totalQty: { $sum: { $ifNull: ['$qty', 0] } },
                         totalValue: { $sum: 0 },
                     }
                 }
@@ -179,7 +161,7 @@ async function getSummary() {
                 { $unwind: '$lineItems' },
                 {
                     $match: {
-                        'lineItems.sku': { $exists: true, $ne: null },
+                        'lineItems.sku': { $exists: true, $ne: null, $nin: EXCLUDED_SKUS },
                         'lineItems.lotNumber': { $exists: true, $nin: INVALID_LOT_VALUES },
                         $and: [
                             { $or: missingCostOr('lineItems.cost') },
@@ -189,28 +171,22 @@ async function getSummary() {
                 },
                 {
                     $group: {
-                        _id: { sku: '$lineItems.sku', lot: '$lineItems.lotNumber' },
-                        quantity: { $first: { $ifNull: ['$lineItems.qtyReceived', '$lineItems.qty'] } },
-                        total: { $first: 0 }
-                    }
-                },
-                {
-                    $group: {
-                        _id: '$_id.sku',
+                        _id: { sku: '$lineItems.sku', type: 'Purchase Order' },
                         count: { $sum: 1 },
-                        totalQty: { $sum: '$quantity' },
+                        totalQty: { $sum: { $ifNull: ['$lineItems.qtyReceived', { $ifNull: ['$lineItems.qty', 0] }] } },
                         totalValue: { $sum: 0 },
                     }
                 }
             ]).allowDiskUse(true),
 
             // ⚡ Manufacturing: valid lotNumber but totalCost=0/null
+            // ⚡ Manufacturing: valid lotNumber but totalCost=0/null
             Manufacturing.aggregate([
                 {
                     $match: {
                         status: { $nin: ['cancelled'] },
                         ...(globalStartDate ? { createdAt: { $gte: globalStartDate } } : {}),
-                        sku: { $exists: true, $ne: null },
+                        sku: { $exists: true, $ne: null, $nin: EXCLUDED_SKUS },
                         $or: missingCostOr('totalCost')
                     }
                 },
@@ -229,16 +205,9 @@ async function getSummary() {
                 },
                 {
                     $group: {
-                        _id: { sku: '$sku', lot: '$lot' },
-                        quantity: { $first: { $add: [{ $ifNull: ['$qty', 0] }, { $ifNull: ['$qtyDifference', 0] }] } },
-                        total: { $first: 0 }
-                    }
-                },
-                {
-                    $group: {
-                        _id: '$_id.sku',
+                        _id: { sku: '$sku', type: 'Manufacturing' },
                         count: { $sum: 1 },
-                        totalQty: { $sum: '$quantity' },
+                        totalQty: { $sum: { $add: [{ $ifNull: ['$qty', 0] }, { $ifNull: ['$qtyDifference', 0] }] } },
                         totalValue: { $sum: 0 },
                     }
                 }
@@ -255,23 +224,16 @@ async function getSummary() {
                 { $unwind: '$lineItems' },
                 {
                     $match: {
-                        'lineItems.sku': { $exists: true, $ne: null },
+                        'lineItems.sku': { $exists: true, $ne: null, $nin: EXCLUDED_SKUS },
                         'lineItems.lotNumber': { $exists: true, $nin: INVALID_LOT_VALUES },
                         $or: missingCostOr('lineItems.cost')
                     }
                 },
                 {
                     $group: {
-                        _id: { sku: '$lineItems.sku', lot: '$lineItems.lotNumber' },
-                        quantity: { $first: { $ifNull: ['$lineItems.qty', 0] } },
-                        total: { $first: 0 }
-                    }
-                },
-                {
-                    $group: {
-                        _id: '$_id.sku',
+                        _id: { sku: '$lineItems.sku', type: 'Mfg. Consumption' },
                         count: { $sum: 1 },
-                        totalQty: { $sum: '$quantity' },
+                        totalQty: { $sum: { $ifNull: ['$lineItems.qty', 0] } },
                         totalValue: { $sum: 0 },
                     }
                 }
@@ -287,17 +249,34 @@ async function getSummary() {
         allSkus.forEach((s: any) => skuMap.set(s._id.toString(), s));
 
         // Merge groups
-        const mergedMap = new Map<string, { count: number; totalQty: number; totalValue: number }>();
+        const mergedMap = new Map<string, { count: number; totalQty: number; totalValue: number; types: Record<string, { count: number; totalQty: number; totalValue: number }> }>();
 
-        for (const groups of [woGroups, soGroups, obGroups, poGroups, mfgGroups, mfgConGroups]) {
-            for (const g of groups) {
-                const id = g._id?.toString();
-                if (!id) continue;
-                const existing = mergedMap.get(id) || { count: 0, totalQty: 0, totalValue: 0 };
+        for (const [sourceGroups, defaultType] of [
+            [woGroups, ''],
+            [soGroups, 'Sale Order'],
+            [obGroups, 'Opening Balance'],
+            [poGroups, 'Purchase Order'],
+            [mfgGroups, 'Manufacturing'],
+            [mfgConGroups, 'Mfg. Consumption']
+        ] as const) {
+            for (const g of sourceGroups) {
+                const sku = g._id?.sku?.toString();
+                const typeLabel = g._id?.type || defaultType || 'Unknown';
+                if (!sku) continue;
+
+                const existing = mergedMap.get(sku) || { count: 0, totalQty: 0, totalValue: 0, types: {} };
                 existing.count += g.count;
                 existing.totalQty += g.totalQty;
                 existing.totalValue += g.totalValue;
-                mergedMap.set(id, existing);
+
+                if (!existing.types[typeLabel]) {
+                    existing.types[typeLabel] = { count: 0, totalQty: 0, totalValue: 0 };
+                }
+                existing.types[typeLabel].count += g.count;
+                existing.types[typeLabel].totalQty += g.totalQty;
+                existing.types[typeLabel].totalValue += g.totalValue;
+
+                mergedMap.set(sku, existing);
             }
         }
 
@@ -314,6 +293,7 @@ async function getSummary() {
                     count: stats.count,
                     totalQty: stats.totalQty,
                     totalValue: stats.totalValue,
+                    types: stats.types,
                 };
             })
             .filter((g): g is any => g !== null)
@@ -348,11 +328,19 @@ async function getSkuDetail(skuId: string) {
     try {
         await dbConnect();
 
-        // ── Fetch global start date filter ──
-        const globalStartDate = await getGlobalStartDate();
-        const skuOid = import('mongoose').then(m => m.default.Types.ObjectId.isValid(skuId) ? new m.default.Types.ObjectId(skuId) : skuId);
-        const resolvedSkuOid = await skuOid;
-        const skuMatch = { $in: [resolvedSkuOid, skuId] };
+        // ── Fetch global start date filter and excluded SKUs ──
+        const [globalStartDate, excludedSkusDocs] = await Promise.all([
+            getGlobalStartDate(),
+            Sku.find({ noCost: true }).select('_id').lean()
+        ]);
+        // Include both String and ObjectId forms since SKU refs vary across collections
+        const EXCLUDED_SKUS = excludedSkusDocs.flatMap((s: any) => {
+            const idStr = s._id.toString();
+            return mongoose.Types.ObjectId.isValid(idStr) ? [idStr, new mongoose.Types.ObjectId(idStr)] : [idStr];
+        });
+        const skuOid = skuId !== 'all' ? import('mongoose').then(m => m.default.Types.ObjectId.isValid(skuId) ? new m.default.Types.ObjectId(skuId) : skuId) : null;
+        const resolvedSkuOid = skuOid ? await skuOid : null;
+        const skuMatch = skuId === 'all' ? { $exists: true, $ne: null, $nin: EXCLUDED_SKUS } : { $in: [resolvedSkuOid, skuId], $nin: EXCLUDED_SKUS };
 
         const [woItems, soItems, obItems, poItems, mfgItems, mfgConItems] = await Promise.all([
             WebOrder.aggregate([
@@ -556,7 +544,7 @@ async function getSkuDetail(skuId: string) {
         for (const so of soItems) {
             const line = so.lineItems;
             items.push({
-                id: `SO_${so._id}`,
+                id: `SO_${so._id}_${Math.random().toString(36).substring(2, 9)}`,
                 source: 'Sale Order',
                 orderId: so._id.toString(),
                 orderNumber: so.label || so._id.toString(),
@@ -572,7 +560,7 @@ async function getSkuDetail(skuId: string) {
 
         for (const ob of obItems) {
             items.push({
-                id: `OB_${ob._id}`,
+                id: `OB_${ob._id}_${Math.random().toString(36).substring(2, 9)}`,
                 source: 'Opening Balance',
                 orderId: ob._id.toString(),
                 orderNumber: 'Opening Balance',
@@ -589,7 +577,7 @@ async function getSkuDetail(skuId: string) {
         for (const po of poItems) {
             const line = po.lineItems;
             items.push({
-                id: `PO_${po._id}`,
+                id: `PO_${po._id}_${Math.random().toString(36).substring(2, 9)}`,
                 source: 'Purchase Order',
                 orderId: po._id.toString(),
                 orderNumber: po.label || po._id.toString(),
@@ -605,7 +593,7 @@ async function getSkuDetail(skuId: string) {
 
         for (const mfg of mfgItems) {
             items.push({
-                id: `MFG_${mfg._id}`,
+                id: `MFG_${mfg._id}_${Math.random().toString(36).substring(2, 9)}`,
                 source: 'Manufacturing',
                 orderId: mfg._id.toString(),
                 orderNumber: mfg.label || mfg._id.toString(),
@@ -622,7 +610,7 @@ async function getSkuDetail(skuId: string) {
         for (const mfgCon of mfgConItems) {
             const line = mfgCon.lineItems;
             items.push({
-                id: `MFG_CON_${mfgCon._id}_${line.lotNumber}`,
+                id: `MFG_CON_${mfgCon._id}_${Math.random().toString(36).substring(2, 9)}`,
                 source: 'Mfg. Consumption',
                 orderId: mfgCon._id.toString(),
                 orderNumber: mfgCon.label || mfgCon._id.toString(),
@@ -636,23 +624,10 @@ async function getSkuDetail(skuId: string) {
             });
         }
 
-        // Sort by date ascending to get the oldest (origin) transaction first
-        items.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-        const uniqueItems: any[] = [];
-        const seenLots = new Set<string>();
-
-        for (const item of items) {
-            if (!seenLots.has(item.lotNumber)) {
-                seenLots.add(item.lotNumber);
-                uniqueItems.push(item);
-            }
-        }
-
         // Sort by date desc for display
-        uniqueItems.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-        const result = { items: uniqueItems };
+        const result = { items };
         detailCache.set(skuId, { data: result, timestamp: Date.now() });
 
         return apiSuccess(result);

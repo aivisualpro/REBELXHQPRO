@@ -15,6 +15,7 @@ const SkuSchema = new mongoose.Schema({
     kitApplied: { type: Boolean, default: false },
     isLotApplied: { type: Boolean, default: false },
     isArchived: { type: Boolean, default: false },
+    noCost: { type: Boolean, default: false },
     isWebProduct: { type: Boolean, default: false },
     website: String,
     // WooCommerce Specific Fields

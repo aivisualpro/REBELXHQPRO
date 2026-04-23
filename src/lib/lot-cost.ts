@@ -88,9 +88,9 @@ export async function getLotsWithCost(skuId: string): Promise<Map<string, number
 
     await dbConnect();
 
-    const objectIdSkuId = new mongoose.Types.ObjectId(skuId);
+    const skuOid = skuId !== 'all' && mongoose.Types.ObjectId.isValid(skuId) ? new mongoose.Types.ObjectId(skuId) : skuId;
     // Match against both ObjectId and plain string — different collections store sku differently
-    const skuMatch = { $in: [objectIdSkuId, skuId] };
+    const skuMatch = skuId === 'all' ? { $exists: true, $ne: null } : { $in: [skuOid, skuId] };
 
     // Fetch all source data in parallel using $group and $lookup aggregations
     // This replaces expensive in-memory array filtering and N+1 queries.

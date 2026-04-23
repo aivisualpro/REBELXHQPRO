@@ -30,12 +30,13 @@ export async function POST(request: NextRequest) {
         const INVALID_LOT_VALUES = [null, '', 'N/A', 'Allocated'];
 
         // ── Build ObjectId-aware SKU match ──
-        const skuOid = mongoose.Types.ObjectId.isValid(skuId) ? new mongoose.Types.ObjectId(skuId) : skuId;
-        const skuMatch = { $in: [skuOid, skuId] };
+        const skuOid = skuId !== 'all' && mongoose.Types.ObjectId.isValid(skuId) ? new mongoose.Types.ObjectId(skuId) : skuId;
+        const skuMatch = skuId === 'all' ? { $exists: true, $ne: null } : { $in: [skuOid, skuId] };
 
         // Helper to check if a field value matches our target skuId (handles ObjectId vs string)
         const matchesSku = (val: any) => {
             if (!val) return false;
+            if (skuId === 'all') return true;
             return String(val) === skuId;
         };
 
@@ -64,19 +65,11 @@ export async function POST(request: NextRequest) {
                 'lineItems.sku': skuMatch,
             }).lean() as any,
 
-            // Opening Balances
-            OpeningBalance.find({
-                sku: skuMatch,
-                lotNumber: { $exists: true, $nin: INVALID_LOT_VALUES },
-                $or: [{ cost: 0 }, { cost: null }, { cost: { $exists: false } }],
-            }).lean() as any,
+            // Opening Balances (Intentionally excluded from auto-apply because they are a cost source)
+            Promise.resolve([]),
 
-            // Purchase Orders
-            PurchaseOrder.find({
-                status: { $nin: ['Cancelled', 'Void'] },
-                ...(globalStartDate ? { createdAt: { $gte: globalStartDate } } : {}),
-                'lineItems.sku': skuMatch,
-            }).lean() as any,
+            // Purchase Orders (Intentionally excluded from auto-apply because they are a cost source)
+            Promise.resolve([]),
 
             // Manufacturing — output (this SKU is the produced item)
             Manufacturing.find({
@@ -181,58 +174,16 @@ export async function POST(request: NextRequest) {
         if (soHasOps) await soBulk.execute();
 
         // ══════════════════════════════════════════════
-        // 3C: Apply costs to Opening Balances
+        // 3C: Removed Opening Balance cost application
+        //     (Opening Balances are a cost source and must be manually entered)
         // ══════════════════════════════════════════════
         let obFixed = 0;
-        const obBulk = OpeningBalance.collection.initializeUnorderedBulkOp();
-        let obHasOps = false;
-
-        for (const ob of openingBalances) {
-            const lot = String(ob.lotNumber || '').trim().replace(/,/g, '').replace(/\.0+$/, '');
-            if (!lot || INVALID_LOT_VALUES.includes(lot)) continue;
-            const cost = lotCosts.get(lot) ?? lotCosts.get(ob.lotNumber) ?? 0;
-            if (cost > 0) {
-                obBulk.find({ _id: ob._id }).updateOne({ $set: { cost, updatedAt: new Date() } });
-                obHasOps = true; obFixed++;
-                resolvedOrderIds.push(String(ob._id));
-            }
-        }
-        if (obHasOps) await obBulk.execute();
 
         // ══════════════════════════════════════════════
-        // 3D: Apply costs to Purchase Order line items
+        // 3D: Removed Purchase Order cost application
+        //     (POs are a cost source and must be manually entered)
         // ══════════════════════════════════════════════
         let poFixed = 0;
-        const poBulk = PurchaseOrder.collection.initializeUnorderedBulkOp();
-        let poHasOps = false;
-
-        for (const po of purchaseOrders) {
-            let changed = false;
-            const updates: Record<string, any> = {};
-
-            for (let i = 0; i < (po.lineItems || []).length; i++) {
-                const li = po.lineItems[i];
-                if (!matchesSku(li.sku)) continue;
-                const hasCost = (li.cost && li.cost > 0) || (li.price && li.price > 0);
-                if (hasCost) continue;
-                if (!li.lotNumber || INVALID_LOT_VALUES.includes(li.lotNumber)) continue;
-
-                const cleanedLot = String(li.lotNumber).trim().replace(/,/g, '').replace(/\.0+$/, '');
-                const cost = lotCosts.get(cleanedLot) ?? lotCosts.get(li.lotNumber) ?? 0;
-                if (cost > 0) {
-                    updates[`lineItems.${i}.cost`] = cost;
-                    changed = true; poFixed++;
-                }
-            }
-
-            if (changed) {
-                updates['updatedAt'] = new Date();
-                poBulk.find({ _id: po._id }).updateOne({ $set: updates });
-                poHasOps = true;
-                resolvedOrderIds.push(String(po._id));
-            }
-        }
-        if (poHasOps) await poBulk.execute();
 
         // ══════════════════════════════════════════════
         // 3E: Apply costs to Manufacturing outputs

@@ -178,11 +178,9 @@ function SkuDetailsPageContent() {
     const [isUpdating, setIsUpdating] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
-    // Edit/Delete state
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editForm, setEditForm] = useState<any>(null);
     const [isEditSaving, setIsEditSaving] = useState(false);
-    const [isDeleting, setIsDeleting] = useState(false);
 
     // Linked web products
     const [linkedWebProducts, setLinkedWebProducts] = useState<LinkedWebProduct[]>([]);
@@ -598,45 +596,7 @@ function SkuDetailsPageContent() {
         }
     };
 
-    const handleDeleteSku = () => {
-        toast((t) => (
-            <div className="flex flex-col gap-2">
-                <p className="text-sm font-bold text-white">Delete this SKU?</p>
-                <p className="text-xs text-gray-400">This action cannot be undone.</p>
-                <div className="flex gap-2 mt-1">
-                    <button
-                        onClick={() => toast.dismiss(t.id)}
-                        className="flex-1 px-3 py-1.5 text-xs font-bold rounded border border-gray-600 bg-gray-800 text-white hover:bg-gray-700 transition-colors"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={async () => {
-                            toast.dismiss(t.id);
-                            setIsDeleting(true);
-                            try {
-                                const res = await fetch(`/api/skus/${id}`, { method: 'DELETE' });
-                                if (res.ok) {
-                                    toast.success('SKU deleted');
-                                    router.push('/warehouse/skus');
-                                } else {
-                                    const data = await res.json();
-                                    toast.error(data.error || 'Failed to delete SKU');
-                                }
-                            } catch (e) {
-                                toast.error('Error deleting SKU');
-                            } finally {
-                                setIsDeleting(false);
-                            }
-                        }}
-                        className="flex-1 px-3 py-1.5 text-xs font-bold rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
-                    >
-                        Delete
-                    </button>
-                </div>
-            </div>
-        ), { duration: 10000, position: 'top-center', style: { maxWidth: '360px', background: '#1a1a1a', color: '#fff', marginTop: '40vh' } });
-    };
+
 
     return (
         <div className="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-background">
@@ -1106,16 +1066,40 @@ function SkuDetailsPageContent() {
                             {(sku as any).isArchived ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
                             <span>{(sku as any).isArchived ? 'Restore' : 'Archive'}</span>
                         </button>
-                        {canDelete() && (
-                            <button
-                                onClick={handleDeleteSku}
-                                disabled={isDeleting}
-                                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-bold uppercase tracking-widest bg-red-600 text-white rounded hover:bg-red-700 transition-colors cursor-pointer disabled:opacity-50 inline-flex shadow-[0_1px_4px_rgba(0,0,0,0.15)]"
-                            >
-                                <Trash2 className="w-3.5 h-3.5" />
-                                <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
-                            </button>
-                        )}
+                        <button
+                            onClick={async () => {
+                                const isNoCost = (sku as any).noCost;
+                                // Optimistic update — flip immediately
+                                setSku((prev: any) => prev ? { ...prev, noCost: !isNoCost } : prev);
+                                const toastId = toast.loading(isNoCost ? 'Enabling cost tracking...' : 'Disabling cost tracking...');
+                                try {
+                                    const res = await fetch(`/api/skus/${id}`, {
+                                        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ noCost: !isNoCost })
+                                    });
+                                    if (res.ok) {
+                                        toast.success(isNoCost ? 'Cost Tracking Enabled' : 'No Cost Applied', { id: toastId });
+                                        fetchSkuDetails(true);
+                                    } else {
+                                        // Revert on failure
+                                        setSku((prev: any) => prev ? { ...prev, noCost: isNoCost } : prev);
+                                        toast.error('Failed', { id: toastId });
+                                    }
+                                } catch {
+                                    setSku((prev: any) => prev ? { ...prev, noCost: isNoCost } : prev);
+                                    toast.error('Failed', { id: toastId });
+                                }
+                            }}
+                            className={cn(
+                                "flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-bold uppercase tracking-widest rounded transition-colors cursor-pointer shadow-[0_1px_4px_rgba(0,0,0,0.15)]",
+                                (sku as any).noCost
+                                    ? "bg-amber-600 text-white hover:bg-amber-700"
+                                    : "bg-secondary hover:bg-secondary border border-border text-foreground"
+                            )}
+                        >
+                            <DollarSign className="w-3.5 h-3.5" />
+                            <span>{(sku as any).noCost ? 'Cost Excluded' : 'No Cost'}</span>
+                        </button>
                     </div>
                 </aside>
 
