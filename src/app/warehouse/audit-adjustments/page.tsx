@@ -52,7 +52,7 @@ const COLUMNS = [
     { key: 'lotNumber', label: 'Lot #', sortable: true, width: 'w-[120px]' },
     { key: 'qty', label: 'Qty', sortable: true, width: 'w-[80px]', align: 'text-right' as const },
     { key: 'cost', label: 'Cost', sortable: true, width: 'w-[90px]', align: 'text-right' as const },
-    { key: 'reason', label: 'Reason', sortable: true, width: 'flex-1' },
+    { key: 'reason', label: 'Reason', sortable: true, width: 'w-[150px]' },
     { key: 'createdBy', label: 'Created By', sortable: false, width: 'w-[140px]' },
     { key: 'actions', label: 'Actions', sortable: false, width: 'w-[90px]', align: 'text-center' as const },
 ];
@@ -180,7 +180,7 @@ const TableRow = React.memo(function TableRow({
             </td>
 
             {/* Reason */}
-            <td className="px-2.5 py-2.5 text-[12px] text-foreground/80 truncate cursor-pointer" title={item.reason}>
+            <td className="px-2.5 py-2.5 text-[12px] text-foreground/80 truncate cursor-pointer max-w-[150px]" title={item.reason}>
                 {item.reason || <span className="text-muted-foreground/30">—</span>}
             </td>
 

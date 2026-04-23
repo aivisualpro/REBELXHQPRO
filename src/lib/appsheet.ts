@@ -56,7 +56,7 @@ export async function syncSkuToAppSheet(sku: any, action: 'Add' | 'Edit' | 'Dele
         logger.info(`AppSheet SKU ${action} Result:`, result);
         return result;
     } catch (error) {
-        logger.error('AppSheet SKU Sync Error:', error);
+        logger.error({ error }, 'AppSheet SKU Sync Error:');
     }
 }
 
@@ -153,7 +153,7 @@ export async function syncClientToAppSheet(clients: any | any[]) {
         logger.info('AppSheet Sync Result:', result);
         return result;
     } catch (error) {
-        logger.error('AppSheet Sync Error:', error);
+        logger.error({ error }, 'AppSheet Sync Error:');
     }
 }
 
@@ -292,7 +292,7 @@ export async function syncOrderToAppSheet(order: any) {
         const results = await Promise.all(promises);
         return { orderResult: results[0], detailResult: results[1] || null };
     } catch (error) {
-        logger.error('AppSheet Order Sync Error:', error);
+        logger.error({ error }, 'AppSheet Order Sync Error:');
     }
 }
 
@@ -380,7 +380,7 @@ export async function deleteOrderFromAppSheet(order: any) {
         const results = await Promise.all(promises);
         return { orderResult: results[0], detailResult: results[1] || null };
     } catch (error) {
-        logger.error('AppSheet Order Delete Error:', error);
+        logger.error({ error }, 'AppSheet Order Delete Error:');
     }
 }
 
@@ -432,7 +432,7 @@ export async function syncPaymentToAppSheet(order: any, payment: any, action: 'A
         logger.info(`AppSheet Payment ${action} Result:`, result);
         return result;
     } catch (error) {
-        logger.error('AppSheet Payment Sync Error:', error);
+        logger.error({ error }, 'AppSheet Payment Sync Error:');
     }
 }
 
@@ -502,7 +502,7 @@ export async function syncOrderLineItemToAppSheet(order: any, lineItem: any, act
 
         return result;
     } catch (error) {
-        logger.error('AppSheet Order Detail Sync Error:', error);
+        logger.error({ error }, 'AppSheet Order Detail Sync Error:');
     }
 }
 
@@ -613,7 +613,7 @@ export async function syncManufacturingToAppSheet(
 
         return result;
     } catch (error) {
-        logger.error('AppSheet Manufacturing Sync Error:', error);
+        logger.error({ error }, 'AppSheet Manufacturing Sync Error:');
     }
 }
 
@@ -663,7 +663,7 @@ export async function deleteManufacturingFromAppSheet(order: any) {
         logger.info('AppSheet Manufacturing Delete Result:', result);
         return result;
     } catch (error) {
-        logger.error('AppSheet Manufacturing Delete Error:', error);
+        logger.error({ error }, 'AppSheet Manufacturing Delete Error:');
     }
 }
 
@@ -723,7 +723,7 @@ export async function syncManufacturingLineItemsToAppSheet(
                 });
             }
         } catch (e) {
-            logger.error('Failed to lookup SKU legacyIds for line items:', e);
+            logger.error({ error: e }, 'Failed to lookup SKU legacyIds for line items:');
         }
     }
 
@@ -789,7 +789,7 @@ export async function syncManufacturingLineItemsToAppSheet(
 
         return result;
     } catch (error) {
-        logger.error('AppSheet Manufacturing LineItems Sync Error:', error);
+        logger.error({ error }, 'AppSheet Manufacturing LineItems Sync Error:');
     }
 }
 
@@ -838,7 +838,7 @@ export async function deleteManufacturingLineItemsFromAppSheet(lineItemIds: stri
         logger.info('AppSheet Manufacturing LineItems Delete Result:', result);
         return result;
     } catch (error) {
-        logger.error('AppSheet Manufacturing LineItems Delete Error:', error);
+        logger.error({ error }, 'AppSheet Manufacturing LineItems Delete Error:');
     }
 }
 
@@ -921,7 +921,7 @@ export async function syncPurchaseOrderToAppSheet(order: any, action: 'Add' | 'E
         };
     });
 
-    logger.info(`[PO AppSheet Sync] Detail rows payload:`, JSON.stringify(detailRows, null, 2));
+    logger.info({ payload: JSON.stringify(detailRows, null, 2) }, '[PO AppSheet Sync] Detail rows payload:');
     const detailPayload = {
         Action: action,
         Properties: { Locale: 'en-US', Timezone: 'Eastern Standard Time' },
@@ -998,7 +998,7 @@ export async function syncPurchaseOrderToAppSheet(order: any, action: 'Add' | 'E
 
         return { orderResult, detailResult };
     } catch (error) {
-        logger.error('AppSheet PO Sync Error:', error);
+        logger.error({ error }, 'AppSheet PO Sync Error:');
     }
 }
 
@@ -1089,7 +1089,7 @@ export async function deletePurchaseOrderFromAppSheet(order: any) {
         const results = await Promise.all(promises);
         return { orderResult: results[0], detailResult: results[1] || null };
     } catch (error) {
-        logger.error('AppSheet PO Delete Error:', error);
+        logger.error({ error }, 'AppSheet PO Delete Error:');
     }
 }
 
@@ -1157,6 +1157,6 @@ export async function syncPOLineItemToAppSheet(order: any, lineItem: any, action
 
         return result;
     } catch (error) {
-        logger.error('AppSheet PO LineItem Sync Error:', error);
+        logger.error({ error }, 'AppSheet PO LineItem Sync Error:');
     }
 }

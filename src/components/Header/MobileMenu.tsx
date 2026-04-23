@@ -54,6 +54,14 @@ export const MobileMenu = () => {
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             onClick={() => setIsOpen(false)}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    setIsOpen(false);
+                                }
+                            }}
                             className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50"
                         />
 
