@@ -14,6 +14,7 @@ interface FilterProps {
     onChange: (values: string[]) => void;
     icon?: React.ElementType; // allow custom icon
     className?: string;
+    dropdownWidth?: string;
 }
 
 export interface MultiSelectFilterRef {
@@ -21,7 +22,7 @@ export interface MultiSelectFilterRef {
     close: () => void;
 }
 
-export const MultiSelectFilter = forwardRef<MultiSelectFilterRef, FilterProps>(({ label, options, selectedValues, onChange, icon: Icon = Filter, className }, ref) => {
+export const MultiSelectFilter = forwardRef<MultiSelectFilterRef, FilterProps>(({ label, options, selectedValues, onChange, icon: Icon = Filter, className, dropdownWidth }, ref) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const containerRef = useRef<HTMLDivElement>(null);
@@ -73,9 +74,15 @@ export const MultiSelectFilter = forwardRef<MultiSelectFilterRef, FilterProps>((
         onChange([]);
     };
 
-    const filteredOptions = options.filter(option =>
-        option.label.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredOptions = options
+        .filter(option => option.label.toLowerCase().includes(searchTerm.toLowerCase()))
+        .sort((a, b) => {
+            const aSelected = selectedValues.includes(a.value);
+            const bSelected = selectedValues.includes(b.value);
+            if (aSelected && !bSelected) return -1;
+            if (!aSelected && bSelected) return 1;
+            return a.label.localeCompare(b.label);
+        });
 
     return (
         <div className="relative z-50" ref={containerRef}>
@@ -104,7 +111,7 @@ export const MultiSelectFilter = forwardRef<MultiSelectFilterRef, FilterProps>((
             </button>
 
             {isOpen && (
-                <div className="absolute right-0 top-full mt-2 w-64 bg-background border border-border shadow-xl rounded-lg z-[100] animate-in fade-in zoom-in-95 duration-100 flex flex-col max-h-80 overflow-hidden">
+                <div className={cn("absolute right-0 top-full mt-2 bg-background border border-border shadow-xl rounded-lg z-[100] animate-in fade-in zoom-in-95 duration-100 flex flex-col max-h-80 overflow-hidden", dropdownWidth || "w-64")}>
                     <div className="p-2 border-b border-border sticky top-0 bg-background z-10">
                         <input
                             type="text"

@@ -141,6 +141,28 @@ export async function POST(req: NextRequest) {
 
             const transformedData = transformShopifyProduct(body, site);
             
+            // Preserve existing linkedSkus on variations before overwriting
+            if (transformedData.variations && transformedData.variations.length > 0) {
+                const existingProduct = await WebProduct.findById(transformedData._id).select('variations').lean();
+                
+                if (existingProduct?.variations) {
+                    const existingVarMap = new Map((existingProduct.variations as any[]).map(v => [v._id, v]));
+                    
+                    transformedData.variations = transformedData.variations.map((newVar: any) => {
+                        const existingVar = existingVarMap.get(newVar._id) as any;
+                        if (existingVar) {
+                            return {
+                                ...newVar,
+                                linkedSkus: (existingVar.linkedSkus && existingVar.linkedSkus.length > 0)
+                                            ? existingVar.linkedSkus
+                                            : newVar.linkedSkus || []
+                            };
+                        }
+                        return newVar;
+                    });
+                }
+            }
+
             await WebProduct.findOneAndUpdate(
                 { _id: transformedData._id },
                 { $set: transformedData },

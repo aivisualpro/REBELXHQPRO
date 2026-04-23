@@ -17,7 +17,8 @@ import {
     Loader2,
     ArrowLeft,
     DollarSign,
-    X
+    X,
+    ChevronDown
 } from 'lucide-react';
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { cn, formatDate } from '@/lib/utils';
@@ -84,6 +85,7 @@ function COGMPage() {
     const urlEnd = searchParams.get('endDate');
     const urlSku = searchParams.get('sku');
     const urlSearch = searchParams.get('search');
+    const urlDatePreset = searchParams.get('datePreset');
 
     const [records, setRecords] = useState<ManufacturingRecord[]>([]);
     const [loading, setLoading] = useState(false);
@@ -95,20 +97,30 @@ function COGMPage() {
     const [hasMore, setHasMore] = useState(true);
     const loadMoreRef = useRef<HTMLDivElement>(null);
 
-    // Date Utils (Bypassing UTC Timezone shift on standard Date.toISOString)
-    const getLocalDateString = (year: number, month: number, day: number) => 
-        `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    // Date Utils
+    const getLocalDateString = (d: Date) => 
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
     const today = new Date();
-    const defaultStart = getLocalDateString(today.getFullYear(), 0, 1); // Jan 1st
-    const defaultEnd = getLocalDateString(today.getFullYear(), 11, 31); // Dec 31st
+    const defaultStart = getLocalDateString(new Date(today.getFullYear(), 0, 1)); // Jan 1st
+    const defaultEnd = getLocalDateString(new Date(today.getFullYear(), 11, 31)); // Dec 31st
 
     // Filters
     const [dateRange, setDateRange] = useState({
         startDate: urlStart !== null ? urlStart : defaultStart,
         endDate: urlEnd !== null ? urlEnd : defaultEnd
     });
-    const [datePreset, setDatePreset] = useState(!urlStart && !urlEnd ? 'this_year' : 'custom');
+    const [datePreset, setDatePreset] = useState(() => {
+        if (urlDatePreset) return urlDatePreset;
+        const s = urlStart !== null ? urlStart : defaultStart;
+        const e = urlEnd !== null ? urlEnd : defaultEnd;
+        if (s === defaultStart && e === defaultEnd) return 'This Year';
+        if (!s && !e) return 'All Time';
+        return 'Custom';
+    });
+    const [dateFilterOpen, setDateFilterOpen] = useState(false);
+    const dateFilterRef = useRef<HTMLDivElement | null>(null);
+
     const [selectedSkus, setSelectedSkus] = useState<string[]>(urlSku ? urlSku.split(',') : []);
     const [skuOptions, setSkuOptions] = useState<{ label: string; value: string }[]>([]);
     const [search, setSearch] = useState(urlSearch || '');
@@ -136,13 +148,16 @@ function COGMPage() {
         if (debouncedSearch) params.set('search', debouncedSearch);
         else params.delete('search');
 
+        if (datePreset && datePreset !== 'Custom') params.set('datePreset', datePreset);
+        else params.delete('datePreset');
+
         const currentQs = searchParams.toString();
         const newQs = params.toString();
         
         if (currentQs !== newQs) {
             router.push(`${window.location.pathname}?${newQs}`, { scroll: false });
         }
-    }, [dateRange, selectedSkus, debouncedSearch, router, searchParams]);
+    }, [dateRange, selectedSkus, debouncedSearch, datePreset, router, searchParams]);
 
     useEffect(() => {
         fetch('/api/reports/cogm/skus')
@@ -214,29 +229,41 @@ function COGMPage() {
         return () => observer.disconnect();
     }, [hasMore, loading]);
 
-    const handlePresetChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const val = e.target.value;
-        setDatePreset(val);
-        const today = new Date();
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (dateFilterRef.current && !dateFilterRef.current.contains(e.target as Node)) {
+                setDateFilterOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
 
-        if (val === 'all') {
-            setDateRange({ startDate: '', endDate: '' });
-        } else if (val === 'this_year') {
-            setDateRange({
-                startDate: getLocalDateString(today.getFullYear(), 0, 1),
-                endDate: getLocalDateString(today.getFullYear(), 11, 31)
-            });
-        } else if (val === 'last_year') {
-            setDateRange({
-                startDate: getLocalDateString(today.getFullYear() - 1, 0, 1),
-                endDate: getLocalDateString(today.getFullYear() - 1, 11, 31)
-            });
-        } else if (val === 'this_month') {
-            setDateRange({
-                startDate: getLocalDateString(today.getFullYear(), today.getMonth(), 1),
-                endDate: getLocalDateString(today.getFullYear(), today.getMonth() + 1, 0)
-            });
+    const handlePresetChange = (preset: string) => {
+        const today = new Date();
+        let start = '';
+        let end = '';
+
+        if (preset === 'This Month') {
+            start = getLocalDateString(new Date(today.getFullYear(), today.getMonth(), 1));
+            end = getLocalDateString(new Date(today.getFullYear(), today.getMonth() + 1, 0));
+        } else if (preset === 'Last Month') {
+            start = getLocalDateString(new Date(today.getFullYear(), today.getMonth() - 1, 1));
+            end = getLocalDateString(new Date(today.getFullYear(), today.getMonth(), 0));
+        } else if (preset === 'This Year') {
+            start = getLocalDateString(new Date(today.getFullYear(), 0, 1));
+            end = getLocalDateString(new Date(today.getFullYear(), 11, 31));
+        } else if (preset === 'Last Year') {
+            start = getLocalDateString(new Date(today.getFullYear() - 1, 0, 1));
+            end = getLocalDateString(new Date(today.getFullYear() - 1, 11, 31));
+        } else if (preset === 'All Time') {
+            start = '';
+            end = '';
         }
+
+        setDatePreset(preset);
+        setDateRange({ startDate: start, endDate: end });
+        setDateFilterOpen(false);
     };
 
     const getStatusColor = (status: string) => {
@@ -296,33 +323,60 @@ function COGMPage() {
                         />
                     </div>
 
-                    <div className="flex items-center gap-2 bg-background border border-border rounded-lg px-2 py-0.5 h-9 shadow-sm transition-all hover:border-border/80">
-                        <Calendar className="w-4 h-4 text-primary ml-1" />
-                        <select 
-                            value={datePreset}
-                            onChange={handlePresetChange}
-                            className="bg-transparent text-[11px] font-bold text-foreground outline-none cursor-pointer border-none pl-1 pr-1"
+                    {/* Date Filter */}
+                    <div ref={dateFilterRef} className="relative shrink-0">
+                        <button
+                            onClick={() => setDateFilterOpen(p => !p)}
+                            className={cn(
+                                'flex items-center gap-1.5 px-3 h-9 rounded-lg border border-border text-[11px] font-semibold transition-all cursor-pointer bg-background hover:bg-secondary shadow-sm hover:border-border/80',
+                                (dateRange.startDate || dateRange.endDate)
+                                    ? 'bg-primary/10 border-primary/30 text-primary hover:bg-primary/20'
+                                    : 'text-muted-foreground hover:text-foreground'
+                            )}
                         >
-                            <option value="custom">Custom Date</option>
-                            <option value="all">All Time</option>
-                            <option value="this_month">This Month</option>
-                            <option value="this_year">This Year</option>
-                            <option value="last_year">Last Year</option>
-                        </select>
-                        <div className="w-px h-4 bg-border mx-1" />
-                        <input
-                            type="date"
-                            value={dateRange.startDate}
-                            onChange={e => { setDateRange({ ...dateRange, startDate: e.target.value }); setDatePreset('custom'); }}
-                            className="bg-transparent text-[11px] font-medium text-foreground outline-none w-26 cursor-pointer color-scheme-auto"
-                        />
-                        <span className="text-muted-foreground/50 text-[11px] font-bold">-</span>
-                        <input
-                            type="date"
-                            value={dateRange.endDate}
-                            onChange={e => { setDateRange({ ...dateRange, endDate: e.target.value }); setDatePreset('custom'); }}
-                            className="bg-transparent text-[11px] font-medium text-foreground outline-none w-26 cursor-pointer color-scheme-auto"
-                        />
+                            <Calendar className="w-3.5 h-3.5" />
+                            <span className="uppercase tracking-wider text-nowrap">
+                                {datePreset !== 'All Time' ? datePreset : (dateRange.startDate || dateRange.endDate) ? 'Custom' : 'All Time'}
+                            </span>
+                            <ChevronDown className={cn('w-3 h-3 transition-transform', dateFilterOpen && 'rotate-180')} />
+                        </button>
+                        {dateFilterOpen && (
+                            <div className="absolute top-full mt-1.5 right-0 z-50 bg-background border border-border rounded-xl shadow-2xl min-w-[280px] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                                <div className="px-3 py-2 border-b border-border bg-secondary flex justify-between items-center">
+                                    <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Date Filter</span>
+                                    {(dateRange.startDate || dateRange.endDate || datePreset !== 'All Time') && (
+                                        <button onClick={() => { setDatePreset('All Time'); setDateRange({ startDate: '', endDate: '' }); setDateFilterOpen(false); }} className="text-[9px] font-bold text-primary hover:underline cursor-pointer">
+                                            Clear
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="p-3 bg-background grid gap-1.5 grid-cols-2 text-center pb-3 border-b border-border">
+                                    {['All Time', 'This Month', 'Last Month', 'This Year', 'Last Year'].map((preset, idx) => (
+                                        <button
+                                            key={preset}
+                                            onClick={() => handlePresetChange(preset)}
+                                            className={cn(
+                                                'px-2 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors cursor-pointer',
+                                                preset === 'All Time' && idx === 0 ? 'col-span-2' : '',
+                                                datePreset === preset ? 'bg-primary border-primary text-white' : 'bg-secondary border-border hover:bg-secondary/80 text-foreground'
+                                            )}
+                                        >
+                                            {preset}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="p-3 bg-background space-y-2">
+                                    <div className="space-y-1 text-left">
+                                        <label className="text-[10px] font-bold text-muted-foreground uppercase opacity-70">From</label>
+                                        <input type="date" value={dateRange.startDate} onChange={e => { setDateRange({ ...dateRange, startDate: e.target.value }); setDatePreset('Custom'); }} className="w-full bg-background border border-border rounded-lg px-2 h-8 text-[12px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all text-foreground [color-scheme:dark_light]" />
+                                    </div>
+                                    <div className="space-y-1 text-left">
+                                        <label className="text-[10px] font-bold text-muted-foreground uppercase opacity-70">To</label>
+                                        <input type="date" value={dateRange.endDate} onChange={e => { setDateRange({ ...dateRange, endDate: e.target.value }); setDatePreset('Custom'); }} className="w-full bg-background border border-border rounded-lg px-2 h-8 text-[12px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all text-foreground [color-scheme:dark_light]" />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <div className="w-[180px]">
@@ -332,6 +386,7 @@ function COGMPage() {
                             options={skuOptions}
                             selectedValues={selectedSkus}
                             onChange={setSelectedSkus}
+                            dropdownWidth="w-[450px]"
                             className="h-9 border-border bg-background hover:bg-secondary text-foreground shadow-sm text-[11px] rounded-lg w-full justify-between"
                         />
                     </div>
@@ -342,10 +397,10 @@ function COGMPage() {
                                 const today = new Date();
                                 setSearch('');
                                 setSelectedSkus([]);
-                                setDatePreset('this_year');
+                                setDatePreset('This Year');
                                 setDateRange({
-                                    startDate: getLocalDateString(today.getFullYear(), 0, 1),
-                                    endDate: getLocalDateString(today.getFullYear(), 11, 31)
+                                    startDate: getLocalDateString(new Date(today.getFullYear(), 0, 1)),
+                                    endDate: getLocalDateString(new Date(today.getFullYear(), 11, 31))
                                 });
                             }} 
                             className="h-9 px-3 flex items-center gap-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider text-red-500 hover:text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-transparent hover:border-red-500/30 transition-all ml-1 shadow-sm shrink-0"

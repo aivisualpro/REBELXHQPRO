@@ -229,6 +229,9 @@ function WebOrdersContent() {
     } else if (preset === 'Last Year') {
       start = formatDateStr(new Date(today.getFullYear() - 1, 0, 1));
       end = formatDateStr(new Date(today.getFullYear() - 1, 11, 31));
+    } else if (preset === 'All Time') {
+      start = '';
+      end = '';
     }
 
     setDatePreset(preset);
@@ -615,12 +618,13 @@ function WebOrdersContent() {
                   )}
                 </div>
                 <div className="p-3 bg-background grid gap-1.5 grid-cols-2 text-center pb-3 border-b border-border">
-                  {['This Month', 'Last Month', 'This Year', 'Last Year'].map(preset => (
+                  {['All Time', 'This Month', 'Last Month', 'This Year', 'Last Year'].map((preset, idx) => (
                     <button
                       key={preset}
                       onClick={() => handleDatePreset(preset)}
                       className={cn(
                         'px-2 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors cursor-pointer',
+                        preset === 'All Time' && idx === 0 ? 'col-span-2' : '',
                         datePreset === preset ? 'bg-primary border-primary text-white' : 'bg-secondary border-border hover:bg-secondary/80 text-foreground'
                       )}
                     >

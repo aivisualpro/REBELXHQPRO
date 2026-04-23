@@ -60,73 +60,81 @@ export async function GET(request: NextRequest) {
             return handleDrilldown(drilldown, dateMatch, now);
         }
 
-        /* ── Summary counts (run in parallel) ──────────────── */
-        const baselineCutoff = new Date();
-        baselineCutoff.setDate(baselineCutoff.getDate() - CFG.baselineDays);
+        /* ── Summary counts (Parallelized) ────────────────────────── */
+        
+        const [
+            incomplete, 
+            scrapMOCount, 
+            missingCost, 
+            overdue, 
+            noBom, 
+            unreservedCount,
+            noValuation,
+            scrapAgg,
+            laborMos,
+            costMos,
+            opDiscMos,
+            yieldVarMos,
+            reworkMos
+        ] = await Promise.all([
+            Manufacturing.countDocuments({ ...dateMatch, status: { $ne: 'Fulfilled' } }),
+            Manufacturing.countDocuments({ ...dateMatch, 'lineItems.qtyScrapped': { $gt: 0 } }),
+            Manufacturing.countDocuments({ ...dateMatch, status: 'Fulfilled', $or: [{ totalCost: 0 }, { totalCost: null }, { totalCost: { $exists: false } }] }),
+            Manufacturing.countDocuments({ ...dateMatch, status: { $ne: 'Fulfilled' }, scheduledFinish: { $lt: now } }),
+            Manufacturing.countDocuments({ ...dateMatch, $or: [{ recipesId: null }, { recipesId: { $exists: false } }] }),
+            Manufacturing.countDocuments({ ...dateMatch, status: { $ne: 'Fulfilled' }, 'lineItems.lotNumber': { $in: [null, '', undefined] } }),
+            Manufacturing.countDocuments({ ...dateMatch, status: 'Fulfilled', $or: [{ laborCost: 0 }, { laborCost: null }], 'labor.0': { $exists: true } }),
+            
+            Manufacturing.aggregate([
+                { $match: { ...dateMatch, 'lineItems.qtyScrapped': { $gt: 0 } } },
+                { $unwind: '$lineItems' },
+                { $group: { _id: null, totalScrap: { $sum: '$lineItems.qtyScrapped' } } }
+            ]),
 
-        // Pre-fetch all MOs we'll need for statistical KPIs
-        const allMOs = await Manufacturing.find(dateMatch)
-            .select('_id label sku status qty qtyDifference scheduledFinish recipesId totalCost materialCost laborCost lineItems.qtyScrapped lineItems.cost lineItems.lotNumber lineItems.sku labor.user labor.duration labor.createdAt createdAt createdBy')
-            .lean();
+            // For laborAnomalies
+            Manufacturing.find({ ...dateMatch, status: 'Fulfilled', 'labor.0': { $exists: true } })
+                .select('_id sku labor.user labor.duration').lean(),
+                
+            // For costOutliers
+            Manufacturing.find({ ...dateMatch, status: 'Fulfilled', totalCost: { $gt: 0 } })
+                .select('_id sku qty qtyDifference totalCost').lean(),
 
-        const fulfilled = allMOs.filter((m: any) => m.status === 'Fulfilled');
-        const open = allMOs.filter((m: any) => m.status !== 'Fulfilled');
+            // For operatorDiscrepancies
+            Manufacturing.find({ ...dateMatch, 'labor.0': { $exists: true } })
+                .select('_id label sku labor.user labor.createdAt').lean(),
 
-        // 1. Incomplete
-        const incomplete = open.length;
+            // For yieldVariance
+            Manufacturing.find({ ...dateMatch, status: 'Fulfilled' })
+                .select('_id qty qtyDifference').lean(),
 
-        // 2. Scrap
-        let scrapMOCount = 0;
-        let totalScrapQty = 0;
-        allMOs.forEach((m: any) => {
-            let moScrap = 0;
-            (m.lineItems || []).forEach((li: any) => { moScrap += li.qtyScrapped || 0; });
-            if (moScrap > 0) { scrapMOCount++; totalScrapQty += moScrap; }
-        });
+            // For reworkLoops
+            Manufacturing.find({ ...dateMatch, 'lineItems.1': { $exists: true } })
+                .select('_id lineItems.sku').lean()
+        ]);
 
-        // 3. Missing Cost
-        const missingCost = fulfilled.filter((m: any) => !m.totalCost || m.totalCost === 0).length;
+        const totalScrapQty = scrapAgg.length > 0 ? scrapAgg[0].totalScrap : 0;
 
-        // 4. Labor Anomalies
-        const laborFlags = computeLaborAnomalies(fulfilled);
+        const laborFlags = computeLaborAnomalies(laborMos);
+        const costFlags = computeCostOutliers(costMos);
+        const opDiscrepancies = computeOperatorDiscrepancies(opDiscMos);
 
-        // 5. Cost-Per-Unit Outliers
-        const costFlags = computeCostOutliers(fulfilled);
-
-        // 6. Overdue
-        const overdue = open.filter((m: any) => m.scheduledFinish && new Date(m.scheduledFinish) < now).length;
-
-        // 7. No BOM
-        const noBom = allMOs.filter((m: any) => !m.recipesId).length;
-
-        // 8. Unreserved Components (open MOs with lineItems missing lotNumber)
-        let unreservedCount = 0;
-        open.forEach((m: any) => {
-            const missing = (m.lineItems || []).some((li: any) => !li.lotNumber);
-            if (missing) unreservedCount++;
-        });
-
-        // 9. Operator Time Discrepancies (same user, 2+ MOs, same day)
-        const opDiscrepancies = computeOperatorDiscrepancies(allMOs);
-
-        // 10. Yield Variance
-        const yieldVar = fulfilled.filter((m: any) => {
+        // Yield Variance
+        const yieldVar = yieldVarMos.filter((m: any) => {
             if (!m.qty || m.qty === 0) return false;
             const variance = Math.abs(m.qtyDifference || 0) / m.qty * 100;
             return variance > CFG.yieldVariancePct;
         }).length;
 
-        // 11. Valuation Not Posted (Fulfilled, no labor cost posted)
-        const noValuation = fulfilled.filter((m: any) => (!m.laborCost || m.laborCost === 0) && (m.labor || []).length > 0).length;
-
-        // 12. Rework Loops (same SKU appears 2+ times in lineItems)
+        // Rework Loops
         let reworkCount = 0;
-        allMOs.forEach((m: any) => {
+        reworkMos.forEach((m: any) => {
             const skuSet = new Map<string, number>();
             (m.lineItems || []).forEach((li: any) => {
-                if (li.sku) skuSet.set(li.sku, (skuSet.get(li.sku) || 0) + 1);
+                if (li.sku) skuSet.set(li.sku.toString(), (skuSet.get(li.sku.toString()) || 0) + 1);
             });
-            for (const c of skuSet.values()) { if (c > 1) { reworkCount++; break; } }
+            for (const c of skuSet.values()) { 
+                if (c > 1) { reworkCount++; break; } 
+            }
         });
 
         return apiSuccess({
