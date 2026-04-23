@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import dbConnect from '@/lib/mongoose';
 import OpeningBalance from '@/models/OpeningBalance';
 import PurchaseOrder from '@/models/PurchaseOrder';
@@ -48,188 +49,219 @@ export async function getLotsWithBalances(skuId: string): Promise<LotInfo[]> {
 
     // ==================== PHASE 1: SOURCES (Create lot entries) ====================
     
-    // 1. Opening Balances
-    const obs = await OpeningBalance.find({ sku: skuId }).lean();
+    const objId = new mongoose.Types.ObjectId(skuId);
+
+    const timePipeline = async (name: string, promise: any) => {
+        console.time(name);
+        const res = await promise;
+        console.timeEnd(name);
+        return res;
+    };
+
+    console.time('getLotsWithBalances-PromiseAll');
+    // Fetch and aggregate all sources and consumptions directly in the database
+    // This prevents pulling thousands of massive documents into Node.js memory
+    const [obs, pos, mfgProduced, adjs, mfgConsumed, saleOrders, webOrders] = await Promise.all([
+        // 1. Opening Balances
+        timePipeline('pipeline-OpeningBalance', OpeningBalance.aggregate([
+            { $match: { sku: objId } },
+            { $sort: { createdAt: 1 } },
+            { $group: { 
+                _id: "$lotNumber", 
+                qty: { $sum: "$qty" }, 
+                costs: { $push: { $cond: [{ $and: [{ $ne: ["$cost", null] }, { $ne: ["$cost", 0] }] }, "$cost", null] } }, 
+                date: { $first: "$createdAt" } 
+            } },
+            { $addFields: {
+                cost: {
+                    $let: {
+                        vars: { filteredCosts: { $filter: { input: "$costs", as: "c", cond: { $ne: ["$$c", null] } } } },
+                        in: { $cond: [{ $gt: [{ $size: "$$filteredCosts" }, 0] }, { $arrayElemAt: ["$$filteredCosts", -1] }, 0] }
+                    }
+                }
+            }},
+            { $project: { costs: 0 } }
+        ])),
+        
+        // 2. Purchase Orders
+        timePipeline('pipeline-PurchaseOrder', PurchaseOrder.aggregate([
+            { $match: { "lineItems.sku": objId, status: { $regex: /^received$/i } } },
+            { $unwind: "$lineItems" },
+            { $match: { "lineItems.sku": objId, "lineItems.qtyReceived": { $gt: 0 } } },
+            { $sort: { createdAt: 1 } },
+            { $group: { 
+                _id: "$lineItems.lotNumber", 
+                qty: { $sum: "$lineItems.qtyReceived" }, 
+                costs: { $push: { 
+                    $let: {
+                        vars: { rawCost: { $ifNull: ["$lineItems.cost", "$lineItems.price"] } },
+                        in: { $cond: [{ $and: [{ $ne: ["$$rawCost", null] }, { $ne: ["$$rawCost", 0] }] }, "$$rawCost", null] }
+                    }
+                }}, 
+                date: { $first: { $ifNull: ["$lineItems.receivedDate", "$createdAt"] } } 
+            }},
+            { $addFields: {
+                cost: {
+                    $let: {
+                        vars: { filteredCosts: { $filter: { input: "$costs", as: "c", cond: { $ne: ["$$c", null] } } } },
+                        in: { $cond: [{ $gt: [{ $size: "$$filteredCosts" }, 0] }, { $arrayElemAt: ["$$filteredCosts", -1] }, 0] }
+                    }
+                }
+            }},
+            { $project: { costs: 0 } }
+        ])),
+
+        // 3. Manufacturing Produced
+        timePipeline('pipeline-ManufacturingProduced', Manufacturing.aggregate([
+            { $match: { sku: objId, status: { $nin: [/pending/i, /processing/i] } } },
+            { $sort: { createdAt: 1 } },
+            { $group: {
+                _id: { $ifNull: ["$lotNumber", "$label"] },
+                qty: { $sum: { $add: [{ $ifNull: ["$qty", 0] }, { $ifNull: ["$qtyDifference", 0] }] } },
+                costs: { $push: { $cond: [{ $and: [{ $ne: ["$totalCost", null] }, { $ne: ["$totalCost", 0] }] }, "$totalCost", null] } }, 
+                date: { $first: { $ifNull: ["$scheduledFinish", "$createdAt"] } }
+            }},
+            { $addFields: {
+                cost: {
+                    $let: {
+                        vars: { filteredCosts: { $filter: { input: "$costs", as: "c", cond: { $ne: ["$$c", null] } } } },
+                        in: { $cond: [{ $gt: [{ $size: "$$filteredCosts" }, 0] }, { $arrayElemAt: ["$$filteredCosts", -1] }, 0] }
+                    }
+                }
+            }},
+            { $project: { costs: 0 } }
+        ])),
+
+        // 4. Audit Adjustments
+        timePipeline('pipeline-AuditAdjustment', AuditAdjustment.aggregate([
+            { $match: { sku: objId } },
+            { $sort: { createdAt: 1 } },
+            { $group: { 
+                _id: "$lotNumber", 
+                qty: { $sum: "$qty" }, 
+                costs: { $push: { $cond: [{ $and: [{ $ne: ["$cost", null] }, { $ne: ["$cost", 0] }] }, "$cost", null] } }, 
+                date: { $first: "$createdAt" } 
+            }},
+            { $addFields: {
+                cost: {
+                    $let: {
+                        vars: { filteredCosts: { $filter: { input: "$costs", as: "c", cond: { $ne: ["$$c", null] } } } },
+                        in: { $cond: [{ $gt: [{ $size: "$$filteredCosts" }, 0] }, { $arrayElemAt: ["$$filteredCosts", -1] }, 0] }
+                    }
+                }
+            }},
+            { $project: { costs: 0 } }
+        ])),
+
+        // 5. Manufacturing Consumed
+        timePipeline('pipeline-ManufacturingConsumed', Manufacturing.aggregate([
+            { $match: { "lineItems.sku": objId, status: { $regex: /^fulfilled$/i } } },
+            { $unwind: "$lineItems" },
+            { $match: { "lineItems.sku": objId } },
+            { $group: {
+                _id: "$lineItems.lotNumber",
+                // Passing raw arrays up to JS because formula calculation (saExtra) is complex
+                consumptions: { $push: { orderQty: "$qty", recipeQty: "$lineItems.recipeQty", sa: "$lineItems.sa", qtyScrapped: "$lineItems.qtyScrapped" } }
+            }}
+        ])),
+
+        // 6. Sale Orders Consumed
+        timePipeline('pipeline-SaleOrder', SaleOrder.aggregate([
+            { $match: { "lineItems.sku": objId } },
+            { $unwind: "$lineItems" },
+            { $match: { "lineItems.sku": objId } },
+            { $group: { 
+                _id: "$lineItems.lotNumber", 
+                qtyShipped: { $sum: { 
+                    $cond: [
+                        { $and: [{ $ne: ["$lineItems.qtyShipped", null] }, { $ne: ["$lineItems.qtyShipped", 0] }] }, 
+                        "$lineItems.qtyShipped", 
+                        { $ifNull: ["$lineItems.qty", 0] }
+                    ]
+                } } 
+            } }
+        ])),
+
+        // 7. Web Orders Consumed
+        timePipeline('pipeline-WebOrder', WebOrder.aggregate([
+            { $match: { $or: [{ "lineItems.sku": objId }, { "lineItems.linkedSkuId": skuId }] } },
+            { $unwind: "$lineItems" },
+            { $match: { $or: [{ "lineItems.sku": objId }, { "lineItems.linkedSkuId": skuId }] } },
+            { $group: { 
+                _id: "$lineItems.lotNumber", 
+                qty: { $sum: { 
+                    $cond: [
+                        { $and: [{ $ne: ["$lineItems.quantity", null] }, { $ne: ["$lineItems.quantity", 0] }] }, 
+                        "$lineItems.quantity", 
+                        { $ifNull: ["$lineItems.qty", 0] }
+                    ]
+                } } 
+            } }
+        ]))
+    ]);
+    console.timeEnd('getLotsWithBalances-PromiseAll');
+
+    // Reconstruct lotData Map from optimized db results
     obs.forEach((ob: any) => {
-        const lot = normalizeLot(ob.lotNumber);
-        if (!lot) return;
-        
-        const existing = lotData.get(lot);
-        lotData.set(lot, {
-            balance: (existing?.balance || 0) + (ob.qty || 0),
-            cost: ob.cost || existing?.cost || 0,
-            date: existing?.date || new Date(ob.createdAt),
-            source: existing?.source || 'Opening Balance'
-        });
+        const lot = normalizeLot(ob._id);
+        if (lot) lotData.set(lot, { balance: ob.qty, cost: ob.cost || 0, date: ob.date, source: 'Opening Balance' });
     });
 
-    // 2. Purchase Orders (Received)
-    const pos = await PurchaseOrder.find({ 
-        'lineItems.sku': skuId, 
-        status: { $in: ['Received', 'received'] }
-    }).lean();
     pos.forEach((po: any) => {
-        po.lineItems?.forEach((li: any) => {
-            if (li.sku?.toString() === skuId && li.qtyReceived > 0) {
-                const lot = normalizeLot(li.lotNumber);
-                if (!lot) return;
-                
-                const existing = lotData.get(lot);
-                lotData.set(lot, {
-                    balance: (existing?.balance || 0) + (li.qtyReceived || 0),
-                    cost: li.cost || li.price || existing?.cost || 0,
-                    date: existing?.date || new Date(li.receivedDate || po.createdAt),
-                    source: existing?.source || 'Purchase Order'
-                });
-            }
-        });
-    });
-
-    // 3. Manufacturing (Produced)
-    // Skip Pending - they are shown in ledger but NOT counted towards balance
-    const mfgProduced = await Manufacturing.find({ 
-        sku: skuId
-    }).lean();
-    mfgProduced.forEach((mo: any) => {
-        // Skip Pending/Processing productions - ledger excludes these from balance
-        if (['pending', 'processing'].includes((mo.status || '').toLowerCase())) return;
-        
-        const lot = normalizeLot(mo.lotNumber || mo.label);
-        if (!lot) return;
-        
-        const totalQty = (mo.qty || 0) + (mo.qtyDifference || 0);
-        if (totalQty <= 0) return;
-        
-        let costPerUnit = 0;
-        if (mo.totalCost && mo.totalCost > 0 && totalQty > 0) {
-            costPerUnit = mo.totalCost / totalQty;
+        const lot = normalizeLot(po._id);
+        if (lot) {
+            const ex = lotData.get(lot);
+            lotData.set(lot, { balance: (ex?.balance || 0) + po.qty, cost: po.cost || ex?.cost || 0, date: ex?.date || po.date, source: ex?.source || 'Purchase Order' });
         }
-        
-        const existing = lotData.get(lot);
-        lotData.set(lot, {
-            balance: (existing?.balance || 0) + totalQty,
-            cost: costPerUnit || existing?.cost || 0,
-            date: existing?.date || new Date(mo.scheduledFinish || mo.createdAt),
-            source: existing?.source || 'Manufacturing'
-        });
     });
 
-    // 4. Audit Adjustments (can be + or -)
-    // Positive adjustments CREATE lots if they don't exist
-    // Negative adjustments only REDUCE existing lots
-    const adjs = await AuditAdjustment.find({ sku: skuId }).lean();
+    mfgProduced.forEach((mo: any) => {
+        const lot = normalizeLot(mo._id);
+        if (lot && mo.qty > 0) {
+            const costPerUnit = mo.cost > 0 ? mo.cost / mo.qty : 0;
+            const ex = lotData.get(lot);
+            lotData.set(lot, { balance: (ex?.balance || 0) + mo.qty, cost: costPerUnit || ex?.cost || 0, date: ex?.date || mo.date, source: ex?.source || 'Manufacturing' });
+        }
+    });
+
     adjs.forEach((adj: any) => {
-        const lot = normalizeLot(adj.lotNumber);
-        if (!lot) return;
-        
-        const qty = adj.qty || 0;
-        const existing = lotData.get(lot);
-        
-        // Only create new lot entry if this is a POSITIVE adjustment
-        if (!existing && qty <= 0) return;
-        
-        lotData.set(lot, {
-            balance: (existing?.balance || 0) + qty,
-            cost: adj.cost || existing?.cost || 0,
-            date: existing?.date || new Date(adj.createdAt),
-            source: existing?.source || 'Audit Adjustment'
-        });
+        const lot = normalizeLot(adj._id);
+        if (lot) {
+            const ex = lotData.get(lot);
+            if (!ex && adj.qty <= 0) return;
+            lotData.set(lot, { balance: (ex?.balance || 0) + adj.qty, cost: adj.cost || ex?.cost || 0, date: ex?.date || adj.date, source: ex?.source || 'Audit Adjustment' });
+        }
     });
 
     // ==================== PHASE 2: CONSUMPTIONS (Only deduct from EXISTING lots) ====================
-
-    // 5. Manufacturing (Consumed) - where this SKU is an INGREDIENT
-    // Skip non-Fulfilled - ledger excludes unfulfilled consumption from balance
-    const mfgConsumed = await Manufacturing.find({ 
-        'lineItems.sku': skuId
-    }).lean();
     mfgConsumed.forEach((mo: any) => {
-        // Skip unfulfilled consumption - ledger excludes these from balance
-        if ((mo.status || '').toLowerCase() !== 'fulfilled') return;
-        
-        mo.lineItems?.forEach((li: any) => {
-            const liSkuId = (typeof li.sku === 'object' && li.sku !== null) ? li.sku._id : li.sku;
-            if (liSkuId?.toString() !== skuId) return;
-            
-            const lot = normalizeLot(li.lotNumber);
-            if (!lot) return;
-            
-            // ONLY deduct if this lot exists in our source data
-            const existing = lotData.get(lot);
-            if (!existing) return;  // Skip - lot doesn't exist as a source
-            
-            // Match ledger's consumption formula: BOM + SA% + scrapped
-            const orderQty = mo.qty || 0;
-            const recipeQty = li.recipeQty || 0;
-            const bomQty = orderQty * recipeQty;
-            const saPercent = li.sa || 0;
-            const saExtra = saPercent > 0 ? (bomQty / (saPercent / 100)) - bomQty : 0;
-            const qtyScrapped = li.qtyScrapped || 0;
-            const totalConsumed = bomQty + qtyScrapped + saExtra;
-            
-            if (totalConsumed > 0) {
-                lotData.set(lot, {
-                    ...existing,
-                    balance: existing.balance - totalConsumed
-                });
-            }
-        });
-    });
-
-    // 6. Sale Orders (Wholesale)
-    // Ledger includes all sale orders - they use qtyShipped which is 0 for non-shipped
-    const saleOrders = await SaleOrder.find({ 
-        'lineItems.sku': skuId
-    }).lean();
-    saleOrders.forEach((so: any) => {
-        so.lineItems?.forEach((li: any) => {
-            if (li.sku?.toString() !== skuId) return;
-            const qty = li.qtyShipped || li.qty || 0;
-            if (qty <= 0) return;
-            
-            const lot = normalizeLot(li.lotNumber);
-            if (!lot) return;
-            
-            // ONLY deduct if this lot exists in our source data
-            const existing = lotData.get(lot);
-            if (!existing) return;  // Skip - lot doesn't exist as a source
-            
-            lotData.set(lot, {
-                ...existing,
-                balance: existing.balance - Math.abs(qty)
+        const lot = normalizeLot(mo._id);
+        const ex = lot ? lotData.get(lot) : null;
+        if (lot && ex) {
+            let totalConsumed = 0;
+            mo.consumptions.forEach((c: any) => {
+                const bomQty = (c.orderQty || 0) * (c.recipeQty || 0);
+                const saExtra = (c.sa || 0) > 0 ? (bomQty / (c.sa / 100)) - bomQty : 0;
+                totalConsumed += bomQty + (c.qtyScrapped || 0) + saExtra;
             });
-        });
+            lotData.set(lot, { ...ex, balance: ex.balance - totalConsumed });
+        }
     });
 
-    // 7. Web Orders (Retail)
-    // Ledger includes ALL web orders (no status filter) - they all deduct from stock
-    const webOrders = await WebOrder.find({
-        $or: [
-            { 'lineItems.sku': skuId },
-            { 'lineItems.linkedSkuId': skuId }
-        ]
-    }).lean();
+    saleOrders.forEach((so: any) => {
+        const lot = normalizeLot(so._id);
+        const ex = lot ? lotData.get(lot) : null;
+        if (lot && ex && so.qtyShipped > 0) {
+            lotData.set(lot, { ...ex, balance: ex.balance - Math.abs(so.qtyShipped) });
+        }
+    });
+
     webOrders.forEach((wo: any) => {
-        wo.lineItems?.forEach((li: any) => {
-            const liSkuId = (typeof li.sku === 'object' && li.sku !== null) ? li.sku._id : li.sku;
-            const isMatch = liSkuId?.toString() === skuId || li.linkedSkuId === skuId;
-            if (!isMatch) return;
-            
-            const lot = normalizeLot(li.lotNumber);
-            if (!lot) return;
-            
-            // ONLY deduct if this lot exists in our source data
-            const existing = lotData.get(lot);
-            if (!existing) return;  // Skip - lot doesn't exist as a source
-            
-            const qty = li.quantity || li.qty || 0;
-            if (qty > 0) {
-                lotData.set(lot, {
-                    ...existing,
-                    balance: existing.balance - qty
-                });
-            }
-        });
+        const lot = normalizeLot(wo._id);
+        const ex = lot ? lotData.get(lot) : null;
+        if (lot && ex && wo.qty > 0) {
+            lotData.set(lot, { ...ex, balance: ex.balance - wo.qty });
+        }
     });
 
     // Convert to array and sort by date (FIFO - oldest first)
@@ -289,151 +321,112 @@ export async function getLotTransactions(skuId: string): Promise<LotTransaction[
     if (!skuId) return [];
     
     await dbConnect();
+    const objId = new mongoose.Types.ObjectId(skuId);
     
-    // Timeline Calculation MUST use full history.
-    // const startDate = await getGlobalStartDate();
-    // const dateFilter = startDate ? { createdAt: { $gte: startDate } } : {};
-    
-    const transactions: LotTransaction[] = [];
-    
+    const [obs, pos, mfgProduced, adjs, saleOrders, webOrders] = await Promise.all([
+        OpeningBalance.aggregate([
+            { $match: { sku: objId } },
+            { $match: { qty: { $gt: 0 } } },
+            { $project: { lotNumber: 1, qty: 1, cost: { $ifNull: ["$cost", 0] }, date: "$createdAt", source: { $literal: "Opening Balance" }, isSource: { $literal: true } } }
+        ]),
+        PurchaseOrder.aggregate([
+            { $match: { "lineItems.sku": objId, status: { $regex: /^received$/i } } },
+            { $unwind: "$lineItems" },
+            { $match: { "lineItems.sku": objId, "lineItems.qtyReceived": { $gt: 0 } } },
+            { $project: {
+                lotNumber: "$lineItems.lotNumber",
+                qty: "$lineItems.qtyReceived",
+                cost: { $cond: [{ $and: [{ $ne: ["$lineItems.cost", null] }, { $ne: ["$lineItems.cost", 0] }] }, "$lineItems.cost", { $ifNull: ["$lineItems.price", 0] }] },
+                date: { $ifNull: ["$lineItems.receivedDate", "$createdAt"] },
+                source: { $literal: "Purchase Order" },
+                isSource: { $literal: true }
+            }}
+        ]),
+        Manufacturing.aggregate([
+            { $match: { sku: objId, status: { $in: ['Completed', 'completed', 'Fulfilled', 'fulfilled'] } } },
+            { $addFields: { totalQty: { $add: [{ $ifNull: ["$qty", 0] }, { $ifNull: ["$qtyDifference", 0] }] } } },
+            { $match: { totalQty: { $gt: 0 } } },
+            { $project: {
+                lotNumber: { $ifNull: ["$lotNumber", "$label"] },
+                qty: "$totalQty",
+                cost: { $cond: [{ $gt: ["$totalQty", 0] }, { $divide: [{ $ifNull: ["$totalCost", 0] }, "$totalQty"] }, 0] },
+                date: { $ifNull: ["$scheduledFinish", "$createdAt"] },
+                source: { $literal: "Manufacturing" },
+                isSource: { $literal: true }
+            }}
+        ]),
+        AuditAdjustment.aggregate([
+            { $match: { sku: objId } },
+            { $match: { qty: { $ne: 0 } } },
+            { $project: {
+                lotNumber: 1,
+                qty: 1,
+                cost: { $ifNull: ["$cost", 0] },
+                date: "$createdAt",
+                source: { $literal: "Audit Adjustment" },
+                isSource: { $gt: ["$qty", 0] }
+            }}
+        ]),
+        SaleOrder.aggregate([
+            { $match: { "lineItems.sku": objId, orderStatus: { $regex: /^(shipped|completed)$/i } } },
+            { $unwind: "$lineItems" },
+            { $match: { "lineItems.sku": objId, "lineItems.qtyShipped": { $gt: 0 } } },
+            { $project: {
+                lotNumber: "$lineItems.lotNumber",
+                qty: { $multiply: [{ $abs: "$lineItems.qtyShipped" }, -1] },
+                cost: { $literal: 0 },
+                date: { $ifNull: ["$shippedDate", "$createdAt"] },
+                source: { $literal: "Sale Order" },
+                isSource: { $literal: false }
+            }}
+        ]),
+        WebOrder.aggregate([
+            { $match: { $or: [{ "lineItems.sku": objId }, { "lineItems.linkedSkuId": skuId }], status: { $regex: /^(shipped|completed)$/i } } },
+            { $unwind: "$lineItems" },
+            { $match: { $or: [{ "lineItems.sku": objId }, { "lineItems.linkedSkuId": skuId }] } },
+            { $addFields: {
+                resolvedQty: {
+                    $cond: [
+                        { $and: [{ $ne: ["$lineItems.quantity", null] }, { $ne: ["$lineItems.quantity", 0] }] },
+                        "$lineItems.quantity",
+                        { $ifNull: ["$lineItems.qty", 0] }
+                    ]
+                }
+            }},
+            { $match: { resolvedQty: { $gt: 0 } } },
+            { $project: {
+                lotNumber: "$lineItems.lotNumber",
+                qty: { $multiply: ["$resolvedQty", -1] },
+                cost: { $literal: 0 },
+                date: { $ifNull: ["$dateCompleted", "$createdAt"] },
+                source: { $literal: "Web Order" },
+                isSource: { $literal: false }
+            }}
+        ])
+    ]);
+
     const normalizeLot = (lot: any): string | null => {
         if (lot === null || lot === undefined) return null;
         let s = String(lot).trim();
-        // Strip locale formatting (commas) and trailing decimal zeros
         s = s.replace(/,/g, '').replace(/\.0+$/, '');
         if (s === '' || s === 'N/A') return null;
         return s;
     };
 
-    // 1. Opening Balances (SOURCE)
-    const obs = await OpeningBalance.find({ sku: skuId }).lean();
-    obs.forEach((ob: any) => {
-        const lot = normalizeLot(ob.lotNumber);
-        if (lot && ob.qty > 0) {
+    const transactions: LotTransaction[] = [];
+    
+    [...obs, ...pos, ...mfgProduced, ...adjs, ...saleOrders, ...webOrders].forEach((tx: any) => {
+        const lot = normalizeLot(tx.lotNumber);
+        if (lot) {
             transactions.push({
                 lotNumber: lot,
-                qty: ob.qty,
-                cost: ob.cost || 0,
-                date: new Date(ob.createdAt),
-                source: 'Opening Balance',
-                isSource: true
+                qty: tx.qty,
+                cost: tx.cost,
+                date: new Date(tx.date),
+                source: tx.source,
+                isSource: tx.isSource
             });
         }
-    });
-
-    // 2. Purchase Orders (SOURCE)
-    const pos = await PurchaseOrder.find({ 
-        'lineItems.sku': skuId, 
-        status: { $in: ['Received', 'received'] }
-    }).lean();
-    pos.forEach((po: any) => {
-        po.lineItems?.forEach((li: any) => {
-            if (li.sku?.toString() === skuId && li.qtyReceived > 0) {
-                const lot = normalizeLot(li.lotNumber);
-                if (lot) {
-                    transactions.push({
-                        lotNumber: lot,
-                        qty: li.qtyReceived,
-                        cost: li.cost || li.price || 0,
-                        date: new Date(li.receivedDate || po.createdAt),
-                        source: 'Purchase Order',
-                        isSource: true
-                    });
-                }
-            }
-        });
-    });
-
-    // 3. Manufacturing Produced (SOURCE)
-    const mfgProduced = await Manufacturing.find({ 
-        sku: skuId, 
-        status: { $in: ['Completed', 'completed', 'Fulfilled', 'fulfilled'] }
-    }).lean();
-    mfgProduced.forEach((mo: any) => {
-        const lot = normalizeLot(mo.lotNumber || mo.label);
-        const totalQty = (mo.qty || 0) + (mo.qtyDifference || 0);
-        if (lot && totalQty > 0) {
-            let costPerUnit = 0;
-            if (mo.totalCost && mo.totalCost > 0 && totalQty > 0) {
-                costPerUnit = mo.totalCost / totalQty;
-            }
-            transactions.push({
-                lotNumber: lot,
-                qty: totalQty,
-                cost: costPerUnit,
-                date: new Date(mo.scheduledFinish || mo.createdAt),
-                source: 'Manufacturing',
-                isSource: true
-            });
-        }
-    });
-
-    // 4. Audit Adjustments (can be source or consumption)
-    const adjs = await AuditAdjustment.find({ sku: skuId }).lean();
-    adjs.forEach((adj: any) => {
-        const lot = normalizeLot(adj.lotNumber);
-        if (lot && adj.qty !== 0) {
-            transactions.push({
-                lotNumber: lot,
-                qty: adj.qty,
-                cost: adj.cost || 0,
-                date: new Date(adj.createdAt),
-                source: 'Audit Adjustment',
-                isSource: adj.qty > 0
-            });
-        }
-    });
-
-    // 5. Sale Orders (CONSUMPTION)
-    const saleOrders = await SaleOrder.find({ 
-        'lineItems.sku': skuId,
-        status: { $in: ['Shipped', 'shipped', 'Completed', 'completed'] }
-    }).lean();
-    saleOrders.forEach((so: any) => {
-        so.lineItems?.forEach((li: any) => {
-            if (li.sku?.toString() === skuId && li.qtyShipped > 0) {
-                const lot = normalizeLot(li.lotNumber);
-                if (lot) {
-                    transactions.push({
-                        lotNumber: lot,
-                        qty: -Math.abs(li.qtyShipped),
-                        cost: 0,
-                        date: new Date(so.shippedDate || so.createdAt),
-                        source: 'Sale Order',
-                        isSource: false
-                    });
-                }
-            }
-        });
-    });
-
-    // 6. Web Orders (CONSUMPTION) - only those with lotNumber assigned
-    const webOrders = await WebOrder.find({
-        $or: [
-            { 'lineItems.sku': skuId },
-            { 'lineItems.linkedSkuId': skuId }
-        ],
-        status: { $in: ['completed', 'shipped', 'Completed', 'Shipped'] }
-    }).lean();
-    webOrders.forEach((wo: any) => {
-        wo.lineItems?.forEach((li: any) => {
-            const liSkuId = (typeof li.sku === 'object' && li.sku !== null) ? li.sku._id : li.sku;
-            const isMatch = liSkuId?.toString() === skuId || li.linkedSkuId === skuId;
-            if (isMatch && li.lotNumber) {
-                const lot = normalizeLot(li.lotNumber);
-                const qty = li.quantity || li.qty || 0;
-                if (lot && qty > 0) {
-                    transactions.push({
-                        lotNumber: lot,
-                        qty: -qty,
-                        cost: 0,
-                        date: new Date(wo.dateCompleted || wo.createdAt),
-                        source: 'Web Order',
-                        isSource: false
-                    });
-                }
-            }
-        });
     });
 
     // Sort by date (oldest first)
@@ -443,44 +436,248 @@ export async function getLotTransactions(skuId: string): Promise<LotTransaction[
 /**
  * Calculate lot availability as of a specific date
  * This replays history up to the given date to find what lots were available at that point
- * @param skuId The SKU to check
- * @param asOfDate The date to calculate availability for
- * @returns Array of lots with their balances as of that date
  */
 export async function getLotsAsOfDate(skuId: string, asOfDate: Date): Promise<LotInfo[]> {
-    const transactions = await getLotTransactions(skuId);
+    if (!skuId) return [];
     
-    // Filter transactions up to the given date
-    const relevantTx = transactions.filter(tx => tx.date <= asOfDate);
-    
-    // Calculate balances
-    const lotData = new Map<string, { balance: number; cost: number; date: Date; source: string }>();
-    
-    for (const tx of relevantTx) {
-        const existing = lotData.get(tx.lotNumber);
-        
-        // Only create lot entry if this is a source transaction (for new lots)
-        if (!existing && !tx.isSource) continue;
-        
-        lotData.set(tx.lotNumber, {
-            balance: (existing?.balance || 0) + tx.qty,
-            cost: tx.isSource && tx.cost > 0 ? tx.cost : (existing?.cost || 0),
-            date: tx.isSource && !existing?.date ? tx.date : (existing?.date || tx.date),
-            source: tx.isSource && !existing?.source ? tx.source : (existing?.source || tx.source)
-        });
-    }
-    
-    // Convert to array, filter positive balances, sort by date (FIFO)
-    return Array.from(lotData.entries())
-        .map(([lotNumber, data]) => ({
-            lotNumber,
-            balance: data.balance,
-            cost: data.cost,
-            date: data.date,
-            source: data.source
-        }))
+    await dbConnect();
+    const objId = new mongoose.Types.ObjectId(skuId);
+
+    const [obs, pos, mfgProduced, adjs, mfgConsumed, saleOrders, webOrders] = await Promise.all([
+        OpeningBalance.aggregate([
+            { $match: { sku: objId, createdAt: { $lte: asOfDate } } },
+            { $sort: { createdAt: 1 } },
+            { $group: { 
+                _id: "$lotNumber", 
+                qty: { $sum: "$qty" }, 
+                costs: { $push: { $cond: [{ $and: [{ $ne: ["$cost", null] }, { $ne: ["$cost", 0] }] }, "$cost", null] } }, 
+                date: { $first: "$createdAt" } 
+            } },
+            { $addFields: {
+                cost: {
+                    $let: {
+                        vars: { filteredCosts: { $filter: { input: "$costs", as: "c", cond: { $ne: ["$$c", null] } } } },
+                        in: { $cond: [{ $gt: [{ $size: "$$filteredCosts" }, 0] }, { $arrayElemAt: ["$$filteredCosts", -1] }, 0] }
+                    }
+                }
+            }},
+            { $project: { costs: 0 } }
+        ]),
+        PurchaseOrder.aggregate([
+            { $match: { "lineItems.sku": objId, status: { $regex: /^received$/i } } },
+            { $addFields: { resolvedDate: { $ifNull: ["$receivedDate", "$createdAt"] } } },
+            { $unwind: "$lineItems" },
+            { $addFields: { lineResolvedDate: { $ifNull: ["$lineItems.receivedDate", "$resolvedDate"] } } },
+            { $match: { "lineItems.sku": objId, "lineItems.qtyReceived": { $gt: 0 }, lineResolvedDate: { $lte: asOfDate } } },
+            { $sort: { createdAt: 1 } },
+            { $group: { 
+                _id: "$lineItems.lotNumber", 
+                qty: { $sum: "$lineItems.qtyReceived" }, 
+                costs: { $push: { 
+                    $let: {
+                        vars: { rawCost: { $ifNull: ["$lineItems.cost", "$lineItems.price"] } },
+                        in: { $cond: [{ $and: [{ $ne: ["$$rawCost", null] }, { $ne: ["$$rawCost", 0] }] }, "$$rawCost", null] }
+                    }
+                }}, 
+                date: { $first: "$lineResolvedDate" } 
+            }},
+            { $addFields: {
+                cost: {
+                    $let: {
+                        vars: { filteredCosts: { $filter: { input: "$costs", as: "c", cond: { $ne: ["$$c", null] } } } },
+                        in: { $cond: [{ $gt: [{ $size: "$$filteredCosts" }, 0] }, { $arrayElemAt: ["$$filteredCosts", -1] }, 0] }
+                    }
+                }
+            }},
+            { $project: { costs: 0 } }
+        ]),
+        Manufacturing.aggregate([
+            { $match: { sku: objId, status: { $nin: [/pending/i, /processing/i] } } },
+            { $addFields: { resolvedDate: { $ifNull: ["$scheduledFinish", "$createdAt"] } } },
+            { $match: { resolvedDate: { $lte: asOfDate } } },
+            { $sort: { createdAt: 1 } },
+            { $group: {
+                _id: { $ifNull: ["$lotNumber", "$label"] },
+                qty: { $sum: { $add: [{ $ifNull: ["$qty", 0] }, { $ifNull: ["$qtyDifference", 0] }] } },
+                costs: { $push: { $cond: [{ $and: [{ $ne: ["$totalCost", null] }, { $ne: ["$totalCost", 0] }] }, "$totalCost", null] } }, 
+                date: { $first: "$resolvedDate" }
+            }},
+            { $addFields: {
+                cost: {
+                    $let: {
+                        vars: { filteredCosts: { $filter: { input: "$costs", as: "c", cond: { $ne: ["$$c", null] } } } },
+                        in: { $cond: [{ $gt: [{ $size: "$$filteredCosts" }, 0] }, { $arrayElemAt: ["$$filteredCosts", -1] }, 0] }
+                    }
+                }
+            }},
+            { $project: { costs: 0 } }
+        ]),
+        AuditAdjustment.aggregate([
+            { $match: { sku: objId, createdAt: { $lte: asOfDate } } },
+            { $sort: { createdAt: 1 } },
+            { $group: { 
+                _id: "$lotNumber", 
+                qty: { $sum: "$qty" }, 
+                costs: { $push: { $cond: [{ $and: [{ $ne: ["$cost", null] }, { $ne: ["$cost", 0] }] }, "$cost", null] } }, 
+                date: { $first: "$createdAt" } 
+            }},
+            { $addFields: {
+                cost: {
+                    $let: {
+                        vars: { filteredCosts: { $filter: { input: "$costs", as: "c", cond: { $ne: ["$$c", null] } } } },
+                        in: { $cond: [{ $gt: [{ $size: "$$filteredCosts" }, 0] }, { $arrayElemAt: ["$$filteredCosts", -1] }, 0] }
+                    }
+                }
+            }},
+            { $project: { costs: 0 } }
+        ]),
+        Manufacturing.aggregate([
+            { $match: { "lineItems.sku": objId, status: { $regex: /^fulfilled$/i } } },
+            { $addFields: { resolvedDate: { $ifNull: ["$createdAt", "$createdAt"] } } },
+            { $match: { resolvedDate: { $lte: asOfDate } } },
+            { $unwind: "$lineItems" },
+            { $match: { "lineItems.sku": objId } },
+            { $group: {
+                _id: "$lineItems.lotNumber",
+                consumptions: { $push: { orderQty: "$qty", recipeQty: "$lineItems.recipeQty", sa: "$lineItems.sa", qtyScrapped: "$lineItems.qtyScrapped" } }
+            }}
+        ]),
+        SaleOrder.aggregate([
+            { $match: { "lineItems.sku": objId } },
+            { $addFields: { resolvedDate: { $ifNull: ["$shippedDate", "$createdAt"] } } },
+            { $match: { resolvedDate: { $lte: asOfDate } } },
+            { $unwind: "$lineItems" },
+            { $match: { "lineItems.sku": objId } },
+            { $group: { 
+                _id: "$lineItems.lotNumber", 
+                qtyShipped: { $sum: { 
+                    $cond: [
+                        { $and: [{ $ne: ["$lineItems.qtyShipped", null] }, { $ne: ["$lineItems.qtyShipped", 0] }] }, 
+                        "$lineItems.qtyShipped", 
+                        { $ifNull: ["$lineItems.qty", 0] }
+                    ]
+                } } 
+            } }
+        ]),
+        WebOrder.aggregate([
+            { $match: { $or: [{ "lineItems.sku": objId }, { "lineItems.linkedSkuId": skuId }] } },
+            { $addFields: { resolvedDate: { $ifNull: ["$dateCompleted", "$createdAt"] } } },
+            { $match: { resolvedDate: { $lte: asOfDate } } },
+            { $unwind: "$lineItems" },
+            { $match: { $or: [{ "lineItems.sku": objId }, { "lineItems.linkedSkuId": skuId }] } },
+            { $group: { 
+                _id: "$lineItems.lotNumber", 
+                qty: { $sum: { 
+                    $cond: [
+                        { $and: [{ $ne: ["$lineItems.quantity", null] }, { $ne: ["$lineItems.quantity", 0] }] }, 
+                        "$lineItems.quantity", 
+                        { $ifNull: ["$lineItems.qty", 0] }
+                    ]
+                } } 
+            } }
+        ])
+    ]);
+
+    const normalizeLot = (lot: any): string | null => {
+        if (lot === null || lot === undefined) return null;
+        let s = String(lot).trim();
+        s = s.replace(/,/g, '').replace(/\.0+$/, '');
+        if (s === '' || s === 'N/A') return null;
+        return s;
+    };
+
+    const lotData = new Map<string, LotInfo>();
+
+    obs.forEach((ob: any) => {
+        const lot = normalizeLot(ob._id);
+        if (lot) {
+            lotData.set(lot, {
+                lotNumber: lot,
+                balance: ob.qty || 0,
+                cost: ob.cost || 0,
+                date: new Date(ob.date || new Date()),
+                source: 'Opening Balance'
+            });
+        }
+    });
+
+    pos.forEach((po: any) => {
+        const lot = normalizeLot(po._id);
+        if (lot) {
+            const existing = lotData.get(lot);
+            lotData.set(lot, {
+                lotNumber: lot,
+                balance: (existing?.balance || 0) + (po.qty || 0),
+                cost: po.cost || existing?.cost || 0,
+                date: existing?.date || new Date(po.date || new Date()),
+                source: existing?.source || 'Purchase Order'
+            });
+        }
+    });
+
+    mfgProduced.forEach((mo: any) => {
+        const lot = normalizeLot(mo._id);
+        if (lot) {
+            const existing = lotData.get(lot);
+            const totalQty = mo.qty || 0;
+            const costPerUnit = mo.cost && mo.cost > 0 && totalQty > 0 ? (mo.cost / totalQty) : 0;
+            lotData.set(lot, {
+                lotNumber: lot,
+                balance: (existing?.balance || 0) + totalQty,
+                cost: costPerUnit || existing?.cost || 0,
+                date: existing?.date || new Date(mo.date || new Date()),
+                source: existing?.source || 'Manufacturing'
+            });
+        }
+    });
+
+    adjs.forEach((adj: any) => {
+        const lot = normalizeLot(adj._id);
+        if (lot) {
+            const existing = lotData.get(lot);
+            lotData.set(lot, {
+                lotNumber: lot,
+                balance: (existing?.balance || 0) + (adj.qty || 0),
+                cost: adj.cost || existing?.cost || 0,
+                date: existing?.date || new Date(adj.date || new Date()),
+                source: existing?.source || 'Audit Adjustment'
+            });
+        }
+    });
+
+    mfgConsumed.forEach((mo: any) => {
+        const lot = normalizeLot(mo._id);
+        const ex = lot ? lotData.get(lot) : null;
+        if (lot && ex) {
+            let totalConsumed = 0;
+            mo.consumptions.forEach((c: any) => {
+                const bomQty = (c.orderQty || 0) * (c.recipeQty || 0);
+                const saExtra = (c.sa || 0) > 0 ? (bomQty / (c.sa / 100)) - bomQty : 0;
+                totalConsumed += bomQty + (c.qtyScrapped || 0) + saExtra;
+            });
+            lotData.set(lot, { ...ex, balance: ex.balance - totalConsumed });
+        }
+    });
+
+    saleOrders.forEach((so: any) => {
+        const lot = normalizeLot(so._id);
+        const ex = lot ? lotData.get(lot) : null;
+        if (lot && ex && so.qtyShipped > 0) {
+            lotData.set(lot, { ...ex, balance: ex.balance - Math.abs(so.qtyShipped) });
+        }
+    });
+
+    webOrders.forEach((wo: any) => {
+        const lot = normalizeLot(wo._id);
+        const ex = lot ? lotData.get(lot) : null;
+        if (lot && ex && wo.qty > 0) {
+            lotData.set(lot, { ...ex, balance: ex.balance - wo.qty });
+        }
+    });
+
+    return Array.from(lotData.values())
         .filter(lot => lot.balance > 0)
-        .sort((a, b) => a.date.getTime() - b.date.getTime());
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 }
 
 /**

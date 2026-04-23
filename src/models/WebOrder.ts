@@ -98,6 +98,11 @@ const WebOrderSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now }
 }, { _id: false });
 
+WebOrderSchema.index({ "lineItems.sku": 1 });
+WebOrderSchema.index({ "lineItems.linkedSkuId": 1 });
+WebOrderSchema.index({ "lineItems.sku": 1, status: 1 });
+WebOrderSchema.index({ "lineItems.linkedSkuId": 1, status: 1 });
+
 // Force recompile if needed
 if (mongoose.models.WebOrder) {
     delete mongoose.models.WebOrder;

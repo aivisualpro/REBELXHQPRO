@@ -29,4 +29,6 @@ const OpeningBalanceSchema: Schema = new Schema({
     createdBy: { type: Schema.Types.ObjectId, ref: 'RXHQUsers' }
 });
 
+OpeningBalanceSchema.index({ sku: 1, lotNumber: 1 });
+
 export default mongoose.models.OpeningBalance || mongoose.model<IOpeningBalance>('OpeningBalance', OpeningBalanceSchema);

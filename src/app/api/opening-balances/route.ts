@@ -25,30 +25,38 @@ export async function GET(request: Request) {
         let query: any = {};
 
         if (search) {
-            // Find SKUs with matching names using raw driver for cross-type matching
-            const fuzzyRegex = buildFuzzyRegex(search);
-            const db = mongoose.connection.db;
-            let matchingSkuIds: any[] = [];
-            if (db) {
-                const matchedSkus = await db.collection('skus').find(
-                    { name: { $regex: fuzzyRegex, $options: 'i' } },
-                    { projection: { _id: 1 } }
-                ).limit(150).toArray();
-                // Include both string and ObjectId forms for cross-type matching
-                matchedSkus.forEach(s => {
-                    matchingSkuIds.push(s._id);
-                    matchingSkuIds.push(s._id.toString());
-                });
-            }
+            const tokens = search.trim().split(/\s+/).filter(Boolean);
+            if (tokens.length > 0) {
+                const andConditions = await Promise.all(tokens.map(async (token) => {
+                    const fuzzyPattern = buildFuzzyRegex(token);
+                    
+                    const db = mongoose.connection.db;
+                    let tokenSkuIds: any[] = [];
+                    if (db) {
+                        const tokenSkus = await db.collection('skus').find(
+                            { name: { $regex: fuzzyPattern, $options: 'i' } },
+                            { projection: { _id: 1 } }
+                        ).limit(150).toArray();
+                        
+                        tokenSkus.forEach((s: any) => {
+                            tokenSkuIds.push(s._id);
+                            tokenSkuIds.push(s._id.toString());
+                        });
+                    }
 
-            const fuzzyQuery = buildFuzzySearchQuery(search, ['lotNumber']);
-            if (fuzzyQuery) {
-                query.$and = fuzzyQuery.$and.map((cond: any) => ({
-                    $or: [
-                        ...cond.$or,
-                        ...(matchingSkuIds.length > 0 ? [{ sku: { $in: matchingSkuIds } }] : [])
-                    ]
+                    const fieldMatches = ['lotNumber'].map(field => ({
+                        [field]: { $regex: fuzzyPattern, $options: 'i' }
+                    }));
+
+                    return {
+                        $or: [
+                            ...fieldMatches,
+                            ...(tokenSkuIds.length > 0 ? [{ sku: { $in: tokenSkuIds } }] : [])
+                        ]
+                    };
                 }));
+
+                query.$and = andConditions;
             }
         }
 

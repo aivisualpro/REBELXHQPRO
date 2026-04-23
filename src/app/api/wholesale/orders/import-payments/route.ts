@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
         console.log('[import-payments] Found', orders.length, 'matching orders in DB');
 
         // Build bulk operations
-        const bulkOps = [];
+        const bulkOps: any[] = [];
         let count = 0;
 
         for (const order of orders) {
@@ -172,7 +172,11 @@ export async function POST(req: NextRequest) {
 
         if (bulkOps.length > 0) {
             console.log('[import-payments] Executing', bulkOps.length, 'bulk operations');
-            await SaleOrder.bulkWrite(bulkOps);
+            const session = await mongoose.startSession();
+            await session.withTransaction(async () => {
+                await SaleOrder.bulkWrite(bulkOps, { session });
+            });
+            await session.endSession();
         }
 
         console.log('[import-payments] Successfully processed', count, 'payments');

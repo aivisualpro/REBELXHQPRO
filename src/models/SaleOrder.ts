@@ -56,6 +56,8 @@ const SaleOrderSchema = new mongoose.Schema({
 
 SaleOrderSchema.index({ clientId: 1 });
 SaleOrderSchema.index({ orderStatus: 1 });
+SaleOrderSchema.index({ "lineItems.sku": 1 });
+SaleOrderSchema.index({ "lineItems.sku": 1, orderStatus: 1 });
 // legacyId index is already defined inline with the field
 
 // Force schema refresh

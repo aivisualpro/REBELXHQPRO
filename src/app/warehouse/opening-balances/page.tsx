@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Search, ArrowUpDown, Loader2, List, Plus, X } from 'lucide-react';
+import { Search, ArrowUpDown, Loader2, List, Plus, X, Download } from 'lucide-react';
 import { cn, formatDate, toDateInputValue } from '@/lib/utils';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
@@ -430,12 +430,55 @@ function OpeningBalancesContent() {
         scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
+    const handleExport = async () => {
+        try {
+            const toastId = toast.loading('Exporting Opening Balances...');
+            const res = await fetch('/api/opening-balances?limit=0');
+            const data = await res.json();
+            if (data.openingBalances && Array.isArray(data.openingBalances)) {
+                const csvRows = [];
+                csvRows.push(['_id', 'sku', 'sku_name', 'lotNumber', 'qty', 'uom', 'cost', 'createdAt'].join(','));
+                
+                for (const ob of data.openingBalances) {
+                    const skuId = typeof ob.sku === 'object' ? ob.sku._id : ob.sku;
+                    const skuName = typeof ob.sku === 'object' ? ob.sku.name : ob.sku;
+                    
+                    csvRows.push([
+                        ob._id || '',
+                        skuId || '',
+                        `"${(skuName || '').replace(/"/g, '""')}"`,
+                        `"${(ob.lotNumber || '').replace(/"/g, '""')}"`,
+                        ob.qty || 0,
+                        ob.uom || '',
+                        ob.cost || 0,
+                        ob.createdAt || ''
+                    ].join(','));
+                }
+                
+                const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Opening_Balances_Export_${new Date().toISOString().split('T')[0]}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                toast.success('Export downloaded!', { id: toastId });
+            } else {
+                toast.error('Failed to load data for export', { id: toastId });
+            }
+        } catch (e: any) {
+            toast.error('Export failed: ' + e.message);
+        }
+    };
+
     const getSkuName = (val: any) => (typeof val === 'object' && val?.name ? val.name : val || '-');
     const getSkuImage = (val: any) => (typeof val === 'object' && val?.image ? val.image : '');
 
     const COLS = [
         { key: 'img', label: 'Img', sortable: false, width: 'w-10' },
-        { key: 'sku', label: 'SKU', sortable: true, width: 'w-[220px]' },
+        { key: 'sku', label: 'SKU', sortable: true, width: 'w-[280px]' },
         { key: 'lotNumber', label: 'Lot Number', sortable: true, width: 'w-[130px]' },
         { key: 'qty', label: 'Qty', sortable: true, width: 'w-[80px]', align: 'text-right' },
         { key: 'uom', label: 'UOM', sortable: true, width: 'w-[80px]' },
@@ -476,6 +519,15 @@ function OpeningBalancesContent() {
                 </div>
 
                 <div className="flex-1" />
+
+                {/* EXPORT button */}
+                <button
+                    onClick={e => { e.stopPropagation(); handleExport(); }}
+                    className="h-8 px-3 bg-secondary text-foreground hover:bg-secondary/80 transition-all rounded-lg shadow flex items-center gap-1.5 cursor-pointer shrink-0"
+                >
+                    <Download className="w-3.5 h-3.5" />
+                    <span className="text-[11px] font-black uppercase tracking-widest">EXPORT</span>
+                </button>
 
                 {/* ADD button */}
                 <button
@@ -549,8 +601,10 @@ function OpeningBalancesContent() {
                                     </td>
 
                                     {/* SKU Name */}
-                                    <td className="px-2.5 py-2.5 w-[220px] text-[12px] font-semibold text-foreground/90 group-hover:text-foreground transition-colors border-r border-border/40">
-                                        <span className="truncate block max-w-[200px]" title={getSkuName(item.sku)}>{getSkuName(item.sku)}</span>
+                                    <td className="px-2.5 py-2.5 w-[280px] text-[12px] font-semibold text-foreground/90 group-hover:text-foreground transition-colors border-r border-border/40">
+                                        <div className="flex items-center">
+                                            <span className="truncate" title={getSkuName(item.sku)}>{getSkuName(item.sku)}</span>
+                                        </div>
                                     </td>
 
                                     {/* Lot Number */}

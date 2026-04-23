@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import mongoose from 'mongoose';
 import { formatDate } from '@/lib/utils';
 
@@ -6,7 +7,7 @@ export async function syncSkuToAppSheet(sku: any, action: 'Add' | 'Edit' | 'Dele
     const accessKey = process.env.APPSHEET_ACCESS_KEY;
 
     if (!appId || !accessKey) {
-        console.error('AppSheet API credentials missing');
+        logger.error('AppSheet API credentials missing');
         return;
     }
 
@@ -52,10 +53,10 @@ export async function syncSkuToAppSheet(sku: any, action: 'Add' | 'Edit' | 'Dele
         clearTimeout(timeout);
 
         const result = await response.json();
-        console.log(`AppSheet SKU ${action} Result:`, result);
+        logger.info(`AppSheet SKU ${action} Result:`, result);
         return result;
     } catch (error) {
-        console.error('AppSheet SKU Sync Error:', error);
+        logger.error('AppSheet SKU Sync Error:', error);
     }
 }
 
@@ -64,7 +65,7 @@ export async function syncClientToAppSheet(clients: any | any[]) {
     const accessKey = process.env.APPSHEET_ACCESS_KEY;
 
     if (!appId || !accessKey) {
-        console.error('AppSheet API credentials missing');
+        logger.error('AppSheet API credentials missing');
         return;
     }
 
@@ -149,10 +150,10 @@ export async function syncClientToAppSheet(clients: any | any[]) {
         });
 
         const result = await response.json();
-        console.log('AppSheet Sync Result:', result);
+        logger.info('AppSheet Sync Result:', result);
         return result;
     } catch (error) {
-        console.error('AppSheet Sync Error:', error);
+        logger.error('AppSheet Sync Error:', error);
     }
 }
 
@@ -161,7 +162,7 @@ export async function syncOrderToAppSheet(order: any) {
     const accessKey = process.env.APPSHEET_ACCESS_KEY;
 
     if (!appId || !accessKey) {
-        console.error('AppSheet API credentials missing');
+        logger.error('AppSheet API credentials missing');
         return;
     }
 
@@ -265,7 +266,7 @@ export async function syncOrderToAppSheet(order: any) {
                     body: JSON.stringify(orderPayload),
                 }
             ).then(res => res.json()).then(result => {
-                console.log('AppSheet Order Sync Result:', result);
+                logger.info('AppSheet Order Sync Result:', result);
                 return result;
             })
         );
@@ -281,7 +282,7 @@ export async function syncOrderToAppSheet(order: any) {
                         body: JSON.stringify(detailPayload),
                     }
                 ).then(res => res.json()).then(result => {
-                    console.log('AppSheet Order Details Sync Result:', result);
+                    logger.info('AppSheet Order Details Sync Result:', result);
                     return result;
                 })
             );
@@ -291,7 +292,7 @@ export async function syncOrderToAppSheet(order: any) {
         const results = await Promise.all(promises);
         return { orderResult: results[0], detailResult: results[1] || null };
     } catch (error) {
-        console.error('AppSheet Order Sync Error:', error);
+        logger.error('AppSheet Order Sync Error:', error);
     }
 }
 
@@ -300,7 +301,7 @@ export async function deleteOrderFromAppSheet(order: any) {
     const accessKey = process.env.APPSHEET_ACCESS_KEY;
 
     if (!appId || !accessKey) {
-        console.error('AppSheet API credentials missing');
+        logger.error('AppSheet API credentials missing');
         return;
     }
 
@@ -308,7 +309,7 @@ export async function deleteOrderFromAppSheet(order: any) {
     const orderKey = orderObj.legacyId || orderObj._id?.toString() || '';
 
     if (!orderKey) {
-        console.error('No order key found for AppSheet deletion');
+        logger.error('No order key found for AppSheet deletion');
         return;
     }
 
@@ -343,7 +344,7 @@ export async function deleteOrderFromAppSheet(order: any) {
                     body: JSON.stringify(orderPayload),
                 }
             ).then(res => res.json()).then(result => {
-                console.log('AppSheet Order Delete Result:', result);
+                logger.info('AppSheet Order Delete Result:', result);
                 return result;
             })
         );
@@ -370,7 +371,7 @@ export async function deleteOrderFromAppSheet(order: any) {
                         body: JSON.stringify(detailPayload),
                     }
                 ).then(res => res.json()).then(result => {
-                    console.log('AppSheet Order Details Delete Result:', result);
+                    logger.info('AppSheet Order Details Delete Result:', result);
                     return result;
                 })
             );
@@ -379,7 +380,7 @@ export async function deleteOrderFromAppSheet(order: any) {
         const results = await Promise.all(promises);
         return { orderResult: results[0], detailResult: results[1] || null };
     } catch (error) {
-        console.error('AppSheet Order Delete Error:', error);
+        logger.error('AppSheet Order Delete Error:', error);
     }
 }
 
@@ -388,7 +389,7 @@ export async function syncPaymentToAppSheet(order: any, payment: any, action: 'A
     const accessKey = process.env.APPSHEET_ACCESS_KEY;
 
     if (!appId || !accessKey) {
-        console.error('AppSheet API credentials missing');
+        logger.error('AppSheet API credentials missing');
         return;
     }
 
@@ -428,10 +429,10 @@ export async function syncPaymentToAppSheet(order: any, payment: any, action: 'A
         clearTimeout(timeout);
 
         const result = await response.json();
-        console.log(`AppSheet Payment ${action} Result:`, result);
+        logger.info(`AppSheet Payment ${action} Result:`, result);
         return result;
     } catch (error) {
-        console.error('AppSheet Payment Sync Error:', error);
+        logger.error('AppSheet Payment Sync Error:', error);
     }
 }
 
@@ -440,7 +441,7 @@ export async function syncOrderLineItemToAppSheet(order: any, lineItem: any, act
     const accessKey = process.env.APPSHEET_ACCESS_KEY;
 
     if (!appId || !accessKey) {
-        console.error('AppSheet API credentials missing');
+        logger.error('AppSheet API credentials missing');
         return;
     }
 
@@ -491,17 +492,17 @@ export async function syncOrderLineItemToAppSheet(order: any, lineItem: any, act
         clearTimeout(timeout);
 
         const result = await response.json();
-        console.log(`AppSheet Order Detail ${action} Result:`, result);
+        logger.info(`AppSheet Order Detail ${action} Result:`, result);
 
         // If Add fails because key already exists, retry with Edit
         if (action === 'Add' && result?.Errors) {
-            console.log('Order Detail Add failed, retrying with Edit...');
+            logger.info('Order Detail Add failed, retrying with Edit...');
             return syncOrderLineItemToAppSheet(order, lineItem, 'Edit');
         }
 
         return result;
     } catch (error) {
-        console.error('AppSheet Order Detail Sync Error:', error);
+        logger.error('AppSheet Order Detail Sync Error:', error);
     }
 }
 
@@ -513,7 +514,7 @@ export async function syncManufacturingToAppSheet(
     const accessKey = process.env.APPSHEET_ACCESS_KEY;
 
     if (!appId || !accessKey) {
-        console.error('AppSheet API credentials missing');
+        logger.error('AppSheet API credentials missing');
         return;
     }
 
@@ -602,17 +603,17 @@ export async function syncManufacturingToAppSheet(
         clearTimeout(timeout);
 
         const result = await response.json();
-        console.log(`AppSheet Manufacturing ${action} Result:`, result);
+        logger.info(`AppSheet Manufacturing ${action} Result:`, result);
 
         // If Add fails because key already exists, retry with Edit
         if (action === 'Add' && result?.Errors) {
-            console.log('Add failed, retrying with Edit...');
+            logger.info('Add failed, retrying with Edit...');
             return syncManufacturingToAppSheet(order, 'Edit');
         }
 
         return result;
     } catch (error) {
-        console.error('AppSheet Manufacturing Sync Error:', error);
+        logger.error('AppSheet Manufacturing Sync Error:', error);
     }
 }
 
@@ -621,7 +622,7 @@ export async function deleteManufacturingFromAppSheet(order: any) {
     const accessKey = process.env.APPSHEET_ACCESS_KEY;
 
     if (!appId || !accessKey) {
-        console.error('AppSheet API credentials missing');
+        logger.error('AppSheet API credentials missing');
         return;
     }
 
@@ -659,10 +660,10 @@ export async function deleteManufacturingFromAppSheet(order: any) {
         clearTimeout(timeout);
 
         const result = await response.json();
-        console.log('AppSheet Manufacturing Delete Result:', result);
+        logger.info('AppSheet Manufacturing Delete Result:', result);
         return result;
     } catch (error) {
-        console.error('AppSheet Manufacturing Delete Error:', error);
+        logger.error('AppSheet Manufacturing Delete Error:', error);
     }
 }
 
@@ -675,7 +676,7 @@ export async function syncManufacturingLineItemsToAppSheet(
     const accessKey = process.env.APPSHEET_ACCESS_KEY;
 
     if (!appId || !accessKey) {
-        console.error('AppSheet API credentials missing');
+        logger.error('AppSheet API credentials missing');
         return;
     }
 
@@ -722,7 +723,7 @@ export async function syncManufacturingLineItemsToAppSheet(
                 });
             }
         } catch (e) {
-            console.error('Failed to lookup SKU legacyIds for line items:', e);
+            logger.error('Failed to lookup SKU legacyIds for line items:', e);
         }
     }
 
@@ -778,17 +779,17 @@ export async function syncManufacturingLineItemsToAppSheet(
         clearTimeout(timeout);
 
         const result = await response.json();
-        console.log(`AppSheet Manufacturing LineItems ${action} Result:`, result);
+        logger.info(`AppSheet Manufacturing LineItems ${action} Result:`, result);
 
         // If Add fails because key already exists, retry with Edit
         if (action === 'Add' && result?.Errors) {
-            console.log('LineItems Add failed, retrying with Edit...');
+            logger.info('LineItems Add failed, retrying with Edit...');
             return syncManufacturingLineItemsToAppSheet(parentOrder, lineItems, 'Edit');
         }
 
         return result;
     } catch (error) {
-        console.error('AppSheet Manufacturing LineItems Sync Error:', error);
+        logger.error('AppSheet Manufacturing LineItems Sync Error:', error);
     }
 }
 
@@ -797,7 +798,7 @@ export async function deleteManufacturingLineItemsFromAppSheet(lineItemIds: stri
     const accessKey = process.env.APPSHEET_ACCESS_KEY;
 
     if (!appId || !accessKey) {
-        console.error('AppSheet API credentials missing');
+        logger.error('AppSheet API credentials missing');
         return;
     }
 
@@ -834,10 +835,10 @@ export async function deleteManufacturingLineItemsFromAppSheet(lineItemIds: stri
         clearTimeout(timeout);
 
         const result = await response.json();
-        console.log('AppSheet Manufacturing LineItems Delete Result:', result);
+        logger.info('AppSheet Manufacturing LineItems Delete Result:', result);
         return result;
     } catch (error) {
-        console.error('AppSheet Manufacturing LineItems Delete Error:', error);
+        logger.error('AppSheet Manufacturing LineItems Delete Error:', error);
     }
 }
 
@@ -850,7 +851,7 @@ export async function syncPurchaseOrderToAppSheet(order: any, action: 'Add' | 'E
     const accessKey = process.env.APPSHEET_ACCESS_KEY;
 
     if (!appId || !accessKey) {
-        console.error('AppSheet API credentials missing');
+        logger.error('AppSheet API credentials missing');
         return;
     }
 
@@ -893,7 +894,7 @@ export async function syncPurchaseOrderToAppSheet(order: any, action: 'Add' | 'E
     };
 
     // Map Line Items to "PO lineitems" table
-    console.log(`[PO AppSheet Sync] Line items count: ${(orderObj.lineItems || []).length}`);
+    logger.info(`[PO AppSheet Sync] Line items count: ${(orderObj.lineItems || []).length}`);
     // Build parent PO key for Ref column (PO table key = PO #)
     const parentPOKey = orderObj.legacyId || orderObj._id?.toString() || '';
 
@@ -920,7 +921,7 @@ export async function syncPurchaseOrderToAppSheet(order: any, action: 'Add' | 'E
         };
     });
 
-    console.log(`[PO AppSheet Sync] Detail rows payload:`, JSON.stringify(detailRows, null, 2));
+    logger.info(`[PO AppSheet Sync] Detail rows payload:`, JSON.stringify(detailRows, null, 2));
     const detailPayload = {
         Action: action,
         Properties: { Locale: 'en-US', Timezone: 'Eastern Standard Time' },
@@ -949,10 +950,10 @@ export async function syncPurchaseOrderToAppSheet(order: any, action: 'Add' | 'E
                 body: JSON.stringify(orderPayload),
             }
         ).then(res => res.json()).then(async result => {
-            console.log(`AppSheet PO ${action} Result:`, result);
+            logger.info(`AppSheet PO ${action} Result:`, result);
             // If Add fails because key already exists, retry with Edit
             if (action === 'Add' && result?.Errors) {
-                console.log('PO Add failed, retrying with Edit...');
+                logger.info('PO Add failed, retrying with Edit...');
                 const editPayload = { ...orderPayload, Action: 'Edit' };
                 return fetchWithTimeout(
                     `https://api.appsheet.com/api/v2/apps/${appId}/tables/PO/Action`,
@@ -977,10 +978,10 @@ export async function syncPurchaseOrderToAppSheet(order: any, action: 'Add' | 'E
                     body: JSON.stringify(detailPayload),
                 }
             ).then(res => res.json()).then(async result => {
-                console.log(`AppSheet PO LineItems ${action} Result:`, result);
+                logger.info(`AppSheet PO LineItems ${action} Result:`, result);
                 // If Add fails, retry with Edit
                 if (action === 'Add' && result?.Errors) {
-                    console.log('PO LineItems Add failed, retrying with Edit...');
+                    logger.info('PO LineItems Add failed, retrying with Edit...');
                     const editPayload = { ...detailPayload, Action: 'Edit' };
                     return fetchWithTimeout(
                         `https://api.appsheet.com/api/v2/apps/${appId}/tables/PO lineitems/Action`,
@@ -997,7 +998,7 @@ export async function syncPurchaseOrderToAppSheet(order: any, action: 'Add' | 'E
 
         return { orderResult, detailResult };
     } catch (error) {
-        console.error('AppSheet PO Sync Error:', error);
+        logger.error('AppSheet PO Sync Error:', error);
     }
 }
 
@@ -1006,7 +1007,7 @@ export async function deletePurchaseOrderFromAppSheet(order: any) {
     const accessKey = process.env.APPSHEET_ACCESS_KEY;
 
     if (!appId || !accessKey) {
-        console.error('AppSheet API credentials missing');
+        logger.error('AppSheet API credentials missing');
         return;
     }
 
@@ -1014,7 +1015,7 @@ export async function deletePurchaseOrderFromAppSheet(order: any) {
     const orderKey = orderObj.legacyId || orderObj._id?.toString() || '';
 
     if (!orderKey) {
-        console.error('No PO key found for AppSheet deletion');
+        logger.error('No PO key found for AppSheet deletion');
         return;
     }
 
@@ -1051,7 +1052,7 @@ export async function deletePurchaseOrderFromAppSheet(order: any) {
                     body: JSON.stringify(orderPayload),
                 }
             ).then(res => res.json()).then(result => {
-                console.log('AppSheet PO Delete Result:', result);
+                logger.info('AppSheet PO Delete Result:', result);
                 return result;
             })
         );
@@ -1079,7 +1080,7 @@ export async function deletePurchaseOrderFromAppSheet(order: any) {
                         body: JSON.stringify(detailPayload),
                     }
                 ).then(res => res.json()).then(result => {
-                    console.log('AppSheet PO LineItems Delete Result:', result);
+                    logger.info('AppSheet PO LineItems Delete Result:', result);
                     return result;
                 })
             );
@@ -1088,7 +1089,7 @@ export async function deletePurchaseOrderFromAppSheet(order: any) {
         const results = await Promise.all(promises);
         return { orderResult: results[0], detailResult: results[1] || null };
     } catch (error) {
-        console.error('AppSheet PO Delete Error:', error);
+        logger.error('AppSheet PO Delete Error:', error);
     }
 }
 
@@ -1097,7 +1098,7 @@ export async function syncPOLineItemToAppSheet(order: any, lineItem: any, action
     const accessKey = process.env.APPSHEET_ACCESS_KEY;
 
     if (!appId || !accessKey) {
-        console.error('AppSheet API credentials missing');
+        logger.error('AppSheet API credentials missing');
         return;
     }
 
@@ -1146,16 +1147,16 @@ export async function syncPOLineItemToAppSheet(order: any, lineItem: any, action
         clearTimeout(timeout);
 
         const result = await response.json();
-        console.log(`AppSheet PO LineItem ${action} Result:`, result);
+        logger.info(`AppSheet PO LineItem ${action} Result:`, result);
 
         // If Add fails because key already exists, retry with Edit
         if (action === 'Add' && result?.Errors) {
-            console.log('PO LineItem Add failed, retrying with Edit...');
+            logger.info('PO LineItem Add failed, retrying with Edit...');
             return syncPOLineItemToAppSheet(order, lineItem, 'Edit');
         }
 
         return result;
     } catch (error) {
-        console.error('AppSheet PO LineItem Sync Error:', error);
+        logger.error('AppSheet PO LineItem Sync Error:', error);
     }
 }

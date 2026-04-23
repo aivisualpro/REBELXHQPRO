@@ -36,6 +36,8 @@ if (models.AuditAdjustment) {
     delete models.AuditAdjustment;
 }
 
+auditAdjustmentSchema.index({ sku: 1 });
+
 const AuditAdjustment = model('AuditAdjustment', auditAdjustmentSchema);
 
 export default AuditAdjustment;

@@ -16,8 +16,8 @@ import { getGlobalStartDate } from '@/lib/global-settings';
 
 export const dynamic = 'force-dynamic';
 
-// ⚡ In-memory cache for SKU ledger responses (30s TTL)
-const CACHE_TTL = 30_000; // 30 seconds
+// ⚡ In-memory cache for SKU ledger responses (1s TTL - microcache for React Strict Mode duplicate calls)
+const CACHE_TTL = 1_000; // 1 second
 const ledgerCache = new Map<string, { data: any; timestamp: number }>();
 
 // Periodic cleanup to prevent memory leaks (every 5 min)
@@ -47,13 +47,15 @@ export async function GET(
     context: { params: Promise<{ id: string }> }
 ) {
     try {
+        console.time('ledger-route');
 
         const { id } = await context.params;
 
-        // ⚡ Check in-memory cache first (30s TTL)
+        // ⚡ Check in-memory cache first (1s TTL)
         const bustCache = request.nextUrl.searchParams.get('bust') === '1';
         const cached = ledgerCache.get(id);
         if (!bustCache && cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
+            console.timeEnd('ledger-route');
             return NextResponse.json(cached.data);
         }
 
@@ -92,119 +94,189 @@ export async function GET(
         const dateFilter = startDate ? { createdAt: { $gte: startDate } } : {};
         // Cast to ObjectId for aggregation $filter (Mongoose .find() auto-casts, aggregation does NOT)
         const skuOid = mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : id;
+        const skuMatch = { $in: [skuOid, id] };
 
         // ⚡ ROCKET: Fire ALL queries in a SINGLE parallel batch
+        const timePipeline = async (name: string, promise: any) => {
+            console.time(name);
+            const res = await promise;
+            console.timeEnd(name);
+            return res;
+        };
+
+        // Kick off immediate standalone queries
+        const webProductsPromise = timePipeline('b1-webproduct', WebProduct.find({
+            $or: [
+                { linkedSkuId: skuMatch },
+                { 'variations.linkedSkuId': skuMatch },
+                { 'linkedSkus.skuId': skuMatch },
+                { 'variations.linkedSkus.skuId': skuMatch }
+            ]
+        } as any)
+            .select('_id webId website multiplier variations.id variations._id variations.multiplier variations.linkedSkuId variations.linkedSkus linkedSkuId linkedSkus')
+            .lean());
+
+        const rawManufacturingJobsPromise = timePipeline('b1-manufacturing', Manufacturing.find({ $or: [{ sku: skuMatch }, { "lineItems.sku": skuMatch }], ...dateFilter } as any)
+            .select('_id sku qty qtyDifference uom lotNumber label scheduledStart scheduledFinish createdAt lineItems labor totalCost packagingCost status')
+            .lean());
+
+        const openingBalancesPromise = timePipeline('b1-openingbalance', OpeningBalance.aggregate([
+            { $match: { sku: skuMatch, ...dateFilter } },
+            { $sort: { createdAt: 1 } },
+            { $project: { _id: 1, createdAt: 1, lotNumber: 1, qty: 1, uom: 1, cost: 1 } }
+        ]));
+
+        const purchaseOrdersPromise = timePipeline('b1-purchaseorder', PurchaseOrder.aggregate([
+            { $match: { "lineItems.sku": skuMatch, ...dateFilter } },
+            { $unwind: "$lineItems" },
+            { $match: { "lineItems.sku": skuMatch } },
+            { $sort: { createdAt: 1 } },
+            { $project: {
+                _id: 1, label: 1, createdAt: 1, receivedDate: 1, status: 1,
+                lineItems: [{
+                    _id: "$lineItems._id", sku: "$lineItems.sku", qtyReceived: "$lineItems.qtyReceived", lotNumber: "$lineItems.lotNumber", uom: "$lineItems.uom", price: "$lineItems.price",
+                    cost: { $cond: [{ $and: [{ $ne: ["$lineItems.cost", null] }, { $ne: ["$lineItems.cost", 0] }] }, "$lineItems.cost", "$lineItems.price"] }
+                }]
+            }}
+        ]));
+
+        const saleOrdersPromise = timePipeline('b1-saleorder', SaleOrder.aggregate([
+            { $match: { "lineItems.sku": skuMatch, ...dateFilter } },
+            { $unwind: "$lineItems" },
+            { $match: { "lineItems.sku": skuMatch } },
+            { $sort: { createdAt: 1 } },
+            { $project: {
+                _id: 1, label: 1, createdAt: 1, shippedDate: 1, orderStatus: 1,
+                lineItems: [{
+                    _id: "$lineItems._id", sku: "$lineItems.sku", qty: "$lineItems.qty", lotNumber: "$lineItems.lotNumber", uom: "$lineItems.uom", cost: "$lineItems.cost", price: "$lineItems.price",
+                    qtyShipped: {
+                        $cond: [
+                            { $and: [{ $ne: ["$lineItems.qtyShipped", null] }, { $ne: ["$lineItems.qtyShipped", 0] }] },
+                            "$lineItems.qtyShipped",
+                            { $ifNull: ["$lineItems.qty", 0] }
+                        ]
+                    }
+                }]
+            }}
+        ]));
+
+        const adjustmentsPromise = timePipeline('b1-auditadjustment', AuditAdjustment.aggregate([
+            { $match: { sku: skuMatch, ...dateFilter } },
+            { $sort: { createdAt: 1 } },
+            { $project: { _id: 1, createdAt: 1, reference: 1, lotNumber: 1, qty: 1, cost: 1, status: 1 } }
+        ]));
+
+        // Chain merged web orders off webProductsPromise
+        const webOrdersPromise = webProductsPromise.then((webProducts: any) => {
+            const wpWebIds = webProducts.map((wp: any) => wp.webId).filter(Boolean);
+            const wpWebsites = [...new Set(webProducts.map((wp: any) => wp.website).filter(Boolean))];
+            
+            const matchOr: any[] = [
+                { "lineItems.sku": skuMatch },
+                { "lineItems.varianceId": { $in: varianceIds } },
+                { "lineItems.linkedSkuId": skuMatch },
+                { "lineItems.linkedSkus.skuId": skuMatch }
+            ];
+            if (wpWebIds.length > 0) {
+                matchOr.push({ "lineItems.productId": { $in: wpWebIds }, website: { $in: wpWebsites } });
+            }
+
+            const innerMatchOr: any[] = [
+                { "lineItems.sku": skuMatch },
+                { "lineItems.varianceId": { $in: varianceIds } },
+                { "lineItems.linkedSkuId": skuMatch },
+                { "lineItems.linkedSkus.skuId": skuMatch }
+            ];
+            if (wpWebIds.length > 0) {
+                innerMatchOr.push({ "lineItems.productId": { $in: wpWebIds } });
+            }
+
+            return timePipeline('merged-weborder', WebOrder.aggregate([
+                { $match: { $or: matchOr, ...dateFilter } },
+                { $unwind: "$lineItems" },
+                { $match: { $or: innerMatchOr } },
+                { $sort: { createdAt: 1 } },
+                { $project: {
+                    _id: 1, createdAt: 1, dateCompleted: 1, status: 1, website: 1,
+                    lineItems: [{
+                        _id: "$lineItems._id", id: "$lineItems.id", sku: "$lineItems.sku", linkedSkuId: "$lineItems.linkedSkuId", varianceId: "$lineItems.varianceId", linkedSkus: "$lineItems.linkedSkus", productId: "$lineItems.productId", variationId: "$lineItems.variationId", lotNumber: "$lineItems.lotNumber", cost: "$lineItems.cost", total: "$lineItems.total", qty: "$lineItems.qty",
+                        quantity: {
+                            $cond: [
+                                { $and: [{ $ne: ["$lineItems.quantity", null] }, { $ne: ["$lineItems.quantity", 0] }] },
+                                "$lineItems.quantity",
+                                { $ifNull: ["$lineItems.qty", 0] }
+                            ]
+                        }
+                    }]
+                }}
+            ]));
+        });
+
+        // Chain ingredients off rawManufacturingJobsPromise
+        const ingredientsPromise = rawManufacturingJobsPromise.then((jobs: any) => {
+            const ingredientSkuIds = new Set<string>();
+            ingredientSkuIds.add(id);
+            jobs.forEach((job: any) => {
+                const jobSkuId = job.sku?._id || job.sku;
+                if (jobSkuId?.toString() === id) {
+                    job.lineItems?.forEach((li: any) => {
+                        const liSkuId = (li.sku?._id || li.sku)?.toString();
+                        if (liSkuId) ingredientSkuIds.add(liSkuId);
+                    });
+                }
+            });
+
+            const needsIngredients = ingredientSkuIds.size > 1;
+            const ingOids = needsIngredients ? Array.from(ingredientSkuIds).flatMap(sid => [
+                mongoose.Types.ObjectId.isValid(sid) ? new mongoose.Types.ObjectId(sid) : sid,
+                sid
+            ]) : [];
+
+            if (!needsIngredients) return [[], []] as [any, any];
+
+            return Promise.all([
+                timePipeline('b2-openingbalance', OpeningBalance.aggregate([
+                    { $match: { sku: { $in: ingOids } } },
+                    { $project: { _id: 1, sku: 1, lotNumber: 1, cost: 1 } }
+                ])),
+                timePipeline('b2-purchaseorder', PurchaseOrder.aggregate([
+                    { $match: { "lineItems.sku": { $in: ingOids } } },
+                    { $unwind: "$lineItems" },
+                    { $match: { "lineItems.sku": { $in: ingOids } } },
+                    { $project: {
+                        _id: 1,
+                        lineItems: [{
+                            sku: "$lineItems.sku",
+                            lotNumber: "$lineItems.lotNumber",
+                            price: "$lineItems.price",
+                            cost: { $cond: [{ $and: [{ $ne: ["$lineItems.cost", null] }, { $ne: ["$lineItems.cost", 0] }] }, "$lineItems.cost", "$lineItems.price"] }
+                        }]
+                    }}
+                ]))
+            ]);
+        });
+
+        console.time('all-queries-total');
         const [
             rawManufacturingJobs, webProducts,
-            openingBalances, purchaseOrders, saleOrders, adjustments, webOrders
+            openingBalances, purchaseOrders, saleOrders, adjustments, webOrders,
+            [ingObs, ingPos], additionalWebOrders
         ] = await Promise.all([
-            Manufacturing.find({ $or: [{ sku: id }, { "lineItems.sku": id }], ...dateFilter })
-                .select('_id sku qty qtyDifference uom lotNumber label scheduledStart scheduledFinish createdAt lineItems labor totalCost packagingCost status')
-                .lean(),
-            WebProduct.find({
-                $or: [
-                    { linkedSkuId: id },
-                    { 'variations.linkedSkuId': id },
-                    { 'linkedSkus.skuId': id },
-                    { 'variations.linkedSkus.skuId': id }
-                ]
-            })
-                .select('_id webId website multiplier variations.id variations._id variations.multiplier variations.linkedSkuId variations.linkedSkus linkedSkuId linkedSkus')
-                .lean(),
-            OpeningBalance.find({ sku: id, ...dateFilter })
-                .select('_id createdAt lotNumber qty uom cost')
-                .lean(),
-            PurchaseOrder.find({ "lineItems.sku": id, ...dateFilter })
-                .select('_id label createdAt lineItems status')
-                .populate('vendor', 'name')
-                .lean(),
-            // ⚡ SaleOrder: Use aggregation to filter lineItems SERVER-SIDE (784KB → 136KB)
-            SaleOrder.aggregate([
-                { $match: { "lineItems.sku": skuOid, ...dateFilter } },
-                { $project: {
-                    _id: 1, label: 1, createdAt: 1, shippedDate: 1, orderStatus: 1,
-                    lineItems: {
-                        $filter: {
-                            input: '$lineItems',
-                            as: 'li',
-                            cond: { $eq: ['$$li.sku', skuOid] }
-                        }
-                    }
-                }}
-            ]),
-            AuditAdjustment.find({ sku: id, ...dateFilter })
-                .select('_id createdAt reference lotNumber qty cost status')
-                .lean(),
-            WebOrder.find({
-                $or: [
-                    { "lineItems.sku": id },
-                    { "lineItems.varianceId": { $in: varianceIds } },
-                    { "lineItems.linkedSkuId": id },
-                    { "lineItems.linkedSkus.skuId": id }
-                ],
-                ...dateFilter
-            })
-                .select('_id createdAt dateCompleted status lineItems website')
-                .lean(),
+            rawManufacturingJobsPromise,
+            webProductsPromise,
+            openingBalancesPromise,
+            purchaseOrdersPromise,
+            saleOrdersPromise,
+            adjustmentsPromise,
+            webOrdersPromise,
+            ingredientsPromise,
+            Promise.resolve([]) // Satisfy the downstream Node.js `additionalWebOrders` reference cleanly
         ]);
+        console.timeEnd('all-queries-total');
 
         const manufacturingJobs = rawManufacturingJobs as any[];
 
-        // Extract ingredient SKU IDs + webProduct IDs from first batch results
-        const ingredientSkuIds = new Set<string>();
-        ingredientSkuIds.add(id);
-        manufacturingJobs.forEach((job: any) => {
-            const jobSkuId = job.sku?._id || job.sku;
-            if (jobSkuId?.toString() === id) {
-                job.lineItems?.forEach((li: any) => {
-                    const liSkuId = (li.sku?._id || li.sku)?.toString();
-                    if (liSkuId) ingredientSkuIds.add(liSkuId);
-                });
-            }
-        });
-
-        const wpWebIds = (webProducts as any[]).map((wp: any) => wp.webId).filter(Boolean);
-        const wpWebsites = [...new Set((webProducts as any[]).map((wp: any) => wp.website).filter(Boolean))];
-
-        // ⚡ Second batch: ingredient costs + additional web orders (only if needed)
-        const needsIngredients = ingredientSkuIds.size > 1; // more than just the current SKU
-        const needsAdditionalWO = wpWebIds.length > 0;
-
-        const [ingObs, ingPos, additionalWebOrders] = (needsIngredients || needsAdditionalWO)
-            ? await Promise.all([
-                needsIngredients
-                    ? OpeningBalance.find({ sku: { $in: Array.from(ingredientSkuIds) } }).select('_id sku lotNumber cost').lean()
-                    : Promise.resolve([]),
-                needsIngredients
-                    ? (() => {
-                        const ingOids = Array.from(ingredientSkuIds).map(sid =>
-                            mongoose.Types.ObjectId.isValid(sid) ? new mongoose.Types.ObjectId(sid) : sid
-                        );
-                        return PurchaseOrder.aggregate([
-                            { $match: { "lineItems.sku": { $in: ingOids } } },
-                            { $project: {
-                                _id: 1,
-                                lineItems: {
-                                    $filter: {
-                                        input: '$lineItems',
-                                        as: 'li',
-                                        cond: { $in: ['$$li.sku', ingOids] }
-                                    }
-                                }
-                            }}
-                        ]);
-                    })()
-                    : Promise.resolve([]),
-                needsAdditionalWO
-                    ? WebOrder.find({
-                        "lineItems.productId": { $in: wpWebIds },
-                        website: { $in: wpWebsites },
-                        ...dateFilter
-                    }).select('_id createdAt dateCompleted status lineItems website').lean()
-                    : Promise.resolve([])
-            ])
-            : [[], [], []];
-
+        console.time('nodejs-processing');
         // Build multiplier map
         const multiplierMap = new Map<string, number>();
         (webProducts as any[]).forEach((wp: any) => {
@@ -244,10 +316,10 @@ export async function GET(
 
         // Helper for manufacturing ingredient costs (Pass 0 results)
         const getIngredientCost = (skuId: string, lot: string) => {
-            const ob = ingObs.find(o => o.sku.toString() === skuId && o.lotNumber === lot);
+            const ob = (ingObs as any[]).find((o: any) => o.sku.toString() === skuId && o.lotNumber === lot);
             if (ob) return ob.cost || 0;
-            for (const po of ingPos) {
-                const line = po.lineItems.find((l: any) => (l.sku?._id || l.sku)?.toString() === skuId && l.lotNumber === lot);
+            for (const po of (ingPos as any[])) {
+                const line = po.lineItems?.find((l: any) => (l.sku?._id || l.sku)?.toString() === skuId && l.lotNumber === lot) || (Array.isArray(po.lineItems) ? undefined : (po.lineItems?.sku?.toString() === skuId && po.lineItems?.lotNumber === lot ? po.lineItems : undefined));
                 if (line) return line.cost || line.price || 0;
             }
             return 0;
@@ -329,7 +401,7 @@ export async function GET(
                 if (lineSkuId?.toString() === id && line.qtyReceived > 0) {
                     transactions.push({
                         _id: line._id,
-                        date: line.receivedDate ? new Date(line.receivedDate) : new Date(po.createdAt),
+                        date: po.receivedDate ? new Date(po.receivedDate) : new Date(po.createdAt),
                         type: 'Purchase Order',
                         reference: po.label || po._id,
                         lotNumber: cleanLot(line.lotNumber),
@@ -337,7 +409,7 @@ export async function GET(
                         uom: line.uom,
                         cost: round8(lotCosts.get(line.lotNumber) || line.cost || line.price || 0),
                         docId: po._id,
-                        link: `/warehouse/purchase-orders/${po._id}`,
+                        link: `/warehouse/purchase-orders/${po._id}?highlightSku=${id}`,
                         status: po.status || ''
                     });
                 }
@@ -361,7 +433,7 @@ export async function GET(
                     uom: job.uom,
                     cost: round8(lotCosts.get(lot) || 0),
                     docId: job._id,
-                    link: `/warehouse/manufacturing/${job._id}`,
+                    link: `/warehouse/manufacturing/${job._id}?highlightSku=${id}`,
                     status: job.status || ''
                 });
             }
@@ -391,7 +463,7 @@ export async function GET(
                             uom: line.uom,
                             cost: round8(lotCosts.get(line.lotNumber) || line.cost || 0),
                             docId: job._id,
-                            link: `/warehouse/manufacturing/${job._id}`,
+                            link: `/warehouse/manufacturing/${job._id}?highlightSku=${id}`,
                             status: job.status || ''
                         });
                     }
@@ -417,7 +489,7 @@ export async function GET(
                         cost: round8(virtualCost !== undefined ? virtualCost : (line.cost || 0)),
                         salePrice: round8(line.price || 0),
                         docId: so._id,
-                        link: `/sales/wholesale-orders/${so._id}`,
+                        link: `/sales/wholesale-orders/${so._id}?highlightSku=${id}`,
                         status: so.orderStatus || ''
                     });
                 }
@@ -532,7 +604,7 @@ export async function GET(
                         cost: round8(virtualCost !== undefined ? virtualCost : (linkedSkuMatch?.cost || (isDirectMatch ? (line.cost || 0) : 0))),
                         salePrice: round8((line.total && line.quantity) ? (line.total / line.quantity) : 0),
                         docId: wo._id,
-                        link: `/sales/web-orders/${wo._id}`,
+                        link: `/sales/web-orders/${wo._id}?highlightSku=${id}`,
                         varianceId: line.varianceId,
                         website: wo.website,
                         status: wo.status || ''
@@ -665,6 +737,7 @@ export async function GET(
         else if (hasSales && hasConsumption) tier = 2;
         else if (!hasSales && hasConsumption) tier = 3;
 
+        console.timeEnd('nodejs-processing');
 
         const responseData = {
             sku: { ...sku, tier },
@@ -678,10 +751,12 @@ export async function GET(
         // ⚡ Cache the response
         ledgerCache.set(id, { data: responseData, timestamp: Date.now() });
 
+        console.timeEnd('ledger-route');
         return NextResponse.json(responseData);
 
     } catch (error: any) {
         console.error("Error fetching SKU ledger:", error);
+        console.timeEnd('ledger-route');
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

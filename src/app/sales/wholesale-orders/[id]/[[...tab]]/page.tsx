@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
@@ -137,6 +137,8 @@ const ORDER_TAB_TO_SLUG: Record<string, string> = {
 export default function SaleOrderDetailPage() {
     const params = useParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const highlightSku = searchParams.get('highlightSku');
     const { data: session } = useSession();
 
     // Read initial tab from URL, then manage via client state (no DOM reload)
@@ -1323,7 +1325,21 @@ export default function SaleOrderDetailPage() {
                                             const skuId = (item.sku && typeof item.sku === 'object') ? item.sku._id : item.sku;
 
                                             return (
-                                                <tr key={item._id} className="hover:bg-secondary transition-colors">
+                                                <tr
+                                                    key={item._id}
+                                                    className={cn(
+                                                        "transition-all duration-700 group",
+                                                        highlightSku && skuId === highlightSku 
+                                                            ? "bg-indigo-500/20 border-l-4 border-l-indigo-500 hover:bg-indigo-500/30" 
+                                                            : "hover:bg-secondary border-l-4 border-l-transparent"
+                                                    )}
+                                                    ref={(el) => {
+                                                        if (el && highlightSku && skuId === highlightSku && !el.dataset.scrolled) {
+                                                            el.dataset.scrolled = "true";
+                                                            setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+                                                        }
+                                                    }}
+                                                >
                                                     <td className="px-3 py-2 text-xs font-bold text-foreground">
                                                         <span
                                                             onClick={() => router.push(`/warehouse/skus/${skuId}`)}

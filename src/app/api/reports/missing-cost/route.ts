@@ -1,8 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { apiSuccess, apiError } from '@/lib/api-response';
 import dbConnect from '@/lib/mongoose';
 import WebOrder from '@/models/WebOrder';
 import SaleOrder from '@/models/SaleOrder';
 import Sku from '@/models/Sku';
+import OpeningBalance from '@/models/OpeningBalance';
+import PurchaseOrder from '@/models/PurchaseOrder';
+import Manufacturing from '@/models/Manufacturing';
 import { getGlobalStartDate } from '@/lib/global-settings';
 
 export const dynamic = 'force-dynamic';
@@ -14,6 +18,16 @@ let detailCache = new Map<string, { data: any; timestamp: number }>();
 
 // Lot numbers that are considered "not real" (no cost expected)
 const INVALID_LOT_VALUES = [null, '', 'N/A', 'Allocated'];
+
+// Helper to catch all forms of missing/empty cost in DB
+const missingCostOr = (field: string) => [
+    { [field]: { $exists: false } },
+    { [field]: null },
+    { [field]: 0 },
+    { [field]: '' },
+    { [field]: '0' },
+    { [field]: '-' }
+];
 
 /**
  * GET /api/reports/missing-cost
@@ -35,7 +49,7 @@ export async function GET(request: NextRequest) {
 // ── Get sidebar summary (lightweight) ──
 async function getSummary() {
     if (summaryCache && (Date.now() - summaryCache.timestamp) < CACHE_TTL) {
-        return NextResponse.json(summaryCache.data);
+        return apiSuccess(summaryCache.data);
     }
 
     try {
@@ -44,7 +58,7 @@ async function getSummary() {
         // ── Fetch global start date filter ──
         const globalStartDate = await getGlobalStartDate();
 
-        const [woGroups, soGroups, allSkus] = await Promise.all([
+        const [woGroups, soGroups, obGroups, poGroups, mfgGroups, mfgConGroups, allSkus] = await Promise.all([
             // ⚡ Web Orders: line items with valid lotNumber but cost=0/null
             WebOrder.aggregate([
                 {
@@ -61,11 +75,7 @@ async function getSummary() {
                         // Has a REAL lot number (not empty/null/N/A/Allocated)
                         'lineItems.lotNumber': { $exists: true, $nin: INVALID_LOT_VALUES },
                         // But cost is 0 or missing
-                        $or: [
-                            { 'lineItems.cost': { $exists: false } },
-                            { 'lineItems.cost': null },
-                            { 'lineItems.cost': 0 },
-                        ]
+                        $or: missingCostOr('lineItems.cost')
                     }
                 },
                 {
@@ -101,11 +111,7 @@ async function getSummary() {
                     $match: {
                         'lineItems.sku': { $exists: true, $ne: null },
                         'lineItems.lotNumber': { $exists: true, $nin: INVALID_LOT_VALUES },
-                        $or: [
-                            { 'lineItems.cost': { $exists: false } },
-                            { 'lineItems.cost': null },
-                            { 'lineItems.cost': 0 },
-                        ]
+                        $or: missingCostOr('lineItems.cost')
                     }
                 },
                 {
@@ -135,6 +141,142 @@ async function getSummary() {
                 }
             ]).allowDiskUse(true),
 
+            // ⚡ Opening Balances: valid lotNumber but cost=0/null
+            OpeningBalance.aggregate([
+                {
+                    $match: {
+                        // Removed globalStartDate filter: Opening Balances carry forward indefinitely
+                        sku: { $exists: true, $ne: null },
+                        lotNumber: { $exists: true, $nin: INVALID_LOT_VALUES },
+                        $or: missingCostOr('cost')
+                    }
+                },
+                {
+                    $group: {
+                        _id: { sku: '$sku', lot: '$lotNumber' },
+                        quantity: { $first: { $ifNull: ['$qty', 0] } },
+                        total: { $first: 0 }
+                    }
+                },
+                {
+                    $group: {
+                        _id: '$_id.sku',
+                        count: { $sum: 1 },
+                        totalQty: { $sum: '$quantity' },
+                        totalValue: { $sum: 0 },
+                    }
+                }
+            ]).allowDiskUse(true),
+
+            // ⚡ Purchase Orders: line items with valid lotNumber but cost=0/null and price=0/null
+            PurchaseOrder.aggregate([
+                {
+                    $match: {
+                        status: { $nin: ['Cancelled', 'Void'] },
+                        ...(globalStartDate ? { createdAt: { $gte: globalStartDate } } : {}),
+                    }
+                },
+                { $unwind: '$lineItems' },
+                {
+                    $match: {
+                        'lineItems.sku': { $exists: true, $ne: null },
+                        'lineItems.lotNumber': { $exists: true, $nin: INVALID_LOT_VALUES },
+                        $and: [
+                            { $or: missingCostOr('lineItems.cost') },
+                            { $or: missingCostOr('lineItems.price') }
+                        ]
+                    }
+                },
+                {
+                    $group: {
+                        _id: { sku: '$lineItems.sku', lot: '$lineItems.lotNumber' },
+                        quantity: { $first: { $ifNull: ['$lineItems.qtyReceived', '$lineItems.qty'] } },
+                        total: { $first: 0 }
+                    }
+                },
+                {
+                    $group: {
+                        _id: '$_id.sku',
+                        count: { $sum: 1 },
+                        totalQty: { $sum: '$quantity' },
+                        totalValue: { $sum: 0 },
+                    }
+                }
+            ]).allowDiskUse(true),
+
+            // ⚡ Manufacturing: valid lotNumber but totalCost=0/null
+            Manufacturing.aggregate([
+                {
+                    $match: {
+                        status: { $nin: ['cancelled'] },
+                        ...(globalStartDate ? { createdAt: { $gte: globalStartDate } } : {}),
+                        sku: { $exists: true, $ne: null },
+                        $or: missingCostOr('totalCost')
+                    }
+                },
+                {
+                    $project: {
+                        sku: 1,
+                        qty: 1,
+                        qtyDifference: 1,
+                        lot: { $ifNull: ['$lotNumber', '$label'] }
+                    }
+                },
+                {
+                    $match: {
+                        lot: { $exists: true, $nin: INVALID_LOT_VALUES }
+                    }
+                },
+                {
+                    $group: {
+                        _id: { sku: '$sku', lot: '$lot' },
+                        quantity: { $first: { $add: [{ $ifNull: ['$qty', 0] }, { $ifNull: ['$qtyDifference', 0] }] } },
+                        total: { $first: 0 }
+                    }
+                },
+                {
+                    $group: {
+                        _id: '$_id.sku',
+                        count: { $sum: 1 },
+                        totalQty: { $sum: '$quantity' },
+                        totalValue: { $sum: 0 },
+                    }
+                }
+            ]).allowDiskUse(true),
+
+            // ⚡ Manufacturing Consumption (Line Items)
+            Manufacturing.aggregate([
+                {
+                    $match: {
+                        status: { $nin: ['cancelled'] },
+                        ...(globalStartDate ? { createdAt: { $gte: globalStartDate } } : {}),
+                    }
+                },
+                { $unwind: '$lineItems' },
+                {
+                    $match: {
+                        'lineItems.sku': { $exists: true, $ne: null },
+                        'lineItems.lotNumber': { $exists: true, $nin: INVALID_LOT_VALUES },
+                        $or: missingCostOr('lineItems.cost')
+                    }
+                },
+                {
+                    $group: {
+                        _id: { sku: '$lineItems.sku', lot: '$lineItems.lotNumber' },
+                        quantity: { $first: { $ifNull: ['$lineItems.qty', 0] } },
+                        total: { $first: 0 }
+                    }
+                },
+                {
+                    $group: {
+                        _id: '$_id.sku',
+                        count: { $sum: 1 },
+                        totalQty: { $sum: '$quantity' },
+                        totalValue: { $sum: 0 },
+                    }
+                }
+            ]).allowDiskUse(true),
+
             Sku.find({ isArchived: { $ne: true } })
                 .select('_id name category uom')
                 .lean(),
@@ -144,27 +286,19 @@ async function getSummary() {
         const skuMap = new Map<string, any>();
         allSkus.forEach((s: any) => skuMap.set(s._id.toString(), s));
 
-        // Merge WO + SO groups
+        // Merge groups
         const mergedMap = new Map<string, { count: number; totalQty: number; totalValue: number }>();
 
-        for (const g of woGroups) {
-            const id = g._id?.toString();
-            if (!id) continue;
-            const existing = mergedMap.get(id) || { count: 0, totalQty: 0, totalValue: 0 };
-            existing.count += g.count;
-            existing.totalQty += g.totalQty;
-            existing.totalValue += g.totalValue;
-            mergedMap.set(id, existing);
-        }
-
-        for (const g of soGroups) {
-            const id = g._id?.toString();
-            if (!id) continue;
-            const existing = mergedMap.get(id) || { count: 0, totalQty: 0, totalValue: 0 };
-            existing.count += g.count;
-            existing.totalQty += g.totalQty;
-            existing.totalValue += g.totalValue;
-            mergedMap.set(id, existing);
+        for (const groups of [woGroups, soGroups, obGroups, poGroups, mfgGroups, mfgConGroups]) {
+            for (const g of groups) {
+                const id = g._id?.toString();
+                if (!id) continue;
+                const existing = mergedMap.get(id) || { count: 0, totalQty: 0, totalValue: 0 };
+                existing.count += g.count;
+                existing.totalQty += g.totalQty;
+                existing.totalValue += g.totalValue;
+                mergedMap.set(id, existing);
+            }
         }
 
         // Build response
@@ -194,11 +328,11 @@ async function getSummary() {
         };
 
         summaryCache = { data: result, timestamp: Date.now() };
-        return NextResponse.json(result);
+        return apiSuccess(result);
 
     } catch (error: any) {
         console.error('Missing Cost summary error:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return apiError(error.message, 500);
     }
 }
 
@@ -206,7 +340,7 @@ async function getSummary() {
 async function getSkuDetail(skuId: string) {
     const cached = detailCache.get(skuId);
     if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
-        return NextResponse.json(cached.data);
+        return apiSuccess(cached.data);
     }
 
     try {
@@ -214,8 +348,11 @@ async function getSkuDetail(skuId: string) {
 
         // ── Fetch global start date filter ──
         const globalStartDate = await getGlobalStartDate();
+        const skuOid = import('mongoose').then(m => m.default.Types.ObjectId.isValid(skuId) ? new m.default.Types.ObjectId(skuId) : skuId);
+        const resolvedSkuOid = await skuOid;
+        const skuMatch = { $in: [resolvedSkuOid, skuId] };
 
-        const [woItems, soItems] = await Promise.all([
+        const [woItems, soItems, obItems, poItems, mfgItems, mfgConItems] = await Promise.all([
             WebOrder.aggregate([
                 {
                     $match: {
@@ -226,13 +363,9 @@ async function getSkuDetail(skuId: string) {
                 { $unwind: '$lineItems' },
                 {
                     $match: {
-                        'lineItems.linkedSkuId': skuId,
+                        'lineItems.linkedSkuId': skuMatch,
                         'lineItems.lotNumber': { $exists: true, $nin: INVALID_LOT_VALUES },
-                        $or: [
-                            { 'lineItems.cost': { $exists: false } },
-                            { 'lineItems.cost': null },
-                            { 'lineItems.cost': 0 },
-                        ]
+                        $or: missingCostOr('lineItems.cost')
                     }
                 },
                 {
@@ -262,13 +395,9 @@ async function getSkuDetail(skuId: string) {
                 { $unwind: '$lineItems' },
                 {
                     $match: {
-                        'lineItems.sku': skuId,
+                        'lineItems.sku': skuMatch,
                         'lineItems.lotNumber': { $exists: true, $nin: INVALID_LOT_VALUES },
-                        $or: [
-                            { 'lineItems.cost': { $exists: false } },
-                            { 'lineItems.cost': null },
-                            { 'lineItems.cost': 0 },
-                        ]
+                        $or: missingCostOr('lineItems.cost')
                     }
                 },
                 {
@@ -279,6 +408,120 @@ async function getSkuDetail(skuId: string) {
                         createdAt: 1,
                         'lineItems.qty': 1,
                         'lineItems.price': 1,
+                        'lineItems.lotNumber': 1,
+                        'lineItems.cost': 1,
+                    }
+                },
+                { $sort: { createdAt: -1 } },
+            ]).allowDiskUse(true),
+
+            OpeningBalance.aggregate([
+                {
+                    $match: {
+                        // Removed globalStartDate filter: Opening Balances carry forward indefinitely
+                        sku: skuMatch,
+                        lotNumber: { $exists: true, $nin: INVALID_LOT_VALUES },
+                        $or: missingCostOr('cost')
+                    }
+                },
+                {
+                    $project: {
+                        _id: 1,
+                        createdAt: 1,
+                        qty: 1,
+                        lotNumber: 1,
+                        cost: 1,
+                    }
+                },
+                { $sort: { createdAt: -1 } },
+            ]).allowDiskUse(true),
+
+            PurchaseOrder.aggregate([
+                {
+                    $match: {
+                        status: { $nin: ['Cancelled', 'Void'] },
+                        ...(globalStartDate ? { createdAt: { $gte: globalStartDate } } : {}),
+                    }
+                },
+                { $unwind: '$lineItems' },
+                {
+                    $match: {
+                        'lineItems.sku': skuMatch,
+                        'lineItems.lotNumber': { $exists: true, $nin: INVALID_LOT_VALUES },
+                        $and: [
+                            { $or: missingCostOr('lineItems.cost') },
+                            { $or: missingCostOr('lineItems.price') }
+                        ]
+                    }
+                },
+                {
+                    $project: {
+                        _id: 1,
+                        label: 1,
+                        status: 1,
+                        createdAt: 1,
+                        'lineItems.qtyReceived': 1,
+                        'lineItems.qty': 1,
+                        'lineItems.price': 1,
+                        'lineItems.lotNumber': 1,
+                        'lineItems.cost': 1,
+                    }
+                },
+                { $sort: { createdAt: -1 } },
+            ]).allowDiskUse(true),
+
+            Manufacturing.aggregate([
+                {
+                    $match: {
+                        status: { $nin: ['cancelled'] },
+                        ...(globalStartDate ? { createdAt: { $gte: globalStartDate } } : {}),
+                        sku: skuMatch,
+                        $or: missingCostOr('totalCost')
+                    }
+                },
+                {
+                    $project: {
+                        _id: 1,
+                        label: 1,
+                        status: 1,
+                        createdAt: 1,
+                        qty: 1,
+                        qtyDifference: 1,
+                        lotNumber: 1,
+                        totalCost: 1,
+                        lot: { $ifNull: ['$lotNumber', '$label'] }
+                    }
+                },
+                {
+                    $match: {
+                        lot: { $exists: true, $nin: INVALID_LOT_VALUES }
+                    }
+                },
+                { $sort: { createdAt: -1 } },
+            ]).allowDiskUse(true),
+
+            Manufacturing.aggregate([
+                {
+                    $match: {
+                        status: { $nin: ['cancelled'] },
+                        ...(globalStartDate ? { createdAt: { $gte: globalStartDate } } : {}),
+                    }
+                },
+                { $unwind: '$lineItems' },
+                {
+                    $match: {
+                        'lineItems.sku': skuMatch,
+                        'lineItems.lotNumber': { $exists: true, $nin: INVALID_LOT_VALUES },
+                        $or: missingCostOr('lineItems.cost')
+                    }
+                },
+                {
+                    $project: {
+                        _id: 1,
+                        label: 1,
+                        status: 1,
+                        createdAt: 1,
+                        'lineItems.qty': 1,
                         'lineItems.lotNumber': 1,
                         'lineItems.cost': 1,
                     }
@@ -325,6 +568,72 @@ async function getSkuDetail(skuId: string) {
             });
         }
 
+        for (const ob of obItems) {
+            items.push({
+                id: `OB_${ob._id}`,
+                source: 'Opening Balance',
+                orderId: ob._id.toString(),
+                orderNumber: 'Opening Balance',
+                status: 'Completed',
+                date: ob.createdAt || '',
+                lotNumber: ob.lotNumber || '',
+                cost: ob.cost || 0,
+                quantity: ob.qty || 0,
+                total: 0,
+                link: `/warehouse/opening-balances/${ob._id}`,
+            });
+        }
+
+        for (const po of poItems) {
+            const line = po.lineItems;
+            items.push({
+                id: `PO_${po._id}`,
+                source: 'Purchase Order',
+                orderId: po._id.toString(),
+                orderNumber: po.label || po._id.toString(),
+                status: po.status || '',
+                date: po.createdAt || '',
+                lotNumber: line.lotNumber || '',
+                cost: line.cost || line.price || 0,
+                quantity: line.qtyReceived || line.qty || 0,
+                total: 0,
+                link: `/warehouse/purchase-orders/${po._id}`,
+            });
+        }
+
+        for (const mfg of mfgItems) {
+            items.push({
+                id: `MFG_${mfg._id}`,
+                source: 'Manufacturing',
+                orderId: mfg._id.toString(),
+                orderNumber: mfg.label || mfg._id.toString(),
+                status: mfg.status || '',
+                date: mfg.createdAt || '',
+                lotNumber: mfg.lot || '',
+                cost: mfg.totalCost || 0,
+                quantity: (mfg.qty || 0) + (mfg.qtyDifference || 0),
+                total: 0,
+                link: `/warehouse/manufacturing/${mfg._id}`,
+            });
+        }
+
+        for (const mfgCon of mfgConItems) {
+            const line = mfgCon.lineItems;
+            items.push({
+                id: `MFG_CON_${mfgCon._id}_${line.lotNumber}`,
+                source: 'Mfg. Consumption',
+                orderId: mfgCon._id.toString(),
+                orderNumber: mfgCon.label || mfgCon._id.toString(),
+                status: mfgCon.status || '',
+                date: mfgCon.createdAt || '',
+                lotNumber: line.lotNumber || '',
+                cost: line.cost || 0,
+                quantity: line.qty || 0,
+                total: 0,
+                link: `/warehouse/manufacturing/${mfgCon._id}`,
+            });
+        }
+
         // Sort by date ascending to get the oldest (origin) transaction first
         items.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
@@ -344,10 +653,10 @@ async function getSkuDetail(skuId: string) {
         const result = { items: uniqueItems };
         detailCache.set(skuId, { data: result, timestamp: Date.now() });
 
-        return NextResponse.json(result);
+        return apiSuccess(result);
 
     } catch (error: any) {
         console.error('Missing Cost detail error:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return apiError(error.message, 500);
     }
 }

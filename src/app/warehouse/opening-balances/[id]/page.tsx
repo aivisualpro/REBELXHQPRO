@@ -66,7 +66,8 @@ export default function OpeningBalanceDetailPage() {
         qty: 0,
         cost: 0,
         uom: '',
-        expirationDate: ''
+        expirationDate: '',
+        createdAt: ''
     });
 
 
@@ -123,7 +124,8 @@ export default function OpeningBalanceDetailPage() {
                     qty: data.qty || 0,
                     cost: data.cost || 0,
                     uom: data.uom || '',
-                    expirationDate: toDateInputValue(data.expirationDate)
+                    expirationDate: toDateInputValue(data.expirationDate),
+                    createdAt: data.createdAt ? new Date(data.createdAt).toISOString().slice(0, 16) : ''
                 });
             } else {
                 toast.error('Failed to load opening balance details');
@@ -139,10 +141,16 @@ export default function OpeningBalanceDetailPage() {
     const handleSave = async () => {
         const toastId = toast.loading('Saving changes...');
         try {
+            const payload = { ...formData };
+            if (payload.createdAt) {
+                // Assuming the input value is in local time, we let new Date() handle the conversion to UTC
+                payload.createdAt = new Date(payload.createdAt).toISOString();
+            }
+
             const res = await fetch(`/api/opening-balances/${id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
+                body: JSON.stringify(payload)
             });
 
             if (res.ok) {
@@ -480,7 +488,16 @@ export default function OpeningBalanceDetailPage() {
                                 {/* Created */}
                                 <div className="flex justify-between items-center">
                                     <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold italic">Created</div>
-                                    <div className="text-xs font-medium text-foreground">{formatDateTime(item.createdAt)}</div>
+                                    {isEditing ? (
+                                        <input
+                                            type="datetime-local"
+                                            value={formData.createdAt}
+                                            onChange={e => setFormData({ ...formData, createdAt: e.target.value })}
+                                            className="px-2 py-1 bg-secondary/50 border border-border rounded text-xs focus:outline-none focus:border-primary text-foreground"
+                                        />
+                                    ) : (
+                                        <div className="text-xs font-medium text-foreground">{formatDateTime(item.createdAt)}</div>
+                                    )}
                                 </div>
 
                                 {/* Record ID */}
@@ -505,7 +522,8 @@ export default function OpeningBalanceDetailPage() {
                                             qty: item.qty || 0,
                                             cost: item.cost || 0,
                                             uom: item.uom || '',
-                                            expirationDate: toDateInputValue(item.expirationDate)
+                                            expirationDate: toDateInputValue(item.expirationDate),
+                                            createdAt: item.createdAt ? new Date(item.createdAt).toISOString().slice(0, 16) : ''
                                         });
                                     }}
                                     className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-secondary text-foreground border border-border hover:bg-secondary/80 transition-colors cursor-pointer"

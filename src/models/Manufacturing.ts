@@ -81,4 +81,7 @@ if (mongoose.models.Manufacturing) {
     delete mongoose.models.Manufacturing;
 }
 
+ManufacturingSchema.index({ sku: 1, status: 1 });
+ManufacturingSchema.index({ "lineItems.sku": 1, status: 1 });
+
 export default mongoose.model('Manufacturing', ManufacturingSchema);

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import {
     ArrowLeft,
@@ -118,8 +118,10 @@ interface WebOrder {
 export default function WebOrderDetailPage() {
     const params = useParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const highlightSku = searchParams.get('highlightSku');
     const { id } = params;
-
+    
     const [order, setOrder] = useState<WebOrder | null>(null);
     const [loading, setLoading] = useState(true);
     const [headerPortal, setHeaderPortal] = useState<HTMLElement | null>(null);
@@ -612,7 +614,21 @@ export default function WebOrderDetailPage() {
 
                                             return skuRows.length <= 1 ? (
                                                 // Single SKU or no SKU — render single row
-                                                <tr key={item.id} className="hover:bg-secondary transition-colors">
+                                                <tr
+                                                    key={item.id}
+                                                    className={cn(
+                                                        "transition-all duration-700 group",
+                                                        highlightSku && skuRows[0]?.skuId === highlightSku
+                                                            ? "bg-indigo-500/20 border-l-4 border-l-indigo-500 hover:bg-indigo-500/30"
+                                                            : "hover:bg-secondary border-l-4 border-l-transparent"
+                                                    )}
+                                                    ref={(el) => {
+                                                        if (el && highlightSku && skuRows[0]?.skuId === highlightSku && !el.dataset.scrolled) {
+                                                            el.dataset.scrolled = "true";
+                                                            setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+                                                        }
+                                                    }}
+                                                >
                                                     <td className="px-3 py-2">
                                                         {(item.webProductId || item.parentProductId) ? (
                                                             <button onClick={(e) => { e.stopPropagation(); router.push(`/warehouse/web-products/${item.webProductId || item.parentProductId}`); }}
@@ -683,9 +699,19 @@ export default function WebOrderDetailPage() {
                                                 <React.Fragment key={item.id}>
                                                     {skuRows.map((sku, skuIdx) => (
                                                         <tr key={`${item.id}-sku-${skuIdx}`} className={cn(
-                                                            'hover:bg-secondary transition-colors',
-                                                            skuIdx > 0 && 'border-t border-dashed border-border/40'
-                                                        )}>
+                                                            "transition-all duration-700 group",
+                                                            skuIdx > 0 && 'border-t border-dashed border-border/40',
+                                                            highlightSku && sku.skuId === highlightSku
+                                                                ? "bg-indigo-500/20 border-l-4 border-l-indigo-500 hover:bg-indigo-500/30"
+                                                                : "hover:bg-secondary border-l-4 border-l-transparent"
+                                                        )}
+                                                        ref={(el) => {
+                                                            if (el && highlightSku && sku.skuId === highlightSku && !el.dataset.scrolled) {
+                                                                el.dataset.scrolled = "true";
+                                                                setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+                                                            }
+                                                        }}
+                                                        >
                                                             {/* Product/Variation/Qty/Price/Total only on first row */}
                                                             {skuIdx === 0 && (
                                                                 <>

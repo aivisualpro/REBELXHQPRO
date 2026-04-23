@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
+    if (process.env.NODE_ENV === 'production') {
+        return new NextResponse(null, { status: 404 });
+    }
     const { searchParams } = new URL(request.url);
     const code = searchParams.get('code');
     const shop = searchParams.get('shop') || 'grhkratom.myshopify.com';

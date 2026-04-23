@@ -2,6 +2,8 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import mongoose from 'mongoose';
 import Manufacturing from '@/models/Manufacturing';
+import WebOrder from '@/models/WebOrder';
+import SaleOrder from '@/models/SaleOrder';
 
 import Sku from '@/models/Sku';
 import OpeningBalance from '@/models/OpeningBalance';
@@ -363,6 +365,114 @@ export async function GET(
     }
 }
 
+/**
+ * After a manufacturing order cost-per-unit changes, push the new cost to every
+ * WebOrder and SaleOrder line item that references this SKU + lot combination.
+ * Only fires when costPerUnit actually changes (delta > $0.001).
+ */
+async function propagateLotCostToOrders(
+    skuId: string,
+    lotNumber: string,
+    newCostPerUnit: number
+): Promise<void> {
+    if (!skuId || !lotNumber || !(newCostPerUnit > 0)) return;
+
+    // Build match filter: target any line item using this skuId + lotNumber
+    // Handles both legacy linkedSkuId and modern linkedSkus array
+    const lineItemFilter = {
+        $or: [
+            // Legacy: single SKU field
+            { 'lineItems.linkedSkuId': skuId, 'lineItems.lotNumber': lotNumber },
+            // Modern: linkedSkus sub-array
+            { 'lineItems.linkedSkus.skuId': skuId, 'lineItems.linkedSkus.lotNumber': lotNumber },
+        ]
+    };
+
+    // Process WebOrders
+    const webOrders = await WebOrder.find(lineItemFilter).select('lineItems').lean();
+    if (webOrders.length > 0) {
+        const woBulk = WebOrder.collection.initializeUnorderedBulkOp();
+        let woOps = 0;
+
+        for (const order of webOrders as any[]) {
+            for (let i = 0; i < order.lineItems.length; i++) {
+                const li = order.lineItems[i];
+
+                // Legacy path: single linkedSkuId
+                if (li.linkedSkuId === skuId && li.lotNumber === lotNumber) {
+                    const multiplier = 1; // legacy path has no multiplier concept here
+                    woBulk.find({ _id: order._id }).updateOne({
+                        $set: { [`lineItems.${i}.cost`]: newCostPerUnit * multiplier }
+                    });
+                    woOps++;
+                }
+
+                // Modern path: linkedSkus array
+                if (li.linkedSkus && Array.isArray(li.linkedSkus)) {
+                    for (let j = 0; j < li.linkedSkus.length; j++) {
+                        const ls = li.linkedSkus[j];
+                        if (ls.skuId === skuId && ls.lotNumber === lotNumber) {
+                            const newLinkedCost = newCostPerUnit * (ls.multiplier || 1);
+                            woBulk.find({ _id: order._id }).updateOne({
+                                $set: {
+                                    [`lineItems.${i}.linkedSkus.${j}.cost`]: newLinkedCost,
+                                    // Keep legacy cost in sync with first linked SKU
+                                    ...(j === 0 ? { [`lineItems.${i}.cost`]: newLinkedCost } : {})
+                                }
+                            });
+                            woOps++;
+                        }
+                    }
+                }
+            }
+        }
+        if (woOps > 0) {
+            await woBulk.execute();
+            console.log(`✅ [cost-propagation] Updated ${woOps} WebOrder line items for SKU=${skuId} Lot=${lotNumber} cost=$${newCostPerUnit.toFixed(4)}`);
+        }
+    }
+
+    // Process SaleOrders
+    const saleOrders = await SaleOrder.find(lineItemFilter).select('lineItems').lean();
+    if (saleOrders.length > 0) {
+        const soBulk = SaleOrder.collection.initializeUnorderedBulkOp();
+        let soOps = 0;
+
+        for (const order of saleOrders as any[]) {
+            for (let i = 0; i < order.lineItems.length; i++) {
+                const li = order.lineItems[i];
+
+                if (li.linkedSkuId === skuId && li.lotNumber === lotNumber) {
+                    soBulk.find({ _id: order._id }).updateOne({
+                        $set: { [`lineItems.${i}.cost`]: newCostPerUnit }
+                    });
+                    soOps++;
+                }
+
+                if (li.linkedSkus && Array.isArray(li.linkedSkus)) {
+                    for (let j = 0; j < li.linkedSkus.length; j++) {
+                        const ls = li.linkedSkus[j];
+                        if (ls.skuId === skuId && ls.lotNumber === lotNumber) {
+                            const newLinkedCost = newCostPerUnit * (ls.multiplier || 1);
+                            soBulk.find({ _id: order._id }).updateOne({
+                                $set: {
+                                    [`lineItems.${i}.linkedSkus.${j}.cost`]: newLinkedCost,
+                                    ...(j === 0 ? { [`lineItems.${i}.cost`]: newLinkedCost } : {})
+                                }
+                            });
+                            soOps++;
+                        }
+                    }
+                }
+            }
+        }
+        if (soOps > 0) {
+            await soBulk.execute();
+            console.log(`✅ [cost-propagation] Updated ${soOps} SaleOrder line items for SKU=${skuId} Lot=${lotNumber} cost=$${newCostPerUnit.toFixed(4)}`);
+        }
+    }
+}
+
 export async function PATCH(
     request: NextRequest,
     context: { params: Promise<{ id: string }> }
@@ -372,9 +482,13 @@ export async function PATCH(
         const { id } = await context.params;
         const body = await request.json();
 
-        // Fetch the old order BEFORE update to detect line item changes
-        const oldOrder: any = await Manufacturing.findById(id).select('lineItems._id').lean();
+        // Fetch the old order BEFORE update to detect line item changes AND capture old cost-per-unit
+        const oldOrder: any = await Manufacturing.findById(id).select('lineItems._id totalCost qty qtyDifference sku lotNumber label').lean();
         const oldLineItemIds = new Set((oldOrder?.lineItems || []).map((li: any) => li._id?.toString()));
+        const oldQtyProduced = (oldOrder?.qty || 0) + (oldOrder?.qtyDifference || 0);
+        const oldCostPerUnit = (oldQtyProduced > 0 && oldOrder?.totalCost > 0)
+            ? oldOrder.totalCost / oldQtyProduced
+            : 0;
 
         const order = await Manufacturing.findByIdAndUpdate(id, body, { new: true })
             .populate('createdBy', 'firstName lastName email')
@@ -501,6 +615,20 @@ export async function PATCH(
                         { _id: orderIdStr },
                         { $set: { materialCost, packagingCost, laborCost, totalCost, lineItems: enrichedItems } }
                     );
+
+                    // ── Auto-propagate cost to all affected orders if cost-per-unit changed ──
+                    const newQtyProduced = (freshOrder.qty || 0) + (freshOrder.qtyDifference || 0);
+                    const newCostPerUnit = newQtyProduced > 0 ? totalCost / newQtyProduced : 0;
+                    const costChanged = Math.abs(newCostPerUnit - oldCostPerUnit) > 0.001;
+
+                    if (costChanged && newCostPerUnit > 0) {
+                        const skuId = freshOrder.sku?._id?.toString() || freshOrder.sku?.toString();
+                        const lotNumber = freshOrder.lotNumber || freshOrder.label;
+                        if (skuId && lotNumber) {
+                            console.log(`💰 [cost-propagation] Cost changed for SKU=${skuId} Lot=${lotNumber}: $${oldCostPerUnit.toFixed(4)} → $${newCostPerUnit.toFixed(4)}. Propagating...`);
+                            await propagateLotCostToOrders(skuId, lotNumber, newCostPerUnit);
+                        }
+                    }
                 }
 
                 // AppSheet sync

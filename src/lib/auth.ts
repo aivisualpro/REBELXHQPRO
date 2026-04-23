@@ -17,24 +17,10 @@ export const authOptions: NextAuthOptions = {
                     throw new Error("Missing email or password");
                 }
 
-                // 1. Check against master admin credentials in .env
-                const masterEmail = process.env.AUTHOR_USERNAME?.trim();
-                const masterPassword = process.env.AUTHOR_PASSWORD?.trim();
                 const inputEmail = credentials.email.trim();
                 const inputPassword = credentials.password.trim();
 
-                if (masterEmail && masterPassword && inputEmail === masterEmail && inputPassword === masterPassword) {
-                    return {
-                        id: "master-admin",
-                        email: masterEmail,
-                        name: "Super Admin",
-                        role: "SuperAdmin",
-                        department: "Management",
-                        image: "https://res.cloudinary.com/dwkq4s4rg/image/upload/v1766349101/rebelx-headquarters/assets/rebelx_favicon_new.png"
-                    };
-                }
-
-                // 2. Database check
+                // Database check
                 try {
                     await dbConnect();
                     const user = await User.findOne({ email: inputEmail });
@@ -59,7 +45,6 @@ export const authOptions: NextAuthOptions = {
                     }
                 } catch (dbError) {
                     console.error("Database auth error:", dbError);
-                    // If DB fails but user isn't master, we throw generic error
                 }
 
                 throw new Error("Invalid credentials");
@@ -75,13 +60,8 @@ export const authOptions: NextAuthOptions = {
             if (account?.provider === "google") {
                 try {
                     await dbConnect();
-                    // Let the master admin in via Google if emails match
-                    const masterEmail = process.env.AUTHOR_USERNAME?.trim();
-                    if (masterEmail && user.email === masterEmail) {
-                        return true;
-                    }
-
-                    // Otherwise, must exist in DB and be active
+                    
+                    // User must exist in DB and be active
                     const dbUser = await User.findOne({ email: user.email });
                     if (!dbUser || dbUser.status !== "Active") {
                         return false;
@@ -101,27 +81,16 @@ export const authOptions: NextAuthOptions = {
             return true;
         },
         async jwt({ token, user, account }) {
-            // When user first signs in, `user` object is populated
             if (user) {
-                // If this was a Google login and it's the master admin
-                if (account?.provider === "google" && user.email === process.env.AUTHOR_USERNAME?.trim()) {
-                    token.id = "master-admin";
-                    token.role = "SuperAdmin";
-                    token.department = "Management";
-                    token.profileId = null;
-                    token.workspaceId = null;
-                } else {
-                    token.id = user.id;
-                    token.role = (user as any).role;
-                    token.department = (user as any).department;
-                    token.profileId = (user as any).profileId || null;
-                    token.workspaceId = (user as any).workspaceId || null;
-                }
+                token.id = user.id;
+                token.role = (user as any).role;
+                token.department = (user as any).department;
+                token.profileId = (user as any).profileId || null;
+                token.workspaceId = (user as any).workspaceId || null;
             }
 
             // Always refresh workspaceId from DB (so changes take effect without re-login)
-            // Skip for master admin (id = "master-admin") since they're not in the DB
-            if (token.id && token.id !== 'master-admin') {
+            if (token.id) {
                 try {
                     await dbConnect();
                     const dbUser = await User.findById(token.id).select('workspaceId profileId').lean();

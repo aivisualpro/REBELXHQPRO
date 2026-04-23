@@ -437,7 +437,7 @@ export async function POST(request: Request) {
 
             await dbConnect();
 
-            const websites = [
+            const websites: { name: string; baseUrl: string; key: string; secret: string; platform?: string }[] = [
                 {
                     name: process.env.KINGKKRATOMTITLE || 'KINGKKRATOM',
                     baseUrl: process.env.KINGKKRATOMAPI || '',
@@ -451,15 +451,8 @@ export async function POST(request: Request) {
                     key: process.env.GRASSROOTSHARVESTCONSUMERKEY || process.env.GRASSROOTSHARVESTONSUMERKEY || '',
                     secret: process.env.GRASSROOTSHARVESTCONSUMERSECRET || ''
                 },
-                // GRHKTATOM WooCommerce REMOVED — website transferred to Shopify.
-                // Existing WC orders are preserved in DB; new orders come from Shopify below.
-                {
-                    name: 'GRHKTATOM',
-                    baseUrl: process.env.GRHKTATOM_SHOPIFY_STORE_URL || '',
-                    key: process.env.GRHKTATOM_SHOPIFY_ACCESS_TOKEN || '',
-                    secret: 'shopify',
-                    platform: 'shopify'
-                },
+                // GRHKTATOM: Migrated to Shopify with webhook integration.
+                // Orders are pushed in real-time via webhook — no polling needed.
                 {
                     name: process.env.REBELXBRANDSRODUCERTITLE || 'REBELXBRANDS',
                     baseUrl: process.env.REBELXBRANDSRODUCERAPI || '',

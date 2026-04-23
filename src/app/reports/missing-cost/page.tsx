@@ -14,6 +14,8 @@ import {
     DollarSign,
     ArrowUpRight,
     CircleDollarSign,
+    Zap,
+    AlertTriangle,
 } from 'lucide-react';
 import { cn, formatDate } from '@/lib/utils';
 
@@ -81,7 +83,6 @@ const formatCurrency = (val: number) => {
 export default function MissingCostPage() {
     const router = useRouter();
     const [groups, setGroups] = useState<SkuGroupSummary[]>([]);
-    const [summary, setSummary] = useState<Summary | null>(null);
     const [loading, setLoading] = useState(true);
     const [selectedSkuId, setSelectedSkuId] = useState<string | null>(null);
     const [sidebarSearch, setSidebarSearch] = useState('');
@@ -90,6 +91,82 @@ export default function MissingCostPage() {
     // Detail state (lazy-loaded per SKU)
     const [detailItems, setDetailItems] = useState<DetailItem[]>([]);
     const [detailLoading, setDetailLoading] = useState(false);
+
+    // Apply state — per-SKU only, no modal
+    const [isApplying, setIsApplying] = useState(false);
+    const [applyFixed, setApplyFixed] = useState<number | null>(null);
+
+    // Derive global summary dynamically from groups so it stays in sync
+    const summary = useMemo<Summary | null>(() => {
+        if (!groups || groups.length === 0) return null;
+        return {
+            totalSkus: groups.length,
+            totalItems: groups.reduce((s, g) => s + g.count, 0),
+            totalQty: groups.reduce((s, g) => s + g.totalQty, 0),
+            totalValue: groups.reduce((s, g) => s + g.totalValue, 0),
+        };
+    }, [groups]);
+
+
+    const runApply = useCallback(async (skuId: string) => {
+        setIsApplying(true);
+        setApplyFixed(null);
+        try {
+            const res = await fetch('/api/reports/missing-cost/apply', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ skuId }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Apply failed');
+
+            const fixed = data.stats?.totalFixed ?? 0;
+            setApplyFixed(fixed);
+
+            // Live-remove resolved rows using the returned order IDs
+            if (data.resolvedOrderIds?.length) {
+                const resolvedSet = new Set<string>(data.resolvedOrderIds);
+                
+                setDetailItems(prev => {
+                    let removedQty = 0;
+                    let removedValue = 0;
+                    const remaining = [];
+                    
+                    for (const item of prev) {
+                        if (resolvedSet.has(item.orderId)) {
+                            removedQty += item.quantity || 0;
+                            removedValue += item.total || 0;
+                        } else {
+                            remaining.push(item);
+                        }
+                    }
+
+                    // If rows resolved, remove SKU counts, qty, and value from sidebar
+                    if (fixed > 0) {
+                        setGroups(prevGroups => {
+                            return prevGroups.map(g =>
+                                g.skuId === skuId ? { 
+                                    ...g, 
+                                    count: Math.max(0, g.count - fixed),
+                                    totalQty: Math.max(0, g.totalQty - removedQty),
+                                    totalValue: Math.max(0, g.totalValue - removedValue)
+                                } : g
+                            ).filter(g => g.count > 0);
+                        });
+                    }
+
+                    return remaining;
+                });
+            }
+
+            // Clear the fixed counter after 3s
+            setTimeout(() => setApplyFixed(null), 3000);
+        } catch (e: any) {
+            console.error('Apply failed:', e);
+        } finally {
+            setIsApplying(false);
+        }
+    }, []);
 
     // ── Load sidebar summary ──
     useEffect(() => {
@@ -100,7 +177,6 @@ export default function MissingCostPage() {
                 if (res.ok) {
                     const data = await res.json();
                     setGroups(data.groups || []);
-                    setSummary(data.summary || null);
                     if (data.groups?.length > 0) {
                         setSelectedSkuId(data.groups[0].skuId);
                     }
@@ -194,6 +270,7 @@ export default function MissingCostPage() {
     const soCount = detailItems.filter(i => i.source === 'Sale Order').length;
 
     return (
+        <>
         <div className="flex flex-col h-[calc(100vh-48px)] bg-background">
 
             {/* ── Summary Stats Bar ── */}
@@ -355,17 +432,27 @@ export default function MissingCostPage() {
                                                 Orders ({soCount})
                                             </button>
                                         </div>
-                                        <div className="hidden md:flex items-center gap-3">
-                                            <div className="text-right">
-                                                <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Total Qty</div>
-                                                <div className="text-sm font-black text-foreground">{selectedGroupSummary.totalQty}</div>
-                                            </div>
-                                            <div className="h-6 w-px bg-border" />
-                                            <div className="text-right">
-                                                <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Value</div>
-                                                <div className="text-sm font-black text-emerald-500">{formatCurrency(selectedGroupSummary.totalValue)}</div>
-                                            </div>
-                                        </div>
+                                        {/* ✨ Apply This SKU button */}
+                                        <button
+                                            id="btn-apply-sku-cost"
+                                            onClick={() => runApply(selectedGroupSummary.skuId)}
+                                            disabled={isApplying}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-violet-500/15 hover:bg-violet-500/25 disabled:opacity-60 disabled:cursor-not-allowed text-violet-400 text-xs font-bold transition-colors border border-violet-500/20"
+                                        >
+                                            {isApplying ? (
+                                                <Loader2 className="w-3 h-3 animate-spin" />
+                                            ) : (
+                                                <Zap className="w-3 h-3" />
+                                            )}
+                                            <span>
+                                                {isApplying
+                                                    ? 'Applying...'
+                                                    : applyFixed !== null
+                                                        ? `✓ Fixed ${applyFixed}`
+                                                        : 'Apply Costs'
+                                                }
+                                            </span>
+                                        </button>
                                         <button
                                             onClick={() => router.push(`/warehouse/skus/${selectedGroupSummary.skuId}`)}
                                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-secondary hover:bg-secondary transition-colors text-xs font-bold text-muted-foreground hover:text-foreground"
@@ -505,6 +592,8 @@ export default function MissingCostPage() {
                 </div>
             </div>
         </div>
+
+        </>
     );
 }
 

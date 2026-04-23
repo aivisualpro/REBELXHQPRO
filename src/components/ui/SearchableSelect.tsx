@@ -150,7 +150,7 @@ export function SearchableSelect({
     // Notify parent of open/close changes
     useEffect(() => {
         onOpenChange?.(isOpen);
-    }, [isOpen]);
+    }, [isOpen, onOpenChange]);
 
     const selectedOption = options.find(o => o.value === value);
 

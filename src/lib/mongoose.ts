@@ -21,6 +21,7 @@ if (!cached) {
 
 async function dbConnect() {
     if (cached.conn) {
+        console.log('⚡ Using cached MongoDB connection');
         return cached.conn;
     }
 
@@ -32,7 +33,10 @@ async function dbConnect() {
             maxPoolSize: 20
         };
 
+        console.log('🔌 Establishing new MongoDB connection...');
+        console.time('mongoose-connect');
         cached.promise = mongoose.connect(MONGODB_URI!, opts).then((mongoose) => {
+            console.timeEnd('mongoose-connect');
             return mongoose;
         });
     }
@@ -42,8 +46,7 @@ async function dbConnect() {
     } catch (e) {
         cached.promise = null;
         console.error("❌ MONGODB CONNECTION ERROR:", e);
-        // Do not throw, return null so the app can continue in "offline" mode
-        return null;
+        throw new Error(`Failed to connect to MongoDB: ${e instanceof Error ? e.message : String(e)}`);
     }
 
     return cached.conn;

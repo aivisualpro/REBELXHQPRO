@@ -164,7 +164,12 @@ export async function PATCH(
                 let finalCost = cost;
                 if (skuId && lotNumber && (cost === undefined || cost === null)) {
                     const lotCosts = await getLotsWithCost(skuId);
-                    const baseCost = lotCosts.get(lotNumber) || 0;
+                    // Clean lot number the same way the map keys are stored
+                    const cleanedLot = lotNumber.trim().replace(/,/g, '').replace(/\.0+$/, '');
+                    const baseCost = lotCosts.get(cleanedLot) ?? lotCosts.get(lotNumber) ?? 0;
+                    if (baseCost === 0) {
+                        console.warn(`[line-item] No cost found for SKU=${skuId} Lot=${lotNumber} (cleaned=${cleanedLot}). Map has ${lotCosts.size} entries:`, Array.from(lotCosts.entries()).slice(0, 10));
+                    }
                     finalCost = baseCost * (entry.multiplier || 1);
                 }
 
@@ -198,14 +203,19 @@ export async function PATCH(
         let finalCost = cost;
         if (lineItem.linkedSkuId && lotNumber && (cost === undefined || cost === null)) {
             const lotCosts = await getLotsWithCost(lineItem.linkedSkuId);
-            const baseCost = lotCosts.get(lotNumber) || 0;
+            // Clean lot number the same way the map keys are stored
+            const cleanedLot = lotNumber.trim().replace(/,/g, '').replace(/\.0+$/, '');
+            const baseCost = lotCosts.get(cleanedLot) ?? lotCosts.get(lotNumber) ?? 0;
+            if (baseCost === 0) {
+                console.warn(`[line-item] No cost found for SKU=${lineItem.linkedSkuId} Lot=${lotNumber} (cleaned=${cleanedLot}). Map has ${lotCosts.size} entries:`, Array.from(lotCosts.entries()).slice(0, 10));
+            }
             const multiplier = await getMultiplier(lineItem);
             finalCost = baseCost * multiplier;
         }
 
-        // Update the line item
-        lineItem.lotNumber = lotNumber || null;
-        lineItem.cost = finalCost || 0;
+        // Update the line item using set() to ensure Mongoose detects the change
+        order.set(`lineItems.${lineItemIdx}.lotNumber`, lotNumber || null);
+        order.set(`lineItems.${lineItemIdx}.cost`, finalCost || 0);
         order.updatedAt = new Date();
         await order.save();
 

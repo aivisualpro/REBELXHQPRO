@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { ArrowLeft, Package, Calendar, User, Clock, Tag, Clipboard, Layers, Pencil, Trash2, X, Plus, Copy, Play, Square, MoreVertical } from 'lucide-react';
@@ -79,6 +79,8 @@ type TabType = typeof TABS[number];
 export default function ManufacturingDetailPage() {
     const params = useParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const highlightSku = searchParams.get('highlightSku');
     const { data: session } = useSession();
     const [order, setOrder] = useState<ManufacturingOrder | null>(null);
     const [loading, setLoading] = useState(true);
@@ -1100,7 +1102,21 @@ export default function ManufacturingDetailPage() {
                                             }
 
                                             return (
-                                                <tr key={item._id} className="hover:bg-secondary transition-colors">
+                                                <tr
+                                                    key={item._id}
+                                                    className={cn(
+                                                        "transition-all duration-700 group",
+                                                        highlightSku && skuId === highlightSku 
+                                                            ? "bg-indigo-500/20 border-l-4 border-l-indigo-500 hover:bg-indigo-500/30" 
+                                                            : "hover:bg-secondary border-l-4 border-l-transparent"
+                                                    )}
+                                                    ref={(el) => {
+                                                        if (el && highlightSku && skuId === highlightSku && !el.dataset.scrolled) {
+                                                            el.dataset.scrolled = "true";
+                                                            setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+                                                        }
+                                                    }}
+                                                >
                                                     <td className="px-3 py-2 text-[11px] text-muted-foreground font-mono">
                                                         {formatDate(item.createdAt)}
                                                     </td>

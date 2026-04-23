@@ -50,79 +50,120 @@ export async function getLotsWithCost(skuId: string): Promise<Map<string, number
 
     await dbConnect();
 
-    // Fetch all source data in parallel
+    const objectIdSkuId = new mongoose.Types.ObjectId(skuId);
+    // Match against both ObjectId and plain string — different collections store sku differently
+    const skuMatch = { $in: [objectIdSkuId, skuId] };
+
+    // Fetch all source data in parallel using $group and $lookup aggregations
+    // This replaces expensive in-memory array filtering and N+1 queries.
     const [openingBalances, purchaseOrders, manufacturingJobs, adjustments] = await Promise.all([
-        OpeningBalance.find({ sku: skuId })
-            .select('lotNumber cost')
-            .lean(),
-        PurchaseOrder.find({ 'lineItems.sku': skuId })
-            .select('lineItems.sku lineItems.lotNumber lineItems.cost lineItems.price lineItems.qtyReceived')
-            .lean(),
-        Manufacturing.find({ sku: skuId })
-            .select('sku qty qtyDifference lotNumber label totalCost lineItems labor packagingCost status')
-            .lean(),
-        AuditAdjustment.find({ sku: skuId })
-            .select('lotNumber cost')
-            .lean(),
+        // Priority 1: Opening Balances
+        OpeningBalance.aggregate([
+            { $match: { sku: skuMatch, cost: { $gt: 0 } } },
+            { $group: { _id: '$lotNumber', cost: { $first: '$cost' } } }
+        ]),
+        
+        // Priority 2: Purchase Orders
+        PurchaseOrder.aggregate([
+            { $match: { 'lineItems.sku': skuMatch } },
+            { $unwind: '$lineItems' },
+            { $match: { 
+                'lineItems.sku': skuMatch, 
+                'lineItems.qtyReceived': { $gt: 0 },
+                'lineItems.lotNumber': { $exists: true, $nin: [null, ''] },
+                $or: [ { 'lineItems.cost': { $gt: 0 } }, { 'lineItems.price': { $gt: 0 } } ]
+            }},
+            { $group: {
+                _id: '$lineItems.lotNumber',
+                cost: { $first: { $cond: [ { $gt: ['$lineItems.cost', 0] }, '$lineItems.cost', '$lineItems.price' ] } }
+            }}
+        ]),
+        
+        // Priority 3: Manufacturing
+        Manufacturing.aggregate([
+            { $match: { sku: skuMatch } },
+            { $unwind: { path: '$lineItems', preserveNullAndEmptyArrays: true } },
+            
+            // Phase 1: In-db lookup of OpeningBalance ingredient costs
+            { $lookup: {
+                from: 'openingbalances',
+                let: { iSku: '$lineItems.sku', iLot: '$lineItems.lotNumber' },
+                pipeline: [
+                    { $match: { $expr: { $and: [ { $eq: ['$sku', '$$iSku'] }, { $eq: ['$lotNumber', '$$iLot'] } ] } } },
+                    { $limit: 1 },
+                    { $project: { cost: 1 } }
+                ],
+                as: 'obData'
+            }},
+            
+            // Phase 2: In-db lookup of PurchaseOrder ingredient costs
+            { $lookup: {
+                from: 'purchaseorders',
+                let: { iSku: '$lineItems.sku', iLot: '$lineItems.lotNumber' },
+                pipeline: [
+                    { $match: { $expr: { $in: ['$$iSku', { $ifNull: ['$lineItems.sku', []] }] } } },
+                    { $unwind: '$lineItems' },
+                    { $match: { $expr: { $and: [ { $eq: ['$lineItems.sku', '$$iSku'] }, { $eq: ['$lineItems.lotNumber', '$$iLot'] } ] } } },
+                    { $limit: 1 },
+                    { $project: { cost: '$lineItems.cost', price: '$lineItems.price' } }
+                ],
+                as: 'poData'
+            }},
+            
+            // Group the unwound items back into a single job document
+            { $group: {
+                _id: '$_id',
+                sku: { $first: '$sku' },
+                qty: { $first: '$qty' },
+                qtyDifference: { $first: '$qtyDifference' },
+                lotNumber: { $first: '$lotNumber' },
+                label: { $first: '$label' },
+                totalCost: { $first: '$totalCost' },
+                labor: { $first: '$labor' },
+                packagingCost: { $first: '$packagingCost' },
+                status: { $first: '$status' },
+                lineItems: { $push: {
+                    sku: '$lineItems.sku',
+                    recipeQty: '$lineItems.recipeQty',
+                    qtyExtra: '$lineItems.qtyExtra',
+                    qtyScrapped: '$lineItems.qtyScrapped',
+                    lotNumber: '$lineItems.lotNumber',
+                    obCost: { $arrayElemAt: ['$obData.cost', 0] },
+                    poCost: { $let: {
+                        vars: { poLine: { $arrayElemAt: ['$poData', 0] } },
+                        in: { $cond: [{ $gt: ['$$poLine.cost', 0] }, '$$poLine.cost', '$$poLine.price'] }
+                    }}
+                }}
+            }}
+        ]),
+        
+        // Priority 4: Audit Adjustments
+        AuditAdjustment.aggregate([
+            { $match: { sku: skuMatch, cost: { $gt: 0 } } },
+            { $group: { _id: '$lotNumber', cost: { $first: '$cost' } } }
+        ])
     ]);
+
 
     const lotCosts = new Map<string, number>();
 
-    // Priority 1: Opening Balances
-    (openingBalances as any[]).forEach((ob: any) => {
-        const lot = cleanLot(ob.lotNumber);
+    // Apply Opening Balances
+    openingBalances.forEach((ob: any) => {
+        const lot = cleanLot(ob._id);
         if (lot && ob.cost && !lotCosts.has(lot)) {
             lotCosts.set(lot, ob.cost);
         }
     });
 
-    // Priority 2: Purchase Orders
-    (purchaseOrders as any[]).forEach((po: any) => {
-        po.lineItems?.forEach((line: any) => {
-            const lineSkuId = (line.sku?._id || line.sku)?.toString();
-            if (lineSkuId === skuId && line.qtyReceived > 0 && line.lotNumber) {
-                const lot = cleanLot(line.lotNumber);
-                const cost = line.cost || line.price || 0;
-                if (lot && cost > 0 && !lotCosts.has(lot)) {
-                    lotCosts.set(lot, cost);
-                }
-            }
-        });
-    });
-
-    // Priority 3: Manufacturing
-    // For manufactured items, we need ingredient costs to calculate costPerUnit
-    // Collect ingredient SKU IDs
-    const ingredientSkuIds = new Set<string>();
-    ingredientSkuIds.add(skuId);
-    (manufacturingJobs as any[]).forEach((job: any) => {
-        const jobSkuId = (job.sku?._id || job.sku)?.toString();
-        if (jobSkuId === skuId) {
-            job.lineItems?.forEach((li: any) => {
-                const liSkuId = (li.sku?._id || li.sku)?.toString();
-                if (liSkuId) ingredientSkuIds.add(liSkuId);
-            });
+    // Apply Purchase Orders
+    purchaseOrders.forEach((po: any) => {
+        const lot = cleanLot(po._id);
+        if (lot && po.cost > 0 && !lotCosts.has(lot)) {
+            lotCosts.set(lot, po.cost);
         }
     });
 
-    // Fetch ingredient costs
-    const [ingObs, ingPos] = await Promise.all([
-        OpeningBalance.find({ sku: { $in: Array.from(ingredientSkuIds) } }).lean(),
-        PurchaseOrder.find({ 'lineItems.sku': { $in: Array.from(ingredientSkuIds) } }).lean(),
-    ]);
-
-    const getIngredientCost = (iSkuId: string, lot: string): number => {
-        const ob = (ingObs as any[]).find(o => o.sku?.toString() === iSkuId && o.lotNumber === lot);
-        if (ob) return ob.cost || 0;
-        for (const po of (ingPos as any[])) {
-            const line = po.lineItems?.find((l: any) =>
-                (l.sku?._id || l.sku)?.toString() === iSkuId && l.lotNumber === lot
-            );
-            if (line) return line.cost || line.price || 0;
-        }
-        return 0;
-    };
-
+    // Apply Manufacturing
     const durationToHours = (duration: string): number => {
         if (!duration) return 0;
         const parts = duration.split(':').map(p => parseFloat(p) || 0);
@@ -131,10 +172,7 @@ export async function getLotsWithCost(skuId: string): Promise<Map<string, number
         return parts[0] || 0;
     };
 
-    (manufacturingJobs as any[]).forEach((job: any) => {
-        const jobSkuId = (job.sku?._id || job.sku)?.toString();
-        if (jobSkuId !== skuId) return;
-
+    manufacturingJobs.forEach((job: any) => {
         const lot = cleanLot(job.lotNumber || job.label);
         if (!lot || lotCosts.has(lot)) return;
 
@@ -148,10 +186,10 @@ export async function getLotsWithCost(skuId: string): Promise<Map<string, number
             // Calculate from components (materials + labor + packaging)
             let totalMatCost = 0;
             job.lineItems?.forEach((li: any) => {
-                const liSkuId = (li.sku?._id || li.sku)?.toString();
-                if (!liSkuId) return;
+                if (!li.sku) return;
                 const totalConsumed = ((li.recipeQty || 0) * (job.qty || 0)) + (li.qtyExtra || 0) + (li.qtyScrapped || 0);
-                totalMatCost += totalConsumed * getIngredientCost(liSkuId, li.lotNumber);
+                const ingredientCost = li.obCost || li.poCost || 0;
+                totalMatCost += totalConsumed * ingredientCost;
             });
 
             let totalLaborCost = 0;
@@ -167,9 +205,9 @@ export async function getLotsWithCost(skuId: string): Promise<Map<string, number
         lotCosts.set(lot, costPerUnit);
     });
 
-    // Priority 4: Audit Adjustments
-    (adjustments as any[]).forEach((adj: any) => {
-        const lot = cleanLot(adj.lotNumber);
+    // Apply Audit Adjustments
+    adjustments.forEach((adj: any) => {
+        const lot = cleanLot(adj._id);
         if (lot && adj.cost && !lotCosts.has(lot)) {
             lotCosts.set(lot, adj.cost);
         }

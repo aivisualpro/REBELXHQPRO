@@ -191,10 +191,10 @@ function WebOrdersContent() {
 
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('search') || '');
-  const [sortBy, setSortBy] = useState('dateCreated');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [activeStatus, setActiveStatus] = useState<string>('All');
-  const [selectedWebsites, setSelectedWebsites] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState(searchParams.get('sortBy') || 'dateCreated');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>((searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc');
+  const [activeStatus, setActiveStatus] = useState<string>(searchParams.get('status') || 'All');
+  const [selectedWebsites, setSelectedWebsites] = useState<string[]>(searchParams.get('websites') ? searchParams.get('websites')!.split(',') : []);
   const [availableWebsites, setAvailableWebsites] = useState<string[]>([]);
   const [websiteDropdownOpen, setWebsiteDropdownOpen] = useState(false);
   const websiteDropdownRef = useRef<HTMLDivElement | null>(null);
@@ -202,9 +202,9 @@ function WebOrdersContent() {
   // Date Filter
   const [dateFilterOpen, setDateFilterOpen] = useState(false);
   const dateFilterRef = useRef<HTMLDivElement | null>(null);
-  const [datePreset, setDatePreset] = useState<string>('All Time');
-  const [fromDate, setFromDate] = useState<string>('');
-  const [toDate, setToDate] = useState<string>('');
+  const [datePreset, setDatePreset] = useState<string>(searchParams.get('datePreset') || 'All Time');
+  const [fromDate, setFromDate] = useState<string>(searchParams.get('fromDate') || '');
+  const [toDate, setToDate] = useState<string>(searchParams.get('toDate') || '');
 
   const handleDatePreset = (preset: string) => {
     const today = new Date();
@@ -272,14 +272,32 @@ function WebOrdersContent() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Sync search to URL
+  // Sync filters to URL
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams();
+    
     if (debouncedSearch) params.set('search', debouncedSearch);
-    else params.delete('search');
-    const newUrl = `${window.location.pathname}${params.toString() ? '?' + params.toString() : ''}`;
-    router.replace(newUrl, { scroll: false });
-  }, [debouncedSearch, router]);
+    if (sortBy !== 'dateCreated') params.set('sortBy', sortBy);
+    if (sortOrder !== 'desc') params.set('sortOrder', sortOrder);
+    if (activeStatus !== 'All') params.set('status', activeStatus);
+    if (selectedWebsites.length > 0) params.set('websites', selectedWebsites.join(','));
+    if (datePreset !== 'All Time') params.set('datePreset', datePreset);
+    if (fromDate) params.set('fromDate', fromDate);
+    if (toDate) params.set('toDate', toDate);
+
+    if (productIdFilter) params.set('productId', productIdFilter);
+    if (variationIdFilter) params.set('variationId', variationIdFilter);
+    if (websiteFilter) params.set('website', websiteFilter);
+
+    const qs = params.toString();
+    const newUrl = `${window.location.pathname}${qs ? '?' + qs : ''}`;
+    
+    // Only replace if it has actually changed to prevent infinite loops
+    const currentQs = window.location.search.replace(/^\?/, '');
+    if (currentQs !== qs) {
+      router.replace(newUrl, { scroll: false });
+    }
+  }, [debouncedSearch, sortBy, sortOrder, activeStatus, selectedWebsites, datePreset, fromDate, toDate, productIdFilter, variationIdFilter, websiteFilter, router]);
 
   // Scroll-back & highlight
   const [highlightId, setHighlightId] = useState<string | null>(null);
@@ -300,7 +318,7 @@ function WebOrdersContent() {
   }, []);
 
   // Status tabs & counts
-  const STATUS_TABS = ['All', 'processing', 'completed', 'on-hold', 'pending', 'cancelled', 'refunded', 'failed'] as const;
+  const STATUS_TABS = ['All', 'processing', 'completed', 'on-hold', 'pending', 'refunded'] as const;
   const STATUS_LABELS: Record<string, string> = { All: 'All', processing: 'Processing', completed: 'Completed', 'on-hold': 'On Hold', pending: 'Pending', cancelled: 'Cancelled', refunded: 'Refunded', failed: 'Failed' };
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({ All: 0, processing: 0, completed: 0, 'on-hold': 0, pending: 0, cancelled: 0, refunded: 0, failed: 0 });
   const [countsLoaded, setCountsLoaded] = useState(false);

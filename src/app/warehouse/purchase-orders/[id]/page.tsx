@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { ArrowLeft, Package, Calendar, Building2, CreditCard, Truck, Plus, X, Trash2, Pencil, ChevronDown, AlertCircle, StickyNote, Send, Loader2 } from 'lucide-react';
 import { cn, formatDate, toDateInputValue } from '@/lib/utils';
@@ -65,6 +65,9 @@ const UOM_OPTIONS = [
 export default function PurchaseOrderDetailPage() {
     const params = useParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const highlightSku = searchParams.get('highlightSku');
+    
     const [order, setOrder] = useState<PurchaseOrder | null>(null);
     const [loading, setLoading] = useState(true);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -723,7 +726,21 @@ export default function PurchaseOrderDetailPage() {
                                             const amount = (item.qtyOrdered || 0) * (item.cost || 0);
 
                                             return (
-                                                <tr key={item._id} className="hover:bg-secondary transition-colors">
+                                                <tr
+                                                    key={item._id}
+                                                    className={cn(
+                                                        "transition-all duration-700 group",
+                                                        highlightSku && skuId === highlightSku 
+                                                            ? "bg-indigo-500/20 border-l-4 border-l-indigo-500 hover:bg-indigo-500/30" 
+                                                            : "hover:bg-secondary border-l-4 border-l-transparent"
+                                                    )}
+                                                    ref={(el) => {
+                                                        if (el && highlightSku && skuId === highlightSku && !el.dataset.scrolled) {
+                                                            el.dataset.scrolled = "true";
+                                                            setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+                                                        }
+                                                    }}
+                                                >
                                                     <td className="px-3 py-1.5 text-[10px] text-foreground">
                                                         <span
                                                             onClick={() => router.push(`/warehouse/skus/${skuId}`)}

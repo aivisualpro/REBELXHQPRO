@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import { google } from 'googleapis';
 import { Readable } from 'stream';
 
@@ -101,7 +102,7 @@ export async function generatePdfFromTemplate(
             });
             const files = orphans.data.files || [];
             if (files.length > 0) {
-                console.log(`Cleaning up ${files.length} orphaned _tmp_pdf_ files...`);
+                logger.info(`Cleaning up ${files.length} orphaned _tmp_pdf_ files...`);
                 for (const f of files) {
                     try {
                         await drive.files.delete({ fileId: f.id! });
@@ -110,7 +111,7 @@ export async function generatePdfFromTemplate(
             }
         } catch (cleanupErr) {
             // Non-critical — continue with PDF generation
-            console.warn('Temp file cleanup failed (non-critical):', cleanupErr);
+            logger.warn(cleanupErr, 'Temp file cleanup failed (non-critical)');
         }
 
         // 1. Backup template as DOCX for safe restore after PDF export
@@ -137,7 +138,7 @@ export async function generatePdfFromTemplate(
                     const templateRowIndex = rows.length - 1;
                     const tableStartIndex = element.startIndex ?? element.table.tableRows?.[0]?.tableCells?.[0]?.content?.[0]?.startIndex;
                     if (tableStartIndex == null) {
-                        console.warn('Could not determine table start index, skipping row insertion');
+                        logger.warn('Could not determine table start index, skipping row insertion');
                         continue;
                     }
 
@@ -315,18 +316,18 @@ async function restoreAndVerify(
             if (bodyText.includes('{{')) {
                 // Placeholders are restored — success
                 if (attempt > 0) {
-                    console.log(`Template restored after ${attempt + 1} attempts`);
+                    logger.info(`Template restored after ${attempt + 1} attempts`);
                 }
                 return;
             }
 
-            console.warn(`Restore attempt ${attempt + 1}: placeholders not found yet, retrying...`);
+            logger.warn(`Restore attempt ${attempt + 1}: placeholders not found yet, retrying...`);
         } catch (restoreErr) {
-            console.error(`Restore attempt ${attempt + 1} failed:`, restoreErr);
+            logger.error(restoreErr, `Restore attempt ${attempt + 1} failed:`);
         }
     }
 
-    console.error('CRITICAL: Template restore verification failed after all retries. ' +
+    logger.error('CRITICAL: Template restore verification failed after all retries. ' +
         'The template may need manual restoration from Google Docs version history.');
 }
 

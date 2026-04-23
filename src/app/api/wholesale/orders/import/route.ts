@@ -176,9 +176,13 @@ export async function POST(request: Request) {
         console.log(`[import-orders] Operations prepared: ${operations.length}, Skipped (no legacyId): ${skippedCount}`);
 
         if (operations.length > 0) {
-            const result = await SaleOrder.bulkWrite(operations, { ordered: false });
-            count = (result.upsertedCount || 0) + (result.modifiedCount || 0);
-            console.log(`[import-orders] Bulk write completed: ${count} orders processed (${result.upsertedCount} inserted, ${result.modifiedCount} modified)`);
+            const session = await mongoose.startSession();
+            await session.withTransaction(async () => {
+                const result = await SaleOrder.bulkWrite(operations, { ordered: false, session });
+                count = (result.upsertedCount || 0) + (result.modifiedCount || 0);
+                console.log(`[import-orders] Bulk write completed: ${count} orders processed (${result.upsertedCount} inserted, ${result.modifiedCount} modified)`);
+            });
+            await session.endSession();
         }
 
         // Skip AppSheet sync during bulk import for performance
