@@ -53,6 +53,7 @@ const COLUMNS = [
     { key: 'qty', label: 'Qty', sortable: true, width: 'w-[60px]', align: 'text-right' as const },
     { key: 'reason', label: 'Reason', sortable: true, width: 'w-[370px]' },
     { key: 'createdBy', label: 'Created By', sortable: false, width: 'w-[140px]' },
+    { key: 'actions', label: '', sortable: false, width: 'w-[80px]', align: 'text-right' as const },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -178,6 +179,28 @@ const TableRow = React.memo(function TableRow({
             {/* Created By */}
             <td className="px-2.5 py-2.5 text-[12px] font-medium text-foreground/80 truncate cursor-pointer">
                 {userName}
+            </td>
+
+            {/* Actions */}
+            <td className="px-2.5 py-2.5 text-right">
+                <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                        onClick={onEdit}
+                        className="p-1.5 rounded-md text-muted-foreground/60 hover:text-primary hover:bg-primary/10 transition-colors"
+                        title="Edit Adjustment"
+                    >
+                        <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    {canDelete() && (
+                        <button
+                            onClick={onDelete}
+                            className="p-1.5 rounded-md text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                            title="Delete Adjustment"
+                        >
+                            <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                    )}
+                </div>
             </td>
 
         </tr>
