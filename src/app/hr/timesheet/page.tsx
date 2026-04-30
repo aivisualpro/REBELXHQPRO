@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import {
     CalendarDays, Plus, Search, X, Loader2, Clock, DollarSign, Trash2, Pencil,
     ChevronLeft, ChevronRight, Download, Calendar, ChevronDown, Users, FileText
@@ -30,7 +30,7 @@ interface TimeSheetEntry {
     createdBy: string;
 }
 
-export default function TimeSheetPage() {
+function TimeSheetContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
 
@@ -842,5 +842,13 @@ export default function TimeSheetPage() {
                 </div>
             )}
         </div>
+    );
+}
+
+export default function TimeSheetPage() {
+    return (
+        <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
+            <TimeSheetContent />
+        </Suspense>
     );
 }
