@@ -342,9 +342,8 @@ export default function OpeningBalanceDetailPage() {
                 headerPortal
             )}
 
-            <div className="flex flex-1 overflow-hidden">
-                {/* Left Sidebar: Details (30%) */}
-                <div className="w-[30%] border-r border-border bg-secondary/30 flex flex-col overflow-hidden relative z-10">
+            <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
+                <div className="w-full lg:w-[30%] border-b lg:border-b-0 lg:border-r border-border bg-secondary/30 flex flex-col overflow-hidden relative z-10 max-h-[40vh] lg:max-h-none">
 
                     {/* SKU Identity Header - Fixed */}
                     <div className="h-16 bg-card border-b border-border shrink-0 flex overflow-hidden">
@@ -564,7 +563,7 @@ export default function OpeningBalanceDetailPage() {
                 </div>
 
                 {/* Right Content: Tabs (70%) */}
-                <div className="w-[70%] bg-background flex flex-col overflow-hidden">
+                <div className="w-full lg:w-[70%] bg-background flex flex-col overflow-hidden flex-1">
                     {/* Tabs & Actions */}
                     <div className="px-4 border-b border-border shrink-0 flex items-center justify-between bg-background z-10 h-9">
                         <div className="flex space-x-1 h-full">

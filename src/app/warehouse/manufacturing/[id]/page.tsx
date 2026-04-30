@@ -648,9 +648,9 @@ export default function ManufacturingDetailPage() {
     return (
         <div className="flex flex-col h-[calc(100vh-48px)] bg-background overflow-hidden relative">
 
-            <div className="flex flex-1 overflow-hidden">
-                {/* Left Sidebar: Details (30%) */}
-                <div className="w-[30%] border-r border-border bg-background overflow-y-auto scrollbar-custom flex flex-col">
+            <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
+                {/* Left Sidebar: Details (30% desktop, full-width stacked on mobile) */}
+                <div className="w-full lg:w-[30%] border-b lg:border-b-0 lg:border-r border-border bg-background overflow-y-auto scrollbar-custom flex flex-col max-h-[40vh] lg:max-h-none">
                     {/* Back + Actions Bar */}
                     <div className="flex items-center justify-end px-4 h-9 border-b border-border shrink-0">
                         <Link
@@ -953,10 +953,10 @@ export default function ManufacturingDetailPage() {
                     </div>
                 </div>
 
-                {/* Right Content: Tabs (70%) */}
-                <div className="w-[70%] bg-background flex flex-col overflow-hidden">
+                {/* Right Content: Tabs (70% desktop, full-width on mobile) */}
+                <div className="w-full lg:w-[70%] bg-background flex flex-col overflow-hidden flex-1">
                     {/* Tabs & Actions */}
-                    <div className="px-4 border-b border-border shrink-0 flex items-center justify-between bg-background z-10 h-9">
+                    <div className="px-2 sm:px-4 border-b border-border shrink-0 flex items-center justify-between bg-background z-10 h-9 overflow-x-auto">
                         <div className="flex space-x-1">
                             {(() => {
                                 const tabCounts: Record<string, number> = {
@@ -973,7 +973,7 @@ export default function ManufacturingDetailPage() {
                                         key={tab}
                                         onClick={() => setActiveTab(tab)}
                                         className={cn(
-                                            "px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors border-b-2 -mb-px outline-none flex items-center space-x-1.5",
+                                            "px-2 sm:px-4 py-3 text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-colors border-b-2 -mb-px outline-none flex items-center space-x-1 whitespace-nowrap",
                                             activeTab === tab
                                                 ? "text-foreground border-foreground"
                                                 : "text-muted-foreground border-transparent hover:text-foreground/70"
@@ -1008,7 +1008,7 @@ export default function ManufacturingDetailPage() {
                                     className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-emerald-500 text-white border border-emerald-600 hover:bg-emerald-600 transition-colors flex items-center space-x-1"
                                 >
                                     <Plus className="w-3 h-3" />
-                                    <span>Add Item</span>
+                                    <span className="hidden sm:inline">Add Item</span>
                                 </button>
                             )}
                             {activeTab === 'Labor' && (
@@ -1021,7 +1021,7 @@ export default function ManufacturingDetailPage() {
                                     className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-emerald-500 text-white border border-emerald-600 hover:bg-emerald-600 transition-colors flex items-center space-x-1"
                                 >
                                     <Plus className="w-3 h-3" />
-                                    <span>Add Labor</span>
+                                    <span className="hidden sm:inline">Add Labor</span>
                                 </button>
                             )}
                             {activeTab === 'WO Notes' && (
@@ -1033,7 +1033,7 @@ export default function ManufacturingDetailPage() {
                                     className="px-2 py-1 text-[10px] font-black uppercase tracking-widest bg-emerald-500 text-white border border-emerald-600 hover:bg-emerald-600 transition-colors flex items-center space-x-1"
                                 >
                                     <Plus className="w-3 h-3" />
-                                    <span>Add Note</span>
+                                    <span className="hidden sm:inline">Add Note</span>
                                 </button>
                             )}
                         </div>

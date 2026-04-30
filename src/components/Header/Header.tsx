@@ -55,16 +55,16 @@ export const Header = () => {
 
     return (
         <header className="sticky top-0 z-[1000] w-full bg-background border-b border-border transition-colors duration-300">
-            <div className="max-w-[1600px] mx-auto h-9 px-4 flex items-center">
-                {/* Left: 5% Logo */}
-                <div className="w-[5%] flex items-center">
+            <div className="max-w-[1600px] mx-auto h-9 px-2 sm:px-4 flex items-center">
+                {/* Left: Logo */}
+                <div className="shrink-0 flex items-center lg:w-[5%]">
                     <Link
                         href="/"
                         className="flex items-center group"
                         onMouseEnter={() => setIsHovered(true)}
                         onMouseLeave={() => setIsHovered(false)}
                     >
-                        <div className="logo-container relative h-8 w-8">
+                        <div className="logo-container relative h-7 w-7 sm:h-8 sm:w-8">
                             {/* Outer glow aura */}
                             <span className="logo-aura" />
 
@@ -92,18 +92,18 @@ export const Header = () => {
                     </Link>
                 </div>
 
-                {/* Navigation: 40% Menus */}
-                <div className="w-[40%] h-full">
+                {/* Navigation: Menus - hidden on mobile/tablet, MobileMenu handles that */}
+                <div className="hidden lg:block lg:w-[40%] h-full">
                     <MegaMenu />
                 </div>
 
-                {/* Route Context: 35% - Dynamic title + route-specific actions */}
-                <div className="w-[35%] h-full flex items-center">
+                {/* Route Context: Dynamic title + route-specific actions - hidden on mobile */}
+                <div className="hidden lg:flex lg:w-[35%] h-full items-center">
                     <RouteContext />
                 </div>
 
-                {/* Right: 20% Actions - Global actions */}
-                <div className="w-[20%] flex items-center justify-end">
+                {/* Right: Actions - fills remaining space on mobile */}
+                <div className="flex-1 lg:w-[20%] flex items-center justify-end gap-1">
                     <DynamicActions />
                     <MobileMenu />
                 </div>

@@ -601,9 +601,9 @@ function SkuDetailsPageContent() {
     return (
         <div className="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-background">
             {/* Main Content Band (Split view) */}
-            <div className="flex-1 flex overflow-hidden min-h-0 bg-background">
-                {/* Left Column (30%) - Independent Scroll */}
-                <aside className="w-[30%] h-full border-r border-border bg-background shrink-0 flex flex-col overflow-hidden">
+            <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0 bg-background">
+                {/* Left Column (30% desktop, full-width stacked on mobile) */}
+                <aside className="w-full lg:w-[30%] max-h-[35vh] lg:max-h-none h-auto lg:h-full border-b lg:border-b-0 lg:border-r border-border bg-background shrink-0 flex flex-col overflow-hidden">
                     <div className="flex-1 overflow-y-auto scrollbar-custom">
                         {/* SKU Hero Section - 3 Column: Image | Tier | Name */}
                         <div className="px-4 pt-4 pb-4">

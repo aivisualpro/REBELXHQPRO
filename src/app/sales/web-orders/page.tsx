@@ -478,13 +478,13 @@ function WebOrdersContent() {
             </button>
           </div>
         )}
-        <div className="px-4 py-2.5 flex items-center gap-4">
+        <div className="px-3 sm:px-4 py-2 flex flex-wrap items-center gap-2 sm:gap-4">
           <div className="flex items-center gap-2 shrink-0">
             <ShoppingBag className="w-4 h-4 text-primary" />
             <h1 className="text-[14px] font-black uppercase tracking-widest text-foreground">Web Orders</h1>
           </div>
           <div className="h-5 w-px bg-border shrink-0" />
-          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-thin">
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-thin flex-1 min-w-0 sm:flex-none">
             {STATUS_TABS.map((tab) => {
               const sc = statusColors[tab]; const isActive = activeStatus === tab;
               return (
@@ -504,7 +504,7 @@ function WebOrdersContent() {
           <div className="h-5 w-px bg-border shrink-0" />
 
           {/* Website Filter Dropdown */}
-          <div ref={websiteDropdownRef} className="relative shrink-0">
+          <div ref={websiteDropdownRef} className="relative shrink-0 hidden sm:block">
             <button
               onClick={() => setWebsiteDropdownOpen(p => !p)}
               className={cn(
@@ -581,13 +581,13 @@ function WebOrdersContent() {
             )}
           </div>
 
-          <div className="flex-1" />
+          <div className="hidden sm:block flex-1" />
 
           {/* Search */}
-          <div className="relative shrink-0">
+          <div className="relative shrink-0 w-full sm:w-auto order-last sm:order-none">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <input type="text" placeholder="Search orders..." value={search} onChange={e => setSearch(e.target.value)}
-              className="pl-8 pr-8 h-8 w-56 bg-background border border-border text-[12px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded" />
+              className="pl-8 pr-8 h-8 w-full sm:w-56 bg-background border border-border text-[12px] focus:outline-none focus:ring-1 focus:ring-primary/5 transition-all placeholder:text-muted-foreground text-foreground rounded" />
             {search && (<button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors z-20 cursor-pointer"><X className="h-3 w-3" /></button>)}
           </div>
           {/* Date Filter */}
@@ -647,12 +647,12 @@ function WebOrdersContent() {
           </div>
           {/* Export */}
           <button onClick={handleExportLineItems} disabled={exporting}
-            className="flex items-center space-x-1.5 px-3 h-8 text-[10px] font-bold uppercase tracking-wider rounded border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer disabled:opacity-50 shrink-0">
+            className="flex items-center space-x-1.5 px-3 h-8 text-[10px] font-bold uppercase tracking-wider rounded border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer disabled:opacity-50 shrink-0 hidden sm:flex">
             {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}<span>Export</span>
           </button>
           {/* Import */}
           <button onClick={() => fileInputRef.current?.click()} disabled={importing}
-            className="flex items-center space-x-1.5 px-3 h-8 text-[10px] font-bold uppercase tracking-wider rounded border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer disabled:opacity-50 shrink-0">
+            className="flex items-center space-x-1.5 px-3 h-8 text-[10px] font-bold uppercase tracking-wider rounded border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer disabled:opacity-50 shrink-0 hidden sm:flex">
             {importing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}<span>Import</span>
           </button>
           <input ref={fileInputRef} type="file" accept=".csv" onChange={handleImportLineItems} className="hidden" />

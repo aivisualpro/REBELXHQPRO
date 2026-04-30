@@ -208,9 +208,8 @@ export default function AuditAdjustmentDetailPage() {
                 headerPortal
             )}
 
-            <div className="flex flex-1 overflow-hidden">
-                {/* Left Sidebar: Details (30%) */}
-                <div className="w-[30%] border-r border-border bg-secondary/30 flex flex-col overflow-hidden">
+            <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
+                <div className="w-full lg:w-[30%] border-b lg:border-b-0 lg:border-r border-border bg-secondary/30 flex flex-col overflow-hidden max-h-[40vh] lg:max-h-none">
                     <div className="flex-1 overflow-y-auto p-4 space-y-4">
                         {/* Identity Boxes - 3 columns: Number, SKU, Lot # */}
                         <div className="grid grid-cols-3 gap-2">
@@ -308,7 +307,7 @@ export default function AuditAdjustmentDetailPage() {
                 </div>
 
                 {/* Right Content (70%) */}
-                <div className="w-[70%] bg-background flex flex-col overflow-hidden">
+                <div className="w-full lg:w-[70%] bg-background flex flex-col overflow-hidden flex-1">
                     <div className="flex-1 overflow-y-auto p-6">
                         {isEditing ? (
                             <div className="max-w-xl mx-auto space-y-6 animate-in fade-in duration-300">

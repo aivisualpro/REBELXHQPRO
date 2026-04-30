@@ -170,12 +170,12 @@ function VacationsContent() {
     return (
         <div className="flex flex-col h-[calc(100vh-48px)] bg-background text-foreground">
             {/* Header */}
-            <div className="shrink-0 border-b border-border bg-card/80 backdrop-blur-sm px-4 py-2.5 flex items-center gap-3">
+            <div className="shrink-0 border-b border-border bg-card/80 backdrop-blur-sm px-3 sm:px-4 py-2 flex flex-wrap items-center gap-2 sm:gap-3">
                 <Palmtree className="w-5 h-5 text-primary" />
                 <h1 className="text-[13px] font-black uppercase tracking-widest">Vacations</h1>
 
                 {/* Status filter chips */}
-                <div className="flex items-center gap-1.5 ml-4">
+                <div className="flex items-center gap-1.5 sm:ml-4">
                     {['', 'Pending', 'Approved', 'Rejected'].map(s => (
                         <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }}
                             className={cn('px-2.5 py-1 text-[10px] font-bold rounded-md border transition-all cursor-pointer',
@@ -200,7 +200,7 @@ function VacationsContent() {
                 <div className="flex-1" />
 
                 {/* KPI Chips */}
-                <div className="flex items-center gap-2">
+                <div className="hidden sm:flex items-center gap-2">
                     <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/10 border border-amber-500/20">
                         <AlertCircle className="w-3 h-3 text-amber-400" />
                         <span className="text-[10px] font-bold text-amber-400">{summary.pending} Pending</span>

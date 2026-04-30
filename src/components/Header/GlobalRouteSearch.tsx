@@ -98,7 +98,7 @@ export const GlobalRouteSearch = () => {
                             initial={{ opacity: 0, scale: 0.95, y: -20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: -20 }}
-                            className="fixed top-[15vh] left-1/2 -translate-x-1/2 w-full max-w-lg bg-card border border-border shadow-2xl rounded-2xl overflow-hidden z-[2001]"
+                            className="fixed top-[10vh] sm:top-[15vh] left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] sm:w-full max-w-lg bg-card border border-border shadow-2xl rounded-2xl overflow-hidden z-[2001]"
                         >
                             <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
                                 <Search className="w-5 h-5 text-muted-foreground" />

@@ -450,3 +450,87 @@ body {
   color: #cbd5e1 !important;
   border: 1px solid rgba(100, 116, 139, 0.3) !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE: MOBILE & TABLET
+   These styles only affect ≤1024px screens.
+   Desktop layout (>1024px) is UNTOUCHED.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Tablet (≤1024px) ───────────────────────────────────────── */
+@media (max-width: 1024px) {
+
+  /* Scrollbar - slimmer on tablet */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  /* Table cells - slightly larger touch targets */
+  td {
+    font-size: 11px;
+    padding: 8px 6px;
+  }
+}
+
+/* ── Mobile (≤768px) ────────────────────────────────────────── */
+@media (max-width: 768px) {
+
+  /* Kill custom scrollbar on mobile - use native */
+  ::-webkit-scrollbar {
+    width: 2px;
+    height: 2px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    border: none;
+  }
+
+  /* Glass header - full opacity on mobile */
+  .glass-header {
+    opacity: 1;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  /* Logo breathing - reduce motion on mobile */
+  .logo-container {
+    animation: none;
+  }
+
+  .logo-shimmer::after {
+    animation: none;
+  }
+
+  /* Tables - allow horizontal scroll */
+  td {
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  th {
+    white-space: nowrap;
+  }
+}
+
+/* ── Mobile-specific utility classes ────────────────────────── */
+@media (max-width: 768px) {
+  /* Hide on mobile */
+  .mobile-hidden {
+    display: none !important;
+  }
+}
+
+@media (min-width: 769px) {
+  /* Show only on mobile */
+  .mobile-only {
+    display: none !important;
+  }
+}
+
+@media (max-width: 1024px) and (min-width: 769px) {
+  /* Tablet-only visibility */
+  .tablet-hidden {
+    display: none !important;
+  }
+}

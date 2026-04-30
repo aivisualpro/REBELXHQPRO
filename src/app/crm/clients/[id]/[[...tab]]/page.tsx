@@ -768,7 +768,7 @@ export default function ClientDashboardPage() {
         <>
             <div className="flex flex-col h-[calc(100vh-40px)] overflow-hidden bg-background">
                 {/* Shell Layer 1: Route Header */}
-                <div className="sticky top-0 z-[50] bg-card border-b border-border px-4 flex items-center space-x-2 shrink-0 h-9">
+                <div className="sticky top-0 z-[50] bg-card border-b border-border px-2 sm:px-4 flex items-center space-x-2 shrink-0 h-9">
                     <button
                         onClick={() => router.back()}
                         className="w-7 h-7 bg-primary flex items-center justify-center text-primary-foreground hover:bg-primary/90 transition-colors shrink-0 rounded"
@@ -794,7 +794,7 @@ export default function ClientDashboardPage() {
                         />
                     </div>
 
-                    <div className="flex items-center space-x-1 h-7 ml-4">
+                    <div className="flex items-center space-x-1 h-7 ml-2 sm:ml-4 overflow-x-auto scrollbar-thin">
                         {[
                             { id: 'Emails', icon: Mail, count: summary?.totalEmails },
                             { id: 'Calls', icon: Phone, count: summary?.totalCalls },
@@ -809,14 +809,14 @@ export default function ClientDashboardPage() {
                                     setSearchQuery(''); // Clear search when switching tabs
                                 }}
                                 className={cn(
-                                    "flex items-center space-x-2 px-4 h-full text-[10px] font-bold uppercase tracking-widest transition-all rounded-md",
+                                    "flex items-center space-x-1 sm:space-x-2 px-2 sm:px-4 h-full text-[9px] sm:text-[10px] font-bold uppercase tracking-widest transition-all rounded-md whitespace-nowrap",
                                     activeTab === tab.id
                                         ? "bg-[#fe9900] text-black shadow-sm"
                                         : "text-muted-foreground hover:text-foreground hover:bg-secondary"
                                 )}
                             >
                                 <tab.icon className="w-3.5 h-3.5" />
-                                <span>{tab.id}</span>
+                                <span className="hidden sm:inline">{tab.id}</span>
                                 {tab.count !== undefined && (
                                     <span className={cn(
                                         "px-1.5 py-0.5 text-[9px] rounded-sm font-mono",
@@ -831,9 +831,9 @@ export default function ClientDashboardPage() {
                 </div>
 
                 {/* Shell Layer 2: Main Content Split */}
-                <div className="flex-1 flex overflow-hidden min-h-0 bg-background">
-                    {/* Left Column (30%) - Client Details */}
-                    <aside className="w-[30%] h-full overflow-y-auto border-r border-border bg-card shrink-0 scrollbar-custom">
+                <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0 bg-background">
+                    {/* Left Column (30% desktop, full-width stacked on mobile) */}
+                    <aside className="w-full lg:w-[30%] max-h-[35vh] lg:max-h-none h-auto lg:h-full overflow-y-auto border-b lg:border-b-0 lg:border-r border-border bg-card shrink-0 scrollbar-custom">
                         <div className="p-4 space-y-6">
 
                             {/* Client Info Section */}

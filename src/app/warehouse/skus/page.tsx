@@ -248,7 +248,7 @@ function SkuModal({ onClose, onSaved, editing }: { onClose: () => void; onSaved:
           <form id="sku-form" onSubmit={handleSubmit} className="space-y-4">
             <Field label="Name *"><input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className={inp} /></Field>
             <Field label="Image URL"><input value={form.image} onChange={e => setForm({ ...form, image: e.target.value })} placeholder="https://..." className={inp} /></Field>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Field label="Category">
                 <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className={inp}>
                   <option value="">Select...</option>
@@ -268,7 +268,7 @@ function SkuModal({ onClose, onSaved, editing }: { onClose: () => void; onSaved:
                 </select>
               </Field>
             </div>
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <Field label="UOM">
                 <input list="uom-opts" value={form.uom} onChange={e => setForm({ ...form, uom: e.target.value })} placeholder="EA, G, MG..." className={inp} />
                 <datalist id="uom-opts">{['EA', 'G', 'GAL', 'HR', 'KG', 'L', 'LBS', 'MG', 'ML', 'OZ'].map(o => <option key={o} value={o} />)}</datalist>
@@ -559,7 +559,7 @@ function SkusContent() {
     <div className="flex flex-col h-[calc(100vh-48px)] bg-background transition-colors duration-300">
 
       {/* ─── Local Header ──────────────────────────────────────────────── */}
-      <div className="shrink-0 border-b border-border bg-background px-3 py-2 flex items-center gap-3 overflow-x-auto">
+      <div className="shrink-0 border-b border-border bg-background px-3 py-2 flex flex-wrap items-center gap-2 sm:gap-3 overflow-x-auto">
 
         {/* Title */}
         <div className="flex items-center gap-2 shrink-0">
@@ -588,18 +588,18 @@ function SkusContent() {
         <div className="h-5 w-px bg-border shrink-0" />
 
         {/* Search */}
-        <div className="relative flex items-center shrink-0">
+        <div className="relative flex items-center shrink-0 w-full sm:w-auto order-last sm:order-none">
           <Search className="absolute left-2.5 w-3.5 h-3.5 text-muted-foreground/50 pointer-events-none" />
           <input
             type="text"
             placeholder="Search SKUs..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="pl-8 pr-3 h-8 w-56 bg-secondary border border-border text-[12px] rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50 placeholder:text-muted-foreground/50 text-foreground transition-all"
+            className="pl-8 pr-3 h-8 w-full sm:w-56 bg-secondary border border-border text-[12px] rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50 placeholder:text-muted-foreground/50 text-foreground transition-all"
           />
         </div>
 
-        <div className="flex-1" />
+        <div className="hidden sm:block flex-1" />
 
         {/* No Transactions filter */}
         <button
@@ -608,7 +608,7 @@ function SkusContent() {
           title={noTransactions ? 'Showing SKUs with no transactions' : 'Filter: No Transactions'}
         >
           <FileX2 className="w-3.5 h-3.5" />
-          <span>No Transactions</span>
+          <span className="hidden sm:inline">No Transactions</span>
         </button>
 
         {/* Show Archived toggle */}
@@ -618,7 +618,7 @@ function SkusContent() {
           title={showArchived ? 'Viewing Archived SKUs' : 'Show Archived SKUs'}
         >
           <Archive className="w-3.5 h-3.5" />
-          <span>Archived</span>
+          <span className="hidden sm:inline">Archived</span>
         </button>
 
         {/* Add Button */}
@@ -627,7 +627,7 @@ function SkusContent() {
           className="h-8 px-3 bg-primary text-black hover:opacity-90 transition-all rounded-lg shadow flex items-center gap-1.5 cursor-pointer shrink-0"
         >
           <Plus className="w-3.5 h-3.5" />
-          <span className="text-[11px] font-black uppercase tracking-widest">ADD</span>
+          <span className="hidden sm:inline text-[11px] font-black uppercase tracking-widest">ADD</span>
         </button>
       </div>
 

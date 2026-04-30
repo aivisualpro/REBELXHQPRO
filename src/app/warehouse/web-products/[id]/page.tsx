@@ -263,9 +263,8 @@ export default function WebProductDetailsPage() {
                 headerPortal
             )}
 
-            <div className="flex flex-1 overflow-hidden">
-                {/* Left Sidebar: Details (30%) */}
-                <div className="w-[30%] border-r border-border bg-background flex flex-col overflow-hidden">
+            <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
+                <div className="w-full lg:w-[30%] border-b lg:border-b-0 lg:border-r border-border bg-background flex flex-col overflow-hidden max-h-[40vh] lg:max-h-none">
                     <div className="flex-1 overflow-y-auto scrollbar-custom">
                         {/* Hero Bar: Image | Name */}
                         <div className="px-4 pt-4 pb-4">
@@ -505,7 +504,7 @@ export default function WebProductDetailsPage() {
                 </div>
 
                 {/* Right Content: Tabs (70%) */}
-                <div className="w-[70%] bg-background flex flex-col overflow-hidden">
+                <div className="w-full lg:w-[70%] bg-background flex flex-col overflow-hidden flex-1">
                     {/* Tabs & Actions */}
                     <div className="px-4 border-b border-border shrink-0 flex items-center justify-between bg-background z-10 h-9">
                         <div className="flex space-x-1 h-full">

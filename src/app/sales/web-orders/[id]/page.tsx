@@ -439,9 +439,9 @@ export default function WebOrderDetailPage() {
         <div className="flex flex-col h-[calc(100vh-48px)] bg-background relative">
 
 
-            <div className="flex flex-1 overflow-hidden">
-                {/* Left Sidebar: Details (30%) */}
-                <div className="w-[30%] border-r border-border bg-background flex flex-col overflow-hidden">
+            <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
+                {/* Left Sidebar: Details (30% desktop, full-width stacked on mobile) */}
+                <div className="w-full lg:w-[30%] border-b lg:border-b-0 lg:border-r border-border bg-background flex flex-col overflow-hidden max-h-[40vh] lg:max-h-none">
                     <div className="flex-1 overflow-y-auto scrollbar-custom">
                         {/* Hero Bar: Order# | Customer | Status */}
                         <div className="px-4 pt-4 pb-4">
@@ -634,10 +634,10 @@ export default function WebOrderDetailPage() {
                     </div>
                 </div>
 
-                {/* Right Content: Line Items (70%) */}
-                <div className="w-[70%] bg-background flex flex-col overflow-hidden">
+                {/* Right Content: Line Items (70% desktop, full-width on mobile) */}
+                <div className="w-full lg:w-[70%] bg-background flex flex-col overflow-hidden flex-1">
                     {/* Header */}
-                    <div className="px-4 border-b border-border shrink-0 flex items-center justify-between bg-background z-10 h-9">
+                    <div className="px-2 sm:px-4 border-b border-border shrink-0 flex items-center justify-between bg-background z-10 h-9">
                         <div className="flex items-center space-x-2 h-full">
                             <span className="px-4 text-[10px] font-black uppercase tracking-widest text-foreground border-b-2 border-foreground -mb-px flex items-center space-x-1.5 h-full">
                                 <span>Line Items</span>

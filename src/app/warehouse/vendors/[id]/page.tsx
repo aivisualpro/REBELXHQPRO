@@ -362,9 +362,9 @@ export default function VendorDetailPage() {
     return (
         <div className="flex flex-col h-[calc(100vh-48px)] bg-background relative transition-colors duration-300">
 
-            <div className="flex flex-1 overflow-hidden">
-                {/* Left Panel (30%) - Vendor Details */}
-                <div className="w-[30%] border-r border-border bg-secondary flex flex-col overflow-hidden">
+            <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
+                {/* Left Panel (30% desktop, full-width stacked on mobile) */}
+                <div className="w-full lg:w-[30%] border-b lg:border-b-0 lg:border-r border-border bg-secondary flex flex-col overflow-hidden max-h-[40vh] lg:max-h-none">
                     <div className="flex-1 overflow-y-auto p-4 space-y-4">
                         {/* Identity Section */}
                         <div className="grid grid-cols-2 gap-2">
@@ -523,10 +523,10 @@ export default function VendorDetailPage() {
                     </div>
                 </div>
 
-                {/* Right Panel (70%) - Tabs */}
-                <div className="w-[70%] bg-background flex flex-col overflow-hidden">
+                {/* Right Panel (70% desktop, full-width on mobile) */}
+                <div className="w-full lg:w-[70%] bg-background flex flex-col overflow-hidden flex-1">
                     {/* Tab Header */}
-                    <div className="px-4 border-b border-border shrink-0 flex items-center justify-between bg-background z-10 h-9">
+                    <div className="px-2 sm:px-4 border-b border-border shrink-0 flex items-center justify-between bg-background z-10 h-9">
                         <div className="flex space-x-1 h-full">
                             {tabs.map(tab => {
                                 const Icon = tab.icon;
@@ -535,14 +535,14 @@ export default function VendorDetailPage() {
                                         key={tab.id}
                                         onClick={() => setActiveTab(tab.id)}
                                         className={cn(
-                                            "px-4 text-[10px] font-black uppercase tracking-widest transition-colors border-b-2 -mb-px outline-none flex items-center space-x-1.5 cursor-pointer",
+                                            "px-2 sm:px-4 text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-colors border-b-2 -mb-px outline-none flex items-center space-x-1 sm:space-x-1.5 cursor-pointer whitespace-nowrap",
                                             activeTab === tab.id
                                                 ? "text-foreground border-foreground"
                                                 : "text-muted-foreground border-transparent hover:text-foreground hover:border-muted-foreground/30"
                                         )}
                                     >
                                         <Icon className="w-3.5 h-3.5" />
-                                        <span>{tab.label}</span>
+                                        <span className="hidden sm:inline">{tab.label}</span>
                                         <span className={cn(
                                             "px-1.5 py-0.5 rounded-none text-[9px] font-bold",
                                             activeTab === tab.id ? "bg-foreground text-background" : "bg-secondary text-muted-foreground"
@@ -711,7 +711,7 @@ export default function VendorDetailPage() {
                         </button>
                     </div>
                     <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-1.5 col-span-2">
                                 <label className="text-[11px] font-black text-muted-foreground uppercase tracking-wider">Name <span className="text-red-500">*</span></label>
                                 <input

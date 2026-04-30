@@ -149,7 +149,7 @@ function CRMDashboardContent() {
       {/* ─── Premium Header ─── */}
       <div className="shrink-0 relative overflow-hidden border-b border-border z-10 bg-background">
         <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent pointer-events-none" />
-        <div className="relative px-6 py-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="relative px-4 sm:px-6 py-4 sm:py-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
             <h1 className="text-xl font-black text-foreground uppercase tracking-tight flex items-center gap-2">
               <Briefcase className="w-5 h-5 text-primary" />
@@ -237,7 +237,7 @@ function CRMDashboardContent() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto scrollbar-custom p-6 space-y-6">
+      <div className="flex-1 overflow-y-auto scrollbar-custom p-4 sm:p-6 space-y-4 sm:space-y-6">
         {/* ─── Key Metrics ─── */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard
@@ -290,8 +290,8 @@ function CRMDashboardContent() {
               {(charts?.leadsByStage || []).map((stage: any, idx: number) => {
                 const widthPct = Math.max(2, Math.round((stage.count / maxStageCount) * 100)); // minimum 2% width
                 return (
-                  <div key={idx} className="flex items-center gap-4 group">
-                    <div className="w-32 text-[11px] font-bold text-muted-foreground uppercase tracking-widest truncate text-right">
+                  <div key={idx} className="flex items-center gap-2 sm:gap-4 group">
+                    <div className="w-20 sm:w-32 text-[10px] sm:text-[11px] font-bold text-muted-foreground uppercase tracking-widest truncate text-right">
                       {stage.name || 'Undefined'}
                     </div>
                     <div className="flex-1 flex items-center gap-3">

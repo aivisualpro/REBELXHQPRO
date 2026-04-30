@@ -151,6 +151,7 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
   const [isClientModalOpen, setIsClientModalOpen] = React.useState(false);
   const [clientModalType, setClientModalType] = React.useState<'Client' | 'Lead'>('Lead');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState<boolean>(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = React.useState(false);
   const [isMounted, setIsMounted] = React.useState(false);
 
   // Load persistence and unread count
@@ -161,6 +162,11 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
     }
     setIsMounted(true);
   }, []);
+
+  // Close mobile sidebar on route change
+  React.useEffect(() => {
+    setIsMobileSidebarOpen(false);
+  }, [pathname]);
 
   const toggleSidebar = React.useCallback(() => {
     setIsSidebarCollapsed(prev => {
@@ -261,9 +267,29 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-full w-full bg-background overflow-hidden font-sans">
+      {/* Mobile sidebar backdrop */}
+      {isMobileSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[900] lg:hidden"
+          onClick={() => setIsMobileSidebarOpen(false)}
+        />
+      )}
+
+      {/* Mobile sidebar toggle button */}
+      <button
+        onClick={() => setIsMobileSidebarOpen(prev => !prev)}
+        className="fixed bottom-4 left-4 z-[950] lg:hidden w-11 h-11 bg-primary text-black rounded-full shadow-lg flex items-center justify-center hover:opacity-90 transition-all active:scale-95"
+        aria-label="Toggle CRM sidebar"
+      >
+        {isMobileSidebarOpen ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeftOpen className="w-5 h-5" />}
+      </button>
+
       {/* Sidebar */}
       <div className={cn(
         "bg-card flex flex-col text-muted h-full shrink-0 border-r border-border transition-all duration-300 ease-in-out",
+        // Mobile: fixed overlay
+        "fixed lg:relative z-[910] lg:z-auto",
+        isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         isSidebarCollapsed ? "w-[64px]" : "w-[260px]"
       )}>
 

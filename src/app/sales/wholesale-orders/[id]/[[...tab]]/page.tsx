@@ -743,9 +743,9 @@ export default function SaleOrderDetailPage() {
 
             {/* Removed inline Header Row */}
 
-            <div className="flex flex-1 overflow-hidden">
-                {/* Left Sidebar: Details (30%) */}
-                <div className="w-[30%] border-r border-border bg-background flex flex-col overflow-hidden">
+            <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
+                {/* Left Sidebar: Details (30% desktop, full-width stacked on mobile) */}
+                <div className="w-full lg:w-[30%] border-b lg:border-b-0 lg:border-r border-border bg-background flex flex-col overflow-hidden max-h-[40vh] lg:max-h-none">
                     <div className="flex-1 overflow-y-auto scrollbar-custom">
                         {/* Hero Bar: Order# | Client | Status */}
                         <div className="px-4 pt-4 pb-4">
@@ -840,9 +840,9 @@ export default function SaleOrderDetailPage() {
                                     rowIdx > 0 && "border-t border-border"
                                 )}>
                                     {row.map((item, colIdx) => (
-                                        <div key={colIdx} className="px-4 py-3 flex flex-col gap-0.5">
-                                            <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">{item.label}</span>
-                                            <span className="text-sm font-bold text-foreground truncate">{item.value}</span>
+                                        <div key={colIdx} className="px-3 sm:px-4 py-2 sm:py-3 flex flex-col gap-0.5">
+                                            <span className="text-[9px] sm:text-[10px] text-muted-foreground uppercase tracking-widest font-bold">{item.label}</span>
+                                            <span className="text-xs sm:text-sm font-bold text-foreground truncate">{item.value}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -974,7 +974,7 @@ export default function SaleOrderDetailPage() {
                                         <div className="px-4 py-2.5 flex items-center justify-between border-t border-border bg-secondary">
                                             <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Email</span>
                                             <div className="flex items-center space-x-2">
-                                                <span className="text-sm font-bold text-foreground truncate max-w-[160px]">
+                                                <span className="text-sm font-bold text-foreground truncate max-w-[120px] sm:max-w-[160px]">
                                                     {c.emails?.[0]?.value || <span className="text-muted-foreground italic font-normal text-xs">None</span>}
                                                 </span>
                                                 {c.emails?.[0]?.value && (
@@ -1228,17 +1228,17 @@ export default function SaleOrderDetailPage() {
                     </div>
                 </div>
 
-                {/* Right Content: Tabs (70%) */}
-                <div className="w-[70%] bg-background flex flex-col overflow-hidden">
+                {/* Right Content: Tabs (70% desktop, full-width on mobile) */}
+                <div className="w-full lg:w-[70%] bg-background flex flex-col overflow-hidden flex-1">
                     {/* Tabs & Actions */}
-                    <div className="px-4 border-b border-border shrink-0 flex items-center justify-between bg-background z-10 h-9">
+                    <div className="px-2 sm:px-4 border-b border-border shrink-0 flex items-center justify-between bg-background z-10 h-9">
                         <div className="flex space-x-1 h-full">
                             {TABS.map(tab => (
                                 <button
                                     key={tab}
                                     onClick={() => setActiveTab(tab)}
                                     className={cn(
-                                        "px-4 text-[10px] font-black uppercase tracking-widest transition-colors border-b-2 -mb-px outline-none flex items-center space-x-1.5",
+                                        "px-2 sm:px-4 text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-colors border-b-2 -mb-px outline-none flex items-center space-x-1",
                                         activeTab === tab
                                             ? "text-foreground border-foreground"
                                             : "text-muted-foreground border-transparent hover:text-foreground"
@@ -1269,7 +1269,7 @@ export default function SaleOrderDetailPage() {
                                         className="px-3 h-9 text-[10px] font-black uppercase tracking-widest bg-[#fe9900] text-black hover:bg-[#d9a318] transition-colors flex items-center space-x-1 shadow-sm"
                                     >
                                         <Plus className="w-3 h-3" />
-                                        <span>Add Item</span>
+                                        <span className="hidden sm:inline">Add Item</span>
                                     </button>
                                 </>
                             )}
@@ -1690,7 +1690,7 @@ export default function SaleOrderDetailPage() {
                             </div>
 
                             {/* Qty + Price side by side */}
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
                                     <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Qty</label>
                                     <input

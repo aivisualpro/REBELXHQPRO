@@ -345,9 +345,8 @@ export default function RecipeDetailPage() {
                 headerPortal
             )}
 
-            <div className="flex flex-1 overflow-hidden">
-                {/* Left Sidebar: Recipe Info (30%) */}
-                <div className="w-[30%] border-r border-border bg-secondary overflow-y-auto p-4 space-y-4">
+            <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
+                <div className="w-full lg:w-[30%] border-b lg:border-b-0 lg:border-r border-border bg-secondary overflow-y-auto p-4 space-y-4 max-h-[40vh] lg:max-h-none">
                     {/* Recipe Name */}
                     <div className="border border-border rounded-md p-4 bg-background">
                         <div className="flex items-center space-x-2 mb-3">
@@ -443,7 +442,7 @@ export default function RecipeDetailPage() {
                 </div>
 
                 {/* Right Side: Tabs (70%) */}
-                <div className="w-[70%] bg-background flex flex-col overflow-hidden">
+                <div className="w-full lg:w-[70%] bg-background flex flex-col overflow-hidden flex-1">
                     {/* Tabs & Actions */}
                     <div className="px-4 border-b border-border shrink-0 flex items-center justify-between bg-background z-10 h-9">
                         <div className="flex space-x-1 h-full">
