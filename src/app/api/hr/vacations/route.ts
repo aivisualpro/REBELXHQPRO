@@ -13,9 +13,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'info@rebelxbrandscrm.com';
 
 function getAppUrl() {
-    return process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : process.env.NEXTAUTH_URL || 'http://localhost:3000';
+    return process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || 'https://www.rebelxbrandscrm.com';
 }
 
 function formatDate(d: Date | string): string {
