@@ -187,6 +187,9 @@ export const MODULE_BLUEPRINTS: ModuleBlueprint[] = [
                     { field: 'type', label: 'Type' },
                     { field: 'status', label: 'Status' },
                 ],
+                settings: [
+                    { key: 'visibility', label: 'Visibility', options: ['Everybody', 'Self'], default: 'Everybody' },
+                ],
             },
         ],
     },

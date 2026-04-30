@@ -55,7 +55,10 @@ import {
     Ticket,
     Settings,
     Briefcase,
-    CalendarDays
+    CalendarDays,
+    CheckCircle,
+    Circle,
+    Users
 } from 'lucide-react';
 import { cn, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -535,13 +538,17 @@ function SettingsPageContent() {
         twoFactor: true,
         filterDataFrom: '', // Global Date Filter
         missingSkuImage: '',
-        crmMinRevenueSlab: '20'
+        crmMinRevenueSlab: '20',
+        vacationApprovers: [] as string[],
     });
+
+    const [allUsers, setAllUsers] = useState<any[]>([]);
 
     React.useEffect(() => {
         fetchSettings();
+        // Fetch users for vacation approvers picker
+        fetch('/api/users?limit=500&status=Active').then(r => r.json()).then(d => setAllUsers(d.users || [])).catch(() => {});
     }, []);
-
 
 
     const fetchSettings = async () => {
@@ -3223,6 +3230,44 @@ function SettingsPageContent() {
                                                     <span className="font-bold text-muted-foreground">TimeSheets:</span>
                                                     <p>date, user (email), hourlyRate (optional — auto-resolved), timeIn (e.g. 6:29:00 AM), timeOut (e.g. 5:30:00 PM), createdBy, createdAt</p>
                                                 </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Vacation Approvers Section */}
+                                        <div className="space-y-4 mt-8">
+                                            <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground border-b border-border pb-2">Vacation Approvers</h2>
+                                            <div className="p-4 border border-indigo-500/30 bg-indigo-950/40 rounded-lg flex items-start space-x-4 mb-4">
+                                                <div className="shrink-0 mt-0.5"><Users className="w-5 h-5 text-indigo-400" /></div>
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-indigo-400">Approval Email Recipients</h4>
+                                                    <p className="text-xs text-indigo-400 mt-1">Select users who will receive email notifications when someone submits a vacation request. They can approve or reject directly from the email.</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {allUsers.map(u => {
+                                                    const email = u.email;
+                                                    const isSelected = ((settings as any).vacationApprovers || []).includes(email);
+                                                    return (
+                                                        <button key={u._id} onClick={() => {
+                                                            setSettings((prev: any) => {
+                                                                const current = prev.vacationApprovers || [];
+                                                                return { ...prev, vacationApprovers: isSelected ? current.filter((e: string) => e !== email) : [...current, email] };
+                                                            });
+                                                        }} className={cn(
+                                                            'flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-bold rounded-md transition-all cursor-pointer border',
+                                                            isSelected ? 'bg-indigo-500/15 border-indigo-500/30 text-indigo-400' : 'bg-card border-border text-muted-foreground hover:border-indigo-500/30'
+                                                        )}>
+                                                            {isSelected ? <CheckCircle className="w-3 h-3" /> : <Circle className="w-3 h-3" />}
+                                                            {u.firstName} {u.lastName}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                            <div className="flex justify-end pt-4 border-t border-border">
+                                                <button onClick={handleSave} disabled={saving} className="h-8 px-5 bg-primary text-black hover:opacity-90 transition-all rounded-lg shadow flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
+                                                    <Save className="w-3.5 h-3.5" />
+                                                    <span className="text-[11px] font-black uppercase tracking-widest">{saving ? 'Saving...' : 'Save Approvers'}</span>
+                                                </button>
                                             </div>
                                         </div>
                                     </div>

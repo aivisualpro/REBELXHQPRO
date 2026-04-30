@@ -3,8 +3,9 @@
 import React, { useState, useRef, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { Search, Bell, User, LogOut, Sun, Moon, X } from 'lucide-react';
+import { Search, Bell, User, LogOut, Sun, Moon, X, Palmtree, CalendarDays, Loader2, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import toast from 'react-hot-toast';
 import { useSession, signOut } from 'next-auth/react';
 import { useTheme } from '@/components/ThemeProvider';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -12,6 +13,7 @@ import { useTimers } from '@/components/TimerContext';
 import { useNotifications } from '@/components/NotificationContext';
 import { useClockIn } from '@/components/ClockInContext';
 import { GlobalRouteSearch } from './GlobalRouteSearch';
+import { VACATION_TYPES, getVacationTypeConfig } from '@/constants/vacation-types';
 
 const DynamicActionsContent = () => {
     const { data: session } = useSession();
@@ -23,6 +25,9 @@ const DynamicActionsContent = () => {
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [searchValue, setSearchValue] = useState('');
+    const [vacationModalOpen, setVacationModalOpen] = useState(false);
+    const [vacationSaving, setVacationSaving] = useState(false);
+    const [vacationForm, setVacationForm] = useState({ dateFrom: '', dateTo: '', vacationType: 'Annual Leave', reason: '' });
     const menuRef = useRef<HTMLDivElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
     const pathname = usePathname();
@@ -79,7 +84,7 @@ const DynamicActionsContent = () => {
         router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     };
 
-    return (
+    return (<>
         <div className="flex items-center justify-end space-x-1 w-full h-full">
             {/* Global Route Search (Command Palette) */}
             <div className="hidden sm:block mr-2">
@@ -245,6 +250,14 @@ const DynamicActionsContent = () => {
                                     <span>{clockLoading ? 'Saving...' : 'Clock In'}</span>
                                 </button>
                             )}
+                            {/* + Vacation */}
+                            <button
+                                onClick={() => { setIsUserMenuOpen(false); setVacationModalOpen(true); }}
+                                className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/5 transition-colors cursor-pointer"
+                            >
+                                <Palmtree className="w-4 h-4" />
+                                <span>+ Vacation</span>
+                            </button>
                             <div className="my-1 border-t border-border/50" />
                             <button
                                 onClick={() => signOut({ callbackUrl: '/login' })}
@@ -258,7 +271,33 @@ const DynamicActionsContent = () => {
                 </AnimatePresence>
             </div>
         </div>
-    );
+
+        {/* Vacation Request Modal */}
+        {vacationModalOpen && (
+            <VacationFormModal
+                form={vacationForm}
+                setForm={setVacationForm}
+                saving={vacationSaving}
+                onClose={() => setVacationModalOpen(false)}
+                onSubmit={async () => {
+                    const days = calcBusinessDays(vacationForm.dateFrom, vacationForm.dateTo);
+                    if (!vacationForm.dateFrom || !vacationForm.dateTo || days <= 0) { toast.error('Select valid dates'); return; }
+                    setVacationSaving(true);
+                    try {
+                        const res = await fetch('/api/hr/vacations', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ ...vacationForm, totalDays: days, employee: session?.user?.email || '', employeeName: session?.user?.name || session?.user?.email || '' }),
+                        });
+                        if (res.ok) {
+                            toast.success('Vacation request submitted!');
+                            setVacationModalOpen(false);
+                            setVacationForm({ dateFrom: '', dateTo: '', vacationType: 'Annual Leave', reason: '' });
+                        } else { const d = await res.json(); toast.error(d.error || 'Failed'); }
+                    } catch { toast.error('Failed to submit'); } finally { setVacationSaving(false); }
+                }}
+            />
+        )}
+    </>);
 };
 
 // Export with Suspense wrapper to fix build error with useSearchParams
@@ -283,3 +322,76 @@ function formatElapsed(totalSec: number): string {
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+function calcBusinessDays(from: string, to: string): number {
+    if (!from || !to) return 0;
+    const d1 = new Date(from); const d2 = new Date(to);
+    if (d2 < d1) return 0;
+    let count = 0;
+    const cur = new Date(d1);
+    while (cur <= d2) {
+        const day = cur.getDay();
+        if (day !== 0 && day !== 6) count++;
+        cur.setDate(cur.getDate() + 1);
+    }
+    return count;
+}
+
+
+function VacationFormModal({ form, setForm, saving, onClose, onSubmit }: {
+    form: { dateFrom: string; dateTo: string; vacationType: string; reason: string };
+    setForm: React.Dispatch<React.SetStateAction<typeof form>>;
+    saving: boolean; onClose: () => void; onSubmit: () => void;
+}) {
+    const days = calcBusinessDays(form.dateFrom, form.dateTo);
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+            <div className="bg-card border border-border rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+                <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-4 h-12 flex items-center justify-between shrink-0">
+                    <h2 className="text-white font-black text-[13px] uppercase tracking-widest">Request Vacation</h2>
+                    <button onClick={onClose} className="text-white/60 hover:text-white cursor-pointer"><X className="w-5 h-5" /></button>
+                </div>
+                <div className="p-6 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">Date From *</label>
+                            <input type="date" value={form.dateFrom} onChange={e => setForm(f => ({ ...f, dateFrom: e.target.value }))}
+                                style={{ colorScheme: 'dark' }}
+                                className="w-full h-9 px-3 bg-background border border-border rounded text-sm focus:ring-1 focus:ring-primary/30 focus:outline-none" />
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">Date To *</label>
+                            <input type="date" value={form.dateTo} onChange={e => setForm(f => ({ ...f, dateTo: e.target.value }))}
+                                style={{ colorScheme: 'dark' }}
+                                className="w-full h-9 px-3 bg-background border border-border rounded text-sm focus:ring-1 focus:ring-primary/30 focus:outline-none" />
+                        </div>
+                    </div>
+                    {days > 0 && (
+                        <div className="flex items-center gap-2 px-3 py-2 bg-primary/10 border border-primary/20 rounded-lg">
+                            <CalendarDays className="w-4 h-4 text-primary" />
+                            <span className="text-sm font-bold text-primary">{days} business day{days > 1 ? 's' : ''}</span>
+                            <span className="text-[10px] text-primary/60 ml-1">(excl. weekends)</span>
+                        </div>
+                    )}
+                    <div>
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">Vacation Type *</label>
+                        <select value={form.vacationType} onChange={e => setForm(f => ({ ...f, vacationType: e.target.value }))}
+                            className="w-full h-9 px-3 bg-background border border-border rounded text-sm focus:ring-1 focus:ring-primary/30 focus:outline-none cursor-pointer">
+                            {VACATION_TYPES.map(t => <option key={t} value={t}>{getVacationTypeConfig(t).emoji} {t}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">Reason</label>
+                        <textarea value={form.reason} onChange={e => setForm(f => ({ ...f, reason: e.target.value }))} rows={3} placeholder="Brief reason for your leave..."
+                            className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:ring-1 focus:ring-primary/30 focus:outline-none resize-none" />
+                    </div>
+                </div>
+                <div className="px-4 h-12 border-t border-border flex items-center justify-end gap-2 shrink-0">
+                    <button onClick={onClose} className="h-8 px-4 border border-border text-muted-foreground rounded-lg text-[11px] font-bold uppercase cursor-pointer hover:bg-secondary transition-all">Cancel</button>
+                    <button onClick={onSubmit} disabled={saving} className="h-8 px-5 bg-primary text-black rounded-lg text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer hover:opacity-90 disabled:opacity-50 transition-all shadow">
+                        {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} Submit
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
