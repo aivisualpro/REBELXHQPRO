@@ -1475,6 +1475,12 @@ function SettingsPageContent() {
                                         </div>
                                     </div>
                                 </div>
+                                <div className="flex justify-end pt-4 border-t border-border">
+                                    <button onClick={handleSave} disabled={saving} className="h-8 px-5 bg-primary text-black hover:opacity-90 transition-all rounded-lg shadow flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
+                                        <Save className="w-3.5 h-3.5" />
+                                        <span className="text-[11px] font-black uppercase tracking-widest">{saving ? 'Saving...' : 'Save Changes'}</span>
+                                    </button>
+                                </div>
                             </div>
                         )}
 
@@ -1541,6 +1547,12 @@ function SettingsPageContent() {
                                         </div>
                                     </div>
                                 </div>
+                                <div className="flex justify-end pt-4 border-t border-border">
+                                    <button onClick={handleSave} disabled={saving} className="h-8 px-5 bg-primary text-black hover:opacity-90 transition-all rounded-lg shadow flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
+                                        <Save className="w-3.5 h-3.5" />
+                                        <span className="text-[11px] font-black uppercase tracking-widest">{saving ? 'Saving...' : 'Save Changes'}</span>
+                                    </button>
+                                </div>
                             </div>
                         )}
 
@@ -1580,6 +1592,12 @@ function SettingsPageContent() {
                                             Select a date to hide older records.
                                         </p>
                                     </div>
+                                </div>
+                                <div className="flex justify-end pt-4 border-t border-border">
+                                    <button onClick={handleSave} disabled={saving} className="h-8 px-5 bg-primary text-black hover:opacity-90 transition-all rounded-lg shadow flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
+                                        <Save className="w-3.5 h-3.5" />
+                                        <span className="text-[11px] font-black uppercase tracking-widest">{saving ? 'Saving...' : 'Save Changes'}</span>
+                                    </button>
                                 </div>
                             </div>
                         )}
@@ -1635,6 +1653,12 @@ function SettingsPageContent() {
                                         </div>
                                     </div>
                                 </div>
+                                <div className="flex justify-end pt-4 border-t border-border">
+                                    <button onClick={handleSave} disabled={saving} className="h-8 px-5 bg-primary text-black hover:opacity-90 transition-all rounded-lg shadow flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
+                                        <Save className="w-3.5 h-3.5" />
+                                        <span className="text-[11px] font-black uppercase tracking-widest">{saving ? 'Saving...' : 'Save Changes'}</span>
+                                    </button>
+                                </div>
                             </div>
                         )}
 
@@ -1672,6 +1696,12 @@ function SettingsPageContent() {
                                             Reset Profile Password
                                         </button>
                                     </div>
+                                </div>
+                                <div className="flex justify-end pt-4 border-t border-border">
+                                    <button onClick={handleSave} disabled={saving} className="h-8 px-5 bg-primary text-black hover:opacity-90 transition-all rounded-lg shadow flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
+                                        <Save className="w-3.5 h-3.5" />
+                                        <span className="text-[11px] font-black uppercase tracking-widest">{saving ? 'Saving...' : 'Save Changes'}</span>
+                                    </button>
                                 </div>
                             </div>
                         )}
