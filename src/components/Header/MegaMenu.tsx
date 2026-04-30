@@ -13,6 +13,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 const MENU_TO_MODULE_KEY: Record<string, string> = {
     'Admin': 'admin',
     'CRM': 'crm',
+    'HR': 'hr',
     'Sales': 'sales',
     'Warehouse': 'warehouse',
     'Reports': 'reports',

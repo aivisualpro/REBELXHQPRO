@@ -2,7 +2,8 @@ import {
     Users, Settings, UsersRound, Activity, ShoppingCart, CreditCard,
     Globe, Package, Clock, Database, Factory, Truck, BookOpen,
     Store, BarChart3, PieChart, LineChart, Scale, LayoutDashboard,
-    HelpCircle, Ticket, ClipboardCheck, Target, AlertTriangle, CircleDollarSign
+    HelpCircle, Ticket, ClipboardCheck, Target, AlertTriangle, CircleDollarSign,
+    Briefcase, CalendarDays, Palmtree
 } from 'lucide-react';
 
 export const MENU_ITEMS = [
@@ -22,6 +23,14 @@ export const MENU_ITEMS = [
             { title: 'Activities', href: '/crm/activities', icon: Activity },
             { title: 'App Connections', href: '/crm/connections', icon: Globe },
             { title: 'Retention', href: '/crm/retention', icon: Target },
+        ]
+    },
+    {
+        title: 'HR',
+        icon: Briefcase,
+        items: [
+            { title: 'TimeSheet', href: '/hr/timesheet', icon: CalendarDays },
+            { title: 'Vacations', href: '/hr/vacations', icon: Palmtree },
         ]
     },
     {

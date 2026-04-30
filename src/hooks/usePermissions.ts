@@ -14,7 +14,7 @@ interface PermissionCache {
     workspaceName: string;
     workspaceColor: string;
     routePermissions: Record<string, RoutePerm>;
-    keyPermissions: Record<string, RoutePerm & { enabled: boolean }>;
+    keyPermissions: Record<string, RoutePerm & { enabled: boolean; settings: Record<string, string> }>;
     enabledModules: string[];
     enabledRoutes: string[];
 }
@@ -153,15 +153,22 @@ export function usePermissions(routeOverride?: string) {
         return perms.keyPermissions?.[subKey]?.enabled ?? false;
     }, [isSuperAdmin, hasWorkspace, perms]);
 
-    // Field visibility check by sub-module key (for sub-modules sharing the same route)
+    // Field visibility check by sub-module key — always respected, even for SuperAdmin
     const isFieldVisibleByKey = useCallback((subKey: string, fieldName: string): boolean => {
-        if (isSuperAdmin) return true;
-        if (!hasWorkspace) return false;
-        if (!perms) return false;
+        if (!hasWorkspace) return true; // No workspace = show all
+        if (!perms) return isSuperAdmin; // Loading — superadmin sees all, others wait
         const keyPerm = perms.keyPermissions?.[subKey];
         if (!keyPerm) return true; // Sub-module not in workspace — default visible
         return keyPerm.fields[fieldName] ?? true;
     }, [isSuperAdmin, hasWorkspace, perms]);
+
+    // Sub-module setting value lookup
+    const getSubModuleSetting = useCallback((subKey: string, settingKey: string): string => {
+        if (!perms) return '';
+        const keyPerm = perms.keyPermissions?.[subKey];
+        if (!keyPerm) return '';
+        return keyPerm.settings?.[settingKey] ?? '';
+    }, [perms]);
 
     return {
         loading,
@@ -173,6 +180,7 @@ export function usePermissions(routeOverride?: string) {
         canDelete: (r?: string) => can('delete', r),
         isFieldVisible,
         isFieldVisibleByKey,
+        getSubModuleSetting,
         isModuleEnabled,
         isRouteEnabled,
         isSubModuleEnabled,

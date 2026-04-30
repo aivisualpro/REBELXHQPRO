@@ -53,7 +53,9 @@ import {
     UsersRound,
     Database,
     Ticket,
-    Settings
+    Settings,
+    Briefcase,
+    CalendarDays
 } from 'lucide-react';
 import { cn, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -61,7 +63,7 @@ import Papa from 'papaparse';
 import { MODULE_BLUEPRINTS, generateDefaultModules } from '@/constants/workspace-modules';
 
 type Tab = 'workspaces' | 'general' | 'localization' | 'crm' | 'notifications' | 'security' | 'dataFilter' | 'modules';
-type ModuleSubTab = 'sales' | 'warehouse' | 'reports' | 'help';
+type ModuleSubTab = 'sales' | 'warehouse' | 'reports' | 'help' | 'hr';
 
 // ─── Toggle Switch Component ─────────────────────────────────────────────────
 function ToggleSwitch({ checked, onChange, size = 'md', activeColor = '#10b981' }: {
@@ -112,6 +114,7 @@ function ToggleSwitch({ checked, onChange, size = 'md', activeColor = '#10b981' 
 const MODULE_ICONS: Record<string, React.ElementType> = {
     admin: Settings,
     crm: UsersRound,
+    hr: Briefcase,
     sales: Truck,
     warehouse: Database,
     reports: BarChart3,
@@ -201,6 +204,10 @@ function SettingsPageContent() {
                         fields: subBp.fields.map(fBp => {
                             const savedField = (savedSub.fields || []).find((f: any) => f.field === fBp.field);
                             return savedField ? { ...fBp, visible: savedField.visible } : fBp;
+                        }),
+                        settings: (subBp.settings || []).map((sBp: any) => {
+                            const savedSetting = (savedSub.settings || []).find((s: any) => s.key === sBp.key);
+                            return savedSetting ? { ...sBp, value: savedSetting.value } : sBp;
                         }),
                     };
                 }),
@@ -352,6 +359,30 @@ function SettingsPageContent() {
         }));
     };
 
+    // Change a sub-module setting value
+    const changeSetting = (moduleKey: string, subKey: string, settingKey: string, value: string) => {
+        setWsFormData(prev => ({
+            ...prev,
+            modules: prev.modules.map(m =>
+                m.key === moduleKey
+                    ? {
+                        ...m,
+                        subModules: m.subModules.map(s =>
+                            s.key === subKey
+                                ? {
+                                    ...s,
+                                    settings: (s as any).settings?.map((st: any) =>
+                                        st.key === settingKey ? { ...st, value } : st
+                                    ) || [],
+                                }
+                                : s
+                        ),
+                    }
+                    : m
+            ),
+        }));
+    };
+
     // Enable all / Disable all for a module
     const setAllSubModules = (moduleKey: string, enabled: boolean) => {
         setWsFormData(prev => ({
@@ -386,6 +417,10 @@ function SettingsPageContent() {
                         fields: subBp.fields.map(fBp => {
                             const savedField = (savedSub.fields || []).find((f: any) => f.field === fBp.field);
                             return savedField ? { ...fBp, visible: savedField.visible } : fBp;
+                        }),
+                        settings: (subBp.settings || []).map((sBp: any) => {
+                            const savedSetting = (savedSub.settings || []).find((s: any) => s.key === sBp.key);
+                            return savedSetting ? { ...sBp, value: savedSetting.value } : sBp;
                         }),
                     };
                 }),
@@ -446,6 +481,9 @@ function SettingsPageContent() {
     const importRecipeLineItemsRef = useRef<HTMLInputElement>(null);
     const importRecipeStepsRef = useRef<HTMLInputElement>(null);
     const importTicketsRef = useRef<HTMLInputElement>(null);
+
+    // HR Import Refs
+    const importTimeSheetsRef = useRef<HTMLInputElement>(null);
     const importKitsRef = useRef<HTMLInputElement>(null);
     const importKitLineItemsRef = useRef<HTMLInputElement>(null);
     const importMfgOrdersRef = useRef<HTMLInputElement>(null);
@@ -813,6 +851,7 @@ function SettingsPageContent() {
         { id: 'warehouse', label: 'Warehouse', icon: Warehouse, keywords: 'warehouse skus vendors import export purchase orders kits recipes manufacturing lab results audit adjustments opening balances variances' },
         { id: 'reports', label: 'Reports', icon: BarChart3, keywords: 'reports analytics' },
         { id: 'help', label: 'Help', icon: HelpCircle, keywords: 'help tickets support' },
+        { id: 'hr', label: 'HR', icon: Briefcase, keywords: 'hr human resources timesheet vacations time sheet import' },
     ];
 
     // Filter tabs based on search
@@ -878,14 +917,6 @@ function SettingsPageContent() {
                         )}
                     </div>
                     <div className="flex-1" />
-                    <button
-                        onClick={handleSave}
-                        disabled={saving}
-                        className="h-8 px-4 bg-primary text-black hover:opacity-90 transition-all rounded-lg shadow flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
-                    >
-                        <Save className="w-3.5 h-3.5" />
-                        <span className="text-[11px] font-black uppercase tracking-widest">{saving ? 'Saving...' : 'Save Changes'}</span>
-                    </button>
                 </div>
             </div>
 
@@ -1304,6 +1335,39 @@ function SettingsPageContent() {
                                                                                                 {field.visible ? <Eye className="w-3 h-3 text-emerald-500" /> : <EyeOff className="w-3 h-3 text-red-400" />}
                                                                                                 {field.label}
                                                                                             </button>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+
+                                                                            {/* Sub-module Settings */}
+                                                                            {isSubExpanded && sub.enabled && (sub as any).settings?.length > 0 && (
+                                                                                <div className="bg-background/60 px-4 py-3 pl-20 border-t border-border/40">
+                                                                                    <div className="flex items-center gap-2 mb-2.5">
+                                                                                        <Settings className="w-3 h-3 text-muted-foreground" />
+                                                                                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Settings</span>
+                                                                                    </div>
+                                                                                    <div className="flex flex-wrap gap-3">
+                                                                                        {(sub as any).settings.map((setting: any) => (
+                                                                                            <div key={setting.key} className="flex items-center gap-2">
+                                                                                                <span className="text-[10px] font-bold text-muted-foreground">{setting.label}:</span>
+                                                                                                <div className="flex rounded-md border border-border overflow-hidden">
+                                                                                                    {setting.options.map((opt: string) => (
+                                                                                                        <button
+                                                                                                            key={opt}
+                                                                                                            onClick={() => changeSetting(mod.key, sub.key, setting.key, opt)}
+                                                                                                            className={cn(
+                                                                                                                "px-2.5 py-1 text-[10px] font-bold transition-all cursor-pointer",
+                                                                                                                setting.value === opt
+                                                                                                                    ? 'bg-primary text-black'
+                                                                                                                    : 'bg-card text-muted-foreground hover:bg-secondary'
+                                                                                                            )}
+                                                                                                        >
+                                                                                                            {opt}
+                                                                                                        </button>
+                                                                                                    ))}
+                                                                                                </div>
+                                                                                            </div>
                                                                                         ))}
                                                                                     </div>
                                                                                 </div>
@@ -3059,6 +3123,75 @@ function SettingsPageContent() {
                                                 <div className="text-[10px] text-muted-foreground">
                                                     <span className="font-bold text-muted-foreground">Tickets:</span>
                                                     <p>date, requestedBy, subCategory, issue, reason, priority, deadline, description, department, document, status, completionNote, completedBy, completedAt</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* HR Module Settings */}
+                                {moduleSubTab === 'hr' && (
+                                    <div className="space-y-6 animate-in fade-in duration-200">
+                                        <input
+                                            type="file"
+                                            accept=".csv"
+                                            className="hidden"
+                                            ref={importTimeSheetsRef}
+                                            onChange={(e) => handleImport(e, '/api/hr/timesheets/import', 'TimeSheets')}
+                                        />
+                                        {/* TimeSheet Import Section */}
+                                        <div className="space-y-4">
+                                            <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground border-b border-border pb-2">TimeSheet Import</h2>
+
+                                            {/* Status Display */}
+                                            {importStatus && (
+                                                <div className={cn(
+                                                    "p-3 rounded-lg text-sm font-medium",
+                                                    importStatus.startsWith('✓') ? "bg-emerald-500/10 text-emerald-700 border border-emerald-500/20" :
+                                                        importStatus.startsWith('⚠️') ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" :
+                                                            importStatus.startsWith('❌') ? "bg-red-500/10 text-red-700 border border-red-500/20" :
+                                                                "bg-blue-950/40 text-blue-400 border border-blue-500/30"
+                                                )}>
+                                                    {isImporting && <RefreshCw className="w-4 h-4 inline mr-2 animate-spin" />}
+                                                    {importStatus}
+                                                </div>
+                                            )}
+
+                                            <div className="p-4 border border-teal-500/30 bg-teal-950/40 rounded-lg flex items-start space-x-4 mb-4">
+                                                <div className="shrink-0 mt-0.5">
+                                                    <CalendarDays className="w-5 h-5 text-teal-400" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-teal-400">Import TimeSheets</h4>
+                                                    <p className="text-xs text-teal-400 mt-1">
+                                                        Import employee timesheets from a CSV file. The <code className="bg-teal-500/20 px-1 rounded">user</code> field should contain
+                                                        a user email matching <code className="bg-teal-500/20 px-1 rounded">/admin/users</code>. If <code className="bg-teal-500/20 px-1 rounded">hourlyRate</code> is
+                                                        not provided, it will be auto-resolved from the user&apos;s profile.
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <button
+                                                    onClick={() => importTimeSheetsRef.current?.click()}
+                                                    disabled={isImporting}
+                                                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-lg hover:border-teal-400 hover:bg-teal-950/40 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <div className="w-12 h-12 rounded-full bg-teal-500/20 flex items-center justify-center mb-3 group-hover:bg-teal-500/30 transition-colors">
+                                                        <CalendarDays className="w-6 h-6 text-teal-400" />
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-muted-foreground">Import TimeSheets</h4>
+                                                    <p className="text-[10px] text-muted-foreground mt-1 text-center">
+                                                        Employee time entries
+                                                    </p>
+                                                </button>
+                                            </div>
+
+                                            <div className="mt-4 p-4 bg-secondary/30 rounded-lg">
+                                                <h4 className="text-xs font-bold text-muted-foreground mb-2">CSV Column Reference</h4>
+                                                <div className="text-[10px] text-muted-foreground">
+                                                    <span className="font-bold text-muted-foreground">TimeSheets:</span>
+                                                    <p>date, user (email), hourlyRate (optional — auto-resolved), timeIn (e.g. 6:29:00 AM), timeOut (e.g. 5:30:00 PM), createdBy, createdAt</p>
                                                 </div>
                                             </div>
                                         </div>

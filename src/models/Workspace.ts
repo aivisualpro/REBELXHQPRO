@@ -26,6 +26,15 @@ export interface ISubModulePermission {
         delete: boolean;
     };
     fields: IFieldPermission[];
+    settings: ISubModuleSetting[];
+}
+
+export interface ISubModuleSetting {
+    key: string;         // e.g. 'visibility'
+    label: string;       // e.g. 'Visibility'
+    options: string[];   // e.g. ['Everybody', 'Self']
+    value: string;       // current value
+    default: string;     // default value
 }
 
 /**
@@ -56,6 +65,14 @@ const FieldPermissionSchema = new Schema({
     visible: { type: Boolean, default: true },
 }, { _id: false });
 
+const SettingSchema = new Schema({
+    key: { type: String, required: true },
+    label: { type: String },
+    options: { type: [String], default: [] },
+    value: { type: String, default: '' },
+    default: { type: String, default: '' },
+}, { _id: false });
+
 const SubModulePermissionSchema = new Schema({
     key: { type: String, required: true },
     label: { type: String, required: true },
@@ -68,6 +85,7 @@ const SubModulePermissionSchema = new Schema({
         delete: { type: Boolean, default: true },
     },
     fields: { type: [FieldPermissionSchema], default: [] },
+    settings: { type: [SettingSchema], default: [] },
 }, { _id: false });
 
 const ModulePermissionSchema = new Schema({

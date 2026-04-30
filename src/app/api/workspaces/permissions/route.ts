@@ -44,6 +44,7 @@ export async function GET(request: Request) {
         const keyPermissions: Record<string, {
             crud: { create: boolean; read: boolean; update: boolean; delete: boolean };
             fields: Record<string, boolean>;
+            settings: Record<string, string>;
             enabled: boolean;
         }> = {};
         const enabledModules: string[] = [];
@@ -69,10 +70,17 @@ export async function GET(request: Request) {
                     delete: sub.crud?.delete ?? true,
                 };
 
+                // Build settings map
+                const settingsMap: Record<string, string> = {};
+                for (const s of sub.settings || []) {
+                    settingsMap[s.key] = s.value ?? s.default ?? '';
+                }
+
                 // Always store by key (unique per sub-module)
                 keyPermissions[sub.key] = {
                     crud: crudPerm,
                     fields: fieldMap,
+                    settings: settingsMap,
                     enabled: sub.enabled ?? false,
                 };
 

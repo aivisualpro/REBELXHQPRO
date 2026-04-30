@@ -10,6 +10,7 @@ import { useTheme } from '@/components/ThemeProvider';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTimers } from '@/components/TimerContext';
 import { useNotifications } from '@/components/NotificationContext';
+import { useClockIn } from '@/components/ClockInContext';
 import { GlobalRouteSearch } from './GlobalRouteSearch';
 
 const DynamicActionsContent = () => {
@@ -17,6 +18,7 @@ const DynamicActionsContent = () => {
     const { theme, toggleTheme } = useTheme();
     const { timers } = useTimers();
     const { unreadCount, setIsPanelOpen } = useNotifications();
+    const { isClockedIn, elapsedSeconds, clockIn, clockOut, loading: clockLoading } = useClockIn();
     const totalBadge = unreadCount + timers.length;
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -156,6 +158,26 @@ const DynamicActionsContent = () => {
                 )}
             </button>
 
+            {/* Clock-In Timer */}
+            {isClockedIn && (
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 animate-in fade-in slide-in-from-right-2 duration-300">
+                    <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                    </span>
+                    <span className="text-[11px] font-mono font-black text-emerald-400 tabular-nums tracking-wider">
+                        {formatElapsed(elapsedSeconds)}
+                    </span>
+                    <button
+                        onClick={clockOut}
+                        disabled={clockLoading}
+                        className="ml-0.5 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-widest bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors cursor-pointer border border-red-500/20"
+                    >
+                        Out
+                    </button>
+                </div>
+            )}
+
             <div className="w-px h-5 bg-border mx-1" />
 
             {/* User Menu */}
@@ -197,6 +219,33 @@ const DynamicActionsContent = () => {
                                 <span>Profile</span>
                             </Link>
                             <div className="my-1 border-t border-border/50" />
+                            {/* Clock In / Clock Out */}
+                            {isClockedIn ? (
+                                <button
+                                    onClick={async () => { await clockOut(); setIsUserMenuOpen(false); }}
+                                    disabled={clockLoading}
+                                    className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-red-500 hover:text-red-400 hover:bg-red-500/5 transition-colors disabled:opacity-50 cursor-pointer"
+                                >
+                                    <span className="relative flex h-4 w-4 items-center justify-center">
+                                        <span className="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-red-400 opacity-40" />
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+                                    </span>
+                                    <span className="flex-1 text-left">{clockLoading ? 'Saving...' : 'Clock Out'}</span>
+                                    <span className="text-[10px] font-mono font-bold text-red-400/80 tabular-nums">{formatElapsed(elapsedSeconds)}</span>
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={async () => { await clockIn(); setIsUserMenuOpen(false); }}
+                                    disabled={clockLoading}
+                                    className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/5 transition-colors disabled:opacity-50 cursor-pointer"
+                                >
+                                    <span className="relative flex h-4 w-4 items-center justify-center">
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                                    </span>
+                                    <span>{clockLoading ? 'Saving...' : 'Clock In'}</span>
+                                </button>
+                            )}
+                            <div className="my-1 border-t border-border/50" />
                             <button
                                 onClick={() => signOut({ callbackUrl: '/login' })}
                                 className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-red-500 hover:text-red-400 hover:bg-red-500/5 transition-colors"
@@ -226,3 +275,11 @@ export const DynamicActions = () => {
         </Suspense>
     );
 };
+
+function formatElapsed(totalSec: number): string {
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+

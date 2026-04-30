@@ -7,16 +7,19 @@ import { ThemeProvider } from './ThemeProvider';
 import { TimerProvider } from './TimerContext';
 import { NotificationProvider } from './NotificationContext';
 import { NotificationPanel } from './NotificationPanel';
+import { ClockInProvider } from './ClockInContext';
 
 export function Providers({ children }: { children: React.ReactNode }) {
     return (
         <SessionProvider refetchOnWindowFocus={false}>
             <ThemeProvider>
                 <TimerProvider>
-                    <NotificationProvider>
-                        {children}
-                        <NotificationPanel />
-                    </NotificationProvider>
+                    <ClockInProvider>
+                        <NotificationProvider>
+                            {children}
+                            <NotificationPanel />
+                        </NotificationProvider>
+                    </ClockInProvider>
                 </TimerProvider>
                 <Toaster position="bottom-right" reverseOrder={false} />
             </ThemeProvider>

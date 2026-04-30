@@ -9,11 +9,19 @@ export interface FieldBlueprint {
     label: string;
 }
 
+export interface SubModuleSetting {
+    key: string;
+    label: string;
+    options: string[];
+    default: string;
+}
+
 export interface SubModuleBlueprint {
     key: string;
     label: string;
     route: string;
     fields: FieldBlueprint[];
+    settings?: SubModuleSetting[];
 }
 
 export interface ModuleBlueprint {
@@ -144,6 +152,40 @@ export const MODULE_BLUEPRINTS: ModuleBlueprint[] = [
                     { field: 'service', label: 'Service' },
                     { field: 'status', label: 'Status' },
                     { field: 'lastSync', label: 'Last Sync' },
+                ],
+            },
+        ],
+    },
+    {
+        key: 'hr',
+        label: 'HR',
+        icon: 'briefcase',
+        subModules: [
+            {
+                key: 'timesheet',
+                label: 'TimeSheet',
+                route: '/hr/timesheet',
+                fields: [
+                    { field: 'date', label: 'Date' },
+                    { field: 'user', label: 'User' },
+                    { field: 'hourlyRate', label: 'Hourly Rate' },
+                    { field: 'timeIn', label: 'Time In' },
+                    { field: 'timeOut', label: 'Time Out' },
+                ],
+                settings: [
+                    { key: 'visibility', label: 'Visibility', options: ['Everybody', 'Self'], default: 'Everybody' },
+                ],
+            },
+            {
+                key: 'vacations',
+                label: 'Vacations',
+                route: '/hr/vacations',
+                fields: [
+                    { field: 'employee', label: 'Employee' },
+                    { field: 'startDate', label: 'Start Date' },
+                    { field: 'endDate', label: 'End Date' },
+                    { field: 'type', label: 'Type' },
+                    { field: 'status', label: 'Status' },
                 ],
             },
         ],
@@ -445,6 +487,13 @@ export function generateDefaultModules() {
                 field: f.field,
                 label: f.label,
                 visible: true,
+            })),
+            settings: (sub.settings || []).map(s => ({
+                key: s.key,
+                label: s.label,
+                options: s.options,
+                value: s.default,
+                default: s.default,
             })),
         })),
     }));
