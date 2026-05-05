@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { 
     Save, 
     Upload,
+    Download,
     Users,
     FileText,
     DollarSign,
@@ -21,6 +22,7 @@ export default function CRMSettingsPage() {
     const [saving, setSaving] = useState(false);
     const [loading, setLoading] = useState(true);
     const [importing, setImporting] = useState(false);
+    const [exporting, setExporting] = useState(false);
     const importClientsRef = React.useRef<HTMLInputElement>(null);
     const importNotesRef = React.useRef<HTMLInputElement>(null);
     const importContactsRef = React.useRef<HTMLInputElement>(null);
@@ -332,6 +334,34 @@ export default function CRMSettingsPage() {
         });
     };
 
+    const handleExportAll = async () => {
+        setExporting(true);
+        const toastId = toast.loading('Preparing export...');
+        try {
+            const res = await fetch('/api/clients/export');
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ error: 'Export failed' }));
+                toast.error(err.error || 'Export failed', { id: toastId });
+                setExporting(false);
+                return;
+            }
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `crm_export_clients_leads_${new Date().toISOString().slice(0, 10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            toast.success('Export downloaded!', { id: toastId });
+        } catch (err) {
+            console.error(err);
+            toast.error('Export failed', { id: toastId });
+        }
+        setExporting(false);
+    };
+
     if (loading) {
         return <div className="p-8">Loading settings...</div>;
     }
@@ -392,7 +422,29 @@ export default function CRMSettingsPage() {
                         onChange={handleImportTasks}
                     />
 
-                    {/* Row 1: Import Clients */}
+                    {/* Row 0: Export All Clients + Leads */}
+                    <div className="p-6 bg-card border border-emerald-500/30 flex items-center justify-between rounded-lg">
+                        <div className="flex items-center space-x-4">
+                            <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center shrink-0">
+                                <Download className="w-5 h-5 text-white" />
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-medium text-foreground">Export All Clients + Leads (CSV)</h4>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                    Downloads every record with all fields, revenue, balance, activities
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={handleExportAll}
+                            disabled={exporting}
+                            className="flex items-center space-x-2 px-4 py-2 bg-emerald-600 text-white text-xs font-medium rounded hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                        >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>{exporting ? 'Exporting...' : 'Export CSV'}</span>
+                        </button>
+                    </div>
+
                     {/* Row 1: Import Clients */}
                     <div className="p-6 bg-card border border-border flex items-center justify-between rounded-lg">
                         <div className="flex items-center space-x-4">
