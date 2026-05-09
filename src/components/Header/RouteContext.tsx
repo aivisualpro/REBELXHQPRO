@@ -86,8 +86,9 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
     // Client Detail
     if (pathname.match(/^\/crm\/clients\/[^/]+$/)) {
         return {
-            title: 'Client Details',
-            actions: []
+            title: '',
+            actions: [],
+            isPortal: true
         };
     }
 
@@ -148,8 +149,9 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
     // Inventory
     if (pathname === '/warehouse/inventory') {
         return {
-            title: 'Inventory',
-            actions: []
+            title: '',
+            actions: [],
+            isPortal: true
         };
     }
 
@@ -201,26 +203,27 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
     // Schedules
     if (pathname === '/jobs/schedules') {
         return {
-            title: 'Schedules',
-            actions: [
-                { label: 'Add', icon: Plus, variant: 'primary' },
-            ]
+            title: '',
+            actions: [],
+            isPortal: true
         };
     }
 
     // Time Cards
     if (pathname === '/jobs/time-cards') {
         return {
-            title: 'Time Cards',
-            actions: []
+            title: '',
+            actions: [],
+            isPortal: true
         };
     }
 
     // Reports
     if (pathname.includes('/reports')) {
         return {
-            title: 'Reports',
-            actions: []
+            title: '',
+            actions: [],
+            isPortal: true
         };
     }
 
@@ -229,16 +232,18 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
     // Dashboard
     if (pathname === '/' || pathname === '/reports/dashboard') {
         return {
-            title: 'Dashboard',
-            actions: []
+            title: '',
+            actions: [],
+            isPortal: true
         };
     }
 
     // Profile
     if (pathname === '/profile' || pathname.startsWith('/profile/')) {
         return {
-            title: 'Profile',
-            actions: []
+            title: '',
+            actions: [],
+            isPortal: true
         };
     }
 
