@@ -843,7 +843,7 @@ function SettingsPageContent() {
         }
     };
 
-    const tabs = [
+    const tabs: Array<{ id: string; label: string; icon: React.ElementType; keywords: string; href?: string }> = [
         { id: 'workspaces', label: 'Workspaces', icon: LayoutGrid, keywords: 'workspaces permissions roles modules crud fields access control' },
         { id: 'general', label: 'General', icon: Building, keywords: 'company name email phone address support general' },
         { id: 'localization', label: 'Localization', icon: Globe, keywords: 'currency timezone date format locale localization language' },
@@ -851,6 +851,7 @@ function SettingsPageContent() {
         { id: 'notifications', label: 'Notifications', icon: Bell, keywords: 'notifications email alerts sms push' },
         { id: 'security', label: 'Security', icon: Shield, keywords: 'security password authentication two-factor session' },
         { id: 'modules', label: 'Modules', icon: Layers, keywords: 'modules sales warehouse reports help import export sync vendors skus recipes kits manufacturing purchase orders lab results audit adjustments opening balances tickets' },
+        { id: 'backups', label: 'Backups', icon: Database, keywords: 'backups backup mongodb cloudinary restore export json gzip atlas', href: '/admin/settings/backups' },
     ];
 
     const moduleSubTabs = [
@@ -936,6 +937,21 @@ function SettingsPageContent() {
                     {filteredTabs.map(tab => {
                         const Icon = tab.icon;
                         const isActive = activeTab === tab.id;
+                        if (tab.href) {
+                            return (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => router.push(tab.href!)}
+                                    className={cn(
+                                        "flex items-center space-x-3 px-5 py-2.5 text-[12px] font-bold transition-all border-l-2 mx-2 rounded-r-lg",
+                                        "border-transparent text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                                    )}
+                                >
+                                    <Icon className="w-4 h-4" />
+                                    <span>{tab.label}</span>
+                                </button>
+                            );
+                        }
                         return (
                             <button
                                 key={tab.id}
