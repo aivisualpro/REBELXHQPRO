@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { fetchAndParseBackup } from '@/lib/backup';
+import { fetchManifest, fetchCollectionPage } from '@/lib/backup';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -41,39 +41,16 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'Invalid url' }, { status: 400 });
         }
 
-        const payload = await fetchAndParseBackup(url);
-        const coll = payload.collections.find(c => c.name === name);
-        if (!coll) {
-            return NextResponse.json(
-                { error: `Collection "${name}" not found in backup` },
-                { status: 404 },
-            );
-        }
-
-        if (full) {
-            return NextResponse.json({
-                ok: true,
-                name: coll.name,
-                count: coll.count,
-                documents: coll.documents,
-            });
-        }
-
-        const total = coll.documents.length;
-        const totalPages = Math.max(1, Math.ceil(total / pageSize));
-        const safePage = Math.min(page, totalPages);
-        const start = (safePage - 1) * pageSize;
-        const end = start + pageSize;
+        const manifest = await fetchManifest(url);
+        const result = await fetchCollectionPage(manifest, name, {
+            page,
+            pageSize,
+            full,
+        });
 
         return NextResponse.json({
             ok: true,
-            name: coll.name,
-            count: coll.count,
-            page: safePage,
-            pageSize,
-            total,
-            totalPages,
-            documents: coll.documents.slice(start, end),
+            ...result,
         });
     } catch (err: any) {
         console.error('[admin/backups/collection] failed:', err);
