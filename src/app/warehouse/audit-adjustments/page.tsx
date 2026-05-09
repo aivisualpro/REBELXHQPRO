@@ -51,7 +51,8 @@ const COLUMNS = [
     { key: 'sku', label: 'SKU', sortable: true, width: 'w-[220px]' },
     { key: 'lotNumber', label: 'Lot #', sortable: true, width: 'w-[100px]' },
     { key: 'qty', label: 'Qty', sortable: true, width: 'w-[60px]', align: 'text-right' as const },
-    { key: 'reason', label: 'Reason', sortable: true, width: 'w-[370px]' },
+    { key: 'cost', label: 'Cost', sortable: true, width: 'w-[80px]', align: 'text-right' as const },
+    { key: 'reason', label: 'Reason', sortable: true, width: 'w-[320px]' },
     { key: 'createdBy', label: 'Created By', sortable: false, width: 'w-[140px]' },
     { key: 'actions', label: '', sortable: false, width: 'w-[80px]', align: 'text-right' as const },
 ];
@@ -171,8 +172,15 @@ const TableRow = React.memo(function TableRow({
                 <QtyBadge qty={item.qty} />
             </td>
 
+            {/* Cost */}
+            <td className="px-2.5 py-2.5 text-right text-[12px] font-mono font-medium text-foreground/70 cursor-pointer">
+                {item.cost && item.cost > 0
+                    ? `$${item.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}`
+                    : <span className="text-muted-foreground/30">—</span>}
+            </td>
+
             {/* Reason */}
-            <td className="px-2.5 py-2.5 text-[12px] text-foreground/80 truncate cursor-pointer max-w-[370px]" title={item.reason}>
+            <td className="px-2.5 py-2.5 text-[12px] text-foreground/80 truncate cursor-pointer max-w-[320px]" title={item.reason}>
                 {item.reason || <span className="text-muted-foreground/30">—</span>}
             </td>
 

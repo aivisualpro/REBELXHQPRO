@@ -252,14 +252,17 @@ export default function AuditAdjustmentDetailPage() {
                                 <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold italic">Created By</div>
                                 <div className="text-xs font-medium text-foreground">{getCreatedBy()}</div>
                             </div>
-                            {item.cost !== undefined && item.cost !== 0 && (
-                                <div className="flex justify-between items-center">
-                                    <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold italic">Cost</div>
-                                    <div className="text-xs font-medium text-foreground font-mono">
-                                        ${(item.cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </div>
+                            <div className="flex justify-between items-center">
+                                <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold italic">Cost</div>
+                                <div className={cn(
+                                    "text-xs font-medium font-mono",
+                                    item.cost && item.cost > 0 ? "text-foreground" : "text-rose-500"
+                                )}>
+                                    {item.cost && item.cost > 0
+                                        ? `$${item.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}`
+                                        : 'Missing'}
                                 </div>
-                            )}
+                            </div>
                         </div>
                     </div>
 

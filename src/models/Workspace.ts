@@ -17,7 +17,7 @@ export interface IFieldPermission {
 export interface ISubModulePermission {
     key: string;         // unique key e.g. 'inbox', 'leads'
     label: string;       // Display label
-    route: string;       // Route path e.g. '/crm/inbox'
+    route: string;       // Route path e.g. '/crm/clients'
     enabled: boolean;    // Whether this sub-module is accessible
     crud: {
         create: boolean;

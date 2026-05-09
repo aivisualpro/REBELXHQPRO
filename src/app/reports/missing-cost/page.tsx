@@ -158,17 +158,20 @@ function MissingCostContent() {
     // Apply state — per-SKU only, no modal
     const [isApplying, setIsApplying] = useState(false);
     const [applyFixed, setApplyFixed] = useState<number | null>(null);
+    const [customCost, setCustomCost] = useState('');
 
-
-
-    const runApply = useCallback(async (skuId: string) => {
+    const runApply = useCallback(async (skuId: string, fallbackCost?: number) => {
         setIsApplying(true);
         setApplyFixed(null);
         try {
+            const body: any = { skuId };
+            if (fallbackCost !== undefined && fallbackCost > 0) {
+                body.customCost = fallbackCost;
+            }
             const res = await fetch('/api/reports/missing-cost/apply', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ skuId }),
+                body: JSON.stringify(body),
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Apply failed');
@@ -625,11 +628,31 @@ function MissingCostContent() {
                                     </div>
                                     <div className="flex items-center gap-3">
 
+                                        {/* ✨ Custom Cost input */}
+                                        {hasApplicableRecords && (
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Custom Cost</span>
+                                                <input
+                                                    id="input-custom-cost"
+                                                    type="number"
+                                                    step="0.00000001"
+                                                    min="0"
+                                                    placeholder="0.00"
+                                                    value={customCost}
+                                                    onChange={(e) => setCustomCost(e.target.value)}
+                                                    className="w-[110px] px-2 py-1.5 text-xs font-mono font-bold bg-secondary border border-border rounded-md outline-none focus:ring-1 focus:ring-violet-500/30 focus:border-violet-500/50 text-foreground placeholder:text-muted-foreground transition-colors tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                />
+                                            </div>
+                                        )}
+
                                         {/* ✨ Apply This SKU button */}
                                         {hasApplicableRecords && (
                                             <button
                                                 id="btn-apply-sku-cost"
-                                                onClick={() => runApply(selectedGroupSummary.skuId)}
+                                                onClick={() => {
+                                                    const parsed = customCost ? parseFloat(parseFloat(customCost).toFixed(8)) : undefined;
+                                                    runApply(selectedGroupSummary.skuId, parsed);
+                                                }}
                                                 disabled={isApplying}
                                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-violet-500/15 hover:bg-violet-500/25 disabled:opacity-60 disabled:cursor-not-allowed text-violet-400 text-xs font-bold transition-colors border border-violet-500/20"
                                             >

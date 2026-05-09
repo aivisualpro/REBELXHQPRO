@@ -224,13 +224,7 @@ const getRouteConfig = (pathname: string): RouteConfig | null => {
         };
     }
 
-    // Inbox
-    if (pathname === '/crm/inbox') {
-        return {
-            title: 'Inbox',
-            actions: []
-        };
-    }
+
 
     // Dashboard
     if (pathname === '/' || pathname === '/reports/dashboard') {

@@ -6,6 +6,7 @@ import SaleOrder from '@/models/SaleOrder';
 import OpeningBalance from '@/models/OpeningBalance';
 import PurchaseOrder from '@/models/PurchaseOrder';
 import Manufacturing from '@/models/Manufacturing';
+import AuditAdjustment from '@/models/AuditAdjustment';
 import { getLotsWithCost, calculateJobCostPerUnit } from '@/lib/lot-cost';
 import { getGlobalStartDate } from '@/lib/global-settings';
 
@@ -20,7 +21,7 @@ export async function POST(request: NextRequest) {
         await dbConnect();
 
         const body = await request.json().catch(() => ({}));
-        const { skuId } = body; // required: which SKU to process
+        const { skuId, customCost: rawCustomCost } = body; // skuId required; customCost optional fallback
 
         if (!skuId) {
             return NextResponse.json({ error: 'skuId is required' }, { status: 400 });
@@ -28,6 +29,11 @@ export async function POST(request: NextRequest) {
 
         const globalStartDate = await getGlobalStartDate();
         const INVALID_LOT_VALUES = [null, '', 'N/A', 'Allocated'];
+
+        // Parse & clamp customCost to 8 decimal places (only used as final fallback)
+        const customCost = (typeof rawCustomCost === 'number' && rawCustomCost > 0)
+            ? parseFloat(rawCustomCost.toFixed(8))
+            : 0;
 
         // ── Build ObjectId-aware SKU match ──
         const skuOid = skuId !== 'all' && mongoose.Types.ObjectId.isValid(skuId) ? new mongoose.Types.ObjectId(skuId) : skuId;
@@ -51,7 +57,7 @@ export async function POST(request: NextRequest) {
         // ── Step 2: Find all records across applicable sources ──
         // Only fetch _id + lineItems (projection) to minimize data transfer
         const t1 = Date.now();
-        const [webOrders, saleOrders, openingBalances, purchaseOrders, mfgOutputs, mfgConsumptions] = await Promise.all([
+        const [webOrders, saleOrders, openingBalances, purchaseOrders, mfgOutputs, mfgConsumptions, auditAdjustments] = await Promise.all([
             // Web Orders — only fetch lineItems
             WebOrder.find({
                 status: { $nin: ['cancelled', 'trash', 'failed', 'refunded'] },
@@ -89,11 +95,18 @@ export async function POST(request: NextRequest) {
                 ...(globalStartDate ? { createdAt: { $gte: globalStartDate } } : {}),
                 'lineItems.sku': skuMatch,
             }).select('_id lineItems').lean() as any,
+
+            // Audit Adjustments — cost=0 with valid lotNumber
+            AuditAdjustment.find({
+                sku: skuMatch,
+                lotNumber: { $exists: true, $nin: INVALID_LOT_VALUES },
+                $or: [{ cost: 0 }, { cost: null }, { cost: { $exists: false } }],
+            }).select('_id sku lotNumber cost qty').lean() as any,
         ]);
         console.log(`[Apply Cost] DB queries in ${Date.now() - t1}ms`);
 
         console.log(`[Apply Cost] SKU=${skuId} | lotCosts: [${[...lotCosts.entries()].map(([k,v]) => `${k}=$${v.toFixed(2)}`).join(', ')}]`);
-        console.log(`[Apply Cost] Records: WO=${webOrders.length} SO=${saleOrders.length} OB=${openingBalances.length} PO=${purchaseOrders.length} MFG=${mfgOutputs.length} MFG_CON=${mfgConsumptions.length}`);
+        console.log(`[Apply Cost] Records: WO=${webOrders.length} SO=${saleOrders.length} OB=${openingBalances.length} PO=${purchaseOrders.length} MFG=${mfgOutputs.length} MFG_CON=${mfgConsumptions.length} AA=${auditAdjustments.length}`);
 
         // ══════════════════════════════════════════════
         // 3A: Apply costs to Web Orders
@@ -112,7 +125,7 @@ export async function POST(request: NextRequest) {
                 // Legacy single-SKU path
                 if (matchesSku(li.linkedSkuId) && li.lotNumber && !INVALID_LOT_VALUES.includes(li.lotNumber) && (!li.cost || li.cost === 0)) {
                     const cleanedLot = String(li.lotNumber).trim().replace(/,/g, '').replace(/\.0+$/, '');
-                    const baseCost = lotCosts.get(cleanedLot) ?? lotCosts.get(li.lotNumber) ?? 0;
+                    const baseCost = lotCosts.get(cleanedLot) ?? lotCosts.get(li.lotNumber) ?? customCost;
                     if (baseCost > 0) {
                         updates[`lineItems.${i}.cost`] = baseCost * (li.multiplier || 1);
                         changed = true; woFixed++;
@@ -125,7 +138,7 @@ export async function POST(request: NextRequest) {
                         const ls = li.linkedSkus[j];
                         if (matchesSku(ls.skuId) && ls.lotNumber && !INVALID_LOT_VALUES.includes(ls.lotNumber) && (!ls.cost || ls.cost === 0)) {
                             const cleanedLot = String(ls.lotNumber).trim().replace(/,/g, '').replace(/\.0+$/, '');
-                            const baseCost = lotCosts.get(cleanedLot) ?? lotCosts.get(ls.lotNumber) ?? 0;
+                            const baseCost = lotCosts.get(cleanedLot) ?? lotCosts.get(ls.lotNumber) ?? customCost;
                             if (baseCost > 0) {
                                 const finalCost = baseCost * (ls.multiplier || 1);
                                 updates[`lineItems.${i}.linkedSkus.${j}.cost`] = finalCost;
@@ -161,7 +174,7 @@ export async function POST(request: NextRequest) {
                 const li = so.lineItems[i];
                 if (matchesSku(li.sku) && li.lotNumber && !INVALID_LOT_VALUES.includes(li.lotNumber) && (!li.cost || li.cost === 0)) {
                     const cleanedLot = String(li.lotNumber).trim().replace(/,/g, '').replace(/\.0+$/, '');
-                    const cost = lotCosts.get(cleanedLot) ?? lotCosts.get(li.lotNumber) ?? 0;
+                    const cost = lotCosts.get(cleanedLot) ?? lotCosts.get(li.lotNumber) ?? customCost;
                     if (cost > 0) {
                         updates[`lineItems.${i}.cost`] = cost;
                         changed = true; soFixed++;
@@ -232,7 +245,7 @@ export async function POST(request: NextRequest) {
                 if (!li.lotNumber || INVALID_LOT_VALUES.includes(li.lotNumber)) continue;
 
                 const cleanedLot = String(li.lotNumber).trim().replace(/,/g, '').replace(/\.0+$/, '');
-                const cost = lotCosts.get(cleanedLot) ?? lotCosts.get(li.lotNumber) ?? 0;
+                const cost = lotCosts.get(cleanedLot) ?? lotCosts.get(li.lotNumber) ?? customCost;
                 if (cost > 0) {
                     updates[`lineItems.${i}.cost`] = cost;
                     changed = true; mfgConFixed++;
@@ -250,7 +263,28 @@ export async function POST(request: NextRequest) {
 
         totalFixed = woFixed + soFixed + obFixed + poFixed + mfgFixed + mfgConFixed;
 
-        console.log(`[Apply Cost] Done | WO=${woFixed} SO=${soFixed} OB=${obFixed} PO=${poFixed} MFG=${mfgFixed} MFG_CON=${mfgConFixed} | Total=${totalFixed}`);
+        // ══════════════════════════════════════════════
+        // 3G: Apply costs to Audit Adjustments
+        // ══════════════════════════════════════════════
+        let aaFixed = 0;
+        const aaBulk = AuditAdjustment.collection.initializeUnorderedBulkOp();
+        let aaHasOps = false;
+
+        for (const aa of auditAdjustments) {
+            if (!aa.lotNumber || INVALID_LOT_VALUES.includes(aa.lotNumber)) continue;
+            const cleanedLot = String(aa.lotNumber).trim().replace(/,/g, '').replace(/\.0+$/, '');
+            const cost = lotCosts.get(cleanedLot) ?? lotCosts.get(aa.lotNumber) ?? customCost;
+            if (cost > 0) {
+                aaBulk.find({ _id: aa._id }).updateOne({ $set: { cost, updatedAt: new Date() } });
+                aaHasOps = true; aaFixed++;
+                resolvedOrderIds.push(String(aa._id));
+            }
+        }
+        if (aaHasOps) await aaBulk.execute();
+
+        totalFixed += aaFixed;
+
+        console.log(`[Apply Cost] Done | WO=${woFixed} SO=${soFixed} OB=${obFixed} PO=${poFixed} MFG=${mfgFixed} MFG_CON=${mfgConFixed} AA=${aaFixed} | Total=${totalFixed}`);
 
         return NextResponse.json({
             success: true,
@@ -262,6 +296,7 @@ export async function POST(request: NextRequest) {
                 purchaseOrdersFixed: poFixed,
                 manufacturingFixed: mfgFixed,
                 mfgConsumptionFixed: mfgConFixed,
+                auditAdjustmentsFixed: aaFixed,
                 totalFixed,
             },
             resolvedOrderIds,

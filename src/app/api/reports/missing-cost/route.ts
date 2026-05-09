@@ -8,6 +8,7 @@ import OpeningBalance from '@/models/OpeningBalance';
 import PurchaseOrder from '@/models/PurchaseOrder';
 import mongoose from 'mongoose';
 import Manufacturing from '@/models/Manufacturing';
+import AuditAdjustment from '@/models/AuditAdjustment';
 import { getGlobalStartDate } from '@/lib/global-settings';
 
 export const dynamic = 'force-dynamic';
@@ -67,7 +68,7 @@ async function getSummary() {
             const idStr = s._id.toString();
             return mongoose.Types.ObjectId.isValid(idStr) ? [idStr, new mongoose.Types.ObjectId(idStr)] : [idStr];
         });
-        const [woGroups, soGroups, obGroups, poGroups, mfgGroups, mfgConGroups, allSkus] = await Promise.all([
+        const [woGroups, soGroups, obGroups, poGroups, mfgGroups, mfgConGroups, aaGroups, allSkus] = await Promise.all([
             // ⚡ Web Orders: line items with valid lotNumber but cost=0/null
             WebOrder.aggregate([
                 {
@@ -262,6 +263,26 @@ async function getSummary() {
                 }
             ]).allowDiskUse(true),
 
+            // ⚡ Audit Adjustments: valid lotNumber but cost=0/null
+            AuditAdjustment.aggregate([
+                {
+                    $match: {
+                        sku: { $exists: true, $ne: null, $nin: EXCLUDED_SKUS },
+                        lotNumber: { $exists: true, $nin: INVALID_LOT_VALUES },
+                        qty: { $nin: [0, -0, '0', '-0'] },
+                        $or: missingCostOr('cost')
+                    }
+                },
+                {
+                    $group: {
+                        _id: { sku: '$sku', type: 'Audit Adjustment' },
+                        count: { $sum: 1 },
+                        totalQty: { $sum: { $abs: { $ifNull: ['$qty', 0] } } },
+                        totalValue: { $sum: 0 },
+                    }
+                }
+            ]).allowDiskUse(true),
+
             Sku.find({ isArchived: { $ne: true } })
                 .select('_id name category uom')
                 .lean(),
@@ -280,7 +301,8 @@ async function getSummary() {
             [obGroups, 'Opening Balance'],
             [poGroups, 'Purchase Order'],
             [mfgGroups, 'Manufacturing'],
-            [mfgConGroups, 'Mfg. Consumption']
+            [mfgConGroups, 'Mfg. Consumption'],
+            [aaGroups, 'Audit Adjustment'],
         ] as const) {
             for (const g of sourceGroups) {
                 const sku = g._id?.sku?.toString();
@@ -365,7 +387,7 @@ async function getSkuDetail(skuId: string) {
         const resolvedSkuOid = skuOid ? await skuOid : null;
         const skuMatch = skuId === 'all' ? { $exists: true, $ne: null, $nin: EXCLUDED_SKUS } : { $in: [resolvedSkuOid, skuId], $nin: EXCLUDED_SKUS };
 
-        const [woItems, soItems, obItems, poItems, mfgItems, mfgConItems] = await Promise.all([
+        const [woItems, soItems, obItems, poItems, mfgItems, mfgConItems, aaItems] = await Promise.all([
             WebOrder.aggregate([
                 {
                     $match: {
@@ -563,6 +585,28 @@ async function getSkuDetail(skuId: string) {
                 },
                 { $sort: { createdAt: -1 } },
             ]).allowDiskUse(true),
+
+            // Audit Adjustments
+            AuditAdjustment.aggregate([
+                {
+                    $match: {
+                        sku: skuMatch,
+                        lotNumber: { $exists: true, $nin: INVALID_LOT_VALUES },
+                        qty: { $nin: [0, -0, '0', '-0'] },
+                        $or: missingCostOr('cost')
+                    }
+                },
+                {
+                    $project: {
+                        _id: 1,
+                        createdAt: 1,
+                        qty: 1,
+                        lotNumber: 1,
+                        cost: 1,
+                    }
+                },
+                { $sort: { createdAt: -1 } },
+            ]).allowDiskUse(true),
         ]);
 
         const items: any[] = [];
@@ -666,6 +710,22 @@ async function getSkuDetail(skuId: string) {
                 quantity: mfgCon.consumedQty || 0,
                 total: 0,
                 link: `/warehouse/manufacturing/${mfgCon._id}`,
+            });
+        }
+
+        for (const aa of aaItems) {
+            items.push({
+                id: `AA_${aa._id}_${Math.random().toString(36).substring(2, 9)}`,
+                source: 'Audit Adjustment',
+                orderId: aa._id.toString(),
+                orderNumber: aa._id.toString().slice(-8),
+                status: 'Completed',
+                date: aa.createdAt || '',
+                lotNumber: aa.lotNumber || '',
+                cost: aa.cost || 0,
+                quantity: aa.qty || 0,
+                total: 0,
+                link: `/warehouse/audit-adjustments?id=${aa._id}`,
             });
         }
 

@@ -2,11 +2,11 @@
 
 import React, { Suspense } from 'react';
 import {
-  Inbox, Trophy, Users,
+  Trophy, Users,
   GitBranch, MessageSquare, ListTodo, BarChart3,
   Plus, Search, ListFilter, Settings,
   Phone, PhoneCall, Hourglass, AlertTriangle,
-  Eye, Briefcase, Send,
+  Eye, Briefcase,
   PanelLeftClose, PanelLeftOpen, StickyNote, ShieldAlert
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -147,7 +147,6 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { data: session } = useSession();
   const { isModuleEnabled, loading: permLoading } = usePermissions();
-  const [unreadCount, setUnreadCount] = React.useState<number | null>(null);
   const [isClientModalOpen, setIsClientModalOpen] = React.useState(false);
   const [clientModalType, setClientModalType] = React.useState<'Client' | 'Lead'>('Lead');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState<boolean>(false);
@@ -176,71 +175,7 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const fetchUnreadCount = React.useCallback(async () => {
-    try {
-      // First, check if filtering is enabled
-      const settingsRes = await fetch('/api/settings');
-      const settings = await settingsRes.json();
-      const filterEnabled = settings.crmFilterEmailsByClients === true;
 
-      if (filterEnabled) {
-        // Fetch client emails and filtered inbox emails
-        const [clientsRes, gmailRes] = await Promise.all([
-          fetch('/api/clients?limit=10000'),
-          fetch('/api/gmail?label=INBOX')
-        ]);
-
-        const clientsData = await clientsRes.json();
-        const gmailData = await gmailRes.json();
-
-        // Extract all client emails
-        const clientEmails: string[] = [];
-        clientsData.clients?.forEach((client: any) => {
-          client.emails?.forEach((e: any) => {
-            if (e.value) clientEmails.push(e.value.toLowerCase().trim());
-          });
-        });
-
-        // Filter emails by client emails and count unread
-        if (gmailData.emails && clientEmails.length > 0) {
-          const filteredUnread = gmailData.emails.filter((email: any) => {
-            const senderEmail = (email.senderEmail || '').toLowerCase().trim();
-            const allRecipients = [
-              email.recipient || '',
-              email.cc || '',
-              email.bcc || ''
-            ].join(' ').toLowerCase();
-
-            const senderMatch = clientEmails.some(ce => senderEmail.includes(ce) || ce.includes(senderEmail));
-            const recipientMatch = clientEmails.some(ce => allRecipients.includes(ce));
-
-            return (senderMatch || recipientMatch) && !email.isRead;
-          }).length;
-
-          setUnreadCount(filteredUnread);
-        } else {
-          setUnreadCount(0);
-        }
-      } else {
-        // Use standard Gmail unread count
-        const res = await fetch('/api/gmail?label=INBOX&limit=1');
-        const data = await res.json();
-        if (typeof data.unreadCount === 'number') {
-          setUnreadCount(data.unreadCount);
-        }
-      }
-    } catch (e) {
-      console.error("Failed to fetch unread count", e);
-    }
-  }, []);
-
-  React.useEffect(() => {
-    if (session?.user) {
-      fetchUnreadCount();
-      const interval = setInterval(fetchUnreadCount, 60000); // Refresh every minute
-      return () => clearInterval(interval);
-    }
-  }, [session?.user, fetchUnreadCount]);
 
   const isActive = (path: string) => pathname === path;
 
@@ -312,44 +247,7 @@ export default function CRMLayout({ children }: { children: React.ReactNode }) {
 
         <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-0.5">
 
-          {/* Inbox & Sent */}
-          <div className="space-y-0.5">
-            <Link href="/crm/inbox" className="block" title={isSidebarCollapsed ? "Inbox" : ""}>
-              <div className={cn(
-                "flex items-center rounded-md cursor-pointer transition-colors group",
-                isSidebarCollapsed ? "justify-center py-2.5 px-0" : "justify-between px-3 py-2",
-                isActive('/crm/inbox') ? "bg-[#fe9900] text-black" : "hover:bg-secondary"
-              )}>
-                <div className={cn("flex items-center", isSidebarCollapsed ? "justify-center" : "space-x-3")}>
-                  <Inbox className={cn("w-5 h-5 transition-colors", !isSidebarCollapsed && "mr-3", isActive('/crm/inbox') ? "text-black" : "group-hover:text-foreground")} />
-                  {!isSidebarCollapsed && <span className={cn("text-[14px] font-medium transition-colors", isActive('/crm/inbox') ? "text-black" : "group-hover:text-foreground")}>Inbox</span>}
-                </div>
-                {!!unreadCount && (
-                  <span className={cn(
-                    "bg-black text-white text-[10px] font-black rounded-sm",
-                    isSidebarCollapsed ? "absolute top-1 right-1 px-1 py-0 min-w-[12px] text-center" : "px-1.5 py-0.5"
-                  )}>
-                    {unreadCount}
-                  </span>
-                )}
-              </div>
-            </Link>
 
-            {[
-              { name: 'Sent', icon: Send, href: '/crm/sent' },
-            ].map((item) => (
-              <Link key={item.name} href={item.href} className="block" title={isSidebarCollapsed ? item.name : ""}>
-                <div className={cn(
-                  "flex items-center rounded-md cursor-pointer transition-colors group",
-                  isSidebarCollapsed ? "justify-center py-2.5 px-0" : "px-3 py-2",
-                  isActive(item.href) ? "bg-[#fe9900] text-black" : "hover:bg-secondary"
-                )}>
-                  <item.icon className={cn("w-5 h-5 transition-colors", !isSidebarCollapsed && "mr-3", isActive(item.href) ? "text-black" : "group-hover:text-foreground")} />
-                  {!isSidebarCollapsed && <span className={cn("text-[14px] font-medium transition-colors", isActive(item.href) ? "text-black" : "group-hover:text-foreground")}>{item.name}</span>}
-                </div>
-              </Link>
-            ))}
-          </div>
 
           {/* Leads */}
           <div className="group/sidebar-item relative">

@@ -71,17 +71,7 @@ export const MODULE_BLUEPRINTS: ModuleBlueprint[] = [
         label: 'CRM',
         icon: 'users-round',
         subModules: [
-            {
-                key: 'inbox',
-                label: 'Inbox',
-                route: '/crm/inbox',
-                fields: [
-                    { field: 'subject', label: 'Subject' },
-                    { field: 'from', label: 'From' },
-                    { field: 'date', label: 'Date' },
-                    { field: 'body', label: 'Body' },
-                ],
-            },
+
             {
                 key: 'clients',
                 label: 'Clients',

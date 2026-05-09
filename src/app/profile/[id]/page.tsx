@@ -152,7 +152,7 @@ export default function UserProfilePage() {
     // Build quick links based on workspace permissions
     const quickLinks = [];
     if (isSuperAdmin || isModuleEnabled('crm')) {
-        quickLinks.push({ icon: Mail, label: 'CRM Inbox', description: 'Manage leads & emails', href: '/crm/inbox', color: 'bg-blue-500/20 text-blue-500', gradient: 'bg-blue-500/20' });
+        quickLinks.push({ icon: Briefcase, label: 'CRM Clients', description: 'Manage clients & emails', href: '/crm/clients', color: 'bg-blue-500/20 text-blue-500', gradient: 'bg-blue-500/20' });
         quickLinks.push({ icon: Target, label: 'Leads', description: 'Track your pipeline', href: '/crm/leads', color: 'bg-purple-500/20 text-purple-500', gradient: 'bg-purple-500/20' });
     }
     if (isSuperAdmin || isModuleEnabled('sales')) {
