@@ -103,4 +103,11 @@ const SkuSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now }
 });
 
+// ─── Performance indexes (M10 Atlas) ─────────────────────────────────────────
+// Compound indexes for the SKU listing page's most common access patterns
+SkuSchema.index({ isArchived: 1, name: 1 }); // Default sort (name asc, non-archived)
+SkuSchema.index({ isArchived: 1, category: 1, name: 1 }); // Category filter + sort
+SkuSchema.index({ category: 1 }); // Category filter alone
+SkuSchema.index({ name: 'text' }); // Text search on name
+
 export default mongoose.models.Sku || mongoose.model('Sku', SkuSchema);

@@ -654,15 +654,16 @@ export async function GET(
 
         const isPendingProduction = (t: any) => t.type === 'Produced' && ['pending', 'processing'].includes((t.status || '').toLowerCase());
         const isUnfulfilledConsumption = (t: any) => t.type === 'Consumption' && (t.status || '').toLowerCase() !== 'fulfilled';
+        const isPendingOrder = (t: any) => t.type === 'Orders' && (t.status || '').toLowerCase() !== 'completed' && (t.status || '').toLowerCase() !== 'shipped';
 
         const filteredTransactions = (startDate ? transactions.filter(t => t.date >= startDate) : transactions).map(t => {
-            // Produced + Pending OR Consumption + not Fulfilled: show in table but don't count towards balance or stats
-            if (!isPendingProduction(t) && !isUnfulfilledConsumption(t)) {
+            // Produced + Pending OR Consumption + not Fulfilled OR Orders + not Completed/Shipped: show in table but don't count towards balance or stats
+            if (!isPendingProduction(t) && !isUnfulfilledConsumption(t) && !isPendingOrder(t)) {
                 balance = round8(balance + t.quantity);
             }
             const key = `${t.date.getFullYear()}-${String(t.date.getMonth() + 1).padStart(2, '0')}`;
 
-            if (t.type === 'Orders' || t.type === 'Web Order') {
+            if ((t.type === 'Orders' || t.type === 'Web Order') && !isPendingOrder(t)) {
                 const qty = Math.abs(t.quantity);
                 const rev = qty * (t.salePrice || 0);
                 const cos = qty * (t.cost || 0);

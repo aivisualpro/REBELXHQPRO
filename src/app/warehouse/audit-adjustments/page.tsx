@@ -294,7 +294,7 @@ function AdjustmentModal({ onClose, initialData, skus, sessionUser, onSuccess }:
                         <div className="space-y-1.5">
                             <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">Quantity</label>
                             <input type="number" step="any" value={formData.qty}
-                                onChange={e => setFormData({ ...formData, qty: parseFloat(e.target.value) })} className={inp} placeholder="0" />
+                                onChange={e => { const v = parseFloat(e.target.value); setFormData({ ...formData, qty: isNaN(v) ? 0 : v }); }} className={inp} placeholder="0" />
                             <p className="text-[10px] text-muted-foreground/60">Positive adds, negative removes.</p>
                         </div>
                     </div>

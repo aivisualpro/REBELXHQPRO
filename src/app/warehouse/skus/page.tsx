@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowUpDown, Plus, Search, X, Loader2, Archive, ArchiveRestore, FileX2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -24,6 +24,7 @@ interface Sku {
   isArchived?: boolean;
   tier?: number;
   createdAt?: string;
+  currentStock?: number;
 }
 
 interface CacheEntry {
@@ -39,6 +40,11 @@ interface CacheEntry {
   noTransactions: boolean;
   timestamp: number;
 }
+
+// ─── Global stock cache (shared across navigations) ───────────────────────────
+
+const globalStockCache: { current: { stockMap: Record<string, number>; timestamp: number } | null } = { current: null };
+const STOCK_CACHE_TTL = 60_000; // 60 seconds (matches server cache)
 
 // ─── Module-level cache ───────────────────────────────────────────────────────
 
@@ -72,6 +78,7 @@ const COLUMNS = [
   { key: 'salePrice', label: 'Sale Price', width: 'w-[90px]', align: 'text-right' },
   { key: 'reOrderPoint', label: 'Re-Order Pt', width: 'w-[90px]', align: 'text-right' },
   { key: 'orderUpto', label: 'Order Upto', width: 'w-[90px]', align: 'text-right' },
+  { key: 'currentStock', label: 'Avail Qty', width: 'w-[100px]', align: 'text-right' },
 ];
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
@@ -172,8 +179,8 @@ function UomPill({ value }: { value: string }) {
 // ─── Table Row ────────────────────────────────────────────────────────────────
 
 const SkuRow = React.memo(function SkuRow({
-  sku, onClick, highlight, onToggleArchive, showArchived
-}: { sku: Sku; onClick: () => void; highlight?: boolean; onToggleArchive?: (skuId: string, isArchived: boolean) => void; showArchived?: boolean }) {
+  sku, onClick, highlight, onToggleArchive, showArchived, stockLoading
+}: { sku: Sku; onClick: () => void; highlight?: boolean; onToggleArchive?: (skuId: string, isArchived: boolean) => void; showArchived?: boolean; stockLoading?: boolean }) {
   const fmt = (n?: number) => n != null ? `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—';
   return (
     <tr
@@ -197,6 +204,16 @@ const SkuRow = React.memo(function SkuRow({
       <td className="px-2.5 py-2.5 w-[90px] text-[12px] font-mono text-right text-foreground/80">{fmt(sku.salePrice)}</td>
       <td className="px-2.5 py-2.5 w-[90px] text-[12px] font-mono text-right text-foreground/70">{sku.reOrderPoint?.toLocaleString() || '—'}</td>
       <td className="px-2.5 py-2.5 w-[90px] text-[12px] font-mono text-right text-foreground/70">{sku.orderUpto?.toLocaleString() || '—'}</td>
+      <td className={cn(
+        "px-2.5 py-2.5 w-[100px] text-[12px] font-mono font-black text-right",
+        stockLoading ? '' :
+        (sku.currentStock ?? 0) > 0 ? 'text-emerald-500' : (sku.currentStock ?? 0) < 0 ? 'text-rose-500' : 'text-muted-foreground/40'
+      )}>
+        {stockLoading
+          ? <div className="h-3 w-12 ml-auto rounded bg-muted-foreground/10 animate-pulse" />
+          : sku.currentStock != null ? sku.currentStock.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—'
+        }
+      </td>
       {/* Archive action */}
       <td className="px-2.5 py-2.5 w-[70px] text-center">
         <button
@@ -337,6 +354,10 @@ function SkusContent() {
   const [editingSku, setEditingSku] = useState<Sku | null>(null);
   const [showArchived, setShowArchived] = useState(searchParams.get('showArchived') === 'true');
   const [noTransactions, setNoTransactions] = useState(searchParams.get('noTransactions') === 'true');
+
+  // Phase 2: Stock data (loaded separately for speed)
+  const [stockMap, setStockMap] = useState<Record<string, number>>(globalStockCache.current?.stockMap || {});
+  const [stockLoading, setStockLoading] = useState(!globalStockCache.current || (Date.now() - (globalStockCache.current?.timestamp || 0)) > STOCK_CACHE_TTL);
 
   const pageRef = useRef(globalCache.current?.page || 0);
   const mountedRef = useRef(true);
@@ -498,6 +519,45 @@ function SkusContent() {
     fetchPageRef.current(1, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sortBy, sortOrder, debouncedSearch, activeCategory, showArchived, noTransactions]);
+
+  // ─── Phase 2: Background stock fetch ────────────────────────────────────
+
+  useEffect(() => {
+    // Use client-side cache if fresh
+    const cached = globalStockCache.current;
+    if (cached && (Date.now() - cached.timestamp) < STOCK_CACHE_TTL) {
+      setStockMap(cached.stockMap);
+      setStockLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setStockLoading(true);
+
+    fetch('/api/skus/stock')
+      .then(r => r.json())
+      .then(data => {
+        if (cancelled) return;
+        if (data.stockMap) {
+          setStockMap(data.stockMap);
+          globalStockCache.current = { stockMap: data.stockMap, timestamp: Date.now() };
+        }
+      })
+      .catch(() => { /* silent */ })
+      .finally(() => { if (!cancelled) setStockLoading(false); });
+
+    return () => { cancelled = true; };
+  }, []); // Only runs once on mount — stock is refreshed by server cache TTL
+
+  // ─── Merge stock into displayed SKUs ────────────────────────────────────
+
+  const skusWithStock = useMemo(() => {
+    if (Object.keys(stockMap).length === 0) return skus;
+    return skus.map(s => ({
+      ...s,
+      currentStock: stockMap[s._id] ?? stockMap[s._id?.toString()] ?? undefined,
+    }));
+  }, [skus, stockMap]);
 
   // ─── Archive Toggle ─────────────────────────────────────────────────────
 
@@ -662,15 +722,16 @@ function SkusContent() {
                 Array.from({ length: 25 }).map((_, i) => <SkeletonRow key={i} index={i} />)
               ) : error ? (
                 <tr><td colSpan={COLUMNS.length + 1} className="px-4 py-12 text-center text-[12px] text-destructive">{error}</td></tr>
-              ) : skus.length === 0 ? (
+              ) : skusWithStock.length === 0 ? (
                 <tr><td colSpan={COLUMNS.length + 1} className="px-4 py-16 text-center text-[12px] text-muted-foreground/50 uppercase tracking-widest">No SKUs found</td></tr>
-              ) : skus.map(sku => (
+              ) : skusWithStock.map(sku => (
                 <SkuRow
                   key={sku._id}
                   sku={sku}
                   highlight={highlightId === sku._id}
                   onToggleArchive={handleToggleArchive}
                   showArchived={showArchived}
+                  stockLoading={stockLoading}
                   onClick={() => {
                     sessionStorage.setItem('sku_scroll_to', sku._id);
                     if (scrollRef.current) sessionStorage.setItem('sku_scroll_top', String(scrollRef.current.scrollTop));
@@ -691,9 +752,9 @@ function SkusContent() {
             </div>
           )}
 
-          {!hasMore && skus.length > 0 && !isLoading && (
+          {!hasMore && skusWithStock.length > 0 && !isLoading && (
             <div className="text-center py-4 text-[11px] text-muted-foreground/40 uppercase tracking-widest">
-              — {skus.length.toLocaleString()} SKUs loaded —
+              — {skusWithStock.length.toLocaleString()} SKUs loaded —
             </div>
           )}
         </div>

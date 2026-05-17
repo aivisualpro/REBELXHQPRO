@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
+import { useSession } from 'next-auth/react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
     Package,
@@ -25,7 +26,8 @@ import {
     Link,
     Search,
     Archive,
-    ArchiveRestore
+    ArchiveRestore,
+    Scale
 } from 'lucide-react';
 import { cn, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -134,6 +136,7 @@ function SkuDetailsPageContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { id } = params;
+    const { data: session } = useSession();
 
     const [sku, setSku] = useState<Sku | null>(null);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -190,6 +193,9 @@ function SkuDetailsPageContent() {
     const [warningFilter, setWarningFilter] = useState<'pending' | 'unfulfilled' | null>(null);
     const [highlightedTxIds, setHighlightedTxIds] = useState<Set<string>>(new Set());
     const mainScrollRef = useRef<HTMLElement>(null);
+
+    // Zero-out lot adjustment state
+    const [adjustingLot, setAdjustingLot] = useState<string | null>(null);
 
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
@@ -464,6 +470,7 @@ function SkuDetailsPageContent() {
 
     const isPendingProduction = (tx: Transaction) => tx.type === 'Produced' && ['pending', 'processing'].includes((tx.status || '').toLowerCase());
     const isUnfulfilledConsumption = (tx: Transaction) => tx.type === 'Consumption' && (tx.status || '').toLowerCase() !== 'fulfilled';
+    const isPendingOrder = (tx: Transaction) => tx.type === 'Orders' && (tx.status || '').toLowerCase() !== 'completed' && (tx.status || '').toLowerCase() !== 'shipped';
 
     const finalTransactions = filteredTransactions.filter(tx => {
         // When reference search is active, bypass lot/variance/warning filters
@@ -496,7 +503,7 @@ function SkuDetailsPageContent() {
                 return (tpLot[a.type] ?? 9) - (tpLot[b.type] ?? 9);
             });
             const balanced = ascTx.map(tx => {
-                if (!isPendingProduction(tx) && !isUnfulfilledConsumption(tx)) {
+                if (!isPendingProduction(tx) && !isUnfulfilledConsumption(tx) && !isPendingOrder(tx)) {
                     runningBal += tx.quantity;
                 }
                 return { ...tx, balance: runningBal };
@@ -596,6 +603,63 @@ function SkuDetailsPageContent() {
         }
     };
 
+    // ─── Zero-out Lot via Audit Adjustment ───────────────────────────────
+
+    const handleZeroOutLot = (lotNumber: string, balance: number) => {
+        // qty is the inverse of the balance to zero it out
+        const adjustQty = -balance;
+        const sign = adjustQty > 0 ? '+' : '';
+        toast((t) => (
+            <div className="flex flex-col gap-2">
+                <p className="text-sm font-bold text-white">Zero out lot <span className="font-mono">{lotNumber}</span>?</p>
+                <p className="text-xs text-gray-400">
+                    This will create an audit adjustment of <span className="font-mono font-bold">{sign}{adjustQty.toLocaleString(undefined, { maximumFractionDigits: 8 })}</span> to bring the balance to 0.
+                </p>
+                <div className="flex gap-2 mt-1">
+                    <button
+                        onClick={() => toast.dismiss(t.id)}
+                        className="flex-1 px-3 py-1.5 text-xs font-bold rounded border border-gray-600 bg-gray-800 text-white hover:bg-gray-700 transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={async () => {
+                            toast.dismiss(t.id);
+                            setAdjustingLot(lotNumber);
+                            try {
+                                const res = await fetch('/api/warehouse/audit-adjustments', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        sku: sku!._id,
+                                        lotNumber,
+                                        qty: adjustQty,
+                                        reason: 'Physical Inventory Count',
+                                        createdBy: (session?.user as any)?.id || (session?.user as any)?.email || session?.user?.name || 'Unknown',
+                                    }),
+                                });
+                                if (res.ok) {
+                                    toast.success(`Lot ${lotNumber} adjusted by ${sign}${adjustQty.toLocaleString(undefined, { maximumFractionDigits: 8 })}`);
+                                    fetchSkuDetails(true);
+                                } else {
+                                    const data = await res.json();
+                                    toast.error(data.error || 'Failed to create adjustment');
+                                }
+                            } catch {
+                                toast.error('Error creating adjustment');
+                            } finally {
+                                setAdjustingLot(null);
+                            }
+                        }}
+                        className="flex-1 px-3 py-1.5 text-xs font-bold rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+                    >
+                        Confirm
+                    </button>
+                </div>
+            </div>
+        ), { duration: 10000, position: 'top-center', style: { maxWidth: '400px', background: '#1a1a1a', color: '#fff', marginTop: '40vh' } });
+    };
+
 
 
     return (
@@ -685,9 +749,11 @@ function SkuDetailsPageContent() {
                         {(() => {
                             const pendingTxs = transactions.filter(tx => isPendingProduction(tx));
                             const unfulfilledTxs = transactions.filter(tx => isUnfulfilledConsumption(tx));
-                            if (pendingTxs.length === 0 && unfulfilledTxs.length === 0) return null;
+                            const pendingOrderTxs = transactions.filter(tx => isPendingOrder(tx));
+                            if (pendingTxs.length === 0 && unfulfilledTxs.length === 0 && pendingOrderTxs.length === 0) return null;
                             const pendingQty = pendingTxs.reduce((acc, tx) => acc + tx.quantity, 0);
                             const unfulfilledQty = unfulfilledTxs.reduce((acc, tx) => acc + Math.abs(tx.quantity), 0);
+                            const pendingOrderQty = pendingOrderTxs.reduce((acc, tx) => acc + Math.abs(tx.quantity), 0);
                             return (
                                 <div className="px-4 py-2">
                                     {pendingTxs.length > 0 && (
@@ -711,6 +777,27 @@ function SkuDetailsPageContent() {
                                                 {warningFilter === 'pending' && (
                                                     <span className="text-[10px] text-white uppercase tracking-wider font-extrabold self-center bg-black/20 px-2 py-0.5 rounded">Filtered</span>
                                                 )}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {pendingOrderTxs.length > 0 && (
+                                        <div
+                                            className={cn(
+                                                "w-full border px-5 py-4 cursor-pointer transition-all rounded-md mb-3 shadow-md",
+                                                "bg-amber-600 border-amber-700 hover:bg-amber-700"
+                                            )}
+                                            onClick={() => setWarningFilter(null)}
+                                        >
+                                            <div className="flex items-start space-x-3">
+                                                <AlertTriangle className="w-5 h-5 text-white shrink-0" />
+                                                <div className="flex-1">
+                                                    <p className="text-sm font-black text-white uppercase tracking-wide">
+                                                        {pendingOrderTxs.length} Pending Order{pendingOrderTxs.length > 1 ? 's' : ''}
+                                                    </p>
+                                                    <p className="text-xs text-amber-100 mt-1 font-medium">
+                                                        <span className="font-mono font-bold">-{pendingOrderQty.toLocaleString()}</span> units not counted until shipped/completed
+                                                    </p>
+                                                </div>
                                             </div>
                                         </div>
                                     )}
@@ -762,6 +849,7 @@ function SkuDetailsPageContent() {
                                                 <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">Date</th>
                                                 <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap text-right">Cost</th>
                                                 <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap text-right">Balance</th>
+                                                <th className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap text-center w-[40px]"></th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-border">
@@ -803,6 +891,24 @@ function SkuDetailsPageContent() {
                                                         lot.balance > 0 ? "text-emerald-500" : lot.balance < 0 ? "text-rose-500" : "text-muted-foreground"
                                                     )}>
                                                         {lot.balance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                                                    </td>
+                                                    <td className="px-1.5 py-2.5 text-center">
+                                                        {lot.balance !== 0 && (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleZeroOutLot(lot.lotNumber, lot.balance);
+                                                                }}
+                                                                disabled={adjustingLot === lot.lotNumber}
+                                                                className="p-1 rounded-md text-muted-foreground/40 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                title={`Adjust ${lot.lotNumber} to zero`}
+                                                            >
+                                                                {adjustingLot === lot.lotNumber
+                                                                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                                    : <Scale className="w-3.5 h-3.5" />
+                                                                }
+                                                            </button>
+                                                        )}
                                                     </td>
                                                 </tr>
                                             ))}
@@ -1263,7 +1369,7 @@ function SkuDetailsPageContent() {
                         </div>
                         <div className="flex items-center space-x-2">
                             {(() => {
-                                const countable = displayTransactions.filter(tx => !isPendingProduction(tx) && !isUnfulfilledConsumption(tx));
+                                const countable = displayTransactions.filter(tx => !isPendingProduction(tx) && !isUnfulfilledConsumption(tx) && !isPendingOrder(tx));
                                 const totalQty = countable.reduce((acc, tx) => acc + tx.quantity, 0);
                                 return (
                                     <>
@@ -1302,7 +1408,7 @@ function SkuDetailsPageContent() {
                         </thead>
                         <tbody className="divide-y divide-border">
                             {paginatedTransactions.map((tx) => (
-                                <tr key={tx._id} data-tx-id={tx._id} className={cn("hover:bg-secondary transition-colors group cursor-pointer", (isPendingProduction(tx) || isUnfulfilledConsumption(tx)) && "!bg-red-500/10 hover:!bg-red-500/15 border-l-2 border-l-red-500", highlightedTxIds.has(tx._id) && "ledger-row-flash")} onClick={() => router.push(tx.link)}>
+                                <tr key={tx._id} data-tx-id={tx._id} className={cn("hover:bg-secondary transition-colors group cursor-pointer", (isPendingProduction(tx) || isUnfulfilledConsumption(tx) || isPendingOrder(tx)) && "!bg-red-500/10 hover:!bg-red-500/15 border-l-2 border-l-red-500", highlightedTxIds.has(tx._id) && "ledger-row-flash")} onClick={() => router.push(tx.link)}>
                                     <td className="px-3 py-3 text-xs text-foreground/80 font-mono font-medium">{formatDate(tx.date)}</td>
                                     <td className="px-3 py-3">
                                         {tx.type === 'Web Order' && tx.reference ? (() => {
@@ -1367,7 +1473,7 @@ function SkuDetailsPageContent() {
                                     <td className="px-3 py-3 text-right">
                                         <span className={cn(
                                             "text-xs font-mono font-black px-2 py-0.5 rounded",
-                                            (isPendingProduction(tx) || isUnfulfilledConsumption(tx)) ? "text-white bg-amber-600 dark:bg-amber-700 line-through" :
+                                            (isPendingProduction(tx) || isUnfulfilledConsumption(tx) || isPendingOrder(tx)) ? "text-white bg-amber-600 dark:bg-amber-700 line-through" :
                                                 tx.quantity > 0 ? "text-white bg-emerald-600 dark:bg-emerald-700" : "text-white bg-rose-600 dark:bg-rose-700"
                                         )}>{tx.quantity > 0 ? '+' : ''}{tx.quantity}</span>
                                     </td>
@@ -1408,10 +1514,10 @@ function SkuDetailsPageContent() {
                                         })() : <span className="text-xs text-muted-foreground/50">-</span>}
                                     </td>
                                     <td className="px-3 py-3 text-right text-sm font-bold text-foreground font-mono">
-                                        {(isPendingProduction(tx) || isUnfulfilledConsumption(tx)) ? <span className="text-muted-foreground/50">-</span> : tx.balance.toLocaleString()}
+                                        {(isPendingProduction(tx) || isUnfulfilledConsumption(tx) || isPendingOrder(tx)) ? <span className="text-muted-foreground/50">-</span> : tx.balance.toLocaleString()}
                                     </td>
                                     <td className="px-3 py-3 text-right text-sm text-muted-foreground font-medium font-mono">
-                                        {(isPendingProduction(tx) || isUnfulfilledConsumption(tx)) ? <span className="text-muted-foreground/50">-</span> : (tx.cost ? `$${tx.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-')}
+                                        {(isPendingProduction(tx) || isUnfulfilledConsumption(tx) || isPendingOrder(tx)) ? <span className="text-muted-foreground/50">-</span> : (tx.cost ? `$${tx.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-')}
                                     </td>
                                 </tr>
                             ))}

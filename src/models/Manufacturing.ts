@@ -83,5 +83,6 @@ if (mongoose.models.Manufacturing) {
 
 ManufacturingSchema.index({ sku: 1, status: 1 });
 ManufacturingSchema.index({ "lineItems.sku": 1, status: 1 });
+ManufacturingSchema.index({ status: 1 }); // Stock endpoint: filter by status alone
 
 export default mongoose.model('Manufacturing', ManufacturingSchema);

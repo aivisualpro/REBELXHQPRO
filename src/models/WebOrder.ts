@@ -102,6 +102,9 @@ WebOrderSchema.index({ "lineItems.sku": 1 });
 WebOrderSchema.index({ "lineItems.linkedSkuId": 1 });
 WebOrderSchema.index({ "lineItems.sku": 1, status: 1 });
 WebOrderSchema.index({ "lineItems.linkedSkuId": 1, status: 1 });
+WebOrderSchema.index({ "lineItems.linkedSkus.skuId": 1, status: 1 }); // Multi-SKU stock aggregation
+WebOrderSchema.index({ "lineItems.varianceId": 1, status: 1 }); // Variance-based stock lookup
+WebOrderSchema.index({ status: 1 }); // Stock endpoint: filter by status first
 
 // Force recompile if needed
 if (mongoose.models.WebOrder) {

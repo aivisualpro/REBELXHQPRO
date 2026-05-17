@@ -34,5 +34,6 @@ const PurchaseOrderSchema = new mongoose.Schema({
 });
 
 PurchaseOrderSchema.index({ "lineItems.sku": 1, status: 1 });
+PurchaseOrderSchema.index({ status: 1 }); // Stock endpoint: filter by status alone
 
 export default mongoose.models.PurchaseOrder || mongoose.model('PurchaseOrder', PurchaseOrderSchema);
