@@ -768,6 +768,28 @@ export async function POST(request: Request) {
             syncProgress.logs.push(`✅ Sync complete: ${totalAdded} added, ${totalUpdated} updated`);
             syncProgress.logs.push(`⏱️ Duration: ${duration}s (${(allWebOrders.length / parseFloat(duration)).toFixed(0)} orders/sec)`);
 
+            // Recompute stock for all SKUs affected by this sync (fire-and-forget)
+            if (modifiedOrderDetails.length > 0) {
+                try {
+                    const { recomputeSkuStock } = await import('@/lib/recompute-sku-stock');
+                    // Collect all unique linked SKU IDs from modified orders
+                    const affectedSkuSet = new Set<string>();
+                    for (const detail of modifiedOrderDetails) {
+                        const wo = await WebOrder.findById(detail.id).select('lineItems.linkedSkuId lineItems.linkedSkus').lean() as any;
+                        wo?.lineItems?.forEach((li: any) => {
+                            if (li.linkedSkuId) affectedSkuSet.add(li.linkedSkuId.toString());
+                            li.linkedSkus?.forEach((ls: any) => { if (ls.skuId) affectedSkuSet.add(ls.skuId.toString()); });
+                        });
+                    }
+                    if (affectedSkuSet.size > 0) {
+                        await recomputeSkuStock(...Array.from(affectedSkuSet));
+                        syncProgress.logs.push(`📊 Stock recomputed for ${affectedSkuSet.size} SKU(s)`);
+                    }
+                } catch (stockErr: any) {
+                    console.error('[web-order-sync] Stock recompute error:', stockErr.message);
+                }
+            }
+
             // Create notification if there were changes
             if (modifiedOrderDetails.length > 0) {
                 try {

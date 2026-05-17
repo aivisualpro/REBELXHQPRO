@@ -164,12 +164,15 @@ export async function POST(request: Request) {
         }
 
         const adjustment = await AuditAdjustment.create({
-            sku, // Can be ID or String due to Mixed type
+            sku,
             lotNumber,
             qty: parseFloat(qty),
             reason,
-            createdBy // Can be ID or String
+            createdBy
         });
+
+        // Recompute stock in background — fire and forget
+        import('@/lib/recompute-sku-stock').then(m => m.recomputeSkuStock(sku?.toString()));
 
         return NextResponse.json({ adjustment }, { status: 201 });
 

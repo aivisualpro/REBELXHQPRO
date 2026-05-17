@@ -141,7 +141,7 @@ function SkuDetailsPageContent() {
     const [sku, setSku] = useState<Sku | null>(null);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [financials, setFinancials] = useState<Financials | null>(null);
-    const [lots, setLots] = useState<{ lotNumber: string; source: string; date: string | null; cost: number; balance: number }[]>([]);
+    const [lots, setLots] = useState<{ lotNumber: string; displayLotNumber?: string; source: string; date: string | null; cost: number; balance: number }[]>([]);
     const [loading, setLoading] = useState(true);
     const [fallbackImage, setFallbackImage] = useState('/sku-placeholder.png');
     
@@ -291,6 +291,8 @@ function SkuDetailsPageContent() {
                 const lotMap = new Map<string, { balance: number; source: string; date: string | null; cost: number; hasSource?: boolean }>();
                 const isPendingProd = (t: any) => t.type === 'Produced' && ['pending', 'processing'].includes((t.status || '').toLowerCase());
                 const isUnfulfilledCons = (t: any) => t.type === 'Consumption' && (t.status || '').toLowerCase() !== 'fulfilled';
+                const isTrashedMfgTx = (t: any) => (t.type === 'Produced' || t.type === 'Consumption') && (t.status || '').toLowerCase() === 'trash';
+                const isPendingWebOrderTx = (t: any) => t.type === 'Web Order' && (t.status || '').toLowerCase() !== 'completed';
 
                 // Sort oldest first for proper source/date attribution
                 // When dates are equal, source (positive) records come first
@@ -312,11 +314,13 @@ function SkuDetailsPageContent() {
                 // Only these types can CREATE a lot (source types)
                 const SOURCE_TYPES = new Set(['Opening', 'Purchase Order', 'Produced', 'Audit']);
 
+                const NO_LOT_KEY = '__no_lot__';
                 for (const tx of sorted) {
-                    const lot = tx.lotNumber;
-                    if (!lot || lot === '' || lot === 'N/A' || lot === '-') continue;
-                    // Skip pending/processing and unfulfilled — same as ledger balance logic
-                    if (isPendingProd(tx) || isUnfulfilledCons(tx)) continue;
+                    const rawLot = tx.lotNumber;
+                    // Normalize: empty/N/A/- all map to the no-lot bucket
+                    const lot = (!rawLot || rawLot === '' || rawLot === 'N/A' || rawLot === '-') ? NO_LOT_KEY : rawLot;
+                    // Skip pending/processing, unfulfilled, trashed, and non-completed web orders — same as ledger balance logic
+                    if (isPendingProd(tx) || isUnfulfilledCons(tx) || isTrashedMfgTx(tx) || isPendingWebOrderTx(tx)) continue;
 
                     const existing = lotMap.get(lot);
 
@@ -344,8 +348,15 @@ function SkuDetailsPageContent() {
                 }
 
                 const derivedLots = Array.from(lotMap.entries())
-                    .map(([lotNumber, data]) => ({ lotNumber, ...data }))
+                    .map(([lotNumber, data]) => ({
+                        lotNumber: lotNumber === NO_LOT_KEY ? '' : lotNumber,
+                        displayLotNumber: lotNumber === NO_LOT_KEY ? 'No Lot' : lotNumber,
+                        ...data
+                    }))
                     .sort((a, b) => {
+                        // Push no-lot to the bottom
+                        if (a.lotNumber === '') return 1;
+                        if (b.lotNumber === '') return -1;
                         const dateA = a.date ? new Date(a.date).getTime() : 0;
                         const dateB = b.date ? new Date(b.date).getTime() : 0;
                         return dateA - dateB;
@@ -471,6 +482,8 @@ function SkuDetailsPageContent() {
     const isPendingProduction = (tx: Transaction) => tx.type === 'Produced' && ['pending', 'processing'].includes((tx.status || '').toLowerCase());
     const isUnfulfilledConsumption = (tx: Transaction) => tx.type === 'Consumption' && (tx.status || '').toLowerCase() !== 'fulfilled';
     const isPendingOrder = (tx: Transaction) => tx.type === 'Orders' && (tx.status || '').toLowerCase() !== 'completed' && (tx.status || '').toLowerCase() !== 'shipped';
+    const isTrashedMfg = (tx: Transaction) => (tx.type === 'Produced' || tx.type === 'Consumption') && (tx.status || '').toLowerCase() === 'trash';
+    const isPendingWebOrder = (tx: Transaction) => tx.type === 'Web Order' && (tx.status || '').toLowerCase() !== 'completed';
 
     const finalTransactions = filteredTransactions.filter(tx => {
         // When reference search is active, bypass lot/variance/warning filters
@@ -503,7 +516,7 @@ function SkuDetailsPageContent() {
                 return (tpLot[a.type] ?? 9) - (tpLot[b.type] ?? 9);
             });
             const balanced = ascTx.map(tx => {
-                if (!isPendingProduction(tx) && !isUnfulfilledConsumption(tx) && !isPendingOrder(tx)) {
+                if (!isPendingProduction(tx) && !isUnfulfilledConsumption(tx) && !isPendingOrder(tx) && !isTrashedMfg(tx) && !isPendingWebOrder(tx)) {
                     runningBal += tx.quantity;
                 }
                 return { ...tx, balance: runningBal };
@@ -750,10 +763,12 @@ function SkuDetailsPageContent() {
                             const pendingTxs = transactions.filter(tx => isPendingProduction(tx));
                             const unfulfilledTxs = transactions.filter(tx => isUnfulfilledConsumption(tx));
                             const pendingOrderTxs = transactions.filter(tx => isPendingOrder(tx));
-                            if (pendingTxs.length === 0 && unfulfilledTxs.length === 0 && pendingOrderTxs.length === 0) return null;
+                            const trashedTxs = transactions.filter(tx => isTrashedMfg(tx));
+                            if (pendingTxs.length === 0 && unfulfilledTxs.length === 0 && pendingOrderTxs.length === 0 && trashedTxs.length === 0) return null;
                             const pendingQty = pendingTxs.reduce((acc, tx) => acc + tx.quantity, 0);
                             const unfulfilledQty = unfulfilledTxs.reduce((acc, tx) => acc + Math.abs(tx.quantity), 0);
                             const pendingOrderQty = pendingOrderTxs.reduce((acc, tx) => acc + Math.abs(tx.quantity), 0);
+                            const trashedQty = trashedTxs.reduce((acc, tx) => acc + Math.abs(tx.quantity), 0);
                             return (
                                 <div className="px-4 py-2">
                                     {pendingTxs.length > 0 && (
@@ -855,15 +870,17 @@ function SkuDetailsPageContent() {
                                         <tbody className="divide-y divide-border">
                                             {lots.filter(l => Math.abs(l.balance) >= 1).map((lot, idx) => (
                                                 <tr
-                                                    key={lot.lotNumber}
+                                                    key={lot.lotNumber || `no-lot-${idx}`}
                                                     className={cn(
                                                         "hover:bg-secondary cursor-pointer transition-colors",
                                                         selectedLot === lot.lotNumber && "bg-primary/10 hover:bg-primary/15"
                                                     )}
                                                     onClick={() => setSelectedLot(selectedLot === lot.lotNumber ? 'All' : lot.lotNumber)}
                                                 >
-                                                    <td className="px-3 py-2.5 text-xs font-mono font-bold text-foreground truncate max-w-[160px]" title={lot.lotNumber}>
-                                                        {lot.lotNumber}
+                                                    <td className="px-3 py-2.5 text-xs font-mono font-bold truncate max-w-[160px]" title={(lot as any).displayLotNumber || lot.lotNumber}>
+                                                        {lot.lotNumber === ''
+                                                            ? <span className="text-muted-foreground italic font-sans">No Lot</span>
+                                                            : lot.lotNumber}
                                                     </td>
                                                     <td className="px-3 py-2.5">
                                                         <span className={cn(
@@ -1369,7 +1386,7 @@ function SkuDetailsPageContent() {
                         </div>
                         <div className="flex items-center space-x-2">
                             {(() => {
-                                const countable = displayTransactions.filter(tx => !isPendingProduction(tx) && !isUnfulfilledConsumption(tx) && !isPendingOrder(tx));
+                                const countable = displayTransactions.filter(tx => !isPendingProduction(tx) && !isUnfulfilledConsumption(tx) && !isPendingOrder(tx) && !isTrashedMfg(tx) && !isPendingWebOrder(tx));
                                 const totalQty = countable.reduce((acc, tx) => acc + tx.quantity, 0);
                                 return (
                                     <>
@@ -1408,7 +1425,7 @@ function SkuDetailsPageContent() {
                         </thead>
                         <tbody className="divide-y divide-border">
                             {paginatedTransactions.map((tx) => (
-                                <tr key={tx._id} data-tx-id={tx._id} className={cn("hover:bg-secondary transition-colors group cursor-pointer", (isPendingProduction(tx) || isUnfulfilledConsumption(tx) || isPendingOrder(tx)) && "!bg-red-500/10 hover:!bg-red-500/15 border-l-2 border-l-red-500", highlightedTxIds.has(tx._id) && "ledger-row-flash")} onClick={() => router.push(tx.link)}>
+                                <tr key={tx._id} data-tx-id={tx._id} className={cn("hover:bg-secondary transition-colors group cursor-pointer", (isPendingProduction(tx) || isUnfulfilledConsumption(tx) || isPendingOrder(tx) || isTrashedMfg(tx) || isPendingWebOrder(tx)) && "!bg-red-500/10 hover:!bg-red-500/15 border-l-2 border-l-red-500", highlightedTxIds.has(tx._id) && "ledger-row-flash")} onClick={() => router.push(tx.link)}>
                                     <td className="px-3 py-3 text-xs text-foreground/80 font-mono font-medium">{formatDate(tx.date)}</td>
                                     <td className="px-3 py-3">
                                         {tx.type === 'Web Order' && tx.reference ? (() => {
@@ -1473,7 +1490,7 @@ function SkuDetailsPageContent() {
                                     <td className="px-3 py-3 text-right">
                                         <span className={cn(
                                             "text-xs font-mono font-black px-2 py-0.5 rounded",
-                                            (isPendingProduction(tx) || isUnfulfilledConsumption(tx) || isPendingOrder(tx)) ? "text-white bg-amber-600 dark:bg-amber-700 line-through" :
+                                            (isPendingProduction(tx) || isUnfulfilledConsumption(tx) || isPendingOrder(tx) || isTrashedMfg(tx) || isPendingWebOrder(tx)) ? "text-white bg-amber-600 dark:bg-amber-700 line-through" :
                                                 tx.quantity > 0 ? "text-white bg-emerald-600 dark:bg-emerald-700" : "text-white bg-rose-600 dark:bg-rose-700"
                                         )}>{tx.quantity > 0 ? '+' : ''}{tx.quantity}</span>
                                     </td>
@@ -1486,7 +1503,8 @@ function SkuDetailsPageContent() {
                                                         ['in progress', 'processing', 'picking'].includes(s) ? 'Processing' :
                                                             s === 'ready to qc' ? 'Ready to QC' :
                                                                 ['pending', 'draft', 'on-hold', 'on hold'].includes(s) ? 'Pending' :
-                                                                    s;
+                                                                    s === 'trash' ? 'Trash' :
+                                                                        s;
 
                                             const styleMap: Record<string, { bg: string; color: string; border?: string; darkBg?: string; darkColor?: string }> = {
                                                 'Fulfilled': { bg: '#059669', color: '#ffffff', darkBg: 'rgba(5,150,105,0.2)', darkColor: '#34d399' },
@@ -1494,6 +1512,7 @@ function SkuDetailsPageContent() {
                                                 'Processing': { bg: '#2563eb', color: '#ffffff', darkBg: 'rgba(59,130,246,0.2)', darkColor: '#60a5fa' },
                                                 'Ready to QC': { bg: '#d97706', color: '#ffffff', darkBg: 'rgba(245,158,11,0.2)', darkColor: '#fbbf24' },
                                                 'Pending': { bg: '#e2e8f0', color: '#000000', border: '1px solid #cbd5e1', darkBg: 'rgba(100,116,139,0.2)', darkColor: '#cbd5e1' },
+                                                'Trash': { bg: '#b91c1c', color: '#ffffff', darkBg: 'rgba(185,28,28,0.2)', darkColor: '#fca5a5' },
                                             };
 
                                             // Fallbacks for unmapped
@@ -1514,10 +1533,10 @@ function SkuDetailsPageContent() {
                                         })() : <span className="text-xs text-muted-foreground/50">-</span>}
                                     </td>
                                     <td className="px-3 py-3 text-right text-sm font-bold text-foreground font-mono">
-                                        {(isPendingProduction(tx) || isUnfulfilledConsumption(tx) || isPendingOrder(tx)) ? <span className="text-muted-foreground/50">-</span> : tx.balance.toLocaleString()}
+                                        {(isPendingProduction(tx) || isUnfulfilledConsumption(tx) || isPendingOrder(tx) || isTrashedMfg(tx) || isPendingWebOrder(tx)) ? <span className="text-muted-foreground/50">-</span> : tx.balance.toLocaleString()}
                                     </td>
                                     <td className="px-3 py-3 text-right text-sm text-muted-foreground font-medium font-mono">
-                                        {(isPendingProduction(tx) || isUnfulfilledConsumption(tx) || isPendingOrder(tx)) ? <span className="text-muted-foreground/50">-</span> : (tx.cost ? `$${tx.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-')}
+                                        {(isPendingProduction(tx) || isUnfulfilledConsumption(tx) || isPendingOrder(tx) || isTrashedMfg(tx) || isPendingWebOrder(tx)) ? <span className="text-muted-foreground/50">-</span> : (tx.cost ? `$${tx.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-')}
                                     </td>
                                 </tr>
                             ))}

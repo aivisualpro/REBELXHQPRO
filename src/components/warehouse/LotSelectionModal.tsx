@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 
 interface Lot {
     lotNumber: string;
+    displayLotNumber?: string;
     balance: number;
     source?: string;
     date?: string;
@@ -48,7 +49,7 @@ export function LotSelectionModal({
         setLoading(true);
         setError(null);
         try {
-            const res = await fetch(`/api/warehouse/skus/${skuId}/ledger`);
+            const res = await fetch(`/api/warehouse/skus/${skuId}/ledger?lotsOnly=1`);
             if (res.ok) {
                 const data = await res.json();
                 const txList = data.transactions || [];
@@ -56,28 +57,29 @@ export function LotSelectionModal({
                 // Derive lots from ledger transactions (single source of truth)
                 const isPendingProd = (t: any) => t.type === 'Produced' && ['pending', 'processing'].includes((t.status || '').toLowerCase());
                 const isUnfulfilledCons = (t: any) => t.type === 'Consumption' && (t.status || '').toLowerCase() !== 'fulfilled';
+                const isTrashedMfg = (t: any) => (t.type === 'Produced' || t.type === 'Consumption') && (t.status || '').toLowerCase() === 'trash';
+                const isPendingWebOrder = (t: any) => t.type === 'Web Order' && (t.status || '').toLowerCase() !== 'completed';
 
                 const lotMap = new Map<string, { balance: number; source: string; date: string; cost: number; hasSource?: boolean }>();
-                // When dates are equal, source (positive) records come first
                 const tp: Record<string, number> = { 'Opening': 0, 'Audit': 1, 'Purchase Order': 2, 'Produced': 3, 'Consumption': 4, 'Orders': 5, 'Web Order': 6 };
                 const sorted = [...txList].sort((a: any, b: any) => {
                     const dayA = new Date(new Date(a.date).toDateString()).getTime();
                     const dayB = new Date(new Date(b.date).toDateString()).getTime();
                     if (dayA !== dayB) return dayA - dayB;
-                    // Same day: positive records first
                     const aPf = a.quantity > 0 ? 0 : 1;
                     const bPf = b.quantity > 0 ? 0 : 1;
                     if (aPf !== bPf) return aPf - bPf;
                     return (tp[a.type] ?? 9) - (tp[b.type] ?? 9);
                 });
 
-                // Only these types can CREATE a lot
                 const SOURCE_TYPES = new Set(['Opening', 'Purchase Order', 'Produced', 'Audit']);
 
+                const NO_LOT_KEY = '__no_lot__'; // Internal key for no-lot transactions
                 for (const tx of sorted) {
-                    const lot = tx.lotNumber;
-                    if (!lot || lot === '' || lot === 'N/A' || lot === '-') continue;
-                    if (isPendingProd(tx) || isUnfulfilledCons(tx)) continue;
+                    const rawLot = tx.lotNumber;
+                    // Normalize: empty, N/A, - all map to the no-lot bucket
+                    const lot = (!rawLot || rawLot === '' || rawLot === 'N/A' || rawLot === '-') ? NO_LOT_KEY : rawLot;
+                    if (isPendingProd(tx) || isUnfulfilledCons(tx) || isTrashedMfg(tx) || isPendingWebOrder(tx)) continue;
 
                     const existing = lotMap.get(lot);
                     const isSourceType = SOURCE_TYPES.has(tx.type);
@@ -103,8 +105,17 @@ export function LotSelectionModal({
                 }
 
                 const derivedLots = Array.from(lotMap.entries())
-                    .map(([lotNumber, d]) => ({ lotNumber, balance: d.balance, source: d.source, date: d.date, cost: d.cost }))
+                    .map(([lotNumber, d]) => ({
+                        lotNumber: lotNumber === NO_LOT_KEY ? '' : lotNumber,
+                        displayLotNumber: lotNumber === NO_LOT_KEY ? 'No Lot' : lotNumber,
+                        balance: d.balance,
+                        source: d.source,
+                        date: d.date,
+                        cost: d.cost
+                    }))
                     .sort((a, b) => {
+                        if (a.lotNumber === '') return 1;
+                        if (b.lotNumber === '') return -1;
                         const dateA = a.date ? new Date(a.date).getTime() : 0;
                         const dateB = b.date ? new Date(b.date).getTime() : 0;
                         return dateA - dateB;
@@ -132,8 +143,11 @@ export function LotSelectionModal({
         });
 
         // Filter: hide zero-and-negative-balance lots unless it's the currently selected lot
+        // Always exclude the no-lot bucket (lotNumber === '') — the "(No Lot)" clear button at top covers it
         const filtered = sorted.filter(lot => {
-            const matchesSearch = lot.lotNumber.toLowerCase().includes(searchQuery.toLowerCase());
+            if (lot.lotNumber === '') return false; // represented by the clear button
+            const label = lot.displayLotNumber || lot.lotNumber;
+            const matchesSearch = label.toLowerCase().includes(searchQuery.toLowerCase());
             const isCurrent = lot.lotNumber === currentLotNumber;
             const hasPositiveBalance = lot.balance >= 1;
 
@@ -237,9 +251,9 @@ export function LotSelectionModal({
                     <div className="flex items-center gap-2">
                         <p className={cn(
                             "text-sm font-black truncate transition-colors",
-                            isSelected || isSuggested ? "text-white" : "text-foreground"
+                            isSelected || isSuggested ? "text-white" : lot.lotNumber === '' ? "text-muted-foreground italic" : "text-foreground"
                         )}>
-                            {lot.lotNumber}
+                            {lot.displayLotNumber || lot.lotNumber}
                         </p>
                         {isSelected && (
                             <span className="px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest bg-black/20 text-blue-100 rounded shrink-0">

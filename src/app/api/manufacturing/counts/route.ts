@@ -48,6 +48,7 @@ export async function GET() {
             Processing: 0,
             'Ready to QC': 0,
             Fulfilled: 0,
+            Trash: 0,
         };
 
         for (const row of results) {

@@ -96,6 +96,7 @@ function StatusBadge({ status }: { status: string }) {
     'Processing': { bg: '#2563eb', color: '#ffffff', darkBg: 'rgba(59,130,246,0.2)', darkColor: '#60a5fa' },
     'Ready to QC': { bg: '#d97706', color: '#ffffff', darkBg: 'rgba(245,158,11,0.2)', darkColor: '#fbbf24' },
     'Pending': { bg: '#e2e8f0', color: '#000000', border: '1px solid #cbd5e1', darkBg: 'rgba(100,116,139,0.2)', darkColor: '#cbd5e1' },
+    'Trash': { bg: '#b91c1c', color: '#ffffff', darkBg: 'rgba(185,28,28,0.2)', darkColor: '#fca5a5' },
   };
   const s = styleMap[status];
   return (
@@ -543,11 +544,11 @@ function ManufacturingContent() {
 
   // ─── Status Tabs ─────────────────────────────────────────────────────────
 
-  const STATUS_TABS = ['All', 'Pending', 'Processing', 'Ready to QC', 'Fulfilled'] as const;
+  const STATUS_TABS = ['All', 'Pending', 'Processing', 'Ready to QC', 'Fulfilled', 'Trash'] as const;
 
   // Database-wide status counts (aggregation pipeline)
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({
-    All: 0, Pending: 0, Processing: 0, 'Ready to QC': 0, Fulfilled: 0
+    All: 0, Pending: 0, Processing: 0, 'Ready to QC': 0, Fulfilled: 0, Trash: 0
   });
   const [countsLoaded, setCountsLoaded] = useState(false);
 
@@ -614,6 +615,7 @@ function ManufacturingContent() {
                 'Processing': { bg: '#2563eb', color: '#ffffff', hoverBg: 'rgba(37,99,235,0.08)' },
                 'Ready to QC': { bg: '#d97706', color: '#ffffff', hoverBg: 'rgba(217,119,6,0.08)' },
                 'Pending': { bg: '#64748b', color: '#ffffff', hoverBg: 'rgba(100,116,139,0.08)' },
+                'Trash': { bg: '#b91c1c', color: '#ffffff', hoverBg: 'rgba(185,28,28,0.08)' },
               };
               const sc = statusColors[tab];
               const isActive = activeStatus === tab;

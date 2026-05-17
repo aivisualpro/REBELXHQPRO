@@ -29,7 +29,7 @@ const ManufacturingSchema = new mongoose.Schema({
         createdBy: { type: String, ref: 'RXHQUsers' },
         createdAt: { type: Date, default: Date.now }
     }],
-    status: { type: String, enum: ['Pending', 'Processing', 'Ready to QC', 'Fulfilled'], default: 'Pending' },
+    status: { type: String, enum: ['Pending', 'Processing', 'Ready to QC', 'Fulfilled', 'Trash'], default: 'Pending' },
     createdBy: { type: String, ref: 'RXHQUsers' },
     finishedBy: { type: String, ref: 'RXHQUsers' },
     createdAt: { type: Date, default: Date.now },

@@ -53,6 +53,7 @@ export async function GET(
 
         // ⚡ Check in-memory cache first (1s TTL)
         const bustCache = request.nextUrl.searchParams.get('bust') === '1';
+        const lotsOnly = request.nextUrl.searchParams.get('lotsOnly') === '1';
         const cached = ledgerCache.get(id);
         if (!bustCache && cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
             console.timeEnd('ledger-route');
@@ -80,10 +81,10 @@ export async function GET(
             sku = await Sku.findOne({ _id: id }).lean();
         }
 
-        // Get settings in parallel
+        // Get settings in parallel (skip settings fetch for lotsOnly)
         const [startDate, settings] = await Promise.all([
             getGlobalStartDate(),
-            Setting.findOne({ key: 'missingSkuImage' }).select('value').lean()
+            lotsOnly ? Promise.resolve(null) : Setting.findOne({ key: 'missingSkuImage' }).select('value').lean()
         ]);
 
         if (!sku) {
@@ -212,49 +213,51 @@ export async function GET(
             ]));
         });
 
-        // Chain ingredients off rawManufacturingJobsPromise
-        const ingredientsPromise = rawManufacturingJobsPromise.then((jobs: any) => {
-            const ingredientSkuIds = new Set<string>();
-            ingredientSkuIds.add(id);
-            jobs.forEach((job: any) => {
-                const jobSkuId = job.sku?._id || job.sku;
-                if (jobSkuId?.toString() === id) {
-                    job.lineItems?.forEach((li: any) => {
-                        const liSkuId = (li.sku?._id || li.sku)?.toString();
-                        if (liSkuId) ingredientSkuIds.add(liSkuId);
-                    });
-                }
+        // Chain ingredients off rawManufacturingJobsPromise (skip for lotsOnly — not needed for lot derivation)
+        const ingredientsPromise = lotsOnly
+            ? Promise.resolve([[], []] as [any, any])
+            : rawManufacturingJobsPromise.then((jobs: any) => {
+                const ingredientSkuIds = new Set<string>();
+                ingredientSkuIds.add(id);
+                jobs.forEach((job: any) => {
+                    const jobSkuId = job.sku?._id || job.sku;
+                    if (jobSkuId?.toString() === id) {
+                        job.lineItems?.forEach((li: any) => {
+                            const liSkuId = (li.sku?._id || li.sku)?.toString();
+                            if (liSkuId) ingredientSkuIds.add(liSkuId);
+                        });
+                    }
+                });
+
+                const needsIngredients = ingredientSkuIds.size > 1;
+                const ingOids = needsIngredients ? Array.from(ingredientSkuIds).flatMap(sid => [
+                    mongoose.Types.ObjectId.isValid(sid) ? new mongoose.Types.ObjectId(sid) : sid,
+                    sid
+                ]) : [];
+
+                if (!needsIngredients) return [[], []] as [any, any];
+
+                return Promise.all([
+                    timePipeline('b2-openingbalance', OpeningBalance.aggregate([
+                        { $match: { sku: { $in: ingOids } } },
+                        { $project: { _id: 1, sku: 1, lotNumber: 1, cost: 1 } }
+                    ])),
+                    timePipeline('b2-purchaseorder', PurchaseOrder.aggregate([
+                        { $match: { "lineItems.sku": { $in: ingOids } } },
+                        { $unwind: "$lineItems" },
+                        { $match: { "lineItems.sku": { $in: ingOids } } },
+                        { $project: {
+                            _id: 1,
+                            lineItems: [{
+                                sku: "$lineItems.sku",
+                                lotNumber: "$lineItems.lotNumber",
+                                price: "$lineItems.price",
+                                cost: { $cond: [{ $and: [{ $ne: ["$lineItems.cost", null] }, { $ne: ["$lineItems.cost", 0] }] }, "$lineItems.cost", "$lineItems.price"] }
+                            }]
+                        }}
+                    ]))
+                ]);
             });
-
-            const needsIngredients = ingredientSkuIds.size > 1;
-            const ingOids = needsIngredients ? Array.from(ingredientSkuIds).flatMap(sid => [
-                mongoose.Types.ObjectId.isValid(sid) ? new mongoose.Types.ObjectId(sid) : sid,
-                sid
-            ]) : [];
-
-            if (!needsIngredients) return [[], []] as [any, any];
-
-            return Promise.all([
-                timePipeline('b2-openingbalance', OpeningBalance.aggregate([
-                    { $match: { sku: { $in: ingOids } } },
-                    { $project: { _id: 1, sku: 1, lotNumber: 1, cost: 1 } }
-                ])),
-                timePipeline('b2-purchaseorder', PurchaseOrder.aggregate([
-                    { $match: { "lineItems.sku": { $in: ingOids } } },
-                    { $unwind: "$lineItems" },
-                    { $match: { "lineItems.sku": { $in: ingOids } } },
-                    { $project: {
-                        _id: 1,
-                        lineItems: [{
-                            sku: "$lineItems.sku",
-                            lotNumber: "$lineItems.lotNumber",
-                            price: "$lineItems.price",
-                            cost: { $cond: [{ $and: [{ $ne: ["$lineItems.cost", null] }, { $ne: ["$lineItems.cost", 0] }] }, "$lineItems.cost", "$lineItems.price"] }
-                        }]
-                    }}
-                ]))
-            ]);
-        });
 
         console.time('all-queries-total');
         const [
@@ -384,7 +387,7 @@ export async function GET(
                 date: new Date(ob.createdAt),
                 type: 'Opening',
                 reference: ob._id.toString(),
-                lotNumber: cleanLot(ob.lotNumber) || 'N/A',
+                lotNumber: cleanLot(ob.lotNumber) || '',
                 quantity: round8(ob.qty || 0),
                 uom: ob.uom,
                 cost: round8(lotCosts.get(ob.lotNumber) || ob.cost || 0),
@@ -503,7 +506,7 @@ export async function GET(
                 date: new Date(adj.createdAt),
                 type: 'Audit',
                 reference: adj.reference || '',
-                lotNumber: cleanLot(adj.lotNumber) || 'N/A',
+                lotNumber: cleanLot(adj.lotNumber) || '',
                 quantity: round8(adj.qty),
                 uom: sku.uom || 'Unit',
                 cost: round8(lotCosts.get(adj.lotNumber) || adj.cost || 0),
@@ -598,7 +601,7 @@ export async function GET(
                         date: wo.dateCompleted ? new Date(wo.dateCompleted) : new Date(wo.createdAt),
                         type: 'Web Order',
                         reference: line.varianceId ? `${wo._id} (${line.varianceId})` : wo._id,
-                        lotNumber: cleanLot(lot) || 'N/A',
+                        lotNumber: cleanLot(lot) || '',
                         quantity: qtyToDeduct,
                         uom: 'Unit',
                         cost: round8(virtualCost !== undefined ? virtualCost : (linkedSkuMatch?.cost || (isDirectMatch ? (line.cost || 0) : 0))),
@@ -655,15 +658,17 @@ export async function GET(
         const isPendingProduction = (t: any) => t.type === 'Produced' && ['pending', 'processing'].includes((t.status || '').toLowerCase());
         const isUnfulfilledConsumption = (t: any) => t.type === 'Consumption' && (t.status || '').toLowerCase() !== 'fulfilled';
         const isPendingOrder = (t: any) => t.type === 'Orders' && (t.status || '').toLowerCase() !== 'completed' && (t.status || '').toLowerCase() !== 'shipped';
+        const isTrashedMfg = (t: any) => (t.type === 'Produced' || t.type === 'Consumption') && (t.status || '').toLowerCase() === 'trash';
+        const isPendingWebOrder = (t: any) => t.type === 'Web Order' && (t.status || '').toLowerCase() !== 'completed';
 
         const filteredTransactions = (startDate ? transactions.filter(t => t.date >= startDate) : transactions).map(t => {
-            // Produced + Pending OR Consumption + not Fulfilled OR Orders + not Completed/Shipped: show in table but don't count towards balance or stats
-            if (!isPendingProduction(t) && !isUnfulfilledConsumption(t) && !isPendingOrder(t)) {
+            // Produced + Pending OR Consumption + not Fulfilled OR Orders + not Completed/Shipped OR Trashed MFG OR Web Order + not Completed: show in table but don't count towards balance or stats
+            if (!isPendingProduction(t) && !isUnfulfilledConsumption(t) && !isPendingOrder(t) && !isTrashedMfg(t) && !isPendingWebOrder(t)) {
                 balance = round8(balance + t.quantity);
             }
             const key = `${t.date.getFullYear()}-${String(t.date.getMonth() + 1).padStart(2, '0')}`;
 
-            if ((t.type === 'Orders' || t.type === 'Web Order') && !isPendingOrder(t)) {
+            if ((t.type === 'Orders' || t.type === 'Web Order') && !isPendingOrder(t) && !isPendingWebOrder(t)) {
                 const qty = Math.abs(t.quantity);
                 const rev = qty * (t.salePrice || 0);
                 const cos = qty * (t.cost || 0);
@@ -672,7 +677,7 @@ export async function GET(
                     const s = monthlyStats.get(key)!;
                     s.revenue += rev; s.qty += qty;
                 }
-            } else if (t.type === 'Produced' && !isPendingProduction(t) && !isUnfulfilledConsumption(t)) {
+            } else if (t.type === 'Produced' && !isPendingProduction(t) && !isUnfulfilledConsumption(t) && !isTrashedMfg(t)) {
                 if (monthlyStats.has(key)) {
                     const s = monthlyStats.get(key)!;
                     s.productionQty += t.quantity;
@@ -683,7 +688,7 @@ export async function GET(
         });
 
         const cogmTotal = transactions
-            .filter(tx => tx.type === 'Produced' && !isPendingProduction(tx))
+            .filter(tx => tx.type === 'Produced' && !isPendingProduction(tx) && !isTrashedMfg(tx))
             .reduce((acc, tx) => acc + (Math.abs(tx.quantity) * (tx.cost || 0)), 0);
 
         const cogpTotal = transactions

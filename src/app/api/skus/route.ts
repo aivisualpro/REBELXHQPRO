@@ -196,8 +196,8 @@ export async function GET(request: Request) {
                     }
                 }
             ]),
-            // 4. Manufacturing - Produced (all except Pending — matches ledger logic)
-            Manufacturing.find({ sku: { $in: skuIds }, status: { $ne: 'Pending' } })
+            // 4. Manufacturing - Produced (all except Pending/Trash — matches ledger logic)
+            Manufacturing.find({ sku: { $in: skuIds }, status: { $nin: ['Pending', 'Trash'] } })
                 .select('sku qty qtyDifference lineItems labor status')
                 .lean(),
 

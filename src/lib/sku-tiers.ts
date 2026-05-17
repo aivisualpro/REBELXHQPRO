@@ -19,7 +19,7 @@ export async function getSkuTiers(skuIds: string[]) {
             "lineItems.sku": { $in: skuIds },
             ...dateFilter
         }).select('status lineItems.sku lineItems.qty').lean(),
-        Manufacturing.find({ 'lineItems.sku': { $in: skuIds }, ...dateFilter }).select('qty lineItems.sku lineItems.recipeQty lineItems.sa lineItems.qtyScrapped').lean()
+        Manufacturing.find({ 'lineItems.sku': { $in: skuIds }, status: { $nin: ['Trash'] }, ...dateFilter }).select('qty lineItems.sku lineItems.recipeQty lineItems.sa lineItems.qtyScrapped').lean()
     ]);
 
     const tiers: Record<string, number> = {};

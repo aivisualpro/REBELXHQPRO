@@ -113,7 +113,7 @@ export async function getLotsWithBalances(skuId: string): Promise<LotInfo[]> {
 
         // 3. Manufacturing Produced
         timePipeline('pipeline-ManufacturingProduced', Manufacturing.aggregate([
-            { $match: { sku: objId, status: { $nin: [/pending/i, /processing/i] } } },
+            { $match: { sku: objId, status: { $nin: [/pending/i, /processing/i, /trash/i] } } },
             { $sort: { createdAt: 1 } },
             { $group: {
                 _id: { $ifNull: ["$lotNumber", "$label"] },
@@ -184,7 +184,7 @@ export async function getLotsWithBalances(skuId: string): Promise<LotInfo[]> {
 
         // 7. Web Orders Consumed
         timePipeline('pipeline-WebOrder', WebOrder.aggregate([
-            { $match: { $or: [{ "lineItems.sku": objId }, { "lineItems.linkedSkuId": skuId }] } },
+            { $match: { $or: [{ "lineItems.sku": objId }, { "lineItems.linkedSkuId": skuId }], status: { $in: ['completed', 'Completed'] } } },
             { $unwind: "$lineItems" },
             { $match: { $or: [{ "lineItems.sku": objId }, { "lineItems.linkedSkuId": skuId }] } },
             { $group: { 
@@ -492,7 +492,7 @@ export async function getLotsAsOfDate(skuId: string, asOfDate: Date): Promise<Lo
             { $project: { costs: 0 } }
         ]),
         Manufacturing.aggregate([
-            { $match: { sku: objId, status: { $nin: [/pending/i, /processing/i] } } },
+            { $match: { sku: objId, status: { $nin: [/pending/i, /processing/i, /trash/i] } } },
             { $addFields: { resolvedDate: { $ifNull: ["$scheduledFinish", "$createdAt"] } } },
             { $match: { resolvedDate: { $lte: asOfDate } } },
             { $sort: { createdAt: 1 } },

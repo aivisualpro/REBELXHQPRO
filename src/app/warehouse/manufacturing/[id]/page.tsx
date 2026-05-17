@@ -369,7 +369,7 @@ export default function ManufacturingDetailPage() {
     const rawSkuImage = (typeof order.sku === 'object' && order.sku !== null && order.sku.image) ? order.sku.image : skuList.find(s => s._id === (typeof order.sku === 'string' ? order.sku : (order.sku as any)?._id))?.image;
     const skuImage = isValidImageUrl(rawSkuImage) ? rawSkuImage : undefined;
 
-    const STATUSES = ['Pending', 'Processing', 'Ready to QC', 'Fulfilled'];
+    const STATUSES = ['Pending', 'Processing', 'Ready to QC', 'Fulfilled', 'Trash'];
     const PRIORITIES = ['Normal', 'High', 'Extreme'];
 
     const handleStatusChange = async (newStatus: string) => {
@@ -726,7 +726,8 @@ export default function ManufacturingDetailPage() {
                                             order.status === 'Processing' ? "bg-blue-500 text-white border-blue-600 hover:bg-blue-600" :
                                                 order.status === 'Ready to QC' ? "bg-amber-500 text-white border-amber-600 hover:bg-amber-600" :
                                                     order.status === 'Pending' ? "bg-slate-500 text-white border-slate-600 hover:bg-slate-600" :
-                                                        "bg-secondary text-muted-foreground border-border hover:bg-secondary"
+                                                        order.status === 'Trash' ? "bg-red-700 text-white border-red-800 hover:bg-red-800" :
+                                                            "bg-secondary text-muted-foreground border-border hover:bg-secondary"
                                     )}
                                 >
                                     {order.status}
@@ -742,7 +743,8 @@ export default function ManufacturingDetailPage() {
                                                     s === 'Fulfilled' ? "text-emerald-500 hover:bg-emerald-500/10" :
                                                         s === 'Processing' ? "text-blue-500 hover:bg-blue-500/10" :
                                                             s === 'Ready to QC' ? "text-amber-500 hover:bg-amber-500/10" :
-                                                                "text-muted-foreground hover:bg-secondary",
+                                                                s === 'Trash' ? "text-red-500 hover:bg-red-500/10" :
+                                                                    "text-muted-foreground hover:bg-secondary",
                                                     order.status === s && "bg-secondary"
                                                 )}
                                             >

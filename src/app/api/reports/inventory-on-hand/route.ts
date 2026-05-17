@@ -17,7 +17,7 @@ export const maxDuration = 120;
 async function computeInventoryAtDate(tillEnd: Date) {
     const dateQ = { createdAt: { $lte: tillEnd } };
     const woDateQ = { dateCreated: { $lte: tillEnd } };
-    const WO_STATUSES = ['completed', 'shipped', 'Completed', 'Shipped', 'processing', 'Processing', 'pending', 'Pending', 'on-hold', 'On Hold'];
+    const WO_STATUSES = ['completed', 'Completed'];
 
     const [obsAgg, posAgg, sosAgg, mosProdRaw, mosConsAgg, adjsAgg, wosAgg, wosVarAgg, skusRaw] = await Promise.all([
         OpeningBalance.aggregate([
@@ -35,7 +35,7 @@ async function computeInventoryAtDate(tillEnd: Date) {
             { $group: { _id: { $toString: '$lineItems.sku' }, qty: { $sum: { $ifNull: ['$lineItems.qtyShipped', 0] } } } }
         ]),
         // Manufacturing production — find().lean() for BOM cost math + labor parsing
-        Manufacturing.find({ status: { $ne: 'Pending' }, ...dateQ })
+        Manufacturing.find({ status: { $nin: ['Pending', 'Trash'] }, ...dateQ })
             .select('sku qty qtyDifference lineItems labor status')
             .lean(),
         Manufacturing.aggregate([

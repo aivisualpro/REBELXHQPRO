@@ -631,6 +631,14 @@ export async function PATCH(
                     }
                 }
 
+                // ── Recompute stock for output SKU + all ingredient SKUs ──
+                const { recomputeSkuStock } = await import('@/lib/recompute-sku-stock');
+                const allAffectedSkus = [
+                    freshOrder.sku?._id?.toString() || freshOrder.sku?.toString(),
+                    ...(freshOrder.lineItems || []).map((li: any) => li.sku?._id?.toString() || li.sku?.toString())
+                ].filter(Boolean);
+                await recomputeSkuStock(...allAffectedSkus);
+
                 // AppSheet sync
                 if (orderIdStr) {
                     await syncManufacturingOrderToAppSheet(orderIdStr, 'Edit');

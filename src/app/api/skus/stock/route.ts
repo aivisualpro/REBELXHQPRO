@@ -80,7 +80,7 @@ async function computeAllStockQuantities(): Promise<Record<string, number>> {
         WebOrder.aggregate([
             {
                 $match: {
-                    status: { $in: ['completed', 'shipped', 'Completed', 'Shipped', 'processing', 'Processing', 'pending', 'Pending', 'on-hold', 'On Hold'] }
+                    status: { $in: ['completed', 'Completed'] }
                 }
             },
             { $unwind: '$lineItems' },
@@ -177,16 +177,30 @@ async function computeAllStockQuantities(): Promise<Record<string, number>> {
     // 7. Web Orders (OUT)
     wosSkuAgg.forEach((r: any) => subStock(r._id?.toString(), r.qty || 0));
 
+    // ─── DEBUG ───
+    const DS = '698619d0dfa92e3cf7db4451';
+    const dOB = obsAgg.filter((r:any)=>r._id===DS).reduce((s:number,r:any)=>s+(r.qty||0),0);
+    const dPO = posAgg.filter((r:any)=>r._id?.toString()===DS).reduce((s:number,r:any)=>s+(r.qty||0),0);
+    const dSO = sosAgg.filter((r:any)=>r._id===DS).reduce((s:number,r:any)=>s+(r.qty||0),0);
+    const dAdj = adjsAgg.filter((r:any)=>r._id===DS).reduce((s:number,r:any)=>s+(r.netQty||0),0);
+    let dMP=0; (mosProd as any[]).forEach((mo:any)=>{if((mo.sku?._id||mo.sku)?.toString()===DS) dMP+=(mo.qty||0)+(mo.qtyDifference||0);});
+    let dMC=0; (mosCons as any[]).forEach((mo:any)=>{mo.lineItems?.forEach((li:any)=>{if((li.sku?._id||li.sku)?.toString()===DS){const b=(mo.qty||0)*(li.recipeQty||0);const sa=(li.sa||0)/100;dMC+=b+(li.qtyScrapped||0)+(sa>0?(b/sa)-b:0);}});});
+    const dWO = wosSkuAgg.filter((r:any)=>r._id?.toString()===DS).reduce((s:number,r:any)=>s+(r.qty||0),0);
+    console.log(`[STOCK DEBUG] OB=+${dOB} PO=+${dPO} SO=-${dSO} Adj=${dAdj} MfgProd=+${dMP} MfgCons=-${dMC} WO=-${dWO} => TOTAL=${stockMap[DS]}`);
+    // ─── END DEBUG ───
+
     console.timeEnd('stock-compute');
     return stockMap;
 }
 
 // ─── GET handler ─────────────────────────────────────────────────────────────
 
-export async function GET() {
+export async function GET(req: Request) {
     try {
+        const { searchParams } = new URL(req.url);
+        const fresh = searchParams.get('fresh') === '1';
         // Check cache first — return instantly if fresh
-        if (_stockCache && (Date.now() - _stockCache.timestamp) < CACHE_TTL) {
+        if (!fresh && _stockCache && (Date.now() - _stockCache.timestamp) < CACHE_TTL) {
             return NextResponse.json({
                 stockMap: _stockCache.stockMap,
                 cached: true,

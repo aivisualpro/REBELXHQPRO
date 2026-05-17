@@ -43,7 +43,7 @@ interface CacheEntry {
 
 // ─── Global stock cache (shared across navigations) ───────────────────────────
 
-const globalStockCache: { current: { stockMap: Record<string, number>; timestamp: number } | null } = { current: null };
+const globalStockCache: { current: { balanceMap: Record<string, number>; timestamp: number } | null } = { current: null };
 const STOCK_CACHE_TTL = 60_000; // 60 seconds (matches server cache)
 
 // ─── Module-level cache ───────────────────────────────────────────────────────
@@ -356,7 +356,7 @@ function SkusContent() {
   const [noTransactions, setNoTransactions] = useState(searchParams.get('noTransactions') === 'true');
 
   // Phase 2: Stock data (loaded separately for speed)
-  const [stockMap, setStockMap] = useState<Record<string, number>>(globalStockCache.current?.stockMap || {});
+  const [stockMap, setStockMap] = useState<Record<string, number>>(globalStockCache.current?.balanceMap || {});
   const [stockLoading, setStockLoading] = useState(!globalStockCache.current || (Date.now() - (globalStockCache.current?.timestamp || 0)) > STOCK_CACHE_TTL);
 
   const pageRef = useRef(globalCache.current?.page || 0);
@@ -520,34 +520,74 @@ function SkusContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sortBy, sortOrder, debouncedSearch, activeCategory, showArchived, noTransactions]);
 
-  // ─── Phase 2: Background stock fetch ────────────────────────────────────
+  // ─── Phase 2: Stock loading ───────────────────────────────────────────────
+  // Phase 1: Read currentStock from SKU doc instantly (set by recompute-sku-stock.ts)
+  // Phase 2: For SKUs with null currentStock, call ledger in background to compute
+
+  const fetchBalancesForSkus = useCallback(async (skuIds: string[], cancelled: { v: boolean }) => {
+    if (!skuIds.length) return;
+    const results = await Promise.allSettled(
+      skuIds.map(id =>
+        fetch(`/api/warehouse/skus/${id}/ledger?lotsOnly=1`)
+          .then(r => r.json())
+          .then(data => ({ id, balance: data?.transactions?.[0]?.balance ?? null }))
+      )
+    );
+    if (cancelled.v) return;
+    const patch: Record<string, number> = {};
+    results.forEach(r => {
+      if (r.status === 'fulfilled' && r.value.balance !== null) patch[r.value.id] = r.value.balance;
+    });
+    if (Object.keys(patch).length > 0) {
+      setStockMap(prev => {
+        const next = { ...prev, ...patch };
+        globalStockCache.current = { balanceMap: next, timestamp: Date.now() };
+        return next;
+      });
+    }
+  }, []);
 
   useEffect(() => {
-    // Use client-side cache if fresh
-    const cached = globalStockCache.current;
-    if (cached && (Date.now() - cached.timestamp) < STOCK_CACHE_TTL) {
-      setStockMap(cached.stockMap);
-      setStockLoading(false);
-      return;
+    const cancelled = { v: false };
+
+    // Phase 1: show currentStock from SKU doc instantly (may be stale)
+    if (skus.length > 0) {
+      const instant: Record<string, number> = {};
+      skus.forEach((s: any) => {
+        if (s.currentStock !== null && s.currentStock !== undefined) {
+          instant[s._id?.toString()] = s.currentStock;
+        }
+      });
+      if (Object.keys(instant).length > 0) {
+        setStockMap(prev => ({ ...prev, ...instant }));
+        setStockLoading(false);
+      }
     }
 
-    let cancelled = false;
-    setStockLoading(true);
+    // Phase 2: call ledger for ALL visible SKUs in background
+    // This corrects any stale currentStock values in the UI immediately,
+    // then persists the correct values to the DB so next visit is instant.
+    const allIds = skus.map((s: any) => s._id?.toString()).filter(Boolean) as string[];
+    const hasNull = skus.some((s: any) => s.currentStock === null || s.currentStock === undefined);
+    if (hasNull) setStockLoading(true);
 
-    fetch('/api/skus/stock')
-      .then(r => r.json())
-      .then(data => {
-        if (cancelled) return;
-        if (data.stockMap) {
-          setStockMap(data.stockMap);
-          globalStockCache.current = { stockMap: data.stockMap, timestamp: Date.now() };
-        }
-      })
-      .catch(() => { /* silent */ })
-      .finally(() => { if (!cancelled) setStockLoading(false); });
+    if (allIds.length > 0) {
+      fetchBalancesForSkus(allIds, cancelled).then(() => {
+        if (cancelled.v) return;
+        // Persist corrected values to DB silently (targeted recompute for visible SKUs only)
+        fetch('/api/skus/recompute-stock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ skuIds: allIds }),
+        }).catch(() => {}); // fire-and-forget, silent
+      }).finally(() => {
+        if (!cancelled.v) setStockLoading(false);
+      });
+    }
 
-    return () => { cancelled = true; };
-  }, []); // Only runs once on mount — stock is refreshed by server cache TTL
+    return () => { cancelled.v = true; };
+  }, [skus, fetchBalancesForSkus]);
+
 
   // ─── Merge stock into displayed SKUs ────────────────────────────────────
 

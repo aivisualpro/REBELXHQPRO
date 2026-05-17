@@ -45,7 +45,7 @@ export async function POST() {
             });
         });
 
-        const WO_STATUSES = ['completed', 'shipped', 'Completed', 'Shipped', 'processing', 'Processing', 'pending', 'Pending', 'on-hold', 'On Hold'];
+        const WO_STATUSES = ['completed', 'Completed'];
 
         // ─── Step 2: Run ALL aggregations in parallel inside MongoDB  ───
         // Each returns only ~N_SKU grouped records, NOT millions of raw documents.
@@ -82,7 +82,7 @@ export async function POST() {
 
             // 4. Manufacturing production — find().lean() because cost requires
             //    BOM math (qty × recipeQty × unitCost) + labor parsing
-            Manufacturing.find({ status: { $ne: 'Pending' } })
+            Manufacturing.find({ status: { $nin: ['Pending', 'Trash'] } })
                 .select('sku qty qtyDifference lineItems labor status')
                 .lean(),
 
