@@ -1,8 +1,6 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { Suspense, useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
     Package,
@@ -81,7 +79,7 @@ const formatCurrency = (val: number) => {
     return '$' + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
-export default function WaitingOnLotPage() {
+function WaitingOnLotContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [groups, setGroups] = useState<SkuGroupSummary[]>([]);
@@ -700,5 +698,17 @@ function StatChip({ icon: Icon, label, value, color }: {
             <span className="text-[10px] font-bold uppercase tracking-wider opacity-70">{label}</span>
             <span className="text-[11px] font-black">{value}</span>
         </div>
+    );
+}
+
+export default function WaitingOnLotPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex flex-col h-[calc(100vh-48px)] bg-background items-center justify-center">
+                <Loader2 className="w-10 h-10 text-amber-500 animate-spin" />
+            </div>
+        }>
+            <WaitingOnLotContent />
+        </Suspense>
     );
 }
