@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
     Package,
     Loader2,
@@ -81,12 +81,15 @@ const formatCurrency = (val: number) => {
 
 export default function WaitingOnLotPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [groups, setGroups] = useState<SkuGroupSummary[]>([]);
     const [summary, setSummary] = useState<Summary | null>(null);
     const [loading, setLoading] = useState(true);
-    const [selectedSkuId, setSelectedSkuId] = useState<string | null>(null);
-    const [sidebarSearch, setSidebarSearch] = useState('');
+    // Initialize from URL params so page is bookmarkable
+    const [selectedSkuId, setSelectedSkuId] = useState<string | null>(() => searchParams.get('sku'));
+    const [sidebarSearch, setSidebarSearch] = useState(() => searchParams.get('q') || '');
     const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
+    const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
     // Detail state (lazy-loaded per SKU)
     const [detailItems, setDetailItems] = useState<DetailItem[]>([]);
@@ -101,12 +104,13 @@ export default function WaitingOnLotPage() {
         (async () => {
             try {
                 setLoading(true);
-                const res = await fetch('/api/reports/waiting-on-lot');
+                const res = await fetch('/api/reports/waiting-on-lot?bust=1');
                 if (res.ok) {
                     const data = await res.json();
                     setGroups(data.groups || []);
                     setSummary(data.summary || null);
-                    if (data.groups?.length > 0) {
+                    // Only auto-select first if URL has no ?sku= param
+                    if (!searchParams.get('sku') && data.groups?.length > 0) {
                         setSelectedSkuId(data.groups[0].skuId);
                     }
                 }
@@ -116,6 +120,7 @@ export default function WaitingOnLotPage() {
                 setLoading(false);
             }
         })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // ── Load detail items when SKU changes ──
@@ -140,7 +145,25 @@ export default function WaitingOnLotPage() {
             setTypeFilter('all');
             loadSkuDetail(selectedSkuId);
         }
+        // Sync selected SKU to URL
+        const q = sidebarSearch.trim();
+        const params = new URLSearchParams();
+        if (selectedSkuId) params.set('sku', selectedSkuId);
+        if (q) params.set('q', q);
+        router.replace(`/reports/waiting-on-lot${params.toString() ? `?${params.toString()}` : ''}`, { scroll: false });
     }, [selectedSkuId, loadSkuDetail]);
+
+    // ── Sync search query to URL ──
+    useEffect(() => {
+        if (loading) return;
+        const q = sidebarSearch.trim();
+        const params = new URLSearchParams();
+        // When searching, don't persist the selected SKU — URL shows search state only
+        if (!q && selectedSkuId) params.set('sku', selectedSkuId);
+        if (q) params.set('q', q);
+        router.replace(`/reports/waiting-on-lot${params.toString() ? `?${params.toString()}` : ''}`, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sidebarSearch]);
 
     // Filter detail items by type
     const filteredDetailItems = useMemo(() => {
@@ -149,15 +172,26 @@ export default function WaitingOnLotPage() {
         return detailItems.filter(i => i.source === typeFilter);
     }, [detailItems, typeFilter]);
 
-    // Filter sidebar by search
+    // Filter sidebar by search + category
     const filteredGroups = useMemo(() => {
-        if (!sidebarSearch.trim()) return groups;
+        let result = groups;
+        if (categoryFilter !== 'all') {
+            result = result.filter(g => (g.category || 'Uncategorized') === categoryFilter);
+        }
+        if (!sidebarSearch.trim()) return result;
         const q = sidebarSearch.toLowerCase();
-        return groups.filter(g =>
+        return result.filter(g =>
             g.name.toLowerCase().includes(q) ||
             g.category?.toLowerCase().includes(q)
         );
-    }, [groups, sidebarSearch]);
+    }, [groups, sidebarSearch, categoryFilter]);
+
+    // Derived categories list
+    const categories = useMemo(() => {
+        const cats = new Set<string>();
+        groups.forEach(g => cats.add(g.category || 'Uncategorized'));
+        return Array.from(cats).sort();
+    }, [groups]);
 
     // Get selected group summary
     const selectedGroupSummary = useMemo(() => {
@@ -311,6 +345,22 @@ export default function WaitingOnLotPage() {
                             <StatChip icon={Hash} label="Records" value={summary.totalItems.toLocaleString()} color="blue" />
                             <StatChip icon={ShoppingCart} label="Total Qty" value={summary.totalQty.toLocaleString()} color="purple" />
                             <StatChip icon={DollarSign} label="Value" value={formatCurrency(summary.totalValue)} color="emerald" />
+                            {/* Category Filter */}
+                            <div className="flex items-center gap-1.5 shrink-0">
+                                <div className="flex items-center gap-1 h-6 rounded-md border border-border bg-muted/40 px-2">
+                                    <Filter className="w-3 h-3 text-muted-foreground" />
+                                    <select
+                                        value={categoryFilter}
+                                        onChange={e => setCategoryFilter(e.target.value)}
+                                        className="bg-transparent text-[11px] font-bold text-foreground uppercase tracking-wide outline-none cursor-pointer pr-1"
+                                    >
+                                        <option value="all">All Categories</option>
+                                        {categories.map(cat => (
+                                            <option key={cat} value={cat}>{cat}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
                         </>
                     )}
                 </div>

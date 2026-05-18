@@ -581,13 +581,15 @@ export async function GET(
                     if (processedWebOrderLineItems.has(dedupeKey)) return;
                     processedWebOrderLineItems.add(dedupeKey);
 
-                    // Determine lot: only use line.lotNumber for direct/single-SKU matches,
-                    // NOT for WebProduct-resolved multi-SKU entries (that lot belongs to a different SKU)
+                    // Determine lot: priority order is linkedSkuMatch > isDirectMatch > wpResolved
+                    // isDirectMatch MUST come before wpResolvedMultiplier — a line can be both
+                    // WP-resolved AND have linkedSkuId set (direct). In that case, line.lotNumber
+                    // is the authoritative lot (it was assigned via the direct SKU link).
                     const lot = linkedSkuMatch
                         ? (linkedSkuMatch.lotNumber || '')
-                        : (wpResolvedMultiplier !== null
-                            ? '' // WebProduct-resolved: no lot assigned for this specific SKU yet
-                            : (isDirectMatch ? (line.lotNumber || '') : ''));
+                        : isDirectMatch
+                            ? (line.lotNumber || '')
+                            : (wpResolvedMultiplier !== null ? '' : ''); // WP-resolved only: no lot yet
                     const virtualCost = lotCosts.get(lot);
 
                     const key = line.variationId ? `${wo.website}-${line.productId}-${line.variationId}` : `${wo.website}-${line.productId}`;

@@ -452,7 +452,7 @@ function SkuDetailsPageContent() {
         if (tx.type === 'Web Order' && !filters.showWebOrders) return false;
         if ((tx.type === 'Audit' || tx.type === 'Audit Adjustment') && !filters.showAuditAdjustments) return false;
         // New filters: show only records missing lot or cost
-        if (filters.showOnlyNoLot && tx.lotNumber && tx.lotNumber !== '' && tx.lotNumber !== 'N/A' && tx.lotNumber !== '-') return false;
+        if (filters.showOnlyNoLot && tx.lotNumber && tx.lotNumber !== '' && tx.lotNumber !== '-') return false;
         if (filters.showOnlyNoCost && tx.cost && tx.cost > 0) return false;
         // Reference search filter — search across reference, type, lotNumber, status, website
         if (referenceSearch) {

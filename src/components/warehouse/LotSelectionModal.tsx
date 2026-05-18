@@ -80,7 +80,7 @@ export function LotSelectionModal({
                 for (const tx of sorted) {
                     const rawLot = tx.lotNumber;
                     // Normalize: empty, N/A, - all map to the no-lot bucket
-                    const lot = (!rawLot || rawLot === '' || rawLot === 'N/A' || rawLot === '-') ? NO_LOT_KEY : rawLot;
+                    const lot = (!rawLot || rawLot === '' || rawLot === '-') ? NO_LOT_KEY : rawLot;
                     if (isPendingProd(tx) || isUnfulfilledCons(tx) || isTrashedMfg(tx) || isPendingWebOrder(tx) || isPendingOrder(tx)) continue;
 
                     const existing = lotMap.get(lot);
@@ -374,7 +374,7 @@ export function LotSelectionModal({
                         </div>
                     ) : (
                         <div>
-                            {/* Clear option */}
+                            {/* Clear option — removes lot entirely */}
                             <button
                                 onClick={() => onSelect('', 0)}
                                 className={cn(
@@ -400,6 +400,35 @@ export function LotSelectionModal({
                                         (No Lot)
                                     </p>
                                     <p className={cn("text-xs font-medium mt-1", !currentLotNumber ? "text-white/80" : "text-muted-foreground/70")}>Clear lot assignment</p>
+                                </div>
+                            </button>
+
+                            {/* N/A option — assigns a dummy lot that won't be flagged as missing */}
+                            <button
+                                onClick={() => onSelect('N/A', 0)}
+                                className={cn(
+                                    "w-full flex items-center gap-4 px-5 py-4 transition-all text-left outline-none border-b border-border group",
+                                    currentLotNumber === 'N/A'
+                                        ? "bg-zinc-600 shadow-md ring-2 ring-zinc-400 ring-offset-1 ring-offset-background z-10"
+                                        : "hover:bg-zinc-800/60"
+                                )}
+                            >
+                                <div className={cn(
+                                    "w-8 h-8 flex items-center justify-center text-xs font-black transition-colors rounded-md shadow-sm border",
+                                    currentLotNumber === 'N/A'
+                                        ? "bg-white/20 text-white border-white/20"
+                                        : "bg-zinc-800 text-zinc-400 border-zinc-600 group-hover:border-zinc-400"
+                                )}>
+                                    {currentLotNumber === 'N/A' ? <Check className="w-4 h-4 text-white" /> : <span className="text-[10px] font-black">N/A</span>}
+                                </div>
+                                <div className="flex-1">
+                                    <p className={cn(
+                                        "text-sm font-black transition-colors",
+                                        currentLotNumber === 'N/A' ? "text-white" : "text-zinc-400"
+                                    )}>
+                                        N/A
+                                    </p>
+                                    <p className={cn("text-xs font-medium mt-1", currentLotNumber === 'N/A' ? "text-white/80" : "text-zinc-500")}>No lot tracking required</p>
                                 </div>
                             </button>
 

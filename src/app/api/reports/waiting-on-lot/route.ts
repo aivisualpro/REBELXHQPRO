@@ -12,13 +12,16 @@ export const dynamic = 'force-dynamic';
 const CACHE_TTL = 120_000;
 let summaryCache: { data: any; timestamp: number } | null = null;
 let detailCache = new Map<string, { data: any; timestamp: number }>();
+// Bust caches on startup so N/A rule changes take effect immediately
+summaryCache = null;
+detailCache.clear();
 
 // Lot values we consider "missing"
 const MISSING_LOT_OR = [
     { 'lineItems.lotNumber': { $exists: false } },
     { 'lineItems.lotNumber': null },
     { 'lineItems.lotNumber': '' },
-    { 'lineItems.lotNumber': 'N/A' },
+    { 'lineItems.lotNumber': '-' },
     { 'lineItems.lotNumber': 'Allocated' },
 ];
 
@@ -29,17 +32,19 @@ const MISSING_LOT_OR = [
  * no skuId    → returns sidebar summary (groups with counts, no items)
  */
 export async function GET(request: NextRequest) {
-    const skuId = new URL(request.url).searchParams.get('skuId');
+    const url = new URL(request.url);
+    const skuId = url.searchParams.get('skuId');
+    const bust = url.searchParams.get('bust') === '1';
 
     if (skuId) {
-        return getSkuDetail(skuId);
+        return getSkuDetail(skuId, bust);
     }
-    return getSummary();
+    return getSummary(bust);
 }
 
 // ── Get sidebar summary (lightweight) ──
-async function getSummary() {
-    if (summaryCache && (Date.now() - summaryCache.timestamp) < CACHE_TTL) {
+async function getSummary(bust = false) {
+    if (!bust && summaryCache && (Date.now() - summaryCache.timestamp) < CACHE_TTL) {
         return NextResponse.json(summaryCache.data);
     }
 
@@ -87,7 +92,7 @@ async function getSummary() {
                             { 'lineItems.lotNumber': { $exists: false } },
                             { 'lineItems.lotNumber': null },
                             { 'lineItems.lotNumber': '' },
-                            { 'lineItems.lotNumber': 'N/A' },
+                            { 'lineItems.lotNumber': '-' },
                             { 'lineItems.lotNumber': 'Allocated' },
                         ]
                     }
@@ -156,24 +161,24 @@ async function getSummary() {
         const wpResolutions: { skuId: string; website: string; productId: number; variationId?: number; multiplier: number }[] = [];
         (webProducts as any[]).forEach(wp => {
             // Product-level direct link
-            if (wp.linkedSkuId && allSkuIds.includes(wp.linkedSkuId)) {
-                wpResolutions.push({ skuId: wp.linkedSkuId, website: wp.website, productId: wp.webId, multiplier: wp.multiplier || 1 });
+            if (wp.linkedSkuId && allSkuIds.includes(wp.linkedSkuId?.toString())) {
+                wpResolutions.push({ skuId: wp.linkedSkuId.toString(), website: wp.website, productId: wp.webId, multiplier: wp.multiplier || 1 });
             }
             // Product-level linkedSkus
             wp.linkedSkus?.forEach((ls: any) => {
-                if (allSkuIds.includes(ls.skuId)) {
-                    wpResolutions.push({ skuId: ls.skuId, website: wp.website, productId: wp.webId, multiplier: ls.multiplier || 1 });
+                if (ls.skuId && allSkuIds.includes(ls.skuId?.toString())) {
+                    wpResolutions.push({ skuId: ls.skuId.toString(), website: wp.website, productId: wp.webId, multiplier: ls.multiplier || 1 });
                 }
             });
             // Variation-level
             wp.variations?.forEach((v: any) => {
                 const vid = v.id || v._id;
-                if (v.linkedSkuId && allSkuIds.includes(v.linkedSkuId)) {
-                    wpResolutions.push({ skuId: v.linkedSkuId, website: wp.website, productId: wp.webId, variationId: vid, multiplier: v.multiplier || wp.multiplier || 1 });
+                if (v.linkedSkuId && allSkuIds.includes(v.linkedSkuId?.toString())) {
+                    wpResolutions.push({ skuId: v.linkedSkuId.toString(), website: wp.website, productId: wp.webId, variationId: vid, multiplier: v.multiplier || wp.multiplier || 1 });
                 }
                 v.linkedSkus?.forEach((ls: any) => {
-                    if (allSkuIds.includes(ls.skuId)) {
-                        wpResolutions.push({ skuId: ls.skuId, website: wp.website, productId: wp.webId, variationId: vid, multiplier: ls.multiplier || 1 });
+                    if (ls.skuId && allSkuIds.includes(ls.skuId?.toString())) {
+                        wpResolutions.push({ skuId: ls.skuId.toString(), website: wp.website, productId: wp.webId, variationId: vid, multiplier: ls.multiplier || 1 });
                     }
                 });
             });
@@ -191,6 +196,7 @@ async function getSummary() {
                 if (!wpWebsites.includes(r.website)) wpWebsites.push(r.website);
             }
         });
+        const wpWebIdsUnique = wpWebIds; // productId is always Number per schema
 
         if (wpWebIds.length > 0) {
             // Fetch ALL web orders matched via WebProduct productId
@@ -200,7 +206,7 @@ async function getSummary() {
                 {
                     $match: {
                         status: { $nin: ['cancelled', 'trash', 'failed', 'refunded'] },
-                        'lineItems.productId': { $in: wpWebIds },
+                        'lineItems.productId': { $in: wpWebIdsUnique },
                         website: { $in: wpWebsites },
                         ...(globalStartDate ? { dateCreated: { $gte: globalStartDate } } : {}),
                     }
@@ -208,7 +214,7 @@ async function getSummary() {
                 { $unwind: '$lineItems' },
                 {
                     $match: {
-                        'lineItems.productId': { $in: wpWebIds },
+                        'lineItems.productId': { $in: wpWebIdsUnique },
                     }
                 },
                 {
@@ -229,15 +235,24 @@ async function getSummary() {
             ]).allowDiskUse(true);
 
             // Deduplicate: track (orderId_lineId_skuId) to prevent double-counting
-            // items already counted via Phase 1 (direct linkedSkuId)
+            // items already counted via Phase 1 (direct linkedSkuId WITH missing lot).
+            // IMPORTANT: only block lines that Phase 1 actually counted (missing direct lot).
+            // If a line has linkedSkuId with an assigned lot, Phase 1 did NOT count it —
+            // Phase 2 still needs to check linkedSkus[].lotNumber for that line.
             const counted = new Set<string>();
+            const MISSING_LOT_VALUES = new Set(['', '-', 'Allocated']);
 
-            // Pre-populate with Phase 1 items (direct linkedSkuId matches)
-            // — these were already counted in the woGroups aggregation
             for (const wo of wpWoGroups) {
                 const line = wo.lineItems;
                 if (line.linkedSkuId) {
-                    counted.add(`${wo._id}_${line.id || line._id}_${line.linkedSkuId}`);
+                    const directLot = line.lotNumber ?? '';
+                    const directIsMissing = !directLot || MISSING_LOT_VALUES.has(directLot);
+                    if (directIsMissing) {
+                        // Phase 1 counted this line — block Phase 2 from double-counting
+                        counted.add(`${wo._id}_${line.id || line._id}_${line.linkedSkuId.toString()}`);
+                    }
+                    // If lot is assigned on direct match, Phase 2 must still check
+                    // linkedSkus[].lotNumber for bundle component tracking
                 }
             }
 
@@ -247,14 +262,14 @@ async function getSummary() {
 
                 // Find matching WebProduct resolution
                 const matchingRes = wpResolutions.filter(r =>
-                    r.website === wo.website && r.productId === line.productId
+                    r.website === wo.website && String(r.productId) === String(line.productId)
                 );
 
                 for (const res of matchingRes) {
                     // If resolution has a variationId, only match if line has that variationId
-                    if (res.variationId && line.variationId !== res.variationId) continue;
+                    if (res.variationId && String(line.variationId) !== String(res.variationId)) continue;
                     // If resolution has no variationId and line has one, skip (variation-level should match)
-                    if (!res.variationId && line.variationId && matchingRes.some(r => r.variationId === line.variationId)) continue;
+                    if (!res.variationId && line.variationId && matchingRes.some(r => r.variationId && String(r.variationId) === String(line.variationId))) continue;
 
                     const dedupeKey = `${wo._id}_${line.id || line._id}_${res.skuId}`;
                     if (counted.has(dedupeKey)) continue;
@@ -264,18 +279,20 @@ async function getSummary() {
                     // - Direct match (linkedSkuId === skuId): check lineItems.lotNumber
                     // - LinkedSkus match: check linkedSkus[].lotNumber
                     // - WP-resolved: always treated as missing lot
-                    const isDirectMatch = line.linkedSkuId === res.skuId;
-                    const linkedSkuMatch = line.linkedSkus?.find((ls: any) => ls.skuId === res.skuId);
+                    const isDirectMatch = line.linkedSkuId?.toString() === res.skuId;
+                    const linkedSkuMatch = line.linkedSkus?.find((ls: any) => ls.skuId?.toString() === res.skuId);
 
                     let lot = '';
                     if (linkedSkuMatch) {
                         lot = linkedSkuMatch.lotNumber || '';
                     } else if (isDirectMatch) {
                         lot = line.lotNumber || '';
+                    } else {
+                        // WP-resolved: lot was saved to line.lotNumber by transaction-update
+                        lot = line.lotNumber || '';
                     }
-                    // else: WP-resolved → lot stays ''
 
-                    const isMissing = !lot || lot === '' || lot === 'N/A' || lot === 'Allocated';
+                    const isMissing = !lot || lot === '' || lot === '-' || lot === 'Allocated';
                     if (!isMissing) continue;
 
                     const existing = mergedMap.get(res.skuId) || { count: 0, totalQty: 0, totalValue: 0 };
@@ -325,9 +342,9 @@ async function getSummary() {
 }
 
 // ── Get detail items for a specific SKU (lazy-loaded) ──
-async function getSkuDetail(skuId: string) {
+async function getSkuDetail(skuId: string, bust = false) {
     const cached = detailCache.get(skuId);
-    if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
+    if (!bust && cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
         return NextResponse.json(cached.data);
     }
 
@@ -442,7 +459,7 @@ async function getSkuDetail(skuId: string) {
                             { 'lineItems.lotNumber': { $exists: false } },
                             { 'lineItems.lotNumber': null },
                             { 'lineItems.lotNumber': '' },
-                            { 'lineItems.lotNumber': 'N/A' },
+                            { 'lineItems.lotNumber': '-' },
                             { 'lineItems.lotNumber': 'Allocated' },
                         ]
                     }
@@ -490,12 +507,12 @@ async function getSkuDetail(skuId: string) {
             // Determine lot number for THIS specific SKU
             const lot = linkedSkuMatch
                 ? (linkedSkuMatch.lotNumber || '')
-                : (wpResolvedMultiplier !== null
-                    ? '' // WebProduct-resolved: lot is on the linked component, not the line
-                    : (isDirectMatch ? (line.lotNumber || '') : ''));
+                : (isDirectMatch
+                    ? (line.lotNumber || '')
+                    : (line.lotNumber || '')); // WP-resolved: lot saved to line.lotNumber by transaction-update
 
             // Only include if lot is missing
-            const isMissing = !lot || lot === '' || lot === 'N/A' || lot === 'Allocated';
+            const isMissing = !lot || lot === '' || lot === '-' || lot === 'Allocated';
             if (!isMissing) continue;
 
             seen.add(dedupeKey);
