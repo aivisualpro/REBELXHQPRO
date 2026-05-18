@@ -79,8 +79,8 @@ export function LotSelectionModal({
                 const NO_LOT_KEY = '__no_lot__'; // Internal key for no-lot transactions
                 for (const tx of sorted) {
                     const rawLot = tx.lotNumber;
-                    // Normalize: empty, N/A, - all map to the no-lot bucket
-                    const lot = (!rawLot || rawLot === '' || rawLot === '-') ? NO_LOT_KEY : rawLot;
+                    // Normalize: empty, N/A, - all map to the no-lot bucket (not real lot inventory)
+                    const lot = (!rawLot || rawLot === '' || rawLot === '-' || rawLot === 'N/A') ? NO_LOT_KEY : rawLot;
                     if (isPendingProd(tx) || isUnfulfilledCons(tx) || isTrashedMfg(tx) || isPendingWebOrder(tx) || isPendingOrder(tx)) continue;
 
                     const existing = lotMap.get(lot);

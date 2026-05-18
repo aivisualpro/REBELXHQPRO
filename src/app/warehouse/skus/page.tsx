@@ -525,7 +525,7 @@ function SkusContent() {
   // Phase 2: For SKUs with null currentStock, call ledger in background to compute
 
   const fetchBalancesForSkus = useCallback(async (skuIds: string[], cancelled: { v: boolean }) => {
-    if (!skuIds.length) return;
+    if (!skuIds.length) return {};
     const results = await Promise.allSettled(
       skuIds.map(id =>
         fetch(`/api/warehouse/skus/${id}/ledger?lotsOnly=1`)
@@ -533,7 +533,7 @@ function SkusContent() {
           .then(data => ({ id, balance: data?.transactions?.[0]?.balance ?? null }))
       )
     );
-    if (cancelled.v) return;
+    if (cancelled.v) return {};
     const patch: Record<string, number> = {};
     results.forEach(r => {
       if (r.status === 'fulfilled' && r.value.balance !== null) patch[r.value.id] = r.value.balance;
@@ -545,6 +545,7 @@ function SkusContent() {
         return next;
       });
     }
+    return patch;
   }, []);
 
   useEffect(() => {
@@ -572,14 +573,23 @@ function SkusContent() {
     if (hasNull) setStockLoading(true);
 
     if (allIds.length > 0) {
-      fetchBalancesForSkus(allIds, cancelled).then(() => {
-        if (cancelled.v) return;
-        // Persist corrected values to DB silently (targeted recompute for visible SKUs only)
-        fetch('/api/skus/recompute-stock', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ skuIds: allIds }),
-        }).catch(() => {}); // fire-and-forget, silent
+      fetchBalancesForSkus(allIds, cancelled).then((correctedMap) => {
+        if (cancelled.v || !correctedMap || Object.keys(correctedMap).length === 0) return;
+        // Persist the LEDGER-computed balances directly to each SKU document.
+        // We do this instead of calling recompute-stock, because recompute-stock uses its
+        // own aggregation that may diverge from the ledger (e.g. WebProduct vs linkedSkuId
+        // matching for web orders). The ledger is the authoritative source of truth.
+        Object.entries(correctedMap).forEach(([skuId, balance]) => {
+          const stored = skus.find((s: any) => s._id?.toString() === skuId);
+          if (stored && stored.currentStock !== balance) {
+            // Only patch if the stored value is actually stale
+            fetch(`/api/skus/${skuId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ currentStock: balance }),
+            }).catch(() => {}); // fire-and-forget, silent
+          }
+        });
       }).finally(() => {
         if (!cancelled.v) setStockLoading(false);
       });
