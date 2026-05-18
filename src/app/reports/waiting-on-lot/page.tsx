@@ -165,13 +165,6 @@ export default function WaitingOnLotPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sidebarSearch]);
 
-    // Filter detail items by type
-    const filteredDetailItems = useMemo(() => {
-        if (typeFilter === 'all') return detailItems;
-        if (typeFilter === 'Web Order') return detailItems.filter(i => i.source.startsWith('Web Order'));
-        return detailItems.filter(i => i.source === typeFilter);
-    }, [detailItems, typeFilter]);
-
     // Filter sidebar by search + category
     const filteredGroups = useMemo(() => {
         let result = groups;
@@ -192,6 +185,24 @@ export default function WaitingOnLotPage() {
         groups.forEach(g => cats.add(g.category || 'Uncategorized'));
         return Array.from(cats).sort();
     }, [groups]);
+
+    // ── Auto-select first result when search filters the sidebar ──
+    useEffect(() => {
+        if (loading) return;
+        if (!sidebarSearch.trim()) return; // only auto-select when actively searching
+        if (filteredGroups.length > 0 && filteredGroups[0].skuId !== selectedSkuId) {
+            setSelectedSkuId(filteredGroups[0].skuId);
+            loadSkuDetail(filteredGroups[0].skuId);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filteredGroups]);
+
+    // Filter detail items by type
+    const filteredDetailItems = useMemo(() => {
+        if (typeFilter === 'all') return detailItems;
+        if (typeFilter === 'Web Order') return detailItems.filter(i => i.source.startsWith('Web Order'));
+        return detailItems.filter(i => i.source === typeFilter);
+    }, [detailItems, typeFilter]);
 
     // Get selected group summary
     const selectedGroupSummary = useMemo(() => {
