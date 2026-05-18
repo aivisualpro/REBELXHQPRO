@@ -50,9 +50,9 @@ async function computeBalance(skuId: string): Promise<number> {
             { $match: { 'lineItems.sku': skuMatch } },
             { $group: { _id: null, qty: { $sum: '$lineItems.qtyReceived' } } }
         ]),
-        // 3. Sale Orders — Shipped/Completed, qtyShipped with fallback to qty
+        // 3. Sale Orders — Shipped/Completed/Pending Payment count toward stock reduction
         SaleOrder.aggregate([
-            { $match: { orderStatus: { $in: ['Shipped', 'Completed'] }, ...df } },
+            { $match: { orderStatus: { $in: ['Shipped', 'Completed', 'Pending Payment'] }, ...df } },
             { $unwind: '$lineItems' },
             { $match: { 'lineItems.sku': skuMatch } },
             { $group: { _id: null, qty: { $sum: {
@@ -72,7 +72,7 @@ async function computeBalance(skuId: string): Promise<number> {
         Manufacturing.find({
             $or: [{ sku: skuMatch }, { 'lineItems.sku': skuMatch }],
             ...df
-        }).select('sku qty qtyDifference status lineItems.sku lineItems.recipeQty lineItems.sa lineItems.qtyScrapped').lean(),
+        } as any).select('sku qty qtyDifference status lineItems.sku lineItems.recipeQty lineItems.sa lineItems.qtyScrapped').lean(),
         // 6. WebProducts linked to this SKU — to find matching web orders
         WebProduct.find({
             $or: [

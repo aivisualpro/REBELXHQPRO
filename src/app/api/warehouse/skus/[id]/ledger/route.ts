@@ -657,7 +657,7 @@ export async function GET(
 
         const isPendingProduction = (t: any) => t.type === 'Produced' && ['pending', 'processing'].includes((t.status || '').toLowerCase());
         const isUnfulfilledConsumption = (t: any) => t.type === 'Consumption' && (t.status || '').toLowerCase() !== 'fulfilled';
-        const isPendingOrder = (t: any) => t.type === 'Orders' && (t.status || '').toLowerCase() !== 'completed' && (t.status || '').toLowerCase() !== 'shipped';
+        const isPendingOrder = (t: any) => t.type === 'Orders' && !['completed', 'shipped', 'pending payment'].includes((t.status || '').toLowerCase());
         const isTrashedMfg = (t: any) => (t.type === 'Produced' || t.type === 'Consumption') && (t.status || '').toLowerCase() === 'trash';
         const isPendingWebOrder = (t: any) => t.type === 'Web Order' && (t.status || '').toLowerCase() !== 'completed';
 

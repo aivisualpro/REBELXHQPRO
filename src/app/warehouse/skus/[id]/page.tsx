@@ -27,7 +27,8 @@ import {
     Search,
     Archive,
     ArchiveRestore,
-    Scale
+    Scale,
+    ChevronDown
 } from 'lucide-react';
 import { cn, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -293,8 +294,8 @@ function SkuDetailsPageContent() {
                 const isUnfulfilledCons = (t: any) => t.type === 'Consumption' && (t.status || '').toLowerCase() !== 'fulfilled';
                 const isTrashedMfgTx = (t: any) => (t.type === 'Produced' || t.type === 'Consumption') && (t.status || '').toLowerCase() === 'trash';
                 const isPendingWebOrderTx = (t: any) => t.type === 'Web Order' && (t.status || '').toLowerCase() !== 'completed';
-                // Wholesale Orders (type='Orders') only count when Shipped or Completed
-                const isPendingOrderTx = (t: any) => t.type === 'Orders' && !['shipped', 'completed'].includes((t.status || '').toLowerCase());
+                // Wholesale Orders only count when Shipped, Completed, or Pending Payment
+                const isPendingOrderTx = (t: any) => t.type === 'Orders' && !['shipped', 'completed', 'pending payment'].includes((t.status || '').toLowerCase());
 
                 // Sort oldest first for proper source/date attribution
                 // When dates are equal, source (positive) records come first
@@ -483,9 +484,67 @@ function SkuDetailsPageContent() {
 
     const isPendingProduction = (tx: Transaction) => tx.type === 'Produced' && ['pending', 'processing'].includes((tx.status || '').toLowerCase());
     const isUnfulfilledConsumption = (tx: Transaction) => tx.type === 'Consumption' && (tx.status || '').toLowerCase() !== 'fulfilled';
-    const isPendingOrder = (tx: Transaction) => tx.type === 'Orders' && (tx.status || '').toLowerCase() !== 'completed' && (tx.status || '').toLowerCase() !== 'shipped';
+    const isPendingOrder = (tx: Transaction) => tx.type === 'Orders' && !['completed', 'shipped', 'pending payment'].includes((tx.status || '').toLowerCase());
     const isTrashedMfg = (tx: Transaction) => (tx.type === 'Produced' || tx.type === 'Consumption') && (tx.status || '').toLowerCase() === 'trash';
     const isPendingWebOrder = (tx: Transaction) => tx.type === 'Web Order' && (tx.status || '').toLowerCase() !== 'completed';
+
+    // ─── Inline status change ────────────────────────────────────────────────
+    const [statusChanging, setStatusChanging] = useState<string | null>(null);
+    const [openStatusDropdown, setOpenStatusDropdown] = useState<string | null>(null);
+
+    const STATUS_OPTIONS: Record<string, string[]> = {
+        'Orders':      ['Pending', 'Picking', 'Shipping', 'Issued', 'Pending Payment', 'Completed'],
+        'Produced':    ['Pending', 'Processing', 'Ready to QC', 'Fulfilled', 'Trash'],
+        'Consumption': ['Pending', 'Processing', 'Ready to QC', 'Fulfilled', 'Trash'],
+    };
+
+    const handleTxStatusChange = async (tx: Transaction, newStatus: string) => {
+        setOpenStatusDropdown(null);
+        if (tx.status === newStatus) return;
+        setStatusChanging(tx._id);
+        try {
+            let url = '';
+            let body: any = {};
+            if (tx.type === 'Orders') {
+                url = `/api/wholesale/orders/${tx.docId}`;
+                body = { orderStatus: newStatus };
+            } else if (tx.type === 'Produced' || tx.type === 'Consumption') {
+                url = `/api/manufacturing/${tx.docId}`;
+                body = { status: newStatus };
+            } else {
+                setStatusChanging(null);
+                return;
+            }
+            const res = await fetch(url, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            if (res.ok) {
+                // Optimistically update ALL rows sharing the same docId (e.g. Produced + Consumption from same job)
+                setTransactions(prev => prev.map(t =>
+                    t.docId === tx.docId ? { ...t, status: newStatus } : t
+                ));
+                toast.success(`Status → ${newStatus}`);
+                fetchSkuDetails(true);
+            } else {
+                const err = await res.json().catch(() => ({}));
+                toast.error(err.error || 'Failed to update status');
+            }
+        } catch { toast.error('Error updating status'); }
+        finally { setStatusChanging(null); }
+    };
+
+    // Close status dropdown on outside click
+    useEffect(() => {
+        if (!openStatusDropdown) return;
+        const handler = (e: MouseEvent) => {
+            const el = document.getElementById(`status-dd-${openStatusDropdown}`);
+            if (el && !el.contains(e.target as Node)) setOpenStatusDropdown(null);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [openStatusDropdown]);
 
     const finalTransactions = filteredTransactions.filter(tx => {
         // When reference search is active, bypass lot/variance/warning filters
@@ -1508,31 +1567,76 @@ function SkuDetailsPageContent() {
                                                                     s === 'trash' ? 'Trash' :
                                                                         s;
 
-                                            const styleMap: Record<string, { bg: string; color: string; border?: string; darkBg?: string; darkColor?: string }> = {
-                                                'Fulfilled': { bg: '#059669', color: '#ffffff', darkBg: 'rgba(5,150,105,0.2)', darkColor: '#34d399' },
-                                                'Completed': { bg: '#059669', color: '#ffffff', darkBg: 'rgba(5,150,105,0.2)', darkColor: '#34d399' },
-                                                'Processing': { bg: '#2563eb', color: '#ffffff', darkBg: 'rgba(59,130,246,0.2)', darkColor: '#60a5fa' },
-                                                'Ready to QC': { bg: '#d97706', color: '#ffffff', darkBg: 'rgba(245,158,11,0.2)', darkColor: '#fbbf24' },
-                                                'Pending': { bg: '#e2e8f0', color: '#000000', border: '1px solid #cbd5e1', darkBg: 'rgba(100,116,139,0.2)', darkColor: '#cbd5e1' },
-                                                'Trash': { bg: '#b91c1c', color: '#ffffff', darkBg: 'rgba(185,28,28,0.2)', darkColor: '#fca5a5' },
+                                            const styleMap: Record<string, { bg: string; color: string; border?: string }> = {
+                                                'Fulfilled':      { bg: '#059669', color: '#fff' },
+                                                'Completed':      { bg: '#059669', color: '#fff' },
+                                                'Processing':     { bg: '#2563eb', color: '#fff' },
+                                                'Ready to QC':    { bg: '#d97706', color: '#fff' },
+                                                'Pending':        { bg: '#334155', color: '#cbd5e1', border: '1px solid #475569' },
+                                                'Trash':          { bg: '#b91c1c', color: '#fff' },
                                             };
+                                            const customMap: Record<string, { bg: string; color: string }> = {
+                                                'pending payment': { bg: '#92400e', color: '#fde68a' },
+                                                'picking':         { bg: '#1d4ed8', color: '#bfdbfe' },
+                                                'shipping':        { bg: '#6d28d9', color: '#ddd6fe' },
+                                                'issued':          { bg: '#0e7490', color: '#a5f3fc' },
+                                            };
+                                            const defaultStyle = ['cancelled', 'rejected', 'failed'].includes(s)
+                                                ? { bg: '#e11d48', color: '#fff' }
+                                                : { bg: '#1e293b', color: '#64748b' };
+                                            const styleColor = customMap[s] || styleMap[sNormalized] || defaultStyle;
 
-                                            // Fallbacks for unmapped
-                                            const defaultStyle = ['cancelled', 'rejected', 'failed'].includes(s) ?
-                                                { bg: '#e11d48', color: '#fff' } :
-                                                { bg: '#f1f5f9', color: '#64748b' };
+                                            // Changeable types: Orders, Produced, Consumption
+                                            const availableStatuses = STATUS_OPTIONS[tx.type];
+                                            if (availableStatuses) {
+                                                const isChanging = statusChanging === tx._id || statusChanging === tx.docId;
+                                                return (
+                                                    <div className="relative inline-block" id={`status-dd-${tx._id}`}>
+                                                        <button
+                                                            onClick={e => { e.stopPropagation(); setOpenStatusDropdown(p => p === tx._id ? null : tx._id); }}
+                                                            disabled={!!isChanging}
+                                                            className="inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-black uppercase tracking-wider rounded cursor-pointer hover:opacity-80 transition-opacity disabled:opacity-50"
+                                                            style={{ backgroundColor: styleColor.bg, color: styleColor.color, border: (styleColor as any).border }}
+                                                            title="Click to change status"
+                                                        >
+                                                            {isChanging
+                                                                ? <Loader2 className="w-3 h-3 animate-spin" />
+                                                                : <ChevronDown className="w-3 h-3 opacity-70" />}
+                                                            {tx.status}
+                                                        </button>
+                                                        {openStatusDropdown === tx._id && (
+                                                            <div className="absolute left-0 top-full mt-1 z-50 bg-background border border-border rounded-lg shadow-2xl overflow-hidden min-w-[160px] animate-in fade-in slide-in-from-top-1 duration-100">
+                                                                {availableStatuses.map(opt => (
+                                                                    <button
+                                                                        key={opt}
+                                                                        onClick={e => { e.stopPropagation(); handleTxStatusChange(tx, opt); }}
+                                                                        className={cn(
+                                                                            'w-full text-left px-3 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors cursor-pointer',
+                                                                            tx.status === opt
+                                                                                ? 'bg-primary/15 text-primary'
+                                                                                : 'text-foreground/80 hover:bg-secondary'
+                                                                        )}
+                                                                    >
+                                                                        {tx.status === opt && <span className="mr-1.5">✓</span>}{opt}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            }
 
-                                            const styleColor = styleMap[sNormalized] || defaultStyle;
-
+                                            // All other types: static badge
                                             return (
                                                 <span
-                                                    className="inline-flex items-center px-2 py-0.5 text-xs font-black uppercase tracking-wider status-badge"
-                                                    style={{ backgroundColor: styleColor.bg, color: styleColor.color, border: styleColor.border, borderRadius: '4px' }}
+                                                    className="inline-flex items-center px-2 py-0.5 text-xs font-black uppercase tracking-wider rounded"
+                                                    style={{ backgroundColor: styleColor.bg, color: styleColor.color, border: (styleColor as any).border }}
                                                 >
                                                     {tx.status}
                                                 </span>
                                             );
                                         })() : <span className="text-xs text-muted-foreground/50">-</span>}
+
                                     </td>
                                     <td className="px-3 py-3 text-right text-sm font-bold text-foreground font-mono">
                                         {(isPendingProduction(tx) || isUnfulfilledConsumption(tx) || isPendingOrder(tx) || isTrashedMfg(tx) || isPendingWebOrder(tx)) ? <span className="text-muted-foreground/50">-</span> : tx.balance.toLocaleString()}

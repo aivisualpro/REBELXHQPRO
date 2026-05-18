@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, CreditCard, Truck, Plus, X, Trash2, Pencil, User, MapPin, DollarSign, List, RefreshCw, MessageSquare, Phone, Mail, Eye, EyeOff, Download, FileText, Loader2, MailPlus } from 'lucide-react';
+import { ArrowLeft, Calendar, CreditCard, Truck, Plus, X, Trash2, Pencil, User, MapPin, DollarSign, List, RefreshCw, MessageSquare, Phone, Mail, Eye, EyeOff, Download, FileText, Loader2, MailPlus, Copy } from 'lucide-react';
 import { OrderEmailsTab } from '@/components/sales/OrderEmailsTab';
 import { LotSelectionModal } from '@/components/warehouse/LotSelectionModal';
 import { cn, formatDate, toDateInputValue } from '@/lib/utils';
@@ -295,7 +295,28 @@ export default function SaleOrderDetailPage() {
     const grandTotal = subtotal + (order?.shippingCost || 0) + (order?.tax || 0) - (order?.discount || 0);
     const totalPayments = order?.payments?.reduce((sum, p) => sum + (p.paymentAmount || 0), 0) || 0;
     const balance = grandTotal - totalPayments;
-
+    // ─── Sorted + grouped line items (front-end only) ────────────────────────
+    const sortedAndGrouped = useMemo(() => {
+        if (!order?.lineItems) return [];
+        const getName = (item: LineItem) => {
+            const raw = typeof item.sku === 'object' ? (item.sku as any)?.name : allSkus.find(s => s._id === item.sku)?.name || '';
+            return ((raw && raw !== item.sku) ? raw : (item.productDescription || raw || '')).toLowerCase();
+        };
+        const sorted = [...order.lineItems].sort((a, b) => getName(a).localeCompare(getName(b)));
+        return sorted.map((item, i) => {
+            const name = getName(item);
+            const isFirst = i === 0 || getName(sorted[i - 1]) !== name;
+            let groupSize = 0;
+            let groupTotal = 0;
+            if (isFirst) {
+                for (let j = i; j < sorted.length && getName(sorted[j]) === name; j++) {
+                    groupSize++;
+                    groupTotal += sorted[j].qtyShipped || 0;
+                }
+            }
+            return { item, isFirst, groupSize, groupTotal };
+        });
+    }, [order?.lineItems, allSkus]);
 
 
 
@@ -428,6 +449,40 @@ export default function SaleOrderDetailPage() {
             setOrder(previousOrder);
             toast.error('Failed to save item — reverted');
         });
+    };
+
+    const handleDuplicateItem = async (item: LineItem) => {
+        if (!order) return;
+        const skuId = (item.sku && typeof item.sku === 'object') ? item.sku._id : item.sku;
+        const duplicate: LineItem = {
+            sku: skuId,
+            lotNumber: '',
+            qtyShipped: 0,
+            price: item.price || 0,
+            cost: item.cost || 0,
+            uom: item.uom || 'Each',
+            productDescription: item.productDescription || '',
+            total: 0,
+            _id: `temp-${Date.now()}`,
+        };
+        const updatedItems = [...(order.lineItems || []), duplicate];
+        const previousOrder = { ...order, lineItems: order.lineItems ? [...order.lineItems] : [] };
+        setOrder({ ...order, lineItems: updatedItems });
+        toast.success('Line duplicated — set qty & lot');
+
+        fetch(`/api/wholesale/orders/${order._id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                lineItems: updatedItems.map(i => ({
+                    ...i,
+                    sku: (typeof i.sku === 'object' && i.sku !== null) ? i.sku._id : i.sku
+                }))
+            })
+        }).then(res => {
+            if (res.ok) { res.json().then(data => setOrder(data)); }
+            else { setOrder(previousOrder); toast.error('Failed to duplicate — reverted'); }
+        }).catch(() => { setOrder(previousOrder); toast.error('Failed to duplicate — reverted'); });
     };
 
     const handleDeleteItem = async (itemId: string) => {
@@ -1318,21 +1373,18 @@ export default function SaleOrderDetailPage() {
                                             <tr>
                                                 <td colSpan={8} className="px-3 py-6 text-center text-xs font-bold text-muted-foreground uppercase tracking-wider">No line items</td>
                                             </tr>
-                                        ) : order.lineItems.map(item => {
-                                            const skuNameRaw = typeof item.sku === 'object' ? item.sku?.name : allSkus.find(s => s._id === item.sku)?.name || item.sku;
+                                        ) : sortedAndGrouped.map(({ item, isFirst, groupSize, groupTotal }, idx) => {
+                                            const skuNameRaw = typeof item.sku === 'object' ? (item.sku as any)?.name : allSkus.find(s => s._id === item.sku)?.name || item.sku;
                                             const skuName = (skuNameRaw && skuNameRaw !== item.sku) ? skuNameRaw : (item.productDescription || skuNameRaw);
                                             const lineTotal = (item.qtyShipped || 0) * (item.price || 0);
-                                            const skuId = (item.sku && typeof item.sku === 'object') ? item.sku._id : item.sku;
+                                            const skuId = (item.sku && typeof item.sku === 'object') ? (item.sku as any)._id : item.sku;
+                                            const isLastInGroup = idx === sortedAndGrouped.length - 1 || sortedAndGrouped[idx + 1].isFirst;
+                                            const showBracket = isFirst && groupSize > 1;
 
                                             return (
                                                 <tr
                                                     key={item._id}
-                                                    className={cn(
-                                                        "transition-all duration-700 group",
-                                                        highlightSku && skuId === highlightSku 
-                                                            ? "bg-indigo-500/20 border-l-4 border-l-indigo-500 hover:bg-indigo-500/30" 
-                                                            : "hover:bg-secondary border-l-4 border-l-transparent"
-                                                    )}
+                                                    className="group hover:bg-secondary/40 transition-colors"
                                                     ref={(el) => {
                                                         if (el && highlightSku && skuId === highlightSku && !el.dataset.scrolled) {
                                                             el.dataset.scrolled = "true";
@@ -1340,14 +1392,55 @@ export default function SaleOrderDetailPage() {
                                                         }
                                                     }}
                                                 >
-                                                    <td className="px-3 py-2 text-xs font-bold text-foreground">
-                                                        <span
-                                                            onClick={() => router.push(`/warehouse/skus/${skuId}`)}
-                                                            className="hover:text-blue-500 hover:underline cursor-pointer transition-colors"
+                                                    {/* SKU cell — rowSpanned for duplicate groups, bracket lives here */}
+                                                    {isFirst ? (
+                                                        <td
+                                                            rowSpan={groupSize > 1 ? groupSize : undefined}
+                                                            className="px-3 py-2 text-xs font-bold text-foreground align-top"
                                                         >
-                                                            {skuName || '-'}
-                                                        </span>
-                                                    </td>
+                                                            <div className="flex items-stretch gap-1.5">
+                                                                {/* Name + copy */}
+                                                                <div className="flex-1 flex items-start gap-1 min-w-0">
+                                                                    <span
+                                                                        onClick={() => router.push(`/warehouse/skus/${skuId}`)}
+                                                                        className="hover:text-blue-500 hover:underline cursor-pointer transition-colors truncate"
+                                                                    >
+                                                                        {skuName || '-'}
+                                                                    </span>
+                                                                    <button
+                                                                        onClick={e => { e.stopPropagation(); handleDuplicateItem(item); }}
+                                                                        className="opacity-0 group-hover:opacity-100 p-0.5 text-muted-foreground hover:text-emerald-500 transition-all shrink-0"
+                                                                        title="Duplicate line (no lot / qty)"
+                                                                    >
+                                                                        <Copy className="w-3 h-3" />
+                                                                    </button>
+                                                                </div>
+                                                                {/* Curly bracket on right edge of SKU cell — only when group > 1 */}
+                                                                {groupSize > 1 && (
+                                                                    <div className="flex items-center gap-0.5 shrink-0">
+                                                                        <svg
+                                                                            preserveAspectRatio="none"
+                                                                            viewBox="0 0 14 100"
+                                                                            fill="none"
+                                                                            stroke="currentColor"
+                                                                            strokeWidth="2"
+                                                                            strokeLinecap="round"
+                                                                            strokeLinejoin="round"
+                                                                            className="text-indigo-400"
+                                                                            style={{ width: 8, height: `${groupSize * 36}px`, display: 'block' }}
+                                                                        >
+                                                                            <path d="M2,2 Q12,2 12,12 L12,42 Q12,50 6,50 Q12,50 12,58 L12,88 Q12,98 2,98" />
+                                                                        </svg>
+                                                                        <div className="flex flex-col">
+                                                                            <span className="text-[9px] font-black text-indigo-400 leading-none">{groupTotal}</span>
+                                                                            <span className="text-[8px] text-indigo-400/50 leading-none">qty</span>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                    ) : null /* non-first rows: SKU cell covered by rowSpan */}
+
                                                     <td className="px-3 py-2 text-xs text-foreground group">
                                                         <div className="flex items-center gap-1">
                                                             {item.lotNumber ? (
@@ -1374,8 +1467,9 @@ export default function SaleOrderDetailPage() {
                                                     <td className="px-3 py-2 text-xs text-orange-500 font-mono font-bold whitespace-nowrap">{formatCost(item.cost)}</td>
                                                     <td className="px-3 py-2 text-xs text-foreground font-mono font-bold">{formatCurrency(item.price)}</td>
                                                     <td className="px-3 py-2 text-xs text-foreground font-mono font-black bg-secondary">{formatCurrency(lineTotal)}</td>
-                                                    <td className="px-3 py-1.5">
-                                                        <div className="flex items-center space-x-1">
+
+                                                    <td className="px-1.5 py-1.5 w-px whitespace-nowrap">
+                                                        <div className="flex items-center gap-0.5">
                                                             <button
                                                                 onClick={() => {
                                                                     setEditingItem({
@@ -1695,8 +1789,8 @@ export default function SaleOrderDetailPage() {
                                     <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Qty</label>
                                     <input
                                         type="number"
-                                        min="1"
-                                        value={editingItem.qtyShipped || 1}
+                                        min="0"
+                                        value={editingItem.qtyShipped ?? 0}
                                         onChange={(e) => setEditingItem({ ...editingItem, qtyShipped: parseInt(e.target.value) || 0 })}
                                         className="w-full h-[44px] px-3 border border-border rounded-md text-sm focus:outline-none bg-background"
                                     />
