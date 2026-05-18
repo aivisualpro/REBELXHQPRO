@@ -293,7 +293,7 @@ function SkuDetailsPageContent() {
                 const isPendingProd = (t: any) => t.type === 'Produced' && ['pending', 'processing'].includes((t.status || '').toLowerCase());
                 const isUnfulfilledCons = (t: any) => t.type === 'Consumption' && (t.status || '').toLowerCase() !== 'fulfilled';
                 const isTrashedMfgTx = (t: any) => (t.type === 'Produced' || t.type === 'Consumption') && (t.status || '').toLowerCase() === 'trash';
-                const isPendingWebOrderTx = (t: any) => t.type === 'Web Order' && (t.status || '').toLowerCase() !== 'completed';
+                const isPendingWebOrderTx = (t: any) => t.type === 'Web Order' && !['completed', 'processing'].includes((t.status || '').toLowerCase());
                 // Wholesale Orders only count when Shipped, Completed, or Pending Payment
                 const isPendingOrderTx = (t: any) => t.type === 'Orders' && !['shipped', 'completed', 'pending payment'].includes((t.status || '').toLowerCase());
 
@@ -486,7 +486,7 @@ function SkuDetailsPageContent() {
     const isUnfulfilledConsumption = (tx: Transaction) => tx.type === 'Consumption' && (tx.status || '').toLowerCase() !== 'fulfilled';
     const isPendingOrder = (tx: Transaction) => tx.type === 'Orders' && !['completed', 'shipped', 'pending payment'].includes((tx.status || '').toLowerCase());
     const isTrashedMfg = (tx: Transaction) => (tx.type === 'Produced' || tx.type === 'Consumption') && (tx.status || '').toLowerCase() === 'trash';
-    const isPendingWebOrder = (tx: Transaction) => tx.type === 'Web Order' && (tx.status || '').toLowerCase() !== 'completed';
+    const isPendingWebOrder = (tx: Transaction) => tx.type === 'Web Order' && !['completed', 'processing'].includes((tx.status || '').toLowerCase());
 
     // ─── Inline status change ────────────────────────────────────────────────
     const [statusChanging, setStatusChanging] = useState<string | null>(null);

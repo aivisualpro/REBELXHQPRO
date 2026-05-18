@@ -132,7 +132,7 @@ async function computeBalance(skuId: string): Promise<number> {
 
         if (wpMatchOr.length > 0) {
             const woAgg = await WebOrder.aggregate([
-                { $match: { status: { $in: ['completed', 'Completed'] }, $or: wpMatchOr, ...df } },
+                { $match: { status: { $in: ['completed', 'Completed', 'processing', 'Processing'] }, $or: wpMatchOr, ...df } },
                 { $unwind: '$lineItems' }
             ]);
 

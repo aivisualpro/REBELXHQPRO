@@ -184,7 +184,7 @@ export async function getLotsWithBalances(skuId: string): Promise<LotInfo[]> {
 
         // 7. Web Orders Consumed
         timePipeline('pipeline-WebOrder', WebOrder.aggregate([
-            { $match: { $or: [{ "lineItems.sku": objId }, { "lineItems.linkedSkuId": skuId }], status: { $in: ['completed', 'Completed'] } } },
+            { $match: { $or: [{ "lineItems.sku": objId }, { "lineItems.linkedSkuId": skuId }], status: { $in: ['completed', 'Completed', 'processing', 'Processing'] } } },
             { $unwind: "$lineItems" },
             { $match: { $or: [{ "lineItems.sku": objId }, { "lineItems.linkedSkuId": skuId }] } },
             { $group: { 
@@ -381,7 +381,7 @@ export async function getLotTransactions(skuId: string): Promise<LotTransaction[
             }}
         ]),
         WebOrder.aggregate([
-            { $match: { $or: [{ "lineItems.sku": objId }, { "lineItems.linkedSkuId": skuId }], status: { $regex: /^(shipped|completed)$/i } } },
+            { $match: { $or: [{ "lineItems.sku": objId }, { "lineItems.linkedSkuId": skuId }], status: { $regex: /^(shipped|completed|processing)$/i } } },
             { $unwind: "$lineItems" },
             { $match: { $or: [{ "lineItems.sku": objId }, { "lineItems.linkedSkuId": skuId }] } },
             { $addFields: {

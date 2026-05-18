@@ -659,7 +659,7 @@ export async function GET(
         const isUnfulfilledConsumption = (t: any) => t.type === 'Consumption' && (t.status || '').toLowerCase() !== 'fulfilled';
         const isPendingOrder = (t: any) => t.type === 'Orders' && !['completed', 'shipped', 'pending payment'].includes((t.status || '').toLowerCase());
         const isTrashedMfg = (t: any) => (t.type === 'Produced' || t.type === 'Consumption') && (t.status || '').toLowerCase() === 'trash';
-        const isPendingWebOrder = (t: any) => t.type === 'Web Order' && (t.status || '').toLowerCase() !== 'completed';
+        const isPendingWebOrder = (t: any) => t.type === 'Web Order' && !['completed', 'processing'].includes((t.status || '').toLowerCase());
 
         const filteredTransactions = (startDate ? transactions.filter(t => t.date >= startDate) : transactions).map(t => {
             // Produced + Pending OR Consumption + not Fulfilled OR Orders + not Completed/Shipped OR Trashed MFG OR Web Order + not Completed: show in table but don't count towards balance or stats
