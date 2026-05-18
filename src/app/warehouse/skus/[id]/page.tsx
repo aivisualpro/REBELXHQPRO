@@ -191,12 +191,13 @@ function SkuDetailsPageContent() {
     const [loadingLinkedProducts, setLoadingLinkedProducts] = useState(false);
 
     // Warning click -> filter ledger
-    const [warningFilter, setWarningFilter] = useState<'pending' | 'unfulfilled' | null>(null);
+    const [warningFilter, setWarningFilter] = useState<'pending' | 'unfulfilled' | 'pendingOrder' | null>(null);
     const [highlightedTxIds, setHighlightedTxIds] = useState<Set<string>>(new Set());
     const mainScrollRef = useRef<HTMLElement>(null);
 
     // Zero-out lot adjustment state
     const [adjustingLot, setAdjustingLot] = useState<string | null>(null);
+    const [zeroedLots, setZeroedLots] = useState<Set<string>>(new Set()); // Optimistically hidden after confirm
 
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
@@ -291,7 +292,7 @@ function SkuDetailsPageContent() {
                 const txList = data.transactions || [];
                 const lotMap = new Map<string, { balance: number; source: string; date: string | null; cost: number; hasSource?: boolean }>();
                 const isPendingProd = (t: any) => t.type === 'Produced' && ['pending', 'processing'].includes((t.status || '').toLowerCase());
-                const isUnfulfilledCons = (t: any) => t.type === 'Consumption' && (t.status || '').toLowerCase() !== 'fulfilled';
+                const isUnfulfilledCons = (t: any) => t.type === 'Consumption' && (t.status || '').toLowerCase() !== 'fulfilled' && (t.status || '').toLowerCase() !== 'trash';
                 const isTrashedMfgTx = (t: any) => (t.type === 'Produced' || t.type === 'Consumption') && (t.status || '').toLowerCase() === 'trash';
                 const isPendingWebOrderTx = (t: any) => t.type === 'Web Order' && !['completed', 'processing'].includes((t.status || '').toLowerCase());
                 // Wholesale Orders only count when Shipped, Completed, or Pending Payment
@@ -483,7 +484,7 @@ function SkuDetailsPageContent() {
     const uniqueLots = Array.from(new Set(transactions.map(t => t.lotNumber).filter(l => l && l !== '')));
 
     const isPendingProduction = (tx: Transaction) => tx.type === 'Produced' && ['pending', 'processing'].includes((tx.status || '').toLowerCase());
-    const isUnfulfilledConsumption = (tx: Transaction) => tx.type === 'Consumption' && (tx.status || '').toLowerCase() !== 'fulfilled';
+    const isUnfulfilledConsumption = (tx: Transaction) => tx.type === 'Consumption' && (tx.status || '').toLowerCase() !== 'fulfilled' && (tx.status || '').toLowerCase() !== 'trash';
     const isPendingOrder = (tx: Transaction) => tx.type === 'Orders' && !['completed', 'shipped', 'pending payment'].includes((tx.status || '').toLowerCase());
     const isTrashedMfg = (tx: Transaction) => (tx.type === 'Produced' || tx.type === 'Consumption') && (tx.status || '').toLowerCase() === 'trash';
     const isPendingWebOrder = (tx: Transaction) => tx.type === 'Web Order' && !['completed', 'processing'].includes((tx.status || '').toLowerCase());
@@ -558,6 +559,7 @@ function SkuDetailsPageContent() {
         // Warning filter
         if (warningFilter === 'pending') return isPendingProduction(tx);
         if (warningFilter === 'unfulfilled') return isUnfulfilledConsumption(tx);
+        if (warningFilter === 'pendingOrder') return isPendingOrder(tx);
         return true;
     });
 
@@ -699,6 +701,8 @@ function SkuDetailsPageContent() {
                     <button
                         onClick={async () => {
                             toast.dismiss(t.id);
+                            // Immediately hide the row and lock the button (optimistic)
+                            setZeroedLots(prev => new Set(prev).add(lotNumber));
                             setAdjustingLot(lotNumber);
                             try {
                                 const res = await fetch('/api/warehouse/audit-adjustments', {
@@ -721,6 +725,8 @@ function SkuDetailsPageContent() {
                                 }
                             } catch {
                                 toast.error('Error creating adjustment');
+                                // Restore the row if the API call failed
+                                setZeroedLots(prev => { const next = new Set(prev); next.delete(lotNumber); return next; });
                             } finally {
                                 setAdjustingLot(null);
                             }
@@ -860,9 +866,9 @@ function SkuDetailsPageContent() {
                                         <div
                                             className={cn(
                                                 "w-full border px-5 py-4 cursor-pointer transition-all rounded-md mb-3 shadow-md",
-                                                "bg-amber-600 border-amber-700 hover:bg-amber-700"
+                                                warningFilter === 'pendingOrder' ? "bg-amber-700 border-amber-600 ring-2 ring-amber-500 ring-offset-1 ring-offset-background" : "bg-amber-600 border-amber-700 hover:bg-amber-700"
                                             )}
-                                            onClick={() => setWarningFilter(null)}
+                                            onClick={() => setWarningFilter(warningFilter === 'pendingOrder' ? null : 'pendingOrder')}
                                         >
                                             <div className="flex items-start space-x-3">
                                                 <AlertTriangle className="w-5 h-5 text-white shrink-0" />
@@ -874,6 +880,9 @@ function SkuDetailsPageContent() {
                                                         <span className="font-mono font-bold">-{pendingOrderQty.toLocaleString()}</span> units not counted until shipped/completed
                                                     </p>
                                                 </div>
+                                                {warningFilter === 'pendingOrder' && (
+                                                    <span className="text-[10px] text-white uppercase tracking-wider font-extrabold self-center bg-black/20 px-2 py-0.5 rounded">Filtered</span>
+                                                )}
                                             </div>
                                         </div>
                                     )}
@@ -929,7 +938,7 @@ function SkuDetailsPageContent() {
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-border">
-                                            {lots.filter(l => Math.abs(l.balance) >= 1).map((lot, idx) => (
+                                            {lots.filter(l => Math.abs(l.balance) >= 1 && !zeroedLots.has(l.lotNumber)).map((lot, idx) => (
                                                 <tr
                                                     key={lot.lotNumber || `no-lot-${idx}`}
                                                     className={cn(

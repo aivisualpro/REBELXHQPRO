@@ -56,7 +56,7 @@ export function LotSelectionModal({
 
                 // Derive lots from ledger transactions (single source of truth)
                 const isPendingProd = (t: any) => t.type === 'Produced' && ['pending', 'processing'].includes((t.status || '').toLowerCase());
-                const isUnfulfilledCons = (t: any) => t.type === 'Consumption' && (t.status || '').toLowerCase() !== 'fulfilled';
+                const isUnfulfilledCons = (t: any) => t.type === 'Consumption' && (t.status || '').toLowerCase() !== 'fulfilled' && (t.status || '').toLowerCase() !== 'trash';
                 const isTrashedMfg = (t: any) => (t.type === 'Produced' || t.type === 'Consumption') && (t.status || '').toLowerCase() === 'trash';
                 const isPendingWebOrder = (t: any) => t.type === 'Web Order' && !['completed', 'processing'].includes((t.status || '').toLowerCase());
                 // Wholesale Orders only count when Shipped, Completed, or Pending Payment
