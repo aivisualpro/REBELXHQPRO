@@ -321,8 +321,8 @@ function SkuDetailsPageContent() {
                 const NO_LOT_KEY = '__no_lot__';
                 for (const tx of sorted) {
                     const rawLot = tx.lotNumber;
-                    // Normalize: empty/N/A/- all map to the no-lot bucket
-                    const lot = (!rawLot || rawLot === '' || rawLot === 'N/A' || rawLot === '-') ? NO_LOT_KEY : rawLot;
+                    // Normalize: truly empty or dash-only → no-lot bucket. Keep 'N/A' as its own displayable lot.
+                    const lot = (!rawLot || rawLot === '' || rawLot === '-') ? NO_LOT_KEY : rawLot;
                     // Skip pending/processing, unfulfilled, trashed, and non-completed web orders — same as ledger balance logic
                     if (isPendingProd(tx) || isUnfulfilledCons(tx) || isTrashedMfgTx(tx) || isPendingWebOrderTx(tx) || isPendingOrderTx(tx)) continue;
 
@@ -682,12 +682,15 @@ function SkuDetailsPageContent() {
     // ─── Zero-out Lot via Audit Adjustment ───────────────────────────────
 
     const handleZeroOutLot = (lotNumber: string, balance: number) => {
-        // qty is the inverse of the balance to zero it out
         const adjustQty = -balance;
         const sign = adjustQty > 0 ? '+' : '';
+        // Empty string = no-lot bucket (N/A normalized). Use 'N/A' for the API so the
+        // audit adjustment record carries the same lot identifier as the source transactions.
+        const apiLotNumber = lotNumber || 'N/A';
+        const displayLabel = lotNumber || 'No Lot (N/A)';
         toast((t) => (
             <div className="flex flex-col gap-2">
-                <p className="text-sm font-bold text-white">Zero out lot <span className="font-mono">{lotNumber}</span>?</p>
+                <p className="text-sm font-bold text-white">Zero out lot <span className="font-mono">{displayLabel}</span>?</p>
                 <p className="text-xs text-gray-400">
                     This will create an audit adjustment of <span className="font-mono font-bold">{sign}{adjustQty.toLocaleString(undefined, { maximumFractionDigits: 8 })}</span> to bring the balance to 0.
                 </p>
@@ -701,7 +704,6 @@ function SkuDetailsPageContent() {
                     <button
                         onClick={async () => {
                             toast.dismiss(t.id);
-                            // Immediately hide the row and lock the button (optimistic)
                             setZeroedLots(prev => new Set(prev).add(lotNumber));
                             setAdjustingLot(lotNumber);
                             try {
@@ -710,7 +712,7 @@ function SkuDetailsPageContent() {
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({
                                         sku: sku!._id,
-                                        lotNumber,
+                                        lotNumber: apiLotNumber,
                                         qty: adjustQty,
                                         reason: 'Physical Inventory Count',
                                         createdBy: (session?.user as any)?.id || (session?.user as any)?.email || session?.user?.name || 'Unknown',
