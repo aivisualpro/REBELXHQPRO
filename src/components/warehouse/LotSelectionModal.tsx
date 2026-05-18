@@ -58,7 +58,7 @@ export function LotSelectionModal({
                 const isPendingProd = (t: any) => t.type === 'Produced' && ['pending', 'processing'].includes((t.status || '').toLowerCase());
                 const isUnfulfilledCons = (t: any) => t.type === 'Consumption' && (t.status || '').toLowerCase() !== 'fulfilled';
                 const isTrashedMfg = (t: any) => (t.type === 'Produced' || t.type === 'Consumption') && (t.status || '').toLowerCase() === 'trash';
-                const isPendingWebOrder = (t: any) => t.type === 'Web Order' && (t.status || '').toLowerCase() !== 'completed';
+                const isPendingWebOrder = (t: any) => t.type === 'Web Order' && !['completed', 'processing'].includes((t.status || '').toLowerCase());
                 // Wholesale Orders only count when Shipped, Completed, or Pending Payment
                 const isPendingOrder = (t: any) => t.type === 'Orders' && !['shipped', 'completed', 'pending payment'].includes((t.status || '').toLowerCase());
 
