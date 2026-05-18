@@ -227,19 +227,28 @@ function AdjustmentModal({ onClose, initialData, skus, sessionUser, onSuccess }:
     const [formData, setFormData] = useState({
         sku: initialData ? (typeof initialData.sku === 'object' ? initialData.sku._id : initialData.sku) : '',
         lotNumber: initialData?.lotNumber || '',
-        qty: initialData?.qty || 0,
+        qty: initialData?.qty ?? '',
         reason: initialData?.reason || '',
     });
+    // Raw string for qty input — allows typing '-' prefix freely
+    const [qtyStr, setQtyStr] = useState(
+        initialData?.qty != null && initialData.qty !== 0 ? String(initialData.qty) : ''
+    );
     const [saving, setSaving] = useState(false);
     const [isLotModalOpen, setIsLotModalOpen] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        const parsedQty = parseFloat(qtyStr);
+        if (!qtyStr || isNaN(parsedQty) || parsedQty === 0) {
+            toast.error('Please enter a non-zero quantity');
+            return;
+        }
         setSaving(true);
         try {
             const url = initialData ? `/api/warehouse/audit-adjustments/${initialData._id}` : '/api/warehouse/audit-adjustments';
             const method = initialData ? 'PUT' : 'POST';
-            const payload = { ...formData, createdBy: initialData ? undefined : (sessionUser?.id || sessionUser?.name || 'Unknown') };
+            const payload = { ...formData, qty: parsedQty, createdBy: initialData ? undefined : (sessionUser?.id || sessionUser?.name || 'Unknown') };
             const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
             if (res.ok) {
                 toast.success(initialData ? 'Adjustment updated' : 'Adjustment created');
@@ -293,9 +302,56 @@ function AdjustmentModal({ onClose, initialData, skus, sessionUser, onSuccess }:
                         </div>
                         <div className="space-y-1.5">
                             <label className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">Quantity</label>
-                            <input type="number" step="any" value={formData.qty}
-                                onChange={e => { const v = parseFloat(e.target.value); setFormData({ ...formData, qty: isNaN(v) ? 0 : v }); }} className={inp} placeholder="0" />
-                            <p className="text-[10px] text-muted-foreground/60">Positive adds, negative removes.</p>
+                            <div className="flex gap-1.5">
+                                {/* Sign toggle buttons */}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const n = parseFloat(qtyStr);
+                                        const abs = isNaN(n) ? '' : String(Math.abs(n));
+                                        setQtyStr(abs ? abs : qtyStr.replace(/^-/, ''));
+                                    }}
+                                    className={cn(
+                                        'h-9 px-3 rounded-lg text-[13px] font-black transition-colors border cursor-pointer shrink-0',
+                                        !qtyStr.startsWith('-') && qtyStr !== ''
+                                            ? 'bg-emerald-600 border-emerald-700 text-white'
+                                            : 'bg-secondary border-border text-muted-foreground hover:text-emerald-500 hover:border-emerald-500/50'
+                                    )}
+                                    title="Add stock (positive)"
+                                >+</button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const n = parseFloat(qtyStr);
+                                        const abs = isNaN(n) ? '' : String(Math.abs(n));
+                                        setQtyStr(abs ? '-' + abs : qtyStr.startsWith('-') ? qtyStr : '-' + qtyStr);
+                                    }}
+                                    className={cn(
+                                        'h-9 px-3 rounded-lg text-[13px] font-black transition-colors border cursor-pointer shrink-0',
+                                        qtyStr.startsWith('-')
+                                            ? 'bg-red-700 border-red-800 text-white'
+                                            : 'bg-secondary border-border text-muted-foreground hover:text-red-500 hover:border-red-500/50'
+                                    )}
+                                    title="Remove stock (negative)"
+                                >−</button>
+                                {/* Text input — starts blank, no auto-zero */}
+                                <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={qtyStr}
+                                    onChange={e => {
+                                        const v = e.target.value;
+                                        // Allow: empty, '-', digits, one decimal point
+                                        if (v === '' || v === '-' || /^-?\d*\.?\d*$/.test(v)) setQtyStr(v);
+                                    }}
+                                    className={cn(inp, 'flex-1 font-mono font-bold text-center',
+                                        qtyStr.startsWith('-') ? 'text-red-400' : qtyStr && !qtyStr.startsWith('-') ? 'text-emerald-400' : ''
+                                    )}
+                                    placeholder="Enter qty…"
+                                    autoComplete="off"
+                                />
+                            </div>
+                            <p className="text-[10px] text-muted-foreground/50">+ adds stock · − removes stock</p>
                         </div>
                     </div>
 

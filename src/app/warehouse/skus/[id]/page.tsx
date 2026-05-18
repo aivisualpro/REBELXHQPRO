@@ -293,6 +293,8 @@ function SkuDetailsPageContent() {
                 const isUnfulfilledCons = (t: any) => t.type === 'Consumption' && (t.status || '').toLowerCase() !== 'fulfilled';
                 const isTrashedMfgTx = (t: any) => (t.type === 'Produced' || t.type === 'Consumption') && (t.status || '').toLowerCase() === 'trash';
                 const isPendingWebOrderTx = (t: any) => t.type === 'Web Order' && (t.status || '').toLowerCase() !== 'completed';
+                // Wholesale Orders (type='Orders') only count when Shipped or Completed
+                const isPendingOrderTx = (t: any) => t.type === 'Orders' && !['shipped', 'completed'].includes((t.status || '').toLowerCase());
 
                 // Sort oldest first for proper source/date attribution
                 // When dates are equal, source (positive) records come first
@@ -320,7 +322,7 @@ function SkuDetailsPageContent() {
                     // Normalize: empty/N/A/- all map to the no-lot bucket
                     const lot = (!rawLot || rawLot === '' || rawLot === 'N/A' || rawLot === '-') ? NO_LOT_KEY : rawLot;
                     // Skip pending/processing, unfulfilled, trashed, and non-completed web orders — same as ledger balance logic
-                    if (isPendingProd(tx) || isUnfulfilledCons(tx) || isTrashedMfgTx(tx) || isPendingWebOrderTx(tx)) continue;
+                    if (isPendingProd(tx) || isUnfulfilledCons(tx) || isTrashedMfgTx(tx) || isPendingWebOrderTx(tx) || isPendingOrderTx(tx)) continue;
 
                     const existing = lotMap.get(lot);
 

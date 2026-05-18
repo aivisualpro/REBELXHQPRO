@@ -59,6 +59,8 @@ export function LotSelectionModal({
                 const isUnfulfilledCons = (t: any) => t.type === 'Consumption' && (t.status || '').toLowerCase() !== 'fulfilled';
                 const isTrashedMfg = (t: any) => (t.type === 'Produced' || t.type === 'Consumption') && (t.status || '').toLowerCase() === 'trash';
                 const isPendingWebOrder = (t: any) => t.type === 'Web Order' && (t.status || '').toLowerCase() !== 'completed';
+                // Wholesale Orders (type='Orders') only count when Shipped or Completed
+                const isPendingOrder = (t: any) => t.type === 'Orders' && !['shipped', 'completed'].includes((t.status || '').toLowerCase());
 
                 const lotMap = new Map<string, { balance: number; source: string; date: string; cost: number; hasSource?: boolean }>();
                 const tp: Record<string, number> = { 'Opening': 0, 'Audit': 1, 'Purchase Order': 2, 'Produced': 3, 'Consumption': 4, 'Orders': 5, 'Web Order': 6 };
@@ -79,7 +81,7 @@ export function LotSelectionModal({
                     const rawLot = tx.lotNumber;
                     // Normalize: empty, N/A, - all map to the no-lot bucket
                     const lot = (!rawLot || rawLot === '' || rawLot === 'N/A' || rawLot === '-') ? NO_LOT_KEY : rawLot;
-                    if (isPendingProd(tx) || isUnfulfilledCons(tx) || isTrashedMfg(tx) || isPendingWebOrder(tx)) continue;
+                    if (isPendingProd(tx) || isUnfulfilledCons(tx) || isTrashedMfg(tx) || isPendingWebOrder(tx) || isPendingOrder(tx)) continue;
 
                     const existing = lotMap.get(lot);
                     const isSourceType = SOURCE_TYPES.has(tx.type);
