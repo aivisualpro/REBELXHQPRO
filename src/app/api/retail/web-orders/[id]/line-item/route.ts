@@ -272,6 +272,7 @@ export async function POST(
             return NextResponse.json({ error: 'Order not found' }, { status: 404 });
         }
 
+        // ─── DUPLICATE: Split one qty off into a new row ───────────────────────
         if (action === 'duplicate') {
             if (lineItemId === undefined) {
                 return NextResponse.json({ error: 'lineItemId is required for duplication' }, { status: 400 });
@@ -286,38 +287,103 @@ export async function POST(
             }
 
             const originalItem = order.lineItems[lineItemIdx];
-            
-            // Clone the item
-            const newItem = { ...originalItem.toObject() };
-            delete (newItem as any)._id; // Let mongoose generate a new _id
 
-            // Generate a random negative id so it doesn't conflict with real WC ids
-            // But it needs to be unique in this order's context
-            let newId = -Math.floor(Math.random() * 1000000);
+            if ((originalItem.quantity || 1) < 2) {
+                return NextResponse.json(
+                    { error: 'Quantity must be at least 2 to split into separate lot rows' },
+                    { status: 400 }
+                );
+            }
+
+            // Deep-clone the item object, stripping all Mongoose _ids so they get re-generated
+            const rawItem = JSON.parse(JSON.stringify(originalItem.toObject ? originalItem.toObject() : originalItem));
+            delete rawItem._id;
+
+            // Strip nested _ids from linkedSkus so Mongoose generates fresh ones
+            if (Array.isArray(rawItem.linkedSkus)) {
+                rawItem.linkedSkus = rawItem.linkedSkus.map((ls: any) => {
+                    const clean = { ...ls };
+                    delete clean._id;
+                    return clean;
+                });
+            }
+
+            // Generate a unique negative id (won't collide with real WC ids or other negatives)
+            let newId = -Math.floor(Math.random() * 9000000 + 1000000);
             while (order.lineItems.some((li: any) => li.id === newId)) {
-                newId = -Math.floor(Math.random() * 1000000);
+                newId = -Math.floor(Math.random() * 9000000 + 1000000);
             }
-            newItem.id = newId;
-            
-            // Optionally clear the lot number so they have to set it?
-            // Actually, the user asked to "copy the lineitem as it is, and then i can change the lot number".
-            
+
+            // The new row gets qty=1, cleared lot/cost — user assigns its own lot
+            const newItem: any = {
+                ...rawItem,
+                id: newId,
+                quantity: 1,
+                subtotal: rawItem.price || 0,
+                total: rawItem.price || 0,
+                lotNumber: null,
+                cost: 0,
+            };
+
+            // Clear lot/cost on all linkedSkus entries in the new row
+            if (Array.isArray(newItem.linkedSkus)) {
+                newItem.linkedSkus = newItem.linkedSkus.map((ls: any) => ({
+                    ...ls,
+                    lotNumber: null,
+                    cost: 0,
+                }));
+            }
+
+            // Reduce original item's qty by 1
+            const newOrigQty = (originalItem.quantity || 1) - 1;
+            const newOrigTotal = newOrigQty * (originalItem.price || 0);
+            order.set(`lineItems.${lineItemIdx}.quantity`, newOrigQty);
+            order.set(`lineItems.${lineItemIdx}.total`, newOrigTotal);
+            order.set(`lineItems.${lineItemIdx}.subtotal`, newOrigTotal);
+
+            // Push the new split row
             order.lineItems.push(newItem);
-            
-            // Recalculate order totals if we want, but wait, duplicating a line item adds to the total
-            // Usually we'd want to recalculate order total. Let's do it simple:
-            order.total = (order.total || 0) + (newItem.total || 0);
-            if (newItem.totalTax) {
-                order.totalTax = (order.totalTax || 0) + newItem.totalTax;
-            }
-            
+
             order.updatedAt = new Date();
             await order.save();
 
             return NextResponse.json({
                 success: true,
-                message: 'Line item duplicated successfully',
-                lineItem: newItem
+                message: `Split: original qty reduced to ${newOrigQty}, new row created with qty 1`,
+                newLineItemId: newId,
+            });
+        }
+
+        // ─── DELETE: Remove a duplicated/split row ─────────────────────────────
+        if (action === 'delete') {
+            if (lineItemId === undefined) {
+                return NextResponse.json({ error: 'lineItemId is required for deletion' }, { status: 400 });
+            }
+
+            const lineItemIdx = order.lineItems.findIndex((li: any) =>
+                li.id === lineItemId || li._id?.toString() === String(lineItemId)
+            );
+
+            if (lineItemIdx === -1) {
+                return NextResponse.json({ error: 'Line item not found' }, { status: 404 });
+            }
+
+            // Safety: only allow deleting rows that were added by us (negative id = split row)
+            const targetItem = order.lineItems[lineItemIdx];
+            if ((targetItem.id || 0) >= 0) {
+                return NextResponse.json(
+                    { error: 'Only split rows (negative id) can be deleted' },
+                    { status: 400 }
+                );
+            }
+
+            order.lineItems.splice(lineItemIdx, 1);
+            order.updatedAt = new Date();
+            await order.save();
+
+            return NextResponse.json({
+                success: true,
+                message: 'Split row deleted',
             });
         }
 

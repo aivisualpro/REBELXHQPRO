@@ -12,6 +12,9 @@ import {
     ExternalLink,
     ChevronDown,
     Copy,
+    Minus,
+    Plus,
+    Trash2,
 } from 'lucide-react';
 import { cn, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -353,9 +356,13 @@ export default function WebOrderDetailPage() {
         }
     };
 
-    // ─── Duplicate Line Item Handler ────────────────────────────────────────
+    // ─── Duplicate / Split Line Item Handler ───────────────────────────────
     const handleDuplicate = async (item: LineItem) => {
         if (!order) return;
+        if ((item.quantity || 1) < 2) {
+            toast.error('Qty must be ≥ 2 to split into separate lot rows');
+            return;
+        }
         try {
             const res = await fetch(`/api/retail/web-orders/${order._id}/line-item`, {
                 method: 'POST',
@@ -365,15 +372,43 @@ export default function WebOrderDetailPage() {
                     lineItemId: item.id,
                 })
             });
-
+            const data = await res.json();
             if (res.ok) {
-                toast.success('Line item duplicated');
+                toast.success('Split: 1 qty moved to new row — assign its lot number now');
                 fetchOrder();
             } else {
-                toast.error('Failed to duplicate line item');
+                toast.error(data.error || 'Failed to split line item');
             }
         } catch (e) {
-            toast.error('Error duplicating line item');
+            toast.error('Error splitting line item');
+        }
+    };
+
+    // ─── Delete a split row (negative id only) ─────────────────────────────
+    const handleDeleteSplitRow = async (item: LineItem) => {
+        if (!order) return;
+        if ((item.id || 0) >= 0) {
+            toast.error('Only split rows can be deleted');
+            return;
+        }
+        try {
+            const res = await fetch(`/api/retail/web-orders/${order._id}/line-item`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'delete',
+                    lineItemId: item.id,
+                })
+            });
+            if (res.ok) {
+                toast.success('Split row removed');
+                fetchOrder();
+            } else {
+                const data = await res.json();
+                toast.error(data.error || 'Failed to delete split row');
+            }
+        } catch (e) {
+            toast.error('Error deleting split row');
         }
     };
 
@@ -681,7 +716,9 @@ export default function WebOrderDetailPage() {
                                                         "transition-all duration-700 group",
                                                         highlightSku && skuRows[0]?.skuId === highlightSku
                                                             ? "bg-indigo-500/20 border-l-4 border-l-indigo-500 hover:bg-indigo-500/30"
-                                                            : "hover:bg-secondary border-l-4 border-l-transparent"
+                                                            : (item.id || 0) < 0
+                                                                ? "bg-amber-500/5 border-l-4 border-l-amber-500 hover:bg-amber-500/10"
+                                                                : "hover:bg-secondary border-l-4 border-l-transparent"
                                                     )}
                                                     ref={(el) => {
                                                         if (el && highlightSku && skuRows[0]?.skuId === highlightSku && !el.dataset.scrolled) {
@@ -691,14 +728,19 @@ export default function WebOrderDetailPage() {
                                                     }}
                                                 >
                                                     <td className="px-3 py-2">
-                                                        {(item.webProductId || item.parentProductId) ? (
-                                                            <button onClick={(e) => { e.stopPropagation(); router.push(`/warehouse/web-products/${item.webProductId || item.parentProductId}`); }}
-                                                                className="text-xs font-bold text-foreground cursor-pointer text-left transition-colors hover:text-blue-500">
-                                                                {item.name}
-                                                            </button>
-                                                        ) : (
-                                                            <span className="text-xs font-bold text-foreground">{item.name}</span>
-                                                        )}
+                                                        <div className="flex items-center gap-1.5">
+                                                            {(item.id || 0) < 0 && (
+                                                                <span className="px-1 py-0.5 text-[8px] font-black uppercase tracking-widest bg-amber-500/20 text-amber-500 border border-amber-500/30 shrink-0">SPLIT</span>
+                                                            )}
+                                                            {(item.webProductId || item.parentProductId) ? (
+                                                                <button onClick={(e) => { e.stopPropagation(); router.push(`/warehouse/web-products/${item.webProductId || item.parentProductId}`); }}
+                                                                    className="text-xs font-bold text-foreground cursor-pointer text-left transition-colors hover:text-blue-500">
+                                                                    {item.name}
+                                                                </button>
+                                                            ) : (
+                                                                <span className="text-xs font-bold text-foreground">{item.name}</span>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                     <td className="px-3 py-2">
                                                         {item.variationId > 0 ? (
@@ -750,22 +792,41 @@ export default function WebOrderDetailPage() {
                                                         </div>
                                                     </td>
                                                     <td className="px-3 py-2 text-right text-xs text-purple-500 font-mono font-bold">{skuRows.length === 1 ? (skuRows[0].multiplier || 1) : 1}</td>
-                                                    <td className="px-3 py-2 text-right">
-                                                        <div className="flex items-center justify-end gap-1.5">
-                                                            <input
-                                                                type="number"
-                                                                min="0"
-                                                                step="1"
-                                                                value={item.quantity}
-                                                                onChange={(e) => handleQuantityChange(item, parseInt(e.target.value) || 0)}
-                                                                className="w-16 bg-background border border-border rounded px-1.5 py-1 text-xs font-mono font-bold text-right text-foreground hover:border-primary/50 focus:border-primary focus:outline-none transition-colors"
-                                                            />
+                                                     <td className="px-3 py-2 text-right">
+                                                        <div className="flex items-center justify-end gap-1">
+                                                            {/* Split/duplicate button — only if qty >= 2 */}
+                                                            {(item.quantity || 1) >= 2 && (
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handleDuplicate(item); }}
+                                                                    className="p-1 text-muted-foreground hover:text-blue-500 transition-colors rounded-sm opacity-0 group-hover:opacity-100"
+                                                                    title="Split off 1 qty to assign separate lot"
+                                                                >
+                                                                    <Copy className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            )}
+                                                            {/* Delete button — only for split rows (negative id) */}
+                                                            {(item.id || 0) < 0 && (
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handleDeleteSplitRow(item); }}
+                                                                    className="p-1 text-muted-foreground hover:text-rose-500 transition-colors rounded-sm opacity-0 group-hover:opacity-100"
+                                                                    title="Remove this split row"
+                                                                >
+                                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            )}
+                                                            {/* +/- qty steppers */}
                                                             <button
-                                                                onClick={(e) => { e.stopPropagation(); handleDuplicate(item); }}
-                                                                className="p-1 text-muted-foreground hover:text-blue-500 transition-colors rounded-sm opacity-0 group-hover:opacity-100"
-                                                                title="Duplicate Line Item"
+                                                                onClick={(e) => { e.stopPropagation(); handleQuantityChange(item, Math.max(1, (item.quantity || 1) - 1)); }}
+                                                                className="w-5 h-5 flex items-center justify-center border border-border rounded-sm text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors"
                                                             >
-                                                                <Copy className="w-3.5 h-3.5" />
+                                                                <Minus className="w-2.5 h-2.5" />
+                                                            </button>
+                                                            <span className="w-8 text-center text-xs font-mono font-bold text-foreground">{item.quantity}</span>
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handleQuantityChange(item, (item.quantity || 1) + 1); }}
+                                                                className="w-5 h-5 flex items-center justify-center border border-border rounded-sm text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors"
+                                                            >
+                                                                <Plus className="w-2.5 h-2.5" />
                                                             </button>
                                                         </div>
                                                     </td>
@@ -860,21 +921,39 @@ export default function WebOrderDetailPage() {
                                                             <td className="px-3 py-1.5 text-right text-xs text-purple-500 font-mono font-bold">{sku.multiplier || 1}</td>
                                                             {skuIdx === 0 && (
                                                                 <td className="px-3 py-1.5 text-right" rowSpan={rowSpan}>
-                                                                    <div className="flex items-center justify-end gap-1.5">
-                                                                        <input
-                                                                            type="number"
-                                                                            min="0"
-                                                                            step="1"
-                                                                            value={item.quantity}
-                                                                            onChange={(e) => handleQuantityChange(item, parseInt(e.target.value) || 0)}
-                                                                            className="w-16 bg-background border border-border rounded px-1.5 py-1 text-xs font-mono font-bold text-right text-foreground hover:border-primary/50 focus:border-primary focus:outline-none transition-colors"
-                                                                        />
+                                                                    <div className="flex items-center justify-end gap-1">
+                                                                        {/* Split button — only if qty >= 2 */}
+                                                                        {(item.quantity || 1) >= 2 && (
+                                                                            <button
+                                                                                onClick={(e) => { e.stopPropagation(); handleDuplicate(item); }}
+                                                                                className="p-1 text-muted-foreground hover:text-blue-500 transition-colors rounded-sm opacity-0 group-hover:opacity-100"
+                                                                                title="Split off 1 qty to assign separate lot"
+                                                                            >
+                                                                                <Copy className="w-3.5 h-3.5" />
+                                                                            </button>
+                                                                        )}
+                                                                        {/* Delete — only for split rows */}
+                                                                        {(item.id || 0) < 0 && (
+                                                                            <button
+                                                                                onClick={(e) => { e.stopPropagation(); handleDeleteSplitRow(item); }}
+                                                                                className="p-1 text-muted-foreground hover:text-rose-500 transition-colors rounded-sm opacity-0 group-hover:opacity-100"
+                                                                                title="Remove this split row"
+                                                                            >
+                                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                                            </button>
+                                                                        )}
                                                                         <button
-                                                                            onClick={(e) => { e.stopPropagation(); handleDuplicate(item); }}
-                                                                            className="p-1 text-muted-foreground hover:text-blue-500 transition-colors rounded-sm opacity-0 group-hover:opacity-100"
-                                                                            title="Duplicate Line Item"
+                                                                            onClick={(e) => { e.stopPropagation(); handleQuantityChange(item, Math.max(1, (item.quantity || 1) - 1)); }}
+                                                                            className="w-5 h-5 flex items-center justify-center border border-border rounded-sm text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors"
                                                                         >
-                                                                            <Copy className="w-3.5 h-3.5" />
+                                                                            <Minus className="w-2.5 h-2.5" />
+                                                                        </button>
+                                                                        <span className="w-8 text-center text-xs font-mono font-bold text-foreground">{item.quantity}</span>
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); handleQuantityChange(item, (item.quantity || 1) + 1); }}
+                                                                            className="w-5 h-5 flex items-center justify-center border border-border rounded-sm text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors"
+                                                                        >
+                                                                            <Plus className="w-2.5 h-2.5" />
                                                                         </button>
                                                                     </div>
                                                                 </td>
