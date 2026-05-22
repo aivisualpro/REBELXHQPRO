@@ -160,7 +160,7 @@ export default function SaleOrderDetailPage() {
     // Item Modal State
     const [isItemModalOpen, setIsItemModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<any>(null);
-    const [allSkus, setAllSkus] = useState<{ _id: string; name: string, salePrice?: number }[]>([]);
+    const [allSkus, setAllSkus] = useState<{ _id: string; name: string; salePrice?: number; isLotApplied?: boolean }[]>([]);
 
     // Lot Selection State
     const [isLotModalOpen, setIsLotModalOpen] = useState(false);
@@ -315,6 +315,16 @@ export default function SaleOrderDetailPage() {
                 }
             }
             return { item, isFirst, groupSize, groupTotal };
+        });
+    }, [order?.lineItems, allSkus]);
+
+    // True when at least one line item belongs to a lot-tracked SKU but has no lot assigned
+    const hasMissingLots = useMemo(() => {
+        if (!order?.lineItems || order.lineItems.length === 0) return false;
+        return order.lineItems.some(item => {
+            const skuId = (item.sku && typeof item.sku === 'object') ? (item.sku as any)._id : item.sku;
+            const skuDef = allSkus.find(s => s._id === skuId);
+            return skuDef?.isLotApplied === true && !item.lotNumber;
         });
     }, [order?.lineItems, allSkus]);
 
@@ -850,25 +860,35 @@ export default function SaleOrderDetailPage() {
                                 </button>
                                 {statusDropdownOpen && (
                                     <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-md shadow-xl z-30 overflow-hidden">
-                                        {['Pending', 'Picking', 'Shipping', 'Issued', 'Pending Payment', 'Completed'].map(s => (
+                                        {['Pending', 'Picking', 'Shipping', 'Issued', 'Pending Payment', 'Completed'].map(s => {
+                                            const isCompletedBlocked = s === 'Completed' && hasMissingLots;
+                                            return (
                                             <button
                                                 key={s}
-                                                onClick={() => { handleStatusChange(s); setStatusDropdownOpen(false); }}
+                                                disabled={isCompletedBlocked}
+                                                onClick={() => { if (!isCompletedBlocked) { handleStatusChange(s); setStatusDropdownOpen(false); } }}
+                                                title={isCompletedBlocked ? 'Cannot mark as Completed — one or more lot-tracked SKUs are missing a lot number' : undefined}
                                                 className={cn(
-                                                    "w-full text-left px-3 py-2.5 text-[12px] font-bold uppercase tracking-wider transition-colors flex items-center justify-between cursor-pointer",
-                                                    s === 'Completed' ? "text-emerald-500 hover:bg-emerald-500/10" :
-                                                        s === 'Issued' ? "text-sky-500 hover:bg-sky-500/10" :
-                                                            s === 'Pending Payment' ? "text-amber-500 hover:bg-amber-500/10" :
-                                                                s === 'Shipping' ? "text-violet-500 hover:bg-violet-500/10" :
-                                                                    s === 'Picking' ? "text-cyan-500 hover:bg-cyan-500/10" :
-                                                                        "text-orange-500 hover:bg-secondary",
+                                                    "w-full text-left px-3 py-2.5 text-[12px] font-bold uppercase tracking-wider transition-colors flex items-center justify-between",
+                                                    isCompletedBlocked
+                                                        ? "text-emerald-500/40 cursor-not-allowed opacity-50"
+                                                        : s === 'Completed' ? "text-emerald-500 hover:bg-emerald-500/10 cursor-pointer" :
+                                                        s === 'Issued' ? "text-sky-500 hover:bg-sky-500/10 cursor-pointer" :
+                                                            s === 'Pending Payment' ? "text-amber-500 hover:bg-amber-500/10 cursor-pointer" :
+                                                                s === 'Shipping' ? "text-violet-500 hover:bg-violet-500/10 cursor-pointer" :
+                                                                    s === 'Picking' ? "text-cyan-500 hover:bg-cyan-500/10 cursor-pointer" :
+                                                                        "text-orange-500 hover:bg-secondary cursor-pointer",
                                                     order.orderStatus === s && "bg-secondary"
                                                 )}
                                             >
                                                 <span>{s}</span>
-                                                {order.orderStatus === s && <span className="text-[10px]">✓</span>}
+                                                <span className="flex items-center gap-1.5">
+                                                    {isCompletedBlocked && <span className="text-[9px] font-black uppercase tracking-widest text-amber-400">Missing Lots</span>}
+                                                    {order.orderStatus === s && <span className="text-[10px]">✓</span>}
+                                                </span>
                                             </button>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>
