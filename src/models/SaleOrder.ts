@@ -51,6 +51,14 @@ const SaleOrderSchema = new mongoose.Schema({
         note: String,
         createdBy: { type: String, ref: 'RXHQUsers' },
         createdAt: { type: Date, default: Date.now }
+    }],
+
+    auditLog: [{
+        userId:    { type: String },           // email or ID of the logged-in user
+        timestamp: { type: Date, default: Date.now },
+        field:     { type: String },           // e.g. 'orderStatus', 'lineItems', 'payments'
+        from:      { type: mongoose.Schema.Types.Mixed }, // value before change
+        to:        { type: mongoose.Schema.Types.Mixed }  // value after change
     }]
 });
 
@@ -62,4 +70,3 @@ SaleOrderSchema.index({ "lineItems.sku": 1, orderStatus: 1 });
 
 // Force schema refresh
 export default mongoose.models.SaleOrder || mongoose.model('SaleOrder', SaleOrderSchema);
-

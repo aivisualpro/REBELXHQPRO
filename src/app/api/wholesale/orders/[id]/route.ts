@@ -12,6 +12,7 @@ import Client from '@/models/Client';
 import OrderEmail from '@/models/OrderEmail';
 import { deleteOrderFromAppSheet, syncPaymentToAppSheet, syncOrderLineItemToAppSheet } from '@/lib/appsheet';
 import { processEmailInBackground } from '@/app/api/sales/orders/[id]/emails/route';
+import { getSessionFieldMap, applyOrderFieldGuard } from '@/lib/workspace-field-guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -263,6 +264,16 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
             order.lineItems = await enrichLineItemsWithCost(order.lineItems);
         }
 
+        // ── Server-side field security: strip fields hidden by workspace permissions ────────
+        const [orderFieldMap, lineItemFieldMap] = await Promise.all([
+            getSessionFieldMap(request, 'wholesale-orders'),
+            getSessionFieldMap(request, 'wo-lineitems'),
+        ]);
+        if (orderFieldMap || lineItemFieldMap) {
+            order = applyOrderFieldGuard(order, orderFieldMap || {}, lineItemFieldMap || {});
+        }
+        // ────────────────────────────────────────────────────────────────────
+
         return NextResponse.json(order);
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });
@@ -275,26 +286,30 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         const { id } = await context.params;
         const body = await request.json();
 
-        // Capture existing data before update (for detecting new/deleted items)
+        // Extract userId passed from client (strip before saving to $set)
+        const actingUserId: string = body._userId || 'unknown';
+        delete body._userId;
+
+        // Capture existing data before update (for detecting new/deleted items and diffing)
         let existingPaymentIds: string[] = [];
         let existingPayments: any[] = [];
         let existingLineItemIds: string[] = [];
         let existingLineItems: any[] = [];
         let existingOrderData: any = null;
 
-        const needsSnapshot = (body.payments && Array.isArray(body.payments)) || (body.lineItems && Array.isArray(body.lineItems)) || ('orderStatus' in body);
-        if (needsSnapshot) {
-            const existingOrder = await SaleOrder.findById(id).select('payments lineItems label legacyId orderStatus').lean() as any;
-            if (existingOrder) {
-                existingOrderData = existingOrder;
-                if (existingOrder.payments) {
-                    existingPaymentIds = existingOrder.payments.map((p: any) => p._id?.toString());
-                    existingPayments = existingOrder.payments;
-                }
-                if (existingOrder.lineItems) {
-                    existingLineItemIds = existingOrder.lineItems.map((li: any) => li._id?.toString());
-                    existingLineItems = existingOrder.lineItems;
-                }
+        // Always snapshot so we can build the audit diff
+        const existingOrder = await SaleOrder.findById(id)
+            .select('payments lineItems label legacyId orderStatus paymentMethod shippingMethod trackingNumber shippingCost tax discount shippedDate shippingAddress city state salesRep')
+            .lean() as any;
+        if (existingOrder) {
+            existingOrderData = existingOrder;
+            if (existingOrder.payments) {
+                existingPaymentIds = existingOrder.payments.map((p: any) => p._id?.toString());
+                existingPayments = existingOrder.payments;
+            }
+            if (existingOrder.lineItems) {
+                existingLineItemIds = existingOrder.lineItems.map((li: any) => li._id?.toString());
+                existingLineItems = existingOrder.lineItems;
             }
         }
 
@@ -340,6 +355,86 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         if (!updatedOrder) {
             return NextResponse.json({ error: 'Order not found' }, { status: 404 });
         }
+
+        // ─── Audit Log ──────────────────────────────────────────────────────────
+        const auditEntries: any[] = [];
+        const now = new Date();
+
+        // 1. Diff scalar header fields
+        const SCALAR_FIELDS = [
+            'orderStatus', 'paymentMethod', 'shippingMethod', 'trackingNumber',
+            'shippingCost', 'tax', 'discount', 'shippedDate',
+            'shippingAddress', 'city', 'state', 'salesRep'
+        ];
+        if (existingOrderData) {
+            for (const field of SCALAR_FIELDS) {
+                if (field in body) {
+                    const from = existingOrderData[field] ?? null;
+                    const to = body[field] ?? null;
+                    // Compare as strings to handle Date vs string
+                    if (String(from) !== String(to)) {
+                        auditEntries.push({ userId: actingUserId, timestamp: now, field, from, to });
+                    }
+                }
+            }
+        }
+
+        // 2. Diff lineItems (bulk snapshot: before vs after)
+        if (body.lineItems && Array.isArray(body.lineItems) && existingOrderData) {
+            // Sanitise for storage: strip internal _ids that were client-generated temps
+            const cleanBefore = existingLineItems.map((li: any) => ({
+                _id: li._id?.toString(),
+                sku: li.sku?.toString(),
+                lotNumber: li.lotNumber,
+                qtyShipped: li.qtyShipped,
+                price: li.price,
+                uom: li.uom,
+                productDescription: li.productDescription,
+            }));
+            const cleanAfter = (updatedOrder.lineItems || []).map((li: any) => ({
+                _id: li._id?.toString(),
+                sku: (li.sku?._id || li.sku)?.toString(),
+                lotNumber: li.lotNumber,
+                qtyShipped: li.qtyShipped,
+                price: li.price,
+                uom: li.uom,
+                productDescription: li.productDescription,
+            }));
+            if (JSON.stringify(cleanBefore) !== JSON.stringify(cleanAfter)) {
+                auditEntries.push({ userId: actingUserId, timestamp: now, field: 'lineItems', from: cleanBefore, to: cleanAfter });
+            }
+        }
+
+        // 3. Diff payments (bulk snapshot: before vs after)
+        if (body.payments && Array.isArray(body.payments) && existingOrderData) {
+            const cleanBefore = existingPayments.map((p: any) => ({
+                _id: p._id?.toString(),
+                paymentAmount: p.paymentAmount,
+                createdBy: p.createdBy,
+                createdAt: p.createdAt,
+            }));
+            const cleanAfter = (updatedOrder.payments || []).map((p: any) => ({
+                _id: p._id?.toString(),
+                paymentAmount: p.paymentAmount,
+                createdBy: p.createdBy,
+                createdAt: p.createdAt,
+            }));
+            if (JSON.stringify(cleanBefore) !== JSON.stringify(cleanAfter)) {
+                auditEntries.push({ userId: actingUserId, timestamp: now, field: 'payments', from: cleanBefore, to: cleanAfter });
+            }
+        }
+
+        // Persist audit entries (non-blocking, best-effort)
+        if (auditEntries.length > 0) {
+            SaleOrder.findByIdAndUpdate(id, { $push: { auditLog: { $each: auditEntries } } }).exec().catch(
+                (err: any) => console.error('Audit log write failed:', err)
+            );
+            // Also inject into the response so the UI reflects immediately
+            updatedOrder.auditLog = [...(updatedOrder.auditLog || []), ...auditEntries].sort(
+                (a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+            );
+        }
+        // ────────────────────────────────────────────────────────────────────────
 
         if (updatedOrder.lineItems && Array.isArray(updatedOrder.lineItems)) {
             updatedOrder.lineItems = await enrichLineItemsWithCost(updatedOrder.lineItems);
@@ -645,6 +740,16 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
                 });
             }
         }
+
+        // ── Server-side field security: strip fields hidden by workspace permissions ────────
+        const [patchOrderFieldMap, patchLineItemFieldMap] = await Promise.all([
+            getSessionFieldMap(request, 'wholesale-orders'),
+            getSessionFieldMap(request, 'wo-lineitems'),
+        ]);
+        if (patchOrderFieldMap || patchLineItemFieldMap) {
+            applyOrderFieldGuard(updatedOrder, patchOrderFieldMap || {}, patchLineItemFieldMap || {});
+        }
+        // ────────────────────────────────────────────────────────────────────
 
         return NextResponse.json(updatedOrder);
     } catch (error: any) {

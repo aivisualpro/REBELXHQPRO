@@ -85,6 +85,14 @@ interface SaleOrder {
     lineItems?: LineItem[];
     payments?: Payment[];
     notes?: Note[];
+    auditLog?: {
+        _id?: string;
+        userId: string;
+        timestamp: string;
+        field: string;
+        from: any;
+        to: any;
+    }[];
 }
 
 const PAYMENT_METHODS = [
@@ -123,15 +131,15 @@ const UOM_OPTIONS = [
     { label: 'Lb', value: 'Lb' },
 ];
 
-const TABS = ['Line Items', 'Payments', 'Notes', 'Emails'] as const;
+const TABS = ['Line Items', 'Payments', 'Notes', 'Emails', 'History'] as const;
 type TabType = typeof TABS[number];
 
 // Tab slug <-> display name mapping
 const ORDER_TAB_SLUGS: Record<string, TabType> = {
-    'line-items': 'Line Items', payments: 'Payments', notes: 'Notes', emails: 'Emails',
+    'line-items': 'Line Items', payments: 'Payments', notes: 'Notes', emails: 'Emails', history: 'History',
 };
 const ORDER_TAB_TO_SLUG: Record<string, string> = {
-    'Line Items': 'line-items', Payments: 'payments', Notes: 'notes', Emails: 'emails',
+    'Line Items': 'line-items', Payments: 'payments', Notes: 'notes', Emails: 'emails', History: 'history',
 };
 
 export default function SaleOrderDetailPage() {
@@ -391,6 +399,14 @@ export default function SaleOrderDetailPage() {
         }
     };
 
+    // ─── Helper: PATCH order with auto-injected userId for audit log ──────────
+    const patchOrder = (orderId: string, payload: Record<string, any>) =>
+        fetch(`/api/wholesale/orders/${orderId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...payload, _userId: session?.user?.email || 'unknown' }),
+        });
+
     const handleStatusChange = async (newStatus: string) => {
         if (!order) return;
         // Optimistic: update UI instantly
@@ -399,11 +415,7 @@ export default function SaleOrderDetailPage() {
         toast.success('Status updated');
 
         // Background: persist to server
-        fetch(`/api/wholesale/orders/${order._id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ orderStatus: newStatus })
-        }).then(res => {
+        patchOrder(order._id, { orderStatus: newStatus }).then(res => {
             if (res.ok) {
                 res.json().then(data => setOrder(data));
             } else {
@@ -447,7 +459,7 @@ export default function SaleOrderDetailPage() {
         fetch(`/api/wholesale/orders/${order._id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            body: JSON.stringify({ ...payload, _userId: session?.user?.email || 'unknown' })
         }).then(res => {
             if (res.ok) {
                 res.json().then(data => setOrder(data));
@@ -480,15 +492,11 @@ export default function SaleOrderDetailPage() {
         setOrder({ ...order, lineItems: updatedItems });
         toast.success('Line duplicated — set qty & lot');
 
-        fetch(`/api/wholesale/orders/${order._id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                lineItems: updatedItems.map(i => ({
-                    ...i,
-                    sku: (typeof i.sku === 'object' && i.sku !== null) ? i.sku._id : i.sku
-                }))
-            })
+        patchOrder(order._id, {
+            lineItems: updatedItems.map(i => ({
+                ...i,
+                sku: (typeof i.sku === 'object' && i.sku !== null) ? i.sku._id : i.sku
+            }))
         }).then(res => {
             if (res.ok) { res.json().then(data => setOrder(data)); }
             else { setOrder(previousOrder); toast.error('Failed to duplicate — reverted'); }
@@ -526,7 +534,7 @@ export default function SaleOrderDetailPage() {
                             fetch(`/api/wholesale/orders/${order._id}`, {
                                 method: 'PATCH',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ lineItems: updatedItems })
+                                body: JSON.stringify({ lineItems: updatedItems, _userId: session?.user?.email || 'unknown' })
                             }).then(res => {
                                 if (res.ok) {
                                     res.json().then(data => setOrder(data));
@@ -578,11 +586,7 @@ export default function SaleOrderDetailPage() {
                 : { ...item, sku: (item.sku && typeof item.sku === 'object') ? item.sku._id : item.sku }
         ) || [];
 
-        fetch(`/api/wholesale/orders/${order._id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ lineItems: payloadItems })
-        }).then(res => {
+        patchOrder(order._id, { lineItems: payloadItems }).then(res => {
             if (res.ok) {
                 res.json().then(data => setOrder(data));
             } else {
@@ -621,11 +625,7 @@ export default function SaleOrderDetailPage() {
         toast.success(isEdit ? 'Payment updated' : 'Payment added');
 
         // Background: persist to server
-        fetch(`/api/wholesale/orders/${order._id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ payments: updatedPayments })
-        }).then(res => {
+        patchOrder(order._id, { payments: updatedPayments }).then(res => {
             if (res.ok) {
                 res.json().then(data => setOrder(data));
             } else {
@@ -656,11 +656,7 @@ export default function SaleOrderDetailPage() {
                             toast.dismiss(t.id);
                             const updatedPayments = order.payments?.filter(p => p._id !== paymentId) || [];
                             try {
-                                const res = await fetch(`/api/wholesale/orders/${order._id}`, {
-                                    method: 'PATCH',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ payments: updatedPayments })
-                                });
+                                const res = await patchOrder(order._id, { payments: updatedPayments });
                                 if (res.ok) {
                                     const data = await res.json();
                                     setOrder(data);
@@ -689,11 +685,7 @@ export default function SaleOrderDetailPage() {
         toast.success('Order details updated');
 
         // Background: persist to server
-        fetch(`/api/wholesale/orders/${order._id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(editingHeader)
-        }).then(res => {
+        patchOrder(order._id, editingHeader).then(res => {
             if (res.ok) {
                 res.json().then(data => setOrder(data));
             } else {
@@ -751,15 +743,11 @@ export default function SaleOrderDetailPage() {
         if (changedCount > 0) {
             setRefreshProgress('Saving changes...');
             try {
-                const res = await fetch(`/api/wholesale/orders/${order._id}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        lineItems: updatedItems.map(i => ({
-                            ...i,
-                            sku: (typeof i.sku === 'object' && i.sku !== null) ? i.sku._id : i.sku
-                        }))
-                    })
+                const res = await patchOrder(order._id, {
+                    lineItems: updatedItems.map(i => ({
+                        ...i,
+                        sku: (typeof i.sku === 'object' && i.sku !== null) ? i.sku._id : i.sku
+                    }))
                 });
                 if (res.ok) {
                     const data = await res.json();
@@ -1621,11 +1609,7 @@ export default function SaleOrderDetailPage() {
                                                                                 toast.dismiss(t.id);
                                                                                 try {
                                                                                     const updatedNotes = order.notes?.filter(n => n._id !== note._id) || [];
-                                                                                    const res = await fetch(`/api/wholesale/orders/${order._id}`, {
-                                                                                        method: 'PATCH',
-                                                                                        headers: { 'Content-Type': 'application/json' },
-                                                                                        body: JSON.stringify({ notes: updatedNotes })
-                                                                                    });
+                                                                                    const res = await patchOrder(order._id, { notes: updatedNotes });
                                                                                     if (res.ok) {
                                                                                         const data = await res.json();
                                                                                         setOrder(data);
@@ -1665,6 +1649,102 @@ export default function SaleOrderDetailPage() {
                                 client={typeof order.clientId === 'object' && order.clientId ? order.clientId as any : null}
                             />
                         </div>
+
+                        {/* History Tab */}
+                        {activeTab === 'History' && (
+                            <div className="flex-1 overflow-y-auto p-4">
+                                {(!order.auditLog || order.auditLog.length === 0) ? (
+                                    <div className="flex flex-col items-center justify-center py-16 gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
+                                            <List className="w-5 h-5 text-muted-foreground" />
+                                        </div>
+                                        <p className="text-sm text-muted-foreground font-medium">No changes recorded yet</p>
+                                        <p className="text-xs text-muted-foreground/60">Changes will appear here after the order is edited</p>
+                                    </div>
+                                ) : (
+                                    <div className="relative">
+                                        {/* Timeline line */}
+                                        <div className="absolute left-[15px] top-0 bottom-0 w-px bg-border" />
+                                        <div className="space-y-0">
+                                            {[...(order.auditLog || [])].reverse().map((entry, idx) => {
+                                                const isArrayField = entry.field === 'lineItems' || entry.field === 'payments' || entry.field === 'notes';
+                                                const fieldLabel = entry.field === 'orderStatus' ? 'Status'
+                                                    : entry.field === 'paymentMethod' ? 'Payment Method'
+                                                    : entry.field === 'shippingMethod' ? 'Ship Via'
+                                                    : entry.field === 'trackingNumber' ? 'Tracking #'
+                                                    : entry.field === 'shippingCost' ? 'Shipping Cost'
+                                                    : entry.field === 'shippedDate' ? 'Shipped Date'
+                                                    : entry.field === 'shippingAddress' ? 'Ship Address'
+                                                    : entry.field === 'salesRep' ? 'Sales Rep'
+                                                    : entry.field === 'lineItems' ? 'Line Items'
+                                                    : entry.field === 'payments' ? 'Payments'
+                                                    : entry.field === 'notes' ? 'Notes'
+                                                    : entry.field;
+
+                                                const dotColor = entry.field === 'orderStatus' ? 'bg-violet-500'
+                                                    : entry.field === 'lineItems' ? 'bg-sky-500'
+                                                    : entry.field === 'payments' ? 'bg-amber-500'
+                                                    : 'bg-border';
+
+                                                const renderArrayDiff = (from: any[], to: any[]) => {
+                                                    const fromLen = Array.isArray(from) ? from.length : 0;
+                                                    const toLen = Array.isArray(to) ? to.length : 0;
+                                                    const added = toLen - fromLen;
+                                                    if (added > 0) return <span className="text-emerald-500">+{added} added</span>;
+                                                    if (added < 0) return <span className="text-red-500">{added} removed</span>;
+                                                    return <span className="text-sky-400">modified</span>;
+                                                };
+
+                                                return (
+                                                    <div key={entry._id || idx} className="relative pl-9 pb-4">
+                                                        {/* Dot */}
+                                                        <div className={`absolute left-[10px] top-[14px] w-[11px] h-[11px] rounded-full border-2 border-background ${dotColor}`} />
+
+                                                        <div className="bg-secondary border border-border rounded-md p-3">
+                                                            {/* Header row */}
+                                                            <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground border border-border px-1.5 py-0.5 rounded">
+                                                                        {fieldLabel}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                                                                    <User className="w-3 h-3 shrink-0" />
+                                                                    <span className="font-medium truncate max-w-[120px]">{entry.userId}</span>
+                                                                    <span>·</span>
+                                                                    <span>{new Date(entry.timestamp).toLocaleDateString()} {new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Diff */}
+                                                            {isArrayField ? (
+                                                                <div className="text-xs font-medium">
+                                                                    {renderArrayDiff(entry.from, entry.to)}
+                                                                    <span className="text-muted-foreground ml-1">
+                                                                        ({Array.isArray(entry.from) ? entry.from.length : 0} → {Array.isArray(entry.to) ? entry.to.length : 0} items)
+                                                                    </span>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex items-center gap-2 text-xs flex-wrap">
+                                                                    <span className="bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-0.5 rounded font-mono max-w-[150px] truncate">
+                                                                        {String(entry.from ?? '—')}
+                                                                    </span>
+                                                                    <span className="text-muted-foreground shrink-0">→</span>
+                                                                    <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-mono max-w-[150px] truncate">
+                                                                        {String(entry.to ?? '—')}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                     </div>
                 </div>
             </div>
@@ -2135,11 +2215,7 @@ export default function SaleOrderDetailPage() {
                                             createdAt: new Date().toISOString()
                                         };
                                         const updatedNotes = [...(order.notes || []), newNote];
-                                        const res = await fetch(`/api/wholesale/orders/${order._id}`, {
-                                            method: 'PATCH',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({ notes: updatedNotes })
-                                        });
+                                        const res = await patchOrder(order._id, { notes: updatedNotes });
                                         if (res.ok) {
                                             const data = await res.json();
                                             setOrder(data);

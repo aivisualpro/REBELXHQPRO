@@ -1,4 +1,4 @@
-import { NextResponse, after } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import SaleOrder from '@/models/SaleOrder';
 import Counter from '@/models/Counter';
@@ -9,6 +9,7 @@ import { applyDateFilter } from '@/lib/global-settings';
 import { syncOrderToAppSheet } from '@/lib/appsheet';
 import { buildFuzzySearchQuery, buildFuzzyRegex } from '@/lib/fuzzy-search';
 import mongoose from 'mongoose';
+import { getSessionFieldMap, applyOrderFieldGuard } from '@/lib/workspace-field-guard';
 
 /**
  * Atomically generates the next sale order label.
@@ -46,7 +47,7 @@ async function getNextOrderLabel(): Promise<string> {
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
     try {
         await dbConnect();
         void Sku;
@@ -231,6 +232,17 @@ export async function GET(request: Request) {
                 { path: 'lineItems.sku', select: 'name' }
             ]);
 
+            // ── Field guard: strip workspace-hidden fields from each order ──
+            const [listOrderFM, listLineItemFM] = await Promise.all([
+                getSessionFieldMap(request, 'wholesale-orders'),
+                getSessionFieldMap(request, 'wo-lineitems'),
+            ]);
+            if (listOrderFM || listLineItemFM) {
+                orders = orders.map((o: any) =>
+                    applyOrderFieldGuard(o, listOrderFM || {}, listLineItemFM || {})
+                );
+            }
+
             return NextResponse.json({
                 orders,
                 total: countResult,
@@ -252,8 +264,20 @@ export async function GET(request: Request) {
                 .lean()
         ]);
 
+        // ── Field guard: strip workspace-hidden fields from each order ──
+        const [listOrderFM2, listLineItemFM2] = await Promise.all([
+            getSessionFieldMap(request, 'wholesale-orders'),
+            getSessionFieldMap(request, 'wo-lineitems'),
+        ]);
+        let guardedOrders: any[] = orders as any[];
+        if (listOrderFM2 || listLineItemFM2) {
+            guardedOrders = guardedOrders.map((o: any) =>
+                applyOrderFieldGuard(o, listOrderFM2 || {}, listLineItemFM2 || {})
+            );
+        }
+
         return NextResponse.json({
-            orders,
+            orders: guardedOrders,
             total,
             page,
             hasMore: page * limit < total,
