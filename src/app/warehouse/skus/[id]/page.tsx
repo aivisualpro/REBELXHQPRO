@@ -1564,7 +1564,7 @@ function SkuDetailsPageContent() {
                                             "text-xs font-mono font-black px-2 py-0.5 rounded",
                                             (isPendingProduction(tx) || isUnfulfilledConsumption(tx) || isPendingOrder(tx) || isTrashedMfg(tx) || isPendingWebOrder(tx)) ? "text-white bg-amber-600 dark:bg-amber-700 line-through" :
                                                 tx.quantity > 0 ? "text-white bg-emerald-600 dark:bg-emerald-700" : "text-white bg-rose-600 dark:bg-rose-700"
-                                        )}>{tx.quantity > 0 ? '+' : ''}{tx.quantity}</span>
+                                        )}>{tx.quantity > 0 ? '+' : ''}{Math.round(tx.quantity)}</span>
                                     </td>
                                     <td className="px-3 py-3">
                                         {tx.status ? (() => {
